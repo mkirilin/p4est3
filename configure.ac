@@ -37,12 +37,12 @@ echo "| Checking MPI and related programs"
 echo "o---------------------------------------"
 
 dnl A nonempty second/third argument causes to enable F77+F90/CXX, respectively.
-SC_MPI_CONFIG([P4EST], [yes], [yes])
+SC_MPI_CONFIG([P4EST], [], [])
 SC_MPI_ENGAGE([P4EST])
 # This is needed for compatibility with automake >= 1.12
 m4_ifdef([AM_PROG_AR],[AM_PROG_AR])
 SC_PROG_LINT
-SC_C_VERSION
+dnl SC_C_VERSION
 LT_INIT
 
 echo "o---------------------------------------"
@@ -61,8 +61,6 @@ AC_CHECK_HEADERS([arpa/inet.h netinet/in.h unistd.h])
 echo "o---------------------------------------"
 echo "| Checking functions"
 echo "o---------------------------------------"
-
-AC_CHECK_FUNCS([fsync])
 
 echo "o---------------------------------------"
 echo "| Checking subpackages"
@@ -94,6 +92,7 @@ dnl echo "| C_VERSION:   $C_VERSION"
 echo "| CFLAGS:      $CFLAGS"
 echo "| LDFLAGS:     $LDFLAGS"
 echo "| LIBS:        $LIBS"
+echo "| TESTS:       $P4EST_MPIRUN $P4EST_MPI_TEST_FLAGS"
 echo "o----------------------------------"
 
 # Create output files.
