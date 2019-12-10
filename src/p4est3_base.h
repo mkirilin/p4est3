@@ -1,5 +1,5 @@
 /*
-  This file is part of p4est, version 3
+  This file is part of p4est, version 3.
   p4est is a C library to manage a collection (a forest) of multiple
   connected adaptive quadtrees or octrees in parallel.
 
@@ -21,14 +21,29 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#include <p4est3.h>
+#ifndef P4EST3_BASE_H
+#define P4EST3_BASE_H
 
-struct p4est3
-{
-  /* ... */
-};
+#include <sc3_alloc.h>
+#include <stdint.h>
 
-struct p4est3_connectivity
+#ifdef __cplusplus
+extern              "C"
 {
-  /* ... */
-};
+#if 0
+}
+#endif
+#endif
+
+typedef int         p4est3_topidx;
+typedef int         p4est3_locidx;
+typedef long        p4est3_gloidx;
+
+#ifdef __cplusplus
+#if 0
+{
+#endif
+}
+#endif
+
+#endif /* !P4EST3_BASE_H */

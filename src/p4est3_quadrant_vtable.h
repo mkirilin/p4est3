@@ -1,11 +1,10 @@
 /*
-  This file is part of p4est.
+  This file is part of p4est, version 3.
   p4est is a C library to manage a collection (a forest) of multiple
   connected adaptive quadtrees or octrees in parallel.
 
-  Copyright (C) 2010 The University of Texas System
-  Additional copyright (C) 2011 individual authors
-  Written by Carsten Burstedde, Lucas C. Wilcox, and Tobin Isaac
+  Copyright (C) 2019 individual authors
+  Originally written by Carsten Burstedde, Lucas C. Wilcox, and Tobin Isaac
 
   p4est is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -25,17 +24,24 @@
 #ifndef P4EST3_QUADRANT_VTABLE
 #define P4EST3_QUADRANT_VTABLE
 
-#include <p4est_base.h>
+#include <p4est3_base.h>
 
-SC_EXTERN_C_BEGIN;
+#ifdef __cplusplus
+extern              "C"
+{
+#if 0
+}
+#endif
+#endif
 
 /* *INDENT-OFF* */
 typedef size_t      (*p4est3_quadrant_size_t) (void);
-typedef void        (*p4est3_quadrant_out_t) (void *r);
-typedef void        (*p4est3_quadrant_in_out_t) (const void *q, void *r);
+typedef int         (*p4est3_quadrant_is_valid_t) (const void * q);
+typedef sc3_error_t *(*p4est3_quadrant_out_t) (void *r);
+typedef sc3_error_t *(*p4est3_quadrant_in_out_t) (const void *q, void *r);
 
 typedef p4est3_quadrant_out_t p4est3_quadrant_root_t;
-typedef void        (*p4est3_quadrant_child_t) (const void *q, void *r,
+typedef sc3_error_t *(*p4est3_quadrant_child_t) (const void *q, void *r,
                                                 int i);
 typedef p4est3_quadrant_in_out_t p4est3_quadrant_parent_t;
 typedef p4est3_quadrant_in_out_t p4est3_quadrant_successor_t;
@@ -45,6 +51,7 @@ typedef p4est3_quadrant_in_out_t p4est3_quadrant_predecessor_t;
 typedef struct p4est3_quadrant_vtable
 {
   p4est3_quadrant_size_t quadrant_size;
+  p4est3_quadrant_is_valid_t quadrant_is_valid;
   p4est3_quadrant_root_t quadrant_root;
   p4est3_quadrant_child_t quadrant_child;
   p4est3_quadrant_parent_t quadrant_parent;
@@ -53,17 +60,21 @@ typedef struct p4est3_quadrant_vtable
 }
 p4est3_quadrant_vtable_t;
 
-void                p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t *
-                                                  qvt);
-
 size_t              p4est3_quadrant_size (p4est3_quadrant_vtable_t * qvt);
-void                p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt,
-                                          void *q);
-void                p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
+int                 p4est3_quadrant_is_valid (p4est3_quadrant_vtable_t * qvt,
+                                              const void *q);
+sc3_error_t        *p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt,
+                                          void *r);
+sc3_error_t        *p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
                                            const void *q, void *r, int i);
-void                p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
                                             const void *q, void *r);
 
-SC_EXTERN_C_END;
+#ifdef __cplusplus
+#if 0
+{
+#endif
+}
+#endif
 
 #endif /* !P4EST3_QUADRANT_VTABLE */
