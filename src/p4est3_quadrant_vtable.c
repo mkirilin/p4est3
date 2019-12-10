@@ -44,7 +44,7 @@ p4est3_quadrant_is_valid (p4est3_quadrant_vtable_t * qvt, const void *q)
 sc3_error_t        *
 p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt, void *r)
 {
-  SC3A_CHECK (qvt != NULL && qvt->quadrant_root != NULL);
+  P3A_CHECK (qvt != NULL && qvt->quadrant_root != NULL);
 
   return qvt->quadrant_root (r);
 }
@@ -53,7 +53,7 @@ sc3_error_t        *
 p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
                        const void *q, void *r, int i)
 {
-  SC3A_CHECK (qvt != NULL && qvt->quadrant_child != NULL);
+  P3A_CHECK (qvt != NULL && qvt->quadrant_child != NULL);
 
   return qvt->quadrant_child (q, r, i);
 }
@@ -62,7 +62,7 @@ sc3_error_t        *
 p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
                         const void *q, void *r)
 {
-  SC3A_CHECK (qvt != NULL && qvt->quadrant_parent != NULL);
+  P3A_CHECK (qvt != NULL && qvt->quadrant_parent != NULL);
 
   return qvt->quadrant_parent (q, r);
 }

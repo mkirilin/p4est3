@@ -25,6 +25,7 @@
 #define P4EST3_BASE_H
 
 #include <sc3_alloc.h>
+#include <sc3_error.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -34,6 +35,11 @@ extern              "C"
 }
 #endif
 #endif
+
+#define P3A_CHECK(x) SC3A_CHECK (x)
+#define P3A_STACK(x) SC3A_STACK (x)
+#define P3E(f) SC3E (f)
+#define P3E_DEMAND(f) SC3E_DEMAND (f)
 
 typedef int         p4est3_topidx;
 typedef int         p4est3_locidx;
