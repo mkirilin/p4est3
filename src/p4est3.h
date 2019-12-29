@@ -24,7 +24,7 @@
 #ifndef P4EST3_H
 #define P4EST3_H
 
-#include <sc.h>
+#include <sc3_mpi.h>
 #include <p4est3_base.h>
 #include <p4est3_quadrant_vtable.h>
 
@@ -74,8 +74,8 @@ sc3_error_t        *p4est3_args_new (sc3_allocator_t * alloc,
 sc3_error_t        *p4est3_args_destroy (p4est3_args_t ** argsp);
 
 sc3_error_t        *p4est3_args_set_comm (p4est3_args_t * args,
-                                          sc_MPI_Comm comm);
-sc3_error_t        *p4est3_args_set_vtable (p4est3_quadrant_vtable_t *qvt);
+                                          sc3_MPI_Comm_t comm, int dup);
+sc3_error_t        *p4est3_args_set_vtable (p4est3_quadrant_vtable_t * qvt);
 sc3_error_t        *p4est3_args_set_level (p4est3_args_t * args, int level);
 
 sc3_error_t        *p4est3_new (p4est3_args_t ** argsp, p4est3_t ** pp);
