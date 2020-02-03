@@ -17,7 +17,7 @@ libp4est_installed_headers += \
         src/p4est_iterate.h src/p4est_lnodes.h src/p4est_mesh.h \
         src/p4est_balance.h src/p4est_io.h \
         src/p4est_wrap.h src/p4est_plex.h \
-        src/p4est_empty.h src/p4est_p4est3.h \
+        src/p4est_empty.h src/p4est_p4est3.h src/p4est3_internal.h \
         src/p4est3_base.h src/p4est3.h src/p4est3_quadrant_vtable.h
 libp4est_compiled_sources += \
         src/p4est_connectivity.c src/p4est.c \

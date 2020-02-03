@@ -21,11 +21,27 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P4EST3_BASE_H
-#define P4EST3_BASE_H
+#ifndef P4EST3_INTERNAL_H
+#define P4EST3_INTERNAL_H
 
-#include <sc3_alloc.h>
-#include <sc3_error.h>
+#include <p4est3.h>
+#include <sc3_refcount.h>
+
+struct p4est3
+{
+  sc3_refcount_t      rc;
+  sc3_allocator_t    *alloc;
+  int                 setup;
+
+  sc3_MPI_Comm_t      mpicomm;
+  int                 commdup;
+  int                 mpisize;
+  int                 mpirank;
+
+  p4est3_quadrant_vtable_t *qvt;
+  p4est3_topidx       num_trees;
+  int                 level;
+};
 
 #ifdef __cplusplus
 extern              "C"
@@ -35,15 +51,6 @@ extern              "C"
 #endif
 #endif
 
-#define P3A_CHECK(x) SC3A_CHECK (x)
-#define P3A_STACK(x) SC3A_STACK (x)
-#define P3E(f) SC3E (f)
-#define P3E_DEMAND(f) SC3E_DEMAND (f)
-
-typedef int         p4est3_topidx;
-typedef int         p4est3_locidx;
-typedef long        p4est3_gloidx;
-
 #ifdef __cplusplus
 #if 0
 {
@@ -51,4 +58,4 @@ typedef long        p4est3_gloidx;
 }
 #endif
 
-#endif /* !P4EST3_BASE_H */
+#endif /* !P4EST3_INTERNAL_H */

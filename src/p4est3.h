@@ -36,6 +36,8 @@ extern              "C"
 #endif
 #endif
 
+/* TODO make dimension a run-time parameter / member of qvt? */
+
 /** In the 2D implementation, this is the number of a quadrant's children. */
 #define P4EST3_CHILDREN 4
 
@@ -63,25 +65,29 @@ void                p4est3_connectivity_destroy (p4est3_connectivity_t ** c3);
 
 /*------------------------- the p4est object -------------------------*/
 
-typedef struct p4est3_args p4est3_args_t;
 typedef struct p4est3 p4est3_t;
 
-/* p4est construction attributes: set minlevel, user data size, etc. */
-/* While we're not ready defining the connectivity, assume the unit cube. */
+/* p4est construction parameters: connectivity, uniform level, etc. */
+/* While we're not ready defining the connectivity, use abstract trees. */
 
-sc3_error_t        *p4est3_args_new (sc3_allocator_t * alloc,
-                                     p4est3_args_t ** argsp);
-sc3_error_t        *p4est3_args_destroy (p4est3_args_t ** argsp);
+int                 p4est3_is_valid (p4est3_t * p3, char *reason);
+int                 p4est3_is_new (p4est3_t * p3, char *reason);
+int                 p4est3_is_setup (p4est3_t * p3, char *reason);
 
-sc3_error_t        *p4est3_args_set_comm (p4est3_args_t * args,
-                                          sc3_MPI_Comm_t comm, int dup);
-sc3_error_t        *p4est3_args_set_vtable (p4est3_quadrant_vtable_t * qvt);
-sc3_error_t        *p4est3_args_set_level (p4est3_args_t * args, int level);
+sc3_error_t        *p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3);
 
-sc3_error_t        *p4est3_new (p4est3_args_t ** argsp, p4est3_t ** pp);
-sc3_error_t        *p4est3_ref (p4est3_t * p);
-sc3_error_t        *p4est3_unref (p4est3_t ** p);
-sc3_error_t        *p4est3_destroy (p4est3_t ** pp);
+sc3_error_t        *p4est3_set_comm (p4est3_t * p3,
+                                     sc3_MPI_Comm_t comm, int dup);
+sc3_error_t        *p4est3_set_vtable (p4est3_t * p3,
+                                       p4est3_quadrant_vtable_t * qvt);
+sc3_error_t        *p4est3_set_num_trees (p4est3_t * p3,
+                                          p4est3_topidx num_trees);
+sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
+sc3_error_t        *p4est3_setup (p4est3_t * p3);
+
+sc3_error_t        *p4est3_ref (p4est3_t * p3);
+sc3_error_t        *p4est3_unref (p4est3_t ** pp3);
+sc3_error_t        *p4est3_destroy (p4est3_t ** pp3);
 
 /*----------------------- accessing quadrants ------------------------*/
 
