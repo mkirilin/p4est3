@@ -25,10 +25,29 @@
 #include <p4est_bits.h>
 #include <p4est_p4est3.h>
 
+static int
+p4est_vtable_max_level (void)
+{
+  return P4EST_QMAXLEVEL;
+}
+
+static int
+p4est_vtable_num_children (void)
+{
+  return P4EST_CHILDREN;
+}
+
 static              size_t
 p4est_quadrant_vtable_size (void)
 {
   return sizeof (p4est_quadrant_t);
+}
+
+static int
+p4est_quadrant_vtable_is_valid (const void *q, char *reason)
+{
+  SC3E_TEST (p4est_quadrant_is_valid ((p4est_quadrant_t *) q), reason);
+  SC3E_YES (reason);
 }
 
 static sc3_error_t *
@@ -60,9 +79,10 @@ p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt)
   if (qvt == NULL) {
     return;
   }
+  qvt->max_level = p4est_vtable_max_level;
+  qvt->num_children = p4est_vtable_num_children;
   qvt->quadrant_size = p4est_quadrant_vtable_size;
-  qvt->quadrant_is_valid =
-    (p4est3_quadrant_is_valid_t) p4est_quadrant_is_valid;
+  qvt->quadrant_is_valid = p4est_quadrant_vtable_is_valid;
   qvt->quadrant_root = p4est_quadrant_vtable_root;
   qvt->quadrant_child = p4est_quadrant_vtable_child;
   qvt->quadrant_parent = p4est_quadrant_vtable_parent;

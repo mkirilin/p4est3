@@ -35,8 +35,9 @@ extern              "C"
 #endif
 
 /* *INDENT-OFF* */
+typedef int         (*p4est3_quadrant_int_t) (void);
 typedef size_t      (*p4est3_quadrant_size_t) (void);
-typedef int         (*p4est3_quadrant_is_valid_t) (const void * q);
+typedef int         (*p4est3_quadrant_is_t) (const void * q, char *reason);
 typedef sc3_error_t *(*p4est3_quadrant_out_t) (void *r);
 typedef sc3_error_t *(*p4est3_quadrant_in_out_t) (const void *q, void *r);
 
@@ -50,8 +51,10 @@ typedef p4est3_quadrant_in_out_t p4est3_quadrant_predecessor_t;
 
 typedef struct p4est3_quadrant_vtable
 {
+  p4est3_quadrant_int_t max_level;
+  p4est3_quadrant_int_t num_children;
   p4est3_quadrant_size_t quadrant_size;
-  p4est3_quadrant_is_valid_t quadrant_is_valid;
+  p4est3_quadrant_is_t quadrant_is_valid;
   p4est3_quadrant_root_t quadrant_root;
   p4est3_quadrant_child_t quadrant_child;
   p4est3_quadrant_parent_t quadrant_parent;
@@ -60,9 +63,11 @@ typedef struct p4est3_quadrant_vtable
 }
 p4est3_quadrant_vtable_t;
 
+int                 p4est3_max_level (p4est3_quadrant_vtable_t * qvt);
+int                 p4est3_num_children (p4est3_quadrant_vtable_t * qvt);
 size_t              p4est3_quadrant_size (p4est3_quadrant_vtable_t * qvt);
 int                 p4est3_quadrant_is_valid (p4est3_quadrant_vtable_t * qvt,
-                                              const void *q);
+                                              const void *q, char *reason);
 sc3_error_t        *p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt,
                                           void *r);
 sc3_error_t        *p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
