@@ -37,6 +37,10 @@ struct p4est3
   int                 commdup;
   int                 mpisize;
   int                 mpirank;
+  int                 num_nodes;
+  int                 node_num;
+  int                *node_sizes;
+  int                *node_offsets;
 
   p4est3_quadrant_vtable_t *qvt;
   p4est3_topidx       num_trees;

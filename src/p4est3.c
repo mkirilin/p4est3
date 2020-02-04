@@ -77,7 +77,6 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   SC3E (sc3_refcount_init (&p3->rc));
   p3->alloc = alloc;
   p3->mpicomm = SC3_MPI_COMM_WORLD;
-  p3->commdup = 0;
   p3->num_trees = 1;
   SC3A_IS (p4est3_is_new, p3);
 
@@ -141,7 +140,15 @@ sc3_error_t        *
 p4est3_setup (p4est3_t * p3)
 {
   int                 max_level, lev;
+  int                 nodesize, noderank;
+  int                 headsize, headrank;
+  int                 p, next, *ofs;
+  int                 dispunit;
+  int                *nodesizemem;
   p4est3_gloidx       num_uniform, high_uniform;
+  sc3_MPI_Comm_t      nodecomm, headcomm;
+  sc3_MPI_Win_t       nodesizewin;
+  sc3_MPI_Aint_t      nodeabytes;
 
   /*
    * We will extend the functionality of p4est3_set_* and _setup in the future.
@@ -155,8 +162,64 @@ p4est3_setup (p4est3_t * p3)
   /* check conditions that arise due to omitting mandatory _set_ functions */
   SC3E_DEMAND (p3->qvt != NULL, "Quadrant virtual table must be set");
 
+  /* query input communicator */
   SC3E (sc3_MPI_Comm_size (p3->mpicomm, &p3->mpisize));
   SC3E (sc3_MPI_Comm_rank (p3->mpicomm, &p3->mpirank));
+
+  /* create one communicator on each shared-memory node */
+  SC3E (sc3_MPI_Comm_split_type (p3->mpicomm, SC3_MPI_COMM_TYPE_SHARED,
+                                 0, SC3_MPI_INFO_NULL, &nodecomm));
+  SC3E (sc3_MPI_Comm_size (nodecomm, &nodesize));
+  SC3E (sc3_MPI_Comm_rank (nodecomm, &noderank));
+
+  /* create communicator that contains the first rank on each node */
+  SC3E (sc3_MPI_Comm_split (p3->mpicomm, noderank == 0 ? 0 :
+                            SC3_MPI_UNDEFINED, 0, &headcomm));
+  SC3A_CHECK ((noderank != 0) == (headcomm == SC3_MPI_COMM_NULL));
+  if (noderank == 0) {
+    SC3E (sc3_MPI_Comm_size (headcomm, &headsize));
+    SC3E (sc3_MPI_Comm_rank (headcomm, &headrank));
+    nodeabytes = (2 + 2 * headsize + 1) * sizeof (int);
+  }
+  else {
+    headsize = headrank = 0;
+    nodeabytes = 0;
+  }
+
+  /* allocate shared memory for information on node and head communicators */
+  SC3E (sc3_MPI_Win_allocate_shared (nodeabytes, 1, SC3_MPI_INFO_NULL,
+                                     nodecomm, &nodesizemem, &nodesizewin));
+  if (noderank == 0) {
+    nodesizemem[0] = p3->num_nodes = headsize;
+    nodesizemem[1] = p3->node_num = headrank;
+    p3->node_sizes = &nodesizemem[2];
+
+    /* allgather information about all nodes and compute offsets */
+    SC3E (sc3_MPI_Allgather (&nodesize, 1, SC3_MPI_INT,
+                             p3->node_sizes, 1, SC3_MPI_INT, headcomm));
+    *(ofs = p3->node_offsets = &nodesizemem[2 + headsize]) = 0;
+    for (p = 0; p < headsize; ++p) {
+      next = *ofs + p3->node_sizes[p];
+      *++ofs = next;
+    }
+    SC3E (sc3_MPI_Barrier (nodecomm));
+    /* TODO: think about window locking / synchronization */
+  }
+  else {
+    SC3E (sc3_MPI_Barrier (nodecomm));
+    SC3E (sc3_MPI_Win_shared_query (nodesizewin, 0,
+                                    &nodeabytes, &dispunit, &nodesizemem));
+    SC3A_CHECK (nodeabytes >= (sc3_MPI_Aint_t) sizeof (int));
+    SC3A_CHECK (dispunit == 1);
+    SC3A_CHECK (nodesizemem != NULL);
+    p3->num_nodes = nodesizemem[0];
+    SC3A_CHECK (nodeabytes ==
+                (sc3_MPI_Aint_t) ((2 + 2 * p3->num_nodes + 1) *
+                                  sizeof (int)));
+    p3->node_num = nodesizemem[1];
+    p3->node_sizes = &nodesizemem[2];
+    p3->node_offsets = &nodesizemem[2 + p3->num_nodes];
+  }
 
   /* determine uniform refinement level */
   max_level = p4est3_max_level (p3->qvt);
@@ -174,6 +237,13 @@ p4est3_setup (p4est3_t * p3)
   }
   max_level = lev;
   SC3A_CHECK (p4est3_glopow (p3->num_children, max_level) == num_uniform);
+
+  /* TODO remember MPI windows and communicators and free on destruction */
+  SC3E (sc3_MPI_Win_free (&nodesizewin));
+  if (noderank == 0) {
+    SC3E (sc3_MPI_Comm_free (&headcomm));
+  }
+  SC3E (sc3_MPI_Comm_free (&nodecomm));
 
   SC3A_IS (p4est3_is_setup, p3);
   return NULL;
