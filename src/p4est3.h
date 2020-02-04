@@ -36,11 +36,6 @@ extern              "C"
 #endif
 #endif
 
-/* TODO make dimension a run-time parameter / member of qvt? */
-
-/** In the 2D implementation, this is the number of a quadrant's children. */
-#define P4EST3_CHILDREN 4
-
 #if 0
 /*------------------------- the connectivity -------------------------*/
 

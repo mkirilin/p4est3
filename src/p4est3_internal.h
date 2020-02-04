@@ -41,6 +41,9 @@ struct p4est3
   p4est3_quadrant_vtable_t *qvt;
   p4est3_topidx       num_trees;
   int                 level;
+
+  /* variables determined on setup */
+  int                 num_children;
 };
 
 #ifdef __cplusplus

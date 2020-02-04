@@ -41,8 +41,15 @@ extern              "C"
 #define P3E_DEMAND(f) SC3E_DEMAND (f)
 
 typedef int         p4est3_topidx;
+#define P4EST3_TOPIDX_MAX INT_MAX
+
 typedef int         p4est3_locidx;
+#define P4EST3_LOCIDX_MAX INT_MAX
+
 typedef long        p4est3_gloidx;
+#define P4EST3_GLOIDX_MAX LONG_MAX
+#define p4est3_glopow sc3_longpow
+
 
 #ifdef __cplusplus
 #if 0

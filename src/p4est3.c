@@ -140,15 +140,40 @@ p4est3_set_level (p4est3_t * p3, int level)
 sc3_error_t        *
 p4est3_setup (p4est3_t * p3)
 {
+  int                 max_level, lev;
+  p4est3_gloidx       num_uniform, high_uniform;
+
+  /*
+   * We will extend the functionality of p4est3_set_* and _setup in the future.
+   * They will be used to create a new forest by refinement, partitioning, etc.
+   * The forest created is generally immutable after being setup.
+   * Currently, we are just creating a uniformly refined forest.
+   */
+
   SC3A_IS (p4est3_is_new, p3);
 
-  /* TODO write informative check for qvt */
-  SC3A_CHECK (p3->qvt != NULL);
-
-  /* TODO reduce level to qvt->maxlevel */
+  /* check conditions that arise due to omitting mandatory _set_ functions */
+  SC3E_DEMAND (p3->qvt != NULL, "Quadrant virtual table must be set");
 
   SC3E (sc3_MPI_Comm_size (p3->mpicomm, &p3->mpisize));
   SC3E (sc3_MPI_Comm_rank (p3->mpicomm, &p3->mpirank));
+
+  /* determine uniform refinement level */
+  max_level = p4est3_max_level (p3->qvt);
+  SC3A_CHECK (max_level >= 0);
+  max_level = SC3_MIN (p3->level, max_level);
+
+  /* with number of children determine number of elements per tree */
+  p3->num_children = p4est3_num_children (p3->qvt);
+  SC3A_CHECK (p3->num_children > 0);
+  high_uniform = P4EST3_GLOIDX_MAX / p3->num_children;
+  for (num_uniform = 1, lev = 0;
+       num_uniform <= high_uniform && lev < max_level; ++lev) {
+    /* we iterate so we do not roll over the gloidx limit */
+    num_uniform *= p3->num_children;
+  }
+  max_level = lev;
+  SC3A_CHECK (p4est3_glopow (p3->num_children, max_level) == num_uniform);
 
   SC3A_IS (p4est3_is_setup, p3);
   return NULL;
