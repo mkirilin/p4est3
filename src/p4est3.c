@@ -43,6 +43,10 @@ p4est3_is_valid (p4est3_t * p3, char *reason)
   }
   else {
     SC3E_TEST (p3->qvt != NULL, reason);
+
+    SC3E_TEST (p3->nodesizewin != SC3_MPI_WIN_NULL, reason);
+    SC3E_TEST (p3->headcomm != SC3_MPI_COMM_NULL || p3->noderank > 0, reason);
+    SC3E_TEST (p3->nodecomm != SC3_MPI_COMM_NULL, reason);
   }
 
   SC3E_YES (reason);
@@ -77,6 +81,9 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   SC3E (sc3_refcount_init (&p3->rc));
   p3->alloc = alloc;
   p3->mpicomm = SC3_MPI_COMM_WORLD;
+  p3->nodesizewin = SC3_MPI_WIN_NULL;
+  p3->headcomm = SC3_MPI_COMM_NULL;
+  p3->nodecomm = SC3_MPI_COMM_NULL;
   p3->num_trees = 1;
   SC3A_IS (p4est3_is_new, p3);
 
@@ -140,14 +147,11 @@ sc3_error_t        *
 p4est3_setup (p4est3_t * p3)
 {
   int                 max_level, lev;
-  int                 nodesize, noderank;
   int                 headsize, headrank;
   int                 p, next, *ofs;
   int                 dispunit;
   int                *nodesizemem;
   p4est3_gloidx       num_uniform, high_uniform;
-  sc3_MPI_Comm_t      nodecomm, headcomm;
-  sc3_MPI_Win_t       nodesizewin;
   sc3_MPI_Aint_t      nodeabytes;
 
   /*
@@ -168,17 +172,17 @@ p4est3_setup (p4est3_t * p3)
 
   /* create one communicator on each shared-memory node */
   SC3E (sc3_MPI_Comm_split_type (p3->mpicomm, SC3_MPI_COMM_TYPE_SHARED,
-                                 0, SC3_MPI_INFO_NULL, &nodecomm));
-  SC3E (sc3_MPI_Comm_size (nodecomm, &nodesize));
-  SC3E (sc3_MPI_Comm_rank (nodecomm, &noderank));
+                                 0, SC3_MPI_INFO_NULL, &p3->nodecomm));
+  SC3E (sc3_MPI_Comm_size (p3->nodecomm, &p3->nodesize));
+  SC3E (sc3_MPI_Comm_rank (p3->nodecomm, &p3->noderank));
 
   /* create communicator that contains the first rank on each node */
-  SC3E (sc3_MPI_Comm_split (p3->mpicomm, noderank == 0 ? 0 :
-                            SC3_MPI_UNDEFINED, 0, &headcomm));
-  SC3A_CHECK ((noderank != 0) == (headcomm == SC3_MPI_COMM_NULL));
-  if (noderank == 0) {
-    SC3E (sc3_MPI_Comm_size (headcomm, &headsize));
-    SC3E (sc3_MPI_Comm_rank (headcomm, &headrank));
+  SC3E (sc3_MPI_Comm_split (p3->mpicomm, p3->noderank == 0 ? 0 :
+                            SC3_MPI_UNDEFINED, 0, &p3->headcomm));
+  SC3A_CHECK ((p3->noderank != 0) == (p3->headcomm == SC3_MPI_COMM_NULL));
+  if (p3->noderank == 0) {
+    SC3E (sc3_MPI_Comm_size (p3->headcomm, &headsize));
+    SC3E (sc3_MPI_Comm_rank (p3->headcomm, &headrank));
     nodeabytes = (2 + 2 * headsize + 1) * sizeof (int);
   }
   else {
@@ -189,17 +193,17 @@ p4est3_setup (p4est3_t * p3)
   /* allocate shared memory for information on node and head communicators */
   SC3E (sc3_MPI_Win_allocate_shared
         (nodeabytes, sizeof (int), SC3_MPI_INFO_NULL,
-         nodecomm, &nodesizemem, &nodesizewin));
-  if (noderank == 0) {
-    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, SC3_MPI_MODE_NOCHECK,
-                            0, nodesizewin));
+         p3->nodecomm, &nodesizemem, &p3->nodesizewin));
+  if (p3->noderank == 0) {
+    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, 0, SC3_MPI_MODE_NOCHECK,
+                            p3->nodesizewin));
     nodesizemem[0] = p3->num_nodes = headsize;
     nodesizemem[1] = p3->node_num = headrank;
     p3->node_sizes = &nodesizemem[2];
 
     /* allgather information about all nodes and compute offsets */
-    SC3E (sc3_MPI_Allgather (&nodesize, 1, SC3_MPI_INT,
-                             p3->node_sizes, 1, SC3_MPI_INT, headcomm));
+    SC3E (sc3_MPI_Allgather (&p3->nodesize, 1, SC3_MPI_INT,
+                             p3->node_sizes, 1, SC3_MPI_INT, p3->headcomm));
     *(ofs = p3->node_offsets = &nodesizemem[2 + headsize]) = 0;
     for (p = 0; p < headsize; ++p) {
       next = *ofs + p3->node_sizes[p];
@@ -208,20 +212,20 @@ p4est3_setup (p4est3_t * p3)
     SC3A_CHECK (p3->node_offsets[p3->mpirank] == p3->mpirank);
 
     /* make sure shared memory contents are consistent */
-    SC3E (sc3_MPI_Win_unlock (0, nodesizewin));
-    SC3E (sc3_MPI_Barrier (nodecomm));
+    SC3E (sc3_MPI_Win_unlock (0, p3->nodesizewin));
+    SC3E (sc3_MPI_Barrier (p3->nodecomm));
   }
   else {
-    SC3E (sc3_MPI_Win_shared_query (nodesizewin, 0,
+    SC3E (sc3_MPI_Win_shared_query (p3->nodesizewin, 0,
                                     &nodeabytes, &dispunit, &nodesizemem));
     SC3A_CHECK (nodeabytes >= (sc3_MPI_Aint_t) sizeof (int));
     SC3A_CHECK (dispunit == (int) sizeof (int));
     SC3A_CHECK (nodesizemem != NULL);
 
     /* access shared memory written by other process */
-    SC3E (sc3_MPI_Barrier (nodecomm));
-    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, SC3_MPI_MODE_NOCHECK,
-                            0, nodesizewin));
+    SC3E (sc3_MPI_Barrier (p3->nodecomm));
+    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                            p3->nodesizewin));
     p3->num_nodes = nodesizemem[0];
     SC3A_CHECK (nodeabytes ==
                 (sc3_MPI_Aint_t) ((2 + 2 * p3->num_nodes + 1) *
@@ -229,7 +233,7 @@ p4est3_setup (p4est3_t * p3)
     p3->node_num = nodesizemem[1];
     p3->node_sizes = &nodesizemem[2];
     p3->node_offsets = &nodesizemem[2 + p3->num_nodes];
-    SC3E (sc3_MPI_Win_unlock (0, nodesizewin));
+    SC3E (sc3_MPI_Win_unlock (0, p3->nodesizewin));
   }
 
   /* determine uniform refinement level */
@@ -249,13 +253,9 @@ p4est3_setup (p4est3_t * p3)
   max_level = lev;
   SC3A_CHECK (p4est3_glopow (p3->num_children, max_level) == num_uniform);
 
-  /* TODO remember MPI windows and communicators and free on destruction */
-  SC3E (sc3_MPI_Win_free (&nodesizewin));
-  if (noderank == 0) {
-    SC3E (sc3_MPI_Comm_free (&headcomm));
-  }
-  SC3E (sc3_MPI_Comm_free (&nodecomm));
+  /* TODO create trees and quadrants */
 
+  p3->setup = 1;
   SC3A_IS (p4est3_is_setup, p3);
   return NULL;
 }
@@ -283,6 +283,12 @@ p4est3_unref (p4est3_t ** pp3)
 
     alloc = p3->alloc;
     if (p3->setup) {
+      SC3E (sc3_MPI_Win_free (&p3->nodesizewin));
+      if (p3->noderank == 0) {
+        SC3E (sc3_MPI_Comm_free (&p3->headcomm));
+      }
+      SC3E (sc3_MPI_Comm_free (&p3->nodecomm));
+
       /* deallocate internal storage */
     }
     if (p3->commdup) {

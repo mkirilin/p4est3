@@ -35,8 +35,11 @@ struct p4est3
 
   sc3_MPI_Comm_t      mpicomm;
   int                 commdup;
-  int                 mpisize;
-  int                 mpirank;
+
+  sc3_MPI_Comm_t      nodecomm, headcomm;
+  sc3_MPI_Win_t       nodesizewin;
+  int                 mpisize, mpirank;
+  int                 nodesize, noderank;
   int                 num_nodes;
   int                 node_num;
   int                *node_sizes;
@@ -45,8 +48,6 @@ struct p4est3
   p4est3_quadrant_vtable_t *qvt;
   p4est3_topidx       num_trees;
   int                 level;
-
-  /* variables determined on setup */
   int                 num_children;
 };
 
