@@ -70,6 +70,7 @@ include example/steps/Makefile.am
 include example/tetgen/Makefile.am
 include example/timings/Makefile.am
 include example/balance_seeds/Makefile.am
+include example/v3basics/Makefile.am
 
 ## # lint static syntax checker
 ## ALL_LINT_FLAGS = $(LINT_FLAGS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
