@@ -105,6 +105,7 @@ p4est3_set_comm (p4est3_t * p3, sc3_MPI_Comm_t comm, int dup)
   /* register new communicator */
   if (dup) {
     SC3E (sc3_MPI_Comm_dup (comm, &p3->mpicomm));
+    SC3E (sc3_MPI_Comm_set_errhandler (p3->mpicomm, SC3_MPI_ERRORS_RETURN));
   }
   else {
     p3->mpicomm = comm;

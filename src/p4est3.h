@@ -71,6 +71,13 @@ int                 p4est3_is_setup (p4est3_t * p3, char *reason);
 
 sc3_error_t        *p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3);
 
+/** Provide a communicator to use.
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] comm         This communicator replaces any previous one.
+ *                          If it is dupd, we also set it to return errors.
+ * \param [in] dup          If true, the input communicator is dupd
+ *                          and set to return errors.
+ */
 sc3_error_t        *p4est3_set_comm (p4est3_t * p3,
                                      sc3_MPI_Comm_t comm, int dup);
 sc3_error_t        *p4est3_set_vtable (p4est3_t * p3,
