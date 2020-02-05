@@ -187,9 +187,12 @@ p4est3_setup (p4est3_t * p3)
   }
 
   /* allocate shared memory for information on node and head communicators */
-  SC3E (sc3_MPI_Win_allocate_shared (nodeabytes, 1, SC3_MPI_INFO_NULL,
-                                     nodecomm, &nodesizemem, &nodesizewin));
+  SC3E (sc3_MPI_Win_allocate_shared
+        (nodeabytes, sizeof (int), SC3_MPI_INFO_NULL,
+         nodecomm, &nodesizemem, &nodesizewin));
   if (noderank == 0) {
+    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, SC3_MPI_MODE_NOCHECK,
+                            0, nodesizewin));
     nodesizemem[0] = p3->num_nodes = headsize;
     nodesizemem[1] = p3->node_num = headrank;
     p3->node_sizes = &nodesizemem[2];
@@ -202,16 +205,23 @@ p4est3_setup (p4est3_t * p3)
       next = *ofs + p3->node_sizes[p];
       *++ofs = next;
     }
+    SC3A_CHECK (p3->node_offsets[p3->mpirank] == p3->mpirank);
+
+    /* make sure shared memory contents are consistent */
+    SC3E (sc3_MPI_Win_unlock (0, nodesizewin));
     SC3E (sc3_MPI_Barrier (nodecomm));
-    /* TODO: think about window locking / synchronization */
   }
   else {
-    SC3E (sc3_MPI_Barrier (nodecomm));
     SC3E (sc3_MPI_Win_shared_query (nodesizewin, 0,
                                     &nodeabytes, &dispunit, &nodesizemem));
     SC3A_CHECK (nodeabytes >= (sc3_MPI_Aint_t) sizeof (int));
-    SC3A_CHECK (dispunit == 1);
+    SC3A_CHECK (dispunit == (int) sizeof (int));
     SC3A_CHECK (nodesizemem != NULL);
+
+    /* access shared memory written by other process */
+    SC3E (sc3_MPI_Barrier (nodecomm));
+    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, SC3_MPI_MODE_NOCHECK,
+                            0, nodesizewin));
     p3->num_nodes = nodesizemem[0];
     SC3A_CHECK (nodeabytes ==
                 (sc3_MPI_Aint_t) ((2 + 2 * p3->num_nodes + 1) *
@@ -219,6 +229,7 @@ p4est3_setup (p4est3_t * p3)
     p3->node_num = nodesizemem[1];
     p3->node_sizes = &nodesizemem[2];
     p3->node_offsets = &nodesizemem[2 + p3->num_nodes];
+    SC3E (sc3_MPI_Win_unlock (0, nodesizewin));
   }
 
   /* determine uniform refinement level */
