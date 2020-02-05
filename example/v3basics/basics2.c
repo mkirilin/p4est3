@@ -21,6 +21,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+#include <p4est_p4est3.h>
 #include <p4est3.h>
 
 static sc3_error_t *
@@ -33,16 +34,19 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
 }
 
 static sc3_error_t *
-test_p4est_new (sc3_allocator_t * alloc)
+test_p4est_new (sc3_allocator_t * alloc,
+                sc3_MPI_Comm_t mpicomm, p4est3_quadrant_vtable_t * qvt)
 {
   p4est3_t           *p3;
 
   SC3A_IS (sc3_allocator_is_setup, alloc);
-#if 0
+
   SC3E (p4est3_new (alloc, &p3));
+  SC3E (p4est3_set_comm (p3, mpicomm, 1));
+  SC3E (p4est3_set_vtable (p3, qvt));
+  SC3E (p4est3_setup (p3));
 
   SC3E (p4est3_destroy (&p3));
-#endif
   return NULL;
 }
 
@@ -67,7 +71,7 @@ report_errors (sc3_allocator_t * mainalloc, sc3_error_t ** pe)
   }
 
   if (!sc3_allocator_is_free (mainalloc, reason)) {
-    fprintf (stderr, "Allocation remains: %s\n", reason);
+    fprintf (stderr, "Allocation error: %s\n", reason);
   }
 
 #if 0
@@ -87,12 +91,18 @@ main (int argc, char **argv)
 {
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e;
+  sc3_MPI_Comm_t      mpicomm;
+  p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
 
   mainalloc = sc3_allocator_nothread ();
+  mpicomm = SC3_MPI_COMM_WORLD;
+  p4est_quadrant_vtable (qvt);
+
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
   SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
-  SC3E_NULL_SET (e, test_p4est_new (alloc));
+  SC3E_NULL_SET (e, test_p4est_new (alloc, mpicomm, qvt));
   SC3E_NULL_SET (e, free_allocator (&alloc));
+
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
   report_errors (mainalloc, &e);
 
