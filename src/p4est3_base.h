@@ -49,7 +49,7 @@ typedef int         p4est3_locidx;
 typedef long        p4est3_gloidx;
 #define P4EST3_GLOIDX_MAX LONG_MAX
 #define p4est3_glopow sc3_longpow
-
+#define p4est3_glocut sc3_longcut
 
 #ifdef __cplusplus
 #if 0

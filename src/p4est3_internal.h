@@ -38,6 +38,7 @@ struct p4est3
 
   sc3_MPI_Comm_t      nodecomm, headcomm;
   sc3_MPI_Win_t       nodesizewin;
+  sc3_MPI_Win_t       gfposwin, countwin;
   int                 mpisize, mpirank;
   int                 nodesize, noderank;
   int                 num_nodes;
@@ -49,6 +50,9 @@ struct p4est3
   p4est3_topidx       num_trees;
   int                 level;
   int                 num_children;
+  int                 qsize;
+
+  p4est3_locidx       local_num_quads;
 };
 
 #ifdef __cplusplus
