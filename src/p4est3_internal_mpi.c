@@ -111,56 +111,77 @@ p4est3_internal_setup_comm (p4est3_t * p3)
 }
 
 sc3_error_t        *
-p4est3_internal_setup_cut (p4est3_t * p3, p4est3_gloidx num_global, int qsize)
+p4est3_internal_setup_cut (p4est3_t * p3, p4est3_gloidx num_uniform,
+                           int qsize)
 {
   int                 p;
   int                 dispunit;
   char               *gfposmem;
-  p4est3_gloidx      *countmem;
-  sc3_MPI_Aint_t      gfposbytes, countbytes, tempbytes;
+  p4est3_topidx      *gftreemem;
+  p4est3_gloidx      *goffsetmem, num_global;
+  sc3_MPI_Aint_t      gftreebytes, gfposbytes, goffsetbytes, tempbytes;
 
   /* this is a special-purpose function to simplify p4est3_setup */
   SC3A_CHECK (p3 != NULL);
   SC3A_CHECK (0 <= p3->mpirank && p3->mpirank < p3->mpisize);
   SC3A_CHECK (0 <= p3->noderank && p3->noderank < p3->nodesize);
-  SC3A_CHECK (num_global > 0);
+  SC3A_CHECK (num_uniform > 0);
   SC3A_CHECK (qsize > 0);
 
   /* create shared partition arrays */
+  gftreebytes = (p3->mpisize + 1) * sizeof (p4est3_topidx);
+  SC3E (sc3_MPI_Win_allocate_shared
+        (p3->noderank == 0 ? gftreebytes : 0, sizeof (p4est3_topidx),
+         p3->info_noncontig, p3->nodecomm, &gftreemem, &p3->gftreewin));
   gfposbytes = (p3->mpisize + 1) * qsize;
   SC3E (sc3_MPI_Win_allocate_shared
         (p3->noderank == 0 ? gfposbytes : 0, qsize,
          p3->info_noncontig, p3->nodecomm, &gfposmem, &p3->gfposwin));
-  countbytes = (p3->mpisize + 1) * sizeof (p4est3_gloidx);
+  goffsetbytes = (p3->mpisize + 1) * sizeof (p4est3_gloidx);
   SC3E (sc3_MPI_Win_allocate_shared
-        (p3->noderank == 0 ? countbytes : 0, sizeof (p4est3_gloidx),
-         p3->info_noncontig, p3->nodecomm, &countmem, &p3->countwin));
+        (p3->noderank == 0 ? goffsetbytes : 0, sizeof (p4est3_gloidx),
+         p3->info_noncontig, p3->nodecomm, &goffsetmem, &p3->goffsetwin));
 
   /* compute cuts for the whole program without communication */
+  num_global = p3->num_trees * num_uniform;
   if (p3->noderank == 0) {
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, 0, SC3_MPI_MODE_NOCHECK,
-                            p3->countwin));
+                            p3->gftreewin));
+    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, 0, SC3_MPI_MODE_NOCHECK,
+                            p3->goffsetwin));
     for (p = 0; p <= p3->mpisize; ++p) {
-      countmem[p] = p4est3_glocut (num_global, p3->mpisize, p);
+      gftreemem[p] =
+        (goffsetmem[p] =
+         p4est3_glocut (num_global, p3->mpisize, p)) / num_uniform;
     }
-    SC3E (sc3_MPI_Win_unlock (0, p3->countwin));
+    SC3A_CHECK (gftreemem[p3->mpisize] == p3->num_trees);
+    SC3A_CHECK (goffsetmem[p3->mpisize] == num_global);
+    SC3E (sc3_MPI_Win_unlock (0, p3->gftreewin));
+    SC3E (sc3_MPI_Win_unlock (0, p3->goffsetwin));
     SC3E (sc3_MPI_Barrier (p3->nodecomm));
   }
   else {
+    SC3E (sc3_MPI_Win_shared_query (p3->gftreewin, 0,
+                                    &tempbytes, &dispunit, &gftreemem));
+    SC3A_CHECK (gftreebytes == tempbytes);
+    SC3A_CHECK (dispunit == sizeof (p4est3_topidx));
+    SC3A_CHECK (gftreemem != NULL);
     SC3E (sc3_MPI_Win_shared_query (p3->gfposwin, 0,
                                     &tempbytes, &dispunit, &gfposmem));
     SC3A_CHECK (gfposbytes == tempbytes);
     SC3A_CHECK (dispunit == qsize);
     SC3A_CHECK (gfposmem != NULL);
-    SC3E (sc3_MPI_Win_shared_query (p3->countwin, 0,
-                                    &tempbytes, &dispunit, &countmem));
-    SC3A_CHECK (countbytes == tempbytes);
+    SC3E (sc3_MPI_Win_shared_query (p3->goffsetwin, 0,
+                                    &tempbytes, &dispunit, &goffsetmem));
+    SC3A_CHECK (goffsetbytes == tempbytes);
     SC3A_CHECK (dispunit == (int) sizeof (p4est3_gloidx));
-    SC3A_CHECK (countmem != NULL);
+    SC3A_CHECK (goffsetmem != NULL);
     SC3E (sc3_MPI_Barrier (p3->nodecomm));
 #ifdef P4EST_ENABLE_DEBUG
     for (p = 0; p <= p3->mpisize; ++p) {
-      SC3A_CHECK (countmem[p] == p4est3_glocut (num_global, p3->mpisize, p));
+      SC3A_CHECK (gftreemem[p] == goffsetmem[p] / num_uniform);
+      SC3A_CHECK (goffsetmem[p] ==
+                  p4est3_glocut (num_global, p3->mpisize, p));
     }
 #endif
   }
@@ -168,7 +189,8 @@ p4est3_internal_setup_cut (p4est3_t * p3, p4est3_gloidx num_global, int qsize)
   /* assign further object members */
   p3->qsize = qsize;
   p3->global_num_quads = num_global;
-  p3->count = countmem;
+  p3->goffset = goffsetmem;
+  p3->gftree = gftreemem;
   p3->gfpos = gfposmem;
   return NULL;
 }
