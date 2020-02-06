@@ -148,17 +148,10 @@ sc3_error_t        *
 p4est3_setup (p4est3_t * p3)
 {
   int                 max_level, lev;
-  int                 headsize, headrank;
-  int                 p, next, *ofs;
-  int                 dispunit;
-  int                *nodesizemem;
-  char               *gfposmem;
+  int                 qsize;
   p4est3_topidx       fltree, lltree;
-  p4est3_gloidx      *countmem;
   p4est3_gloidx       num_uniform, high_uniform, num_global;
   p4est3_gloidx       first_quad, end_quad;
-  sc3_MPI_Info_t      info_noncontig;
-  sc3_MPI_Aint_t      nodeabytes, gfposbytes, countbytes, tempbytes;
 
   /*
    * We will extend the functionality of p4est3_set_* and _setup in the future.
@@ -172,78 +165,12 @@ p4est3_setup (p4est3_t * p3)
   /* check conditions that arise due to omitting mandatory _set_ functions */
   SC3E_DEMAND (p3->qvt != NULL, "Quadrant virtual table must be set");
 
-  /* query input communicator */
-  SC3E (sc3_MPI_Comm_size (p3->mpicomm, &p3->mpisize));
-  SC3E (sc3_MPI_Comm_rank (p3->mpicomm, &p3->mpirank));
-
-  /* create one communicator on each shared-memory node */
-  SC3E (sc3_MPI_Comm_split_type (p3->mpicomm, SC3_MPI_COMM_TYPE_SHARED,
-                                 0, SC3_MPI_INFO_NULL, &p3->nodecomm));
-  SC3E (sc3_MPI_Comm_size (p3->nodecomm, &p3->nodesize));
-  SC3E (sc3_MPI_Comm_rank (p3->nodecomm, &p3->noderank));
-
-  /* create communicator that contains the first rank on each node */
-  SC3E (sc3_MPI_Comm_split (p3->mpicomm, p3->noderank == 0 ? 0 :
-                            SC3_MPI_UNDEFINED, 0, &p3->headcomm));
-  SC3A_CHECK ((p3->noderank != 0) == (p3->headcomm == SC3_MPI_COMM_NULL));
-  if (p3->noderank == 0) {
-    SC3E (sc3_MPI_Comm_size (p3->headcomm, &headsize));
-    SC3E (sc3_MPI_Comm_rank (p3->headcomm, &headrank));
-    nodeabytes = (2 + 2 * headsize + 1) * sizeof (int);
-  }
-  else {
-    headsize = headrank = 0;
-    nodeabytes = 0;
-  }
-
-  /* allocate shared memory for information on node and head communicators */
-  SC3E (sc3_MPI_Info_create (&info_noncontig));
-  SC3E (sc3_MPI_Info_set (info_noncontig, "alloc_shared_noncontig", "true"));
-  SC3E (sc3_MPI_Win_allocate_shared
-        (nodeabytes, sizeof (int),
-         info_noncontig, p3->nodecomm, &nodesizemem, &p3->nodesizewin));
-  if (p3->noderank == 0) {
-    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, 0, SC3_MPI_MODE_NOCHECK,
-                            p3->nodesizewin));
-    nodesizemem[0] = p3->num_nodes = headsize;
-    nodesizemem[1] = p3->node_num = headrank;
-    p3->node_sizes = &nodesizemem[2];
-
-    /* allgather information about all nodes and compute offsets */
-    SC3E (sc3_MPI_Allgather (&p3->nodesize, 1, SC3_MPI_INT,
-                             p3->node_sizes, 1, SC3_MPI_INT, p3->headcomm));
-    *(ofs = p3->node_offsets = &nodesizemem[2 + headsize]) = 0;
-    for (p = 0; p < headsize; ++p) {
-      next = *ofs + p3->node_sizes[p];
-      *++ofs = next;
-    }
-    SC3A_CHECK (p3->node_offsets[p3->mpirank] == p3->mpirank);
-
-    /* make sure shared memory contents are consistent */
-    SC3E (sc3_MPI_Win_unlock (0, p3->nodesizewin));
-    SC3E (sc3_MPI_Barrier (p3->nodecomm));
-  }
-  else {
-    SC3E (sc3_MPI_Win_shared_query (p3->nodesizewin, 0,
-                                    &nodeabytes, &dispunit, &nodesizemem));
-    SC3A_CHECK (nodeabytes >= (sc3_MPI_Aint_t) sizeof (int));
-    SC3A_CHECK (dispunit == (int) sizeof (int));
-    SC3A_CHECK (nodesizemem != NULL);
-
-    /* access shared memory written by other process */
-    SC3E (sc3_MPI_Barrier (p3->nodecomm));
-    p3->num_nodes = nodesizemem[0];
-    SC3A_CHECK (nodeabytes ==
-                (sc3_MPI_Aint_t) ((2 + 2 * p3->num_nodes + 1) *
-                                  sizeof (int)));
-    p3->node_num = nodesizemem[1];
-    p3->node_sizes = &nodesizemem[2];
-    p3->node_offsets = &nodesizemem[2 + p3->num_nodes];
-  }
+  /* query input communicator and populate node and head communicators */
+  SC3E (p4est3_internal_setup_comm (p3));
 
   /* determine a quadrant's size in memory */
-  p3->qsize = (int) p4est3_quadrant_size (p3->qvt);
-  SC3A_CHECK (p3->qsize > 0);
+  qsize = (int) p4est3_quadrant_size (p3->qvt);
+  SC3A_CHECK (qsize > 0);
 
   /* determine uniform refinement level */
   max_level = p4est3_max_level (p3->qvt);
@@ -277,46 +204,13 @@ p4est3_setup (p4est3_t * p3)
   }
 
   /* create shared partition arrays */
-  gfposbytes = (p3->mpisize + 1) * p3->qsize;
-  SC3E (sc3_MPI_Win_allocate_shared
-        (p3->noderank == 0 ? gfposbytes : 0, p3->qsize,
-         info_noncontig, p3->nodecomm, &gfposmem, &p3->gfposwin));
-  countbytes = (p3->mpisize + 1) * sizeof (p4est3_gloidx);
-  SC3E (sc3_MPI_Win_allocate_shared
-        (p3->noderank == 0 ? countbytes : 0, sizeof (p4est3_gloidx),
-         info_noncontig, p3->nodecomm, &countmem, &p3->countwin));
-
-  /* compute cuts for the whole program without communication */
-  if (p3->noderank == 0) {
-    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, 0, SC3_MPI_MODE_NOCHECK,
-                            p3->countwin));
-    for (p = 0; p <= p3->mpisize; ++p) {
-      countmem[p] = p4est3_glocut (num_global, p3->mpisize, p);
-    }
-    SC3E (sc3_MPI_Win_unlock (0, p3->countwin));
-    SC3E (sc3_MPI_Barrier (p3->nodecomm));
-  }
-  else {
-    SC3E (sc3_MPI_Barrier (p3->nodecomm));
-    SC3E (sc3_MPI_Win_shared_query (p3->countwin, 0,
-                                    &tempbytes, &dispunit, &countmem));
-    SC3A_CHECK (countbytes == tempbytes);
-    SC3A_CHECK (dispunit == (int) sizeof (p4est3_gloidx));
-    SC3A_CHECK (countmem != NULL);
-#ifdef P4EST_ENABLE_DEBUG
-    for (p = 0; p <= p3->mpisize; ++p) {
-      SC3A_CHECK (countmem[p] == p4est3_glocut (num_global, p3->mpisize, p));
-    }
-#endif
-  }
+  SC3E (p4est3_internal_setup_cut (p3, num_global, qsize));
 
   /* TODO create trees and quadrants */
 
   /* TODO: populate shared position array */
 
   /* TODO allgather shared position array */
-
-  SC3E (sc3_MPI_Info_free (&info_noncontig));
 
   p3->setup = 1;
   SC3A_IS (p4est3_is_setup, p3);
@@ -353,6 +247,7 @@ p4est3_unref (p4est3_t ** pp3)
         SC3E (sc3_MPI_Comm_free (&p3->headcomm));
       }
       SC3E (sc3_MPI_Comm_free (&p3->nodecomm));
+      SC3E (sc3_MPI_Info_free (&p3->info_noncontig));
 
       /* deallocate internal storage */
     }

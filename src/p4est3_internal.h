@@ -37,6 +37,7 @@ struct p4est3
   int                 commdup;
 
   sc3_MPI_Comm_t      nodecomm, headcomm;
+  sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Win_t       nodesizewin;
   sc3_MPI_Win_t       gfposwin, countwin;
   int                 mpisize, mpirank;
@@ -53,6 +54,7 @@ struct p4est3
   int                 qsize;
 
   p4est3_locidx       local_num_quads;
+  p4est3_gloidx       global_num_quads;
 };
 
 #ifdef __cplusplus
@@ -62,6 +64,11 @@ extern              "C"
 }
 #endif
 #endif
+
+sc3_error_t        *p4est3_internal_setup_comm (p4est3_t * p3);
+sc3_error_t        *p4est3_internal_setup_cut (p4est3_t * p3,
+                                               p4est3_gloidx num_global,
+                                               int qsize);
 
 #ifdef __cplusplus
 #if 0
