@@ -188,11 +188,12 @@ p4est3_setup (p4est3_t * p3)
   }
   max_level = lev;
   SC3A_CHECK (p4est3_glopow (p3->num_children, max_level) == num_uniform);
-
-  /* compute partition cuts */
   num_global = p3->num_trees * num_uniform;
-  first_quad = p4est3_glocut (num_global, p3->mpisize, p3->mpirank);
-  end_quad = p4est3_glocut (num_global, p3->mpisize, p3->mpirank + 1);
+
+  /* compute partition cuts and create shared partition arrays */
+  SC3E (p4est3_internal_setup_cut (p3, num_global, qsize));
+  first_quad = p3->count[p3->mpirank];
+  end_quad = p3->count[p3->mpirank + 1];
   SC3A_CHECK (end_quad - first_quad <= P4EST3_LOCIDX_MAX);
   if ((p3->local_num_quads = (p4est3_locidx) (end_quad - first_quad)) == 0) {
     fltree = -1;
@@ -202,9 +203,6 @@ p4est3_setup (p4est3_t * p3)
     fltree = (p4est3_topidx) (first_quad / num_uniform);
     lltree = (p4est3_topidx) ((end_quad - 1) / num_uniform);
   }
-
-  /* create shared partition arrays */
-  SC3E (p4est3_internal_setup_cut (p3, num_global, qsize));
 
   /* TODO create trees and quadrants */
 

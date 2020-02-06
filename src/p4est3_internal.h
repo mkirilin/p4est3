@@ -55,6 +55,8 @@ struct p4est3
 
   p4est3_locidx       local_num_quads;
   p4est3_gloidx       global_num_quads;
+  p4est3_gloidx      *count;
+  char               *gfpos;
 };
 
 #ifdef __cplusplus

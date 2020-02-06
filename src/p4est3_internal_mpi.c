@@ -147,6 +147,11 @@ p4est3_internal_setup_cut (p4est3_t * p3, p4est3_gloidx num_global, int qsize)
     SC3E (sc3_MPI_Barrier (p3->nodecomm));
   }
   else {
+    SC3E (sc3_MPI_Win_shared_query (p3->gfposwin, 0,
+                                    &tempbytes, &dispunit, &gfposmem));
+    SC3A_CHECK (gfposbytes == tempbytes);
+    SC3A_CHECK (dispunit == qsize);
+    SC3A_CHECK (gfposmem != NULL);
     SC3E (sc3_MPI_Win_shared_query (p3->countwin, 0,
                                     &tempbytes, &dispunit, &countmem));
     SC3A_CHECK (countbytes == tempbytes);
@@ -161,8 +166,9 @@ p4est3_internal_setup_cut (p4est3_t * p3, p4est3_gloidx num_global, int qsize)
   }
 
   /* assign further object members */
-
   p3->qsize = qsize;
   p3->global_num_quads = num_global;
+  p3->count = countmem;
+  p3->gfpos = gfposmem;
   return NULL;
 }
