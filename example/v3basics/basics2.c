@@ -35,7 +35,8 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
 
 static sc3_error_t *
 test_p4est_new (sc3_allocator_t * alloc,
-                sc3_MPI_Comm_t mpicomm, p4est3_quadrant_vtable_t * qvt)
+                sc3_MPI_Comm_t mpicomm, p4est3_quadrant_vtable_t * qvt,
+                p4est3_topidx num_trees, int level)
 {
   p4est3_t           *p3;
 
@@ -44,6 +45,8 @@ test_p4est_new (sc3_allocator_t * alloc,
   SC3E (p4est3_new (alloc, &p3));
   SC3E (p4est3_set_comm (p3, mpicomm, 1));
   SC3E (p4est3_set_vtable (p3, qvt));
+  SC3E (p4est3_set_num_trees (p3, num_trees));
+  SC3E (p4est3_set_level (p3, level));
   SC3E (p4est3_setup (p3));
 
   SC3E (p4est3_destroy (&p3));
@@ -89,6 +92,8 @@ report_errors (sc3_allocator_t * mainalloc, sc3_error_t ** pe)
 int
 main (int argc, char **argv)
 {
+  int                 level;
+  p4est3_topidx       num_trees;
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e;
   sc3_MPI_Comm_t      mpicomm;
@@ -98,9 +103,12 @@ main (int argc, char **argv)
   mpicomm = SC3_MPI_COMM_WORLD;
   p4est_quadrant_vtable (qvt);
 
+  num_trees = 2;
+  level = 3;
+
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
   SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
-  SC3E_NULL_SET (e, test_p4est_new (alloc, mpicomm, qvt));
+  SC3E_NULL_SET (e, test_p4est_new (alloc, mpicomm, qvt, num_trees, level));
   SC3E_NULL_SET (e, free_allocator (&alloc));
 
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
