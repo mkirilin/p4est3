@@ -74,6 +74,7 @@ p4est3_internal_setup_comm (p4est3_t * p3)
     nodesizemem[0] = p3->num_nodes = headsize;
     nodesizemem[1] = p3->node_num = headrank;
     p3->node_sizes = &nodesizemem[2];
+    p3->node_frank = p3->mpirank;
 
     /* allgather information about all nodes and compute offsets */
     SC3E (sc3_MPI_Allgather (&p3->nodesize, 1, SC3_MPI_INT,
@@ -83,7 +84,8 @@ p4est3_internal_setup_comm (p4est3_t * p3)
       next = *ofs + p3->node_sizes[p];
       *++ofs = next;
     }
-    SC3A_CHECK (p3->node_offsets[p3->mpirank] == p3->mpirank);
+    SC3A_CHECK (p3->node_offsets[headrank] == p3->mpirank);
+    SC3A_CHECK (p3->node_offsets[headsize] == p3->mpisize);
 
     /* make sure shared memory contents are consistent */
     SC3E (sc3_MPI_Win_unlock (0, p3->nodesizewin));
@@ -106,6 +108,7 @@ p4est3_internal_setup_comm (p4est3_t * p3)
     p3->node_sizes = &nodesizemem[2];
     p3->node_offsets = &nodesizemem[2 + p3->num_nodes];
   }
+  SC3A_CHECK (p3->node_frank == p3->node_offsets[p3->node_num]);
 
   return NULL;
 }

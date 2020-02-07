@@ -44,6 +44,7 @@ struct p4est3
   int                 nodesize, noderank;
   int                 num_nodes;
   int                 node_num;
+  int                 node_frank;
   int                *node_sizes;
   int                *node_offsets;
 
