@@ -86,3 +86,12 @@ p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
 
   return qvt->quadrant_parent (q, r);
 }
+
+sc3_error_t        *
+p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
+                        int level, p4est3_gloidx id, void *r)
+{
+  P3A_CHECK (qvt != NULL && qvt->quadrant_morton != NULL);
+
+  return qvt->quadrant_morton (level, id, r);
+}

@@ -51,9 +51,9 @@ p4est_quadrant_vtable_is_valid (const void *q, char *reason)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_root (void *q)
+p4est_quadrant_vtable_root (void *r)
 {
-  p4est_quadrant_set_morton ((p4est_quadrant_t *) q, 0, 0);
+  p4est_quadrant_set_morton ((p4est_quadrant_t *) r, 0, 0);
   return NULL;
 }
 
@@ -73,6 +73,13 @@ p4est_quadrant_vtable_parent (const void *q, void *r)
   return NULL;
 }
 
+static sc3_error_t *
+p4est_quadrant_vtable_morton (int level, p4est_gloidx_t id, void *r)
+{
+  p4est_quadrant_set_morton ((p4est_quadrant_t *) r, level, (uint64_t) id);
+  return NULL;
+}
+
 void
 p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt)
 {
@@ -86,6 +93,7 @@ p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_root = p4est_quadrant_vtable_root;
   qvt->quadrant_child = p4est_quadrant_vtable_child;
   qvt->quadrant_parent = p4est_quadrant_vtable_parent;
+  qvt->quadrant_morton = p4est_quadrant_vtable_morton;
   qvt->quadrant_successor = (p4est3_quadrant_successor_t) NULL;
   qvt->quadrant_predecessor = (p4est3_quadrant_predecessor_t) NULL;
 }

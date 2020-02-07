@@ -40,6 +40,8 @@ typedef size_t      (*p4est3_quadrant_size_t) (void);
 typedef int         (*p4est3_quadrant_is_t) (const void * q, char *reason);
 typedef sc3_error_t *(*p4est3_quadrant_out_t) (void *r);
 typedef sc3_error_t *(*p4est3_quadrant_in_out_t) (const void *q, void *r);
+typedef sc3_error_t *(*p4est3_quadrant_morton_t) (int l, p4est3_gloidx i,
+                                                  void *r);
 
 typedef p4est3_quadrant_out_t p4est3_quadrant_root_t;
 typedef sc3_error_t *(*p4est3_quadrant_child_t) (const void *q, void *r,
@@ -58,6 +60,7 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_root_t quadrant_root;
   p4est3_quadrant_child_t quadrant_child;
   p4est3_quadrant_parent_t quadrant_parent;
+  p4est3_quadrant_morton_t quadrant_morton;
   p4est3_quadrant_successor_t quadrant_successor;
   p4est3_quadrant_predecessor_t quadrant_predecessor;
 }
@@ -74,6 +77,9 @@ sc3_error_t        *p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
                                            const void *q, void *r, int i);
 sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
                                             const void *q, void *r);
+sc3_error_t        *p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
+                                            int level, p4est3_gloidx id,
+                                            void *r);
 
 #ifdef __cplusplus
 #if 0
