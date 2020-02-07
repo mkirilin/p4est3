@@ -149,9 +149,7 @@ p4est3_setup (p4est3_t * p3)
 {
   int                 max_level, lev;
   int                 qsize;
-  p4est3_topidx       fltree, lltree;
   p4est3_gloidx       num_uniform, high_uniform;
-  p4est3_gloidx       first_quad, end_quad;
 
   /*
    * We will extend the functionality of p4est3_set_* and _setup in the future.
@@ -191,20 +189,11 @@ p4est3_setup (p4est3_t * p3)
 
   /* compute partition cuts and create shared partition arrays */
   SC3E (p4est3_internal_setup_cut (p3, num_uniform, qsize));
-  first_quad = p3->goffset[p3->mpirank];
-  end_quad = p3->goffset[p3->mpirank + 1];
-  SC3A_CHECK (end_quad - first_quad <= P4EST3_LOCIDX_MAX);
-  if ((p3->local_num_quads = (p4est3_locidx) (end_quad - first_quad)) == 0) {
-    fltree = -1;
-    lltree = -2;
-  }
-  else {
-    fltree = (p4est3_topidx) (first_quad / num_uniform);
-    lltree = (p4est3_topidx) ((end_quad - 1) / num_uniform);
-    SC3A_CHECK (fltree == p3->gftree[p3->mpirank]);
-  }
 
-  /* TODO create trees and quadrants */
+  /* create tree and quadrant metadata */
+  SC3E (p4est3_internal_setup_tree (p3, num_uniform));
+
+  /* TODO create quadrants */
 
   /* TODO: populate shared position array */
 
@@ -238,10 +227,12 @@ p4est3_unref (p4est3_t ** pp3)
 
     alloc = p3->alloc;
     if (p3->setup) {
+      /* free internal MPI objects */
       SC3E (sc3_MPI_Win_free (&p3->nodesizewin));
       SC3E (sc3_MPI_Win_free (&p3->gfposwin));
       SC3E (sc3_MPI_Win_free (&p3->gftreewin));
       SC3E (sc3_MPI_Win_free (&p3->goffsetwin));
+      SC3E (sc3_MPI_Win_free (&p3->quadwin));
       if (p3->noderank == 0) {
         SC3E (sc3_MPI_Comm_free (&p3->headcomm));
       }
@@ -249,6 +240,8 @@ p4est3_unref (p4est3_t ** pp3)
       SC3E (sc3_MPI_Info_free (&p3->info_noncontig));
 
       /* deallocate internal storage */
+      SC3E (sc3_array_destroy (&p3->trees));
+      SC3E_ALLOCATOR_FREE (p3->alloc, char *, p3->nodequads);
     }
     if (p3->commdup) {
       SC3E (sc3_MPI_Comm_free (&p3->mpicomm));

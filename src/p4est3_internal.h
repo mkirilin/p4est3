@@ -25,7 +25,17 @@
 #define P4EST3_INTERNAL_H
 
 #include <p4est3.h>
+#include <sc3_array.h>
 #include <sc3_refcount.h>
+
+typedef struct p4est3_tree
+{
+  p4est3_topidx       treeid;
+  p4est3_locidx       quad_offset;
+  p4est3_locidx       num_quads;
+  char               *tquads;
+}
+p4est3_tree_t;
 
 struct p4est3
 {
@@ -40,6 +50,7 @@ struct p4est3
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Win_t       nodesizewin;
   sc3_MPI_Win_t       gfposwin, gftreewin, goffsetwin;
+  sc3_MPI_Win_t       quadwin;
   int                 mpisize, mpirank;
   int                 nodesize, noderank;
   int                 num_nodes;
@@ -59,7 +70,10 @@ struct p4est3
   p4est3_gloidx      *goffset;
   p4est3_topidx      *gftree;
   char               *gfpos;
-  char               *quads;
+  char              **nodequads, *quads;
+
+  p4est3_topidx       fltree, lltree, nltrees;
+  sc3_array_t        *trees;
 };
 
 #ifdef __cplusplus
@@ -70,10 +84,15 @@ extern              "C"
 #endif
 #endif
 
+sc3_error_t        *p4est3_tree_index (p4est3_t * p3, p4est3_topidx tt,
+                                       p4est3_tree_t ** tree);
+
 sc3_error_t        *p4est3_internal_setup_comm (p4est3_t * p3);
 sc3_error_t        *p4est3_internal_setup_cut (p4est3_t * p3,
                                                p4est3_gloidx num_uniform,
                                                int qsize);
+sc3_error_t        *p4est3_internal_setup_tree (p4est3_t * p3,
+                                                p4est3_gloidx num_uniform);
 
 #ifdef __cplusplus
 #if 0

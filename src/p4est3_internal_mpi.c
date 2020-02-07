@@ -197,3 +197,101 @@ p4est3_internal_setup_cut (p4est3_t * p3, p4est3_gloidx num_uniform,
   p3->gfpos = gfposmem;
   return NULL;
 }
+
+sc3_error_t        *
+p4est3_tree_index (p4est3_t * p3, p4est3_topidx tt, p4est3_tree_t ** tree)
+{
+  void               *vt;
+
+  SC3A_CHECK (p3 != NULL);
+  SC3A_CHECK (p3->fltree <= tt && tt <= p3->lltree);
+  SC3A_CHECK (tree != NULL);
+
+  SC3E (sc3_array_index (p3->trees, tt - p3->fltree, &vt));
+  *tree = (p4est3_tree_t *) vt;
+
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
+{
+  int                 n;
+  int                 dispunit;
+  char               *quadmem, *nqmem;
+  p4est3_topidx       tt;
+  p4est3_gloidx       first_quad, end_quad, tt_offset;
+  p4est3_gloidx       first_tnum, end_tnum, next_offset;
+  p4est3_tree_t      *tree;
+  sc3_MPI_Aint_t      quadbytes, tempbytes;
+
+  /* this is a special-purpose function to simplify p4est3_setup */
+  SC3A_CHECK (p3 != NULL);
+  SC3A_CHECK (0 <= p3->mpirank && p3->mpirank < p3->mpisize);
+  SC3A_CHECK (0 <= p3->noderank && p3->noderank < p3->nodesize);
+
+  /* determine local trees */
+  first_quad = p3->goffset[p3->mpirank];
+  end_quad = p3->goffset[p3->mpirank + 1];
+  SC3A_CHECK (end_quad - first_quad <= P4EST3_LOCIDX_MAX);
+  if ((p3->local_num_quads = (p4est3_locidx) (end_quad - first_quad)) == 0) {
+    p3->fltree = -1;
+    p3->lltree = -2;
+    p3->nltrees = 0;
+  }
+  else {
+    p3->fltree = (p4est3_topidx) (first_quad / num_uniform);
+    p3->lltree = (p4est3_topidx) ((end_quad - 1) / num_uniform);
+    SC3A_CHECK (p3->fltree == p3->gftree[p3->mpirank]);
+    p3->nltrees = p3->lltree - p3->fltree + 1;
+  }
+
+  /* create shared quadrant storage */
+  SC3E_ALLOCATOR_MALLOC (p3->alloc, char *, p3->nodesize, p3->nodequads);
+  quadbytes = p3->local_num_quads * p3->qsize;
+  SC3E (sc3_MPI_Win_allocate_shared
+        (quadbytes, p3->qsize,
+         p3->info_noncontig, p3->nodecomm, &quadmem, &p3->quadwin));
+  for (n = 0; n < p3->nodesize; ++n) {
+    SC3E (sc3_MPI_Win_shared_query (p3->quadwin, n,
+                                    &tempbytes, &dispunit, &nqmem));
+    SC3A_CHECK (tempbytes == (sc3_MPI_Aint_t)
+                ((p3->goffset[p3->node_frank + n + 1] -
+                  p3->goffset[p3->node_frank + n]) * p3->qsize));
+    SC3A_CHECK (dispunit == p3->qsize);
+    SC3A_CHECK (nqmem != NULL || tempbytes == 0);
+    p3->nodequads[n] = nqmem;
+  }
+  p3->quads = quadmem;
+  SC3A_CHECK (p3->nodequads[p3->noderank] == p3->quads);
+
+  /* populate tree metadata */
+  SC3E (sc3_array_new (p3->alloc, &p3->trees));
+  SC3E (sc3_array_set_elem_size (p3->trees, sizeof (p4est3_tree_t)));
+  SC3E (sc3_array_set_elem_count (p3->trees, p3->nltrees));
+  SC3E (sc3_array_setup (p3->trees));
+  next_offset = 0;
+  tt_offset = p3->fltree * num_uniform;
+  for (tt = p3->fltree; tt <= p3->lltree; ++tt) {
+    SC3E (p4est3_tree_index (p3, tt, &tree));
+    tree->treeid = tt;
+    tree->quad_offset = next_offset;
+    first_tnum = (tt == p3->fltree) ? first_quad - tt_offset : 0;
+    if (tt == p3->lltree) {
+      /* this is the last iteration: no need to update tt_offset */
+      end_tnum = end_quad - tt_offset;
+    }
+    else {
+      end_tnum = tt_offset += num_uniform;
+    }
+    /* by construction each local tree contains at least one element */
+    SC3A_CHECK (0 <= first_tnum && first_tnum < end_tnum);
+    tree->num_quads = end_tnum - first_tnum;
+    SC3A_CHECK (0 < tree->num_quads && tree->num_quads <= num_uniform);
+    next_offset = tree->quad_offset + tree->num_quads;
+    tree->tquads = p3->quads + tree->quad_offset * p3->qsize;
+  }
+  SC3A_CHECK (tt_offset == p3->lltree * num_uniform);
+  SC3A_CHECK (next_offset == p3->local_num_quads);
+  return NULL;
+}
