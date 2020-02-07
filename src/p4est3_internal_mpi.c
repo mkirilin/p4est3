@@ -114,12 +114,13 @@ p4est3_internal_setup_comm (p4est3_t * p3)
 }
 
 sc3_error_t        *
-p4est3_internal_setup_cut (p4est3_t * p3, p4est3_gloidx num_uniform,
-                           int qsize)
+p4est3_internal_setup_cut (p4est3_t * p3, int level,
+                           p4est3_gloidx num_uniform, int qsize)
 {
   int                 p;
+  int                 beginr, endr;
   int                 dispunit;
-  char               *gfposmem;
+  char               *gfposmem, *qptr;
   p4est3_topidx      *gftreemem;
   p4est3_gloidx      *goffsetmem, num_global;
   sc3_MPI_Aint_t      gftreebytes, gfposbytes, goffsetbytes, tempbytes;
@@ -188,6 +189,19 @@ p4est3_internal_setup_cut (p4est3_t * p3, p4est3_gloidx num_uniform,
     }
 #endif
   }
+
+  /* compute all first quadrants fairly across node ranks */
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gfposwin));
+  beginr = (int) p4est3_glocut (p3->mpisize, p3->nodesize, p3->noderank);
+  endr = (int) p4est3_glocut (p3->mpisize, p3->nodesize, p3->noderank + 1);
+  qptr = gfposmem + beginr * p3->qsize;
+  for (p = beginr; p < endr; ++p) {
+    SC3E (p4est3_quadrant_morton
+          (p3->qvt, level, goffsetmem[p] - gftreemem[p] * num_uniform, qptr));
+    qptr += p3->qsize;
+  }
+  SC3E (sc3_MPI_Win_unlock (0, p3->gfposwin));
 
   /* assign further object members */
   p3->qsize = qsize;

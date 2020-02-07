@@ -188,7 +188,7 @@ p4est3_setup (p4est3_t * p3)
   SC3A_CHECK (p4est3_glopow (p3->num_children, max_level) == num_uniform);
 
   /* compute partition cuts and create shared partition arrays */
-  SC3E (p4est3_internal_setup_cut (p3, num_uniform, qsize));
+  SC3E (p4est3_internal_setup_cut (p3, max_level, num_uniform, qsize));
 
   /* create tree and quadrant metadata */
   SC3E (p4est3_internal_setup_tree (p3, num_uniform));

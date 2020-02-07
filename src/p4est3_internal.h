@@ -88,7 +88,7 @@ sc3_error_t        *p4est3_tree_index (p4est3_t * p3, p4est3_topidx tt,
                                        p4est3_tree_t ** tree);
 
 sc3_error_t        *p4est3_internal_setup_comm (p4est3_t * p3);
-sc3_error_t        *p4est3_internal_setup_cut (p4est3_t * p3,
+sc3_error_t        *p4est3_internal_setup_cut (p4est3_t * p3, int level,
                                                p4est3_gloidx num_uniform,
                                                int qsize);
 sc3_error_t        *p4est3_internal_setup_tree (p4est3_t * p3,
