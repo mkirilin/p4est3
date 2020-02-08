@@ -58,7 +58,7 @@ p4est_quadrant_vtable_root (void *r)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_child (const void *q, void *r, int i)
+p4est_quadrant_vtable_child (const void *q, int i, void *r)
 {
   p4est_quadrant_child
     ((const p4est_quadrant_t *) q, (p4est_quadrant_t *) r, i);
@@ -70,6 +70,22 @@ p4est_quadrant_vtable_parent (const void *q, void *r)
 {
   p4est_quadrant_parent
     ((const p4est_quadrant_t *) q, (p4est_quadrant_t *) r);
+  return NULL;
+}
+
+static sc3_error_t *
+p4est_quadrant_vtable_first_descendant (const void *q, int l, void *r)
+{
+  p4est_quadrant_first_descendant
+    ((const p4est_quadrant_t *) q, (p4est_quadrant_t *) r, l);
+  return NULL;
+}
+
+static sc3_error_t *
+p4est_quadrant_vtable_last_descendant (const void *q, int l, void *r)
+{
+  p4est_quadrant_last_descendant
+    ((const p4est_quadrant_t *) q, (p4est_quadrant_t *) r, l);
   return NULL;
 }
 
@@ -93,6 +109,8 @@ p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_root = p4est_quadrant_vtable_root;
   qvt->quadrant_child = p4est_quadrant_vtable_child;
   qvt->quadrant_parent = p4est_quadrant_vtable_parent;
+  qvt->quadrant_first_descendant = p4est_quadrant_vtable_first_descendant;
+  qvt->quadrant_last_descendant = p4est_quadrant_vtable_last_descendant;
   qvt->quadrant_morton = p4est_quadrant_vtable_morton;
   qvt->quadrant_successor = (p4est3_quadrant_successor_t) NULL;
   qvt->quadrant_predecessor = (p4est3_quadrant_predecessor_t) NULL;
