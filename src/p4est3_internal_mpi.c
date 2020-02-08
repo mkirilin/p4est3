@@ -22,6 +22,7 @@
 */
 
 #include <p4est3_internal.h>
+#include <sc3_omp.h>
 
 sc3_error_t        *
 p4est3_internal_setup_comm (p4est3_t * p3)
@@ -117,13 +118,16 @@ sc3_error_t        *
 p4est3_internal_setup_cut (p4est3_t * p3, int level,
                            p4est3_gloidx num_uniform, int qsize)
 {
-  int                 p;
+#ifdef P4EST_ENABLE_DEBUG
+  int                 dp;
+#endif
   int                 beginr, endr;
   int                 dispunit;
-  char               *gfposmem, *qptr;
+  char               *gfposmem;
   p4est3_topidx      *gftreemem;
   p4est3_gloidx      *goffsetmem, num_global;
   sc3_MPI_Aint_t      gftreebytes, gfposbytes, goffsetbytes, tempbytes;
+  sc3_omp_esync_t     esync, *s = &esync;
 
   /* this is a special-purpose function to simplify p4est3_setup */
   SC3A_CHECK (p3 != NULL);
@@ -171,26 +175,43 @@ p4est3_internal_setup_cut (p4est3_t * p3, int level,
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsetwin));
   num_global = p3->num_trees * num_uniform;
-  beginr = (int) p4est3_glocut (p3->mpisize + 1, p3->nodesize, p3->noderank);
-  endr =
-    (int) p4est3_glocut (p3->mpisize + 1, p3->nodesize, p3->noderank + 1);
-  qptr = gfposmem + beginr * qsize;
-  for (p = beginr; p < endr; ++p) {
-    gftreemem[p] =
-      (goffsetmem[p] =
-       p4est3_glocut (num_global, p3->mpisize, p)) / num_uniform;
-    SC3E (p4est3_quadrant_morton
-          (p3->qvt, level, goffsetmem[p] - gftreemem[p] * num_uniform, qptr));
-    qptr += qsize;
+  beginr = sc3_intcut (p3->mpisize + 1, p3->nodesize, p3->noderank);
+  endr = sc3_intcut (p3->mpisize + 1, p3->nodesize, p3->noderank + 1);
+  SC3E (sc3_omp_esync_init (s));
+#pragma omp parallel
+  {
+    int                 beginrt = beginr;
+    int                 endrt = endr;
+    int                 pt;
+    char               *qptr;
+    sc3_error_t        *e = NULL;
+
+    /* parallelize process loop across threads */
+    sc3_omp_thread_intrange (&beginrt, &endrt);
+    qptr = gfposmem + beginrt * qsize;
+    for (pt = beginrt; pt < endrt; ++pt) {
+      gftreemem[pt] =
+        (goffsetmem[pt] =
+         p4est3_glocut (num_global, p3->mpisize, pt)) / num_uniform;
+      if ((e = p4est3_quadrant_morton
+           (p3->qvt, level, goffsetmem[pt] - gftreemem[pt] * num_uniform,
+            qptr)) != NULL) {
+        break;
+      }
+      qptr += qsize;
+    }
+    sc3_omp_esync_barrier (s, &e);
   }
+  SC3E (sc3_omp_esync_summary (s));
   SC3E (sc3_MPI_Win_unlock (0, p3->gftreewin));
   SC3E (sc3_MPI_Win_unlock (0, p3->gfposwin));
   SC3E (sc3_MPI_Win_unlock (0, p3->goffsetwin));
   SC3E (sc3_MPI_Barrier (p3->nodecomm));
 #ifdef P4EST_ENABLE_DEBUG
-  for (p = 0; p <= p3->mpisize; ++p) {
-    SC3A_CHECK (gftreemem[p] == goffsetmem[p] / num_uniform);
-    SC3A_CHECK (goffsetmem[p] == p4est3_glocut (num_global, p3->mpisize, p));
+  for (dp = 0; dp <= p3->mpisize; ++dp) {
+    SC3A_CHECK (gftreemem[dp] == goffsetmem[dp] / num_uniform);
+    SC3A_CHECK (goffsetmem[dp] ==
+                p4est3_glocut (num_global, p3->mpisize, dp));
   }
   SC3A_CHECK (gftreemem[p3->mpisize] == p3->num_trees);
   SC3A_CHECK (goffsetmem[p3->mpisize] == num_global);
