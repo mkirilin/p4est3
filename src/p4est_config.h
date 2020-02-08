@@ -21,44 +21,14 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P4EST3_BASE_H
-#define P4EST3_BASE_H
+/** \file p4est_config.h
+ *
+ * This configuration file is always included in pre-v3 headers.
+ */
 
-#include <sc3_alloc.h>
-#include <sc3_error.h>
+#ifndef P4EST_CONFIG_H
+#define P4EST_CONFIG_H
+
 #include <p4est3_config.h>
 
-#define P3A_CHECK(x) SC3A_CHECK (x)
-#define P3A_STACK(x) SC3A_STACK (x)
-#define P3E(f) SC3E (f)
-#define P3E_DEMAND(f) SC3E_DEMAND (f)
-
-typedef int         p4est3_topidx;
-#define P4EST3_TOPIDX_MAX INT_MAX
-
-typedef int         p4est3_locidx;
-#define P4EST3_LOCIDX_MAX INT_MAX
-
-typedef long        p4est3_gloidx;
-#define P4EST3_GLOIDX_MAX LONG_MAX
-#define p4est3_glopow sc3_longpow
-#define p4est3_glocut sc3_longcut
-
-#ifdef __cplusplus
-extern              "C"
-{
-#if 0
-}
-#endif
-#endif
-
-/* no function prototypes yet */
-
-#ifdef __cplusplus
-#if 0
-{
-#endif
-}
-#endif
-
-#endif /* !P4EST3_BASE_H */
+#endif /* !P4EST_CONFIG_H */
