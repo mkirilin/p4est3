@@ -111,6 +111,7 @@ main (int argc, char **argv)
   SC3E_NULL_SET (e, test_p4est_new (alloc, mpicomm, qvt, num_trees, level));
   SC3E_NULL_SET (e, free_allocator (&alloc));
 
+  /* TODO: call finalize even with errors? */
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
   report_errors (mainalloc, &e);
 

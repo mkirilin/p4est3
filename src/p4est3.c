@@ -22,6 +22,7 @@
 */
 
 #include <p4est3_internal.h>
+#include <sc3_omp.h>
 #include <sc3_refcount_internal.h>
 
 /* TODO add context information to sc3_error
@@ -147,8 +148,9 @@ p4est3_set_level (p4est3_t * p3, int level)
 sc3_error_t        *
 p4est3_setup (p4est3_t * p3)
 {
-  int                 max_level, lev;
+  int                 lev;
   int                 qsize;
+  int                 ti;
   p4est3_gloidx       num_uniform, high_uniform;
 
   /*
@@ -170,25 +172,34 @@ p4est3_setup (p4est3_t * p3)
   qsize = (int) p4est3_quadrant_size (p3->qvt);
   SC3A_CHECK (qsize > 0);
 
-  /* determine uniform refinement level */
-  max_level = p4est3_max_level (p3->qvt);
-  SC3A_CHECK (max_level >= 0);
-  max_level = SC3_MIN (p3->level, max_level);
+  /* determine principal and initial refinement level */
+  p3->qmaxlevel = p4est3_max_level (p3->qvt);
+  SC3A_CHECK (p3->qmaxlevel >= 0);
+  p3->level = SC3_MIN (p3->level, p3->qmaxlevel);
 
   /* with number of children determine number of elements per tree */
   p3->num_children = p4est3_num_children (p3->qvt);
   SC3A_CHECK (p3->num_children > 0);
   high_uniform = P4EST3_GLOIDX_MAX / p3->num_children;
   for (num_uniform = 1, lev = 0;
-       num_uniform <= high_uniform && lev < max_level; ++lev) {
+       num_uniform <= high_uniform && lev < p3->level; ++lev) {
     /* we iterate so we do not roll over the gloidx limit */
     num_uniform *= p3->num_children;
   }
-  max_level = lev;
-  SC3A_CHECK (p4est3_glopow (p3->num_children, max_level) == num_uniform);
+  p3->level = lev;
+  SC3A_CHECK (p4est3_glopow (p3->num_children, p3->level) == num_uniform);
+
+  /* allocate one temporary quadrant per thread */
+  p3->max_threads = sc3_omp_max_threads ();
+  SC3E_ALLOCATOR_MALLOC (p3->alloc,
+                         char *, p3->max_threads, p3->temp_quad);
+  for (ti = 0; ti < p3->max_threads; ++ti) {
+    SC3E_ALLOCATOR_MALLOC (p3->alloc,
+                           char, qsize, p3->temp_quad[ti]);
+  }
 
   /* compute partition cuts and create shared partition arrays */
-  SC3E (p4est3_internal_setup_cut (p3, max_level, num_uniform, qsize));
+  SC3E (p4est3_internal_setup_cut (p3, num_uniform, qsize));
 
   /* create tree and quadrant metadata */
   SC3E (p4est3_internal_setup_tree (p3, num_uniform));
@@ -227,6 +238,8 @@ p4est3_unref (p4est3_t ** pp3)
 
     alloc = p3->alloc;
     if (p3->setup) {
+      int              ti;
+
       /* free internal MPI objects */
       SC3E (sc3_MPI_Win_free (&p3->nodesizewin));
       SC3E (sc3_MPI_Win_free (&p3->gfposwin));
@@ -240,6 +253,11 @@ p4est3_unref (p4est3_t ** pp3)
       SC3E (sc3_MPI_Info_free (&p3->info_noncontig));
 
       /* deallocate internal storage */
+      for (ti = 0; ti < p3->max_threads; ++ti) {
+        SC3E_ALLOCATOR_FREE (p3->alloc, char, p3->temp_quad[ti]);
+      }
+      SC3E_ALLOCATOR_FREE (p3->alloc, char *, p3->temp_quad);
+
       SC3E (sc3_array_destroy (&p3->trees));
       SC3E_ALLOCATOR_FREE (p3->alloc, char *, p3->nodequads);
     }

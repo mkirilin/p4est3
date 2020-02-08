@@ -62,8 +62,12 @@ struct p4est3
   p4est3_quadrant_vtable_t *qvt;
   p4est3_topidx       num_trees;
   int                 level;
+  int                 qmaxlevel;
   int                 num_children;
   int                 qsize;
+
+  int                 max_threads;
+  char              **temp_quad;
 
   p4est3_locidx       local_num_quads;
   p4est3_gloidx       global_num_quads;
@@ -88,7 +92,7 @@ sc3_error_t        *p4est3_tree_index (p4est3_t * p3, p4est3_topidx tt,
                                        p4est3_tree_t ** tree);
 
 sc3_error_t        *p4est3_internal_setup_comm (p4est3_t * p3);
-sc3_error_t        *p4est3_internal_setup_cut (p4est3_t * p3, int level,
+sc3_error_t        *p4est3_internal_setup_cut (p4est3_t * p3,
                                                p4est3_gloidx num_uniform,
                                                int qsize);
 sc3_error_t        *p4est3_internal_setup_tree (p4est3_t * p3,

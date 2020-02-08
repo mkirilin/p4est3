@@ -115,7 +115,7 @@ p4est3_internal_setup_comm (p4est3_t * p3)
 }
 
 sc3_error_t        *
-p4est3_internal_setup_cut (p4est3_t * p3, int level,
+p4est3_internal_setup_cut (p4est3_t * p3,
                            p4est3_gloidx num_uniform, int qsize)
 {
 #ifdef P4EST_ENABLE_DEBUG
@@ -184,7 +184,8 @@ p4est3_internal_setup_cut (p4est3_t * p3, int level,
     int                 endrt = endr;
     int                 pt;
     char               *qptr;
-    sc3_error_t        *e = NULL;
+    char               *temp = p3->temp_quad[sc3_omp_thread_num ()];
+    sc3_error_t        *e;
 
     /* parallelize process loop across threads */
     sc3_omp_thread_intrange (&beginrt, &endrt);
@@ -193,11 +194,12 @@ p4est3_internal_setup_cut (p4est3_t * p3, int level,
       gftreemem[pt] =
         (goffsetmem[pt] =
          p4est3_glocut (num_global, p3->mpisize, pt)) / num_uniform;
-      if ((e = p4est3_quadrant_morton
-           (p3->qvt, level, goffsetmem[pt] - gftreemem[pt] * num_uniform,
-            qptr)) != NULL) {
-        break;
-      }
+      SC3E_SET (e, p4est3_quadrant_morton
+                (p3->qvt, p3->level,
+                 goffsetmem[pt] - gftreemem[pt] * num_uniform, temp));
+      SC3E_NULL_SET (e, p4est3_quadrant_first_descendant
+                     (p3->qvt, temp, p3->qmaxlevel, qptr));
+      SC3E_NULL_BREAK (e);
       qptr += qsize;
     }
     sc3_omp_esync_barrier (s, &e);
