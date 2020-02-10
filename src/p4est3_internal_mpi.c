@@ -325,3 +325,105 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   SC3A_CHECK (next_offset == p3->local_num_quads);
   return NULL;
 }
+
+/** Binary search a local quad number in the local trees */
+static sc3_error_t *
+p4est3_local_quad_tree (p4est3_t * p3,
+                        p4est3_locidx local_num, p4est3_tree_t ** ptree)
+{
+  p4est3_topidx       mint, maxt, guess;
+
+  /* sanity checks */
+  SC3A_CHECK (p3 != NULL);
+  SC3A_CHECK (0 <= local_num && local_num < p3->local_num_quads);
+  SC3A_CHECK (ptree != NULL);
+
+  /* begin search with local range of trees (inclusive) */
+  mint = p3->fltree;
+  maxt = p3->lltree;
+  for (;;) {
+    SC3A_CHECK (mint <= maxt);
+
+    /* have we found our result? */
+    if (mint == maxt) {
+      SC3E (p4est3_tree_index (p3, mint, ptree));
+      return NULL;
+    }
+
+    /* if not, it is important to look ahead of previous minimum */
+    guess = (mint + maxt + 1) / 2;
+    SC3E (p4est3_tree_index (p3, guess, ptree));
+    if (local_num < (*ptree)->quad_offset) {
+      /* the quadrant is on a lower tree */
+      maxt = guess - 1;
+    }
+    else {
+      /* the quadrant is on this or a higher tree */
+      mint = guess;
+    }
+  }
+}
+
+sc3_error_t        *
+p4est3_internal_setup_morton (p4est3_t * p3)
+{
+  sc3_omp_esync_t     esync, *s = &esync;
+
+  /* this is a special-purpose function to simplify p4est3_setup */
+  SC3A_CHECK (p3 != NULL && p3->quads != NULL);
+  SC3A_CHECK (0 <= p3->mpirank && p3->mpirank < p3->mpisize);
+  SC3A_CHECK (0 <= p3->noderank && p3->noderank < p3->nodesize);
+
+  /* we work on the process-local window onte the quadrants */
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, p3->noderank,
+                          SC3_MPI_MODE_NOCHECK, p3->quadwin));
+  SC3E (sc3_omp_esync_init (s));
+#pragma omp parallel
+  {
+    const int           tnum = sc3_omp_num_threads ();
+    const int           tid = sc3_omp_thread_num ();
+    char               *charq;
+    sc3_error_t        *e;
+    p4est3_locidx       first_quad_num, end_quad_num, tmine, tq;
+    p4est3_gloidx       gq;
+    p4est3_tree_t      *tree;
+
+    /* find tree sub-range for each thread separately */
+    first_quad_num = p4est3_loccut (p3->local_num_quads, tnum, tid);
+    end_quad_num = p4est3_loccut (p3->local_num_quads, tnum, tid + 1);
+    SC3E_SET (e, p4est3_local_quad_tree (p3, first_quad_num, &tree));
+    if (e == NULL) {
+      tq = first_quad_num;
+      gq = tree->first_tquad + (first_quad_num - tree->quad_offset);
+      charq = p3->quads + first_quad_num * p3->qsize;
+
+      /* loop over subset of local trees */
+      for (;;) {
+        SC3E_NULL_REQ (e, tree->quad_offset <= tq);
+        SC3E_NULL_REQ (e, tq < tree->quad_offset + tree->num_quads);
+        tmine = SC3_MIN (end_quad_num, tree->quad_offset + tree->num_quads);
+
+        /* loop over quadrants in local tree */
+        for (; tq < tmine; ++tq, ++gq, charq += p3->qsize) {
+          SC3E_NULL_SET
+            (e, p4est3_quadrant_morton (p3->qvt, p3->level, gq, charq));
+          SC3E_NULL_BREAK (e);
+        }
+        SC3E_NULL_REQ (e, tq <= end_quad_num);
+        if (tq == end_quad_num) {
+          break;
+        }
+
+        /* move forward to next tree */
+        SC3E_NULL_SET (e, p4est3_tree_index (p3, tree->treeid + 1, &tree));
+        SC3E_NULL_BREAK (e);
+        gq = 0;
+      }
+    }
+    sc3_omp_esync (s, &e);
+  }
+  SC3E (sc3_omp_esync_summary (s));
+  SC3E (sc3_MPI_Win_unlock (p3->noderank, p3->quadwin));
+  SC3E (sc3_MPI_Barrier (p3->nodecomm));
+  return NULL;
+}

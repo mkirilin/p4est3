@@ -98,6 +98,7 @@ sc3_error_t        *p4est3_internal_setup_cut (p4est3_t * p3,
                                                int qsize);
 sc3_error_t        *p4est3_internal_setup_tree (p4est3_t * p3,
                                                 p4est3_gloidx num_uniform);
+sc3_error_t        *p4est3_internal_setup_morton (p4est3_t * p3);
 
 #ifdef __cplusplus
 #if 0

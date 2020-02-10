@@ -48,6 +48,8 @@ p4est3_is_valid (p4est3_t * p3, char *reason)
     SC3E_TEST (p3->nodesizewin != SC3_MPI_WIN_NULL, reason);
     SC3E_TEST (p3->headcomm != SC3_MPI_COMM_NULL || p3->noderank > 0, reason);
     SC3E_TEST (p3->nodecomm != SC3_MPI_COMM_NULL, reason);
+
+    /* TODO thoroughly test all member variables */
   }
 
   SC3E_YES (reason);
@@ -204,12 +206,10 @@ p4est3_setup (p4est3_t * p3)
   /* create tree and quadrant metadata */
   SC3E (p4est3_internal_setup_tree (p3, num_uniform));
 
-  /* TODO create quadrants */
+  /* create quadrants by the morton method, which is presumably slowest */
+  SC3E (p4est3_internal_setup_morton (p3));
 
-  /* TODO populate shared position array */
-
-  /* TODO allgather shared position array */
-
+  /* we are done creating a valid forest */
   p3->setup = 1;
   SC3A_IS (p4est3_is_setup, p3);
   return NULL;
