@@ -185,7 +185,7 @@ p4est3_internal_setup_cut (p4est3_t * p3,
     int                 pt;
     char               *qptr;
     char               *temp = p3->temp_quad[sc3_omp_thread_num ()];
-    sc3_error_t        *e;
+    sc3_error_t        *e = NULL;
 
     /* parallelize process loop across threads */
     sc3_omp_thread_intrange (&beginrt, &endrt);
@@ -202,7 +202,7 @@ p4est3_internal_setup_cut (p4est3_t * p3,
       SC3E_NULL_BREAK (e);
       qptr += qsize;
     }
-    sc3_omp_esync_barrier (s, &e);
+    sc3_omp_esync (s, &e);
   }
   SC3E (sc3_omp_esync_summary (s));
   SC3E (sc3_MPI_Win_unlock (0, p3->gftreewin));
