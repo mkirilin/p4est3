@@ -177,6 +177,8 @@ p4est3_setup (p4est3_t * p3)
   SC3A_CHECK (p3->qmaxlevel >= 0);
   p3->level = SC3_MIN (p3->level, p3->qmaxlevel);
 
+  /* TODO make sure that the number of local quadrants stays bounded */
+
   /* with number of children determine number of elements per tree */
   p3->num_children = p4est3_num_children (p3->qvt);
   SC3A_CHECK (p3->num_children > 0);
@@ -191,11 +193,9 @@ p4est3_setup (p4est3_t * p3)
 
   /* allocate one temporary quadrant per thread */
   p3->max_threads = sc3_omp_max_threads ();
-  SC3E_ALLOCATOR_MALLOC (p3->alloc,
-                         char *, p3->max_threads, p3->temp_quad);
+  SC3E_ALLOCATOR_MALLOC (p3->alloc, char *, p3->max_threads, p3->temp_quad);
   for (ti = 0; ti < p3->max_threads; ++ti) {
-    SC3E_ALLOCATOR_MALLOC (p3->alloc,
-                           char, qsize, p3->temp_quad[ti]);
+    SC3E_ALLOCATOR_MALLOC (p3->alloc, char, qsize, p3->temp_quad[ti]);
   }
 
   /* compute partition cuts and create shared partition arrays */
@@ -206,7 +206,7 @@ p4est3_setup (p4est3_t * p3)
 
   /* TODO create quadrants */
 
-  /* TODO: populate shared position array */
+  /* TODO populate shared position array */
 
   /* TODO allgather shared position array */
 
@@ -238,7 +238,7 @@ p4est3_unref (p4est3_t ** pp3)
 
     alloc = p3->alloc;
     if (p3->setup) {
-      int              ti;
+      int                 ti;
 
       /* free internal MPI objects */
       SC3E (sc3_MPI_Win_free (&p3->nodesizewin));

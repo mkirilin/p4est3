@@ -38,6 +38,7 @@ typedef int         p4est3_topidx;
 
 typedef int         p4est3_locidx;
 #define P4EST3_LOCIDX_MAX INT_MAX
+#define p4est3_loccut sc3_intcut
 
 typedef long        p4est3_gloidx;
 #define P4EST3_GLOIDX_MAX LONG_MAX

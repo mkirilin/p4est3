@@ -31,6 +31,7 @@
 typedef struct p4est3_tree
 {
   p4est3_topidx       treeid;
+  p4est3_gloidx       first_tquad, end_tquad;
   p4est3_locidx       quad_offset;
   p4est3_locidx       num_quads;
   char               *tquads;

@@ -250,8 +250,7 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   int                 dispunit;
   char               *quadmem, *nqmem;
   p4est3_topidx       tt;
-  p4est3_gloidx       first_quad, end_quad, tt_offset;
-  p4est3_gloidx       first_tnum, end_tnum, next_offset;
+  p4est3_gloidx       first_quad, end_quad, tt_offset, next_offset;
   p4est3_tree_t      *tree;
   sc3_MPI_Aint_t      quadbytes, tempbytes;
 
@@ -306,17 +305,18 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
     SC3E (p4est3_tree_index (p3, tt, &tree));
     tree->treeid = tt;
     tree->quad_offset = next_offset;
-    first_tnum = (tt == p3->fltree) ? first_quad - tt_offset : 0;
+    tree->first_tquad = (tt == p3->fltree) ? first_quad - tt_offset : 0;
     if (tt == p3->lltree) {
       /* this is the last iteration: no need to update tt_offset */
-      end_tnum = end_quad - tt_offset;
+      tree->end_tquad = end_quad - tt_offset;
     }
     else {
-      end_tnum = tt_offset += num_uniform;
+      tree->end_tquad = tt_offset += num_uniform;
     }
     /* by construction each local tree contains at least one element */
-    SC3A_CHECK (0 <= first_tnum && first_tnum < end_tnum);
-    tree->num_quads = end_tnum - first_tnum;
+    SC3A_CHECK (0 <= tree->first_tquad &&
+                tree->first_tquad < tree->end_tquad);
+    tree->num_quads = tree->end_tquad - tree->first_tquad;
     SC3A_CHECK (0 < tree->num_quads && tree->num_quads <= num_uniform);
     next_offset = tree->quad_offset + tree->num_quads;
     tree->tquads = p3->quads + tree->quad_offset * p3->qsize;
