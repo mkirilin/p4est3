@@ -106,6 +106,7 @@ p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt, int id)
   if (qvt == NULL) {
     return;
   }
+  memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
   qvt->id = id;
   qvt->dim = P4EST_DIM;
   qvt->max_level = p4est_vtable_max_level;

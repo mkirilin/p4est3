@@ -60,7 +60,7 @@ struct p4est3
   int                *node_sizes;
   int                *node_offsets;
 
-  p4est3_quadrant_vtable_t *qvt;
+  p4est3_quadrant_vtable_t sqvt, *qvt;
   p4est3_topidx       num_trees;
   int                 level;
   int                 qmaxlevel;

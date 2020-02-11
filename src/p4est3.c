@@ -43,7 +43,7 @@ p4est3_is_valid (p4est3_t * p3, char *reason)
     SC3E_TEST (p3->mpisize == 0 && p3->mpirank == 0, reason);
   }
   else {
-    SC3E_TEST (p3->qvt != NULL, reason);
+    SC3E_TEST (p3->qvt == &p3->sqvt, reason);
 
     SC3E_TEST (p3->nodesizewin != SC3_MPI_WIN_NULL, reason);
     SC3E_TEST (p3->headcomm != SC3_MPI_COMM_NULL || p3->noderank > 0, reason);
@@ -123,7 +123,7 @@ p4est3_set_vtable (p4est3_t * p3, p4est3_quadrant_vtable_t * qvt)
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (qvt != NULL);
 
-  p3->qvt = qvt;
+  *(p3->qvt = &p3->sqvt) = *qvt;
   return NULL;
 }
 
@@ -165,7 +165,7 @@ p4est3_setup (p4est3_t * p3)
   SC3A_IS (p4est3_is_new, p3);
 
   /* check conditions that arise due to omitting mandatory _set_ functions */
-  SC3E_DEMAND (p3->qvt != NULL, "Quadrant virtual table must be set");
+  SC3E_DEMAND (p3->qvt == &p3->sqvt, "Quadrant virtual table must be set");
 
   /* query input communicator and populate node and head communicators */
   SC3E (p4est3_internal_setup_comm (p3));
