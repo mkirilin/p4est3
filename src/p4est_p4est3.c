@@ -101,11 +101,13 @@ p4est_quadrant_vtable_morton (int level, p4est_gloidx_t id, void *r)
 }
 
 void
-p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt)
+p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt, int id)
 {
   if (qvt == NULL) {
     return;
   }
+  qvt->id = id;
+  qvt->dim = P4EST_DIM;
   qvt->max_level = p4est_vtable_max_level;
   qvt->num_children = p4est_vtable_num_children;
   qvt->quadrant_size = p4est_quadrant_vtable_size;

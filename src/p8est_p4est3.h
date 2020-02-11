@@ -37,7 +37,8 @@ extern              "C"
 
 p4est3_t           *p8est3_new_p4est (p8est_t * p4est);
 
-void                p8est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt);
+void                p8est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt,
+                                           int id);
 
 #ifdef __cplusplus
 #if 0

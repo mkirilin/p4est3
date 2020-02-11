@@ -89,9 +89,26 @@ report_errors (sc3_allocator_t * mainalloc, sc3_error_t ** pe)
 #endif
 }
 
+static sc3_error_t *
+set_vtable (int dim, p4est3_quadrant_vtable_t * qvt)
+{
+  switch (dim) {
+  case 2:
+    p4est_quadrant_vtable (qvt, 0);
+    break;
+  case 3:
+    p8est_quadrant_vtable (qvt, 0);
+    break;
+  default:
+    SC3E_UNREACH ("Invalid dimension");
+  }
+  return NULL;
+}
+
 int
 main (int argc, char **argv)
 {
+  int                 dim;
   int                 level;
   p4est3_topidx       num_trees;
   sc3_allocator_t    *alloc, *mainalloc;
@@ -101,14 +118,17 @@ main (int argc, char **argv)
 
   mainalloc = sc3_allocator_nothread ();
   mpicomm = SC3_MPI_COMM_WORLD;
-  p4est_quadrant_vtable (qvt);
 
+  dim = 2;
   num_trees = 2;
   level = 3;
 
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
   SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
+
+  SC3E_NULL_SET (e, set_vtable (dim, qvt));
   SC3E_NULL_SET (e, test_p4est_new (alloc, mpicomm, qvt, num_trees, level));
+
   SC3E_NULL_SET (e, free_allocator (&alloc));
 
   /* TODO: call finalize even with errors? */

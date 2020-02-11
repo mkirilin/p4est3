@@ -56,6 +56,8 @@ typedef p4est3_quadrant_in_out_t p4est3_quadrant_predecessor_t;
 
 typedef struct p4est3_quadrant_vtable
 {
+  int                 id;
+  int                 dim;
   p4est3_quadrant_int_t max_level;
   p4est3_quadrant_int_t num_children;
   p4est3_quadrant_size_t quadrant_size;
