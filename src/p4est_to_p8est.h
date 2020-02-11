@@ -471,4 +471,7 @@
 /* functions in p4est_connrefine */
 #define p4est_connectivity_refine       p8est_connectivity_refine
 
+/* functions on p4est_p4est3 */
+#define p4est_quadrant_vtable           p8est_quadrant_vtable
+
 #endif /* !P4EST_TO_P8EST_H */

@@ -22,7 +22,7 @@
 */
 
 #include <p4est_p4est3.h>
-#include <p4est3.h>
+#include <p8est_p4est3.h>
 
 static sc3_error_t *
 make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)

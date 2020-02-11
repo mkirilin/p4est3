@@ -21,10 +21,10 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P4EST_P4EST3_H
-#define P4EST_P4EST3_H
+#ifndef P8EST_P4EST3_H
+#define P8EST_P4EST3_H
 
-#include <p4est.h>
+#include <p8est.h>
 #include <p4est3.h>
 
 #ifdef __cplusplus
@@ -35,14 +35,9 @@ extern              "C"
 #endif
 #endif
 
-#if 0
-p4est3_connectivity_t *p4est3_connectivity_new_p4est (p4est_connectivity_t *
-                                                      conn);
-#endif /* 0 */
+p4est3_t           *p8est3_new_p4est (p8est_t * p4est);
 
-p4est3_t           *p4est3_new_p4est (p4est_t * p4est);
-
-void                p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt);
+void                p8est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt);
 
 #ifdef __cplusplus
 #if 0
@@ -51,4 +46,4 @@ void                p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt);
 }
 #endif
 
-#endif /* !P4EST_P4EST3_H */
+#endif /* !P8EST_P4EST3_H */
