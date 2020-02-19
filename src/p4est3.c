@@ -36,13 +36,14 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
   SC3E_IS (sc3_allocator_is_setup, p3->alloc, reason);
 
   SC3E_TEST (p3->mpicomm != SC3_MPI_COMM_NULL, reason);
-  SC3E_TEST (p3->num_trees > 0, reason);
   SC3E_TEST (p3->level >= 0, reason);
 
   if (!p3->setup) {
     SC3E_TEST (p3->mpisize == 0 && p3->mpirank == 0, reason);
   }
   else {
+    SC3E_IS (p4est3_connectivity_is_setup, p3->conn, reason);
+    SC3E_TEST (p3->num_trees > 0, reason);
     SC3E_TEST (p3->qvt == &p3->sqvt, reason);
 
     SC3E_TEST (p3->nodesizewin != SC3_MPI_WIN_NULL, reason);
@@ -87,7 +88,6 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   p3->nodesizewin = SC3_MPI_WIN_NULL;
   p3->headcomm = SC3_MPI_COMM_NULL;
   p3->nodecomm = SC3_MPI_COMM_NULL;
-  p3->num_trees = 1;
   SC3A_IS (p4est3_is_new, p3);
 
   *pp3 = p3;
@@ -118,22 +118,30 @@ p4est3_set_comm (p4est3_t * p3, sc3_MPI_Comm_t comm, int dup)
 }
 
 sc3_error_t        *
+p4est3_set_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  SC3A_IS (p4est3_connectivity_is_setup, conn);
+
+  if (p3->conn != NULL) {
+    SC3E (p4est3_connectivity_unref (&p3->conn));
+  }
+  p3->conn = conn;
+  SC3E (p4est3_connectivity_ref (p3->conn));
+
+  /* query connectivity for number of trees */
+  SC3E (p4est3_connectivity_get_num_trees (p3->conn, &p3->num_trees));
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_set_vtable (p4est3_t * p3, p4est3_quadrant_vtable_t * qvt)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (qvt != NULL);
 
+  /* make deep copy of virtual table */
   *(p3->qvt = &p3->sqvt) = *qvt;
-  return NULL;
-}
-
-sc3_error_t        *
-p4est3_set_num_trees (p4est3_t * p3, p4est3_topidx num_trees)
-{
-  SC3A_IS (p4est3_is_new, p3);
-  SC3A_CHECK (num_trees > 0);
-
-  p3->num_trees = num_trees;
   return NULL;
 }
 
@@ -165,7 +173,11 @@ p4est3_setup (p4est3_t * p3)
   SC3A_IS (p4est3_is_new, p3);
 
   /* check conditions that arise due to omitting mandatory _set_ functions */
+  SC3E_DEMAND (p3->conn != NULL, "Connectivity must be set");
   SC3E_DEMAND (p3->qvt == &p3->sqvt, "Quadrant virtual table must be set");
+
+  /* further pre-setup consistency checks */
+  SC3A_CHECK (p3->num_trees > 0);
 
   /* query input communicator and populate node and head communicators */
   SC3E (p4est3_internal_setup_comm (p3));
@@ -260,6 +272,11 @@ p4est3_unref (p4est3_t ** pp3)
 
       SC3E (sc3_array_destroy (&p3->trees));
       SC3E_ALLOCATOR_FREE (p3->alloc, char *, p3->nodequads);
+    }
+
+    /* release data that has been referenced before setup */
+    if (p3->conn != NULL) {
+      SC3E (p4est3_connectivity_unref (&p3->conn));
     }
     if (p3->commdup) {
       SC3E (sc3_MPI_Comm_free (&p3->mpicomm));

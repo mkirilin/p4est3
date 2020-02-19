@@ -26,6 +26,7 @@
 
 #include <sc3_mpi.h>
 #include <p4est3_base.h>
+#include <p4est3_connectivity.h>
 #include <p4est3_quadrant_vtable.h>
 
 #ifdef __cplusplus
@@ -35,30 +36,6 @@ extern              "C"
 }
 #endif
 #endif
-
-#if 0
-/*------------------------- the connectivity -------------------------*/
-
-typedef struct p4est3_connectivity_attr p4est3_connectivity_attr_t;
-typedef struct p4est3_connectivity p4est3_connectivity_t;
-
-/* attributes: set comm, maybe more */
-/* ... */
-
-p4est3_connectivity_t *p4est3_connectivity_new (p4est3_connectivity_attr_t *
-                                                ca);
-p4est3_connectivity_t *p4est3_connectivity_new_unitcube (void);
-
-/* function-based construction of connectivity */
-/* ... */
-
-void                p4est3_connectivity_setup (p4est3_connectivity_t * conn);
-void                p4est3_connectivity_ref (p4est3_connectivity_t * c3);
-void                p4est3_connectivity_unref (p4est3_connectivity_t ** c3);
-void                p4est3_connectivity_destroy (p4est3_connectivity_t ** c3);
-#endif
-
-/*------------------------- the p4est object -------------------------*/
 
 typedef struct p4est3 p4est3_t;
 
@@ -80,10 +57,10 @@ sc3_error_t        *p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3);
  */
 sc3_error_t        *p4est3_set_comm (p4est3_t * p3,
                                      sc3_MPI_Comm_t comm, int dup);
+sc3_error_t        *p4est3_set_connectivity (p4est3_t * p3,
+                                             p4est3_connectivity_t * conn);
 sc3_error_t        *p4est3_set_vtable (p4est3_t * p3,
                                        p4est3_quadrant_vtable_t * qvt);
-sc3_error_t        *p4est3_set_num_trees (p4est3_t * p3,
-                                          p4est3_topidx num_trees);
 sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
 sc3_error_t        *p4est3_setup (p4est3_t * p3);
 
