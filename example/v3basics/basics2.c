@@ -41,25 +41,41 @@ test_p4est_new (sc3_allocator_t * alloc,
                 sc3_MPI_Comm_t mpicomm, p4est3_quadrant_vtable_t * qvt,
                 p4est3_topidx num_trees, int level)
 {
+  int                 i;
   p4est3_connectivity_t *conn;
   p4est3_t           *p3;
 
   SC3A_IS (sc3_allocator_is_setup, alloc);
 
-  /* create connectivity structure */
-  SC3E (p4est3_connectivity_new (alloc, &conn));
-  SC3E (p4est3_connectivity_setup (conn));
+  for (i = 0; i < 3; ++i) {
+    /* create connectivity structure */
+    switch (i) {
+    case 0:
+      SC3E (p4est3_connectivity_new (alloc, &conn));
+      SC3E (p4est3_connectivity_setup (conn));
+      break;
+    case 1:
+      SC3E (p4est3_connectivity_new_num_trees (alloc, 1, &conn));
+      break;
+    case 2:
+      /* at this stage this object is still dimension independent */
+      SC3E (p4est3_connectivity_new_unitcube (alloc, &conn));
+      break;
+    default:
+      SC3E_UNREACH ("Invalid example counter");
+    }
 
-  /* create p4est object with connectivity */
-  SC3E (p4est3_new (alloc, &p3));
-  SC3E (p4est3_set_comm (p3, mpicomm, 1));
-  SC3E (p4est3_set_connectivity (p3, conn));
-  SC3E (p4est3_set_vtable (p3, qvt));
-  SC3E (p4est3_set_level (p3, level));
-  SC3E (p4est3_setup (p3));
+    /* create p4est object with connectivity */
+    SC3E (p4est3_new (alloc, &p3));
+    SC3E (p4est3_set_comm (p3, mpicomm, 1));
+    SC3E (p4est3_set_connectivity (p3, conn));
+    SC3E (p4est3_set_vtable (p3, qvt));
+    SC3E (p4est3_set_level (p3, level));
+    SC3E (p4est3_setup (p3));
 
-  SC3E (p4est3_destroy (&p3));
-  SC3E (p4est3_connectivity_destroy (&conn));
+    SC3E (p4est3_destroy (&p3));
+    SC3E (p4est3_connectivity_destroy (&conn));
+  }
   return NULL;
 }
 

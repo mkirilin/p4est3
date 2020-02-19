@@ -34,6 +34,17 @@ extern              "C"
 #endif
 #endif
 
+typedef sc3_error_t *(*p4est3_connectivity_inout_t) (void *slf);
+typedef sc3_error_t *(*p4est3_connectivity_get_topidx_t)
+                    (void *slf, p4est3_topidx * pnum_trees);
+
+typedef struct p4est3_connectivity_vtable
+{
+  p4est3_connectivity_get_topidx_t get_num_trees;
+  p4est3_connectivity_inout_t destroy;
+}
+p4est3_connectivity_vtable_t;
+
 typedef struct p4est3_connectivity p4est3_connectivity_t;
 
 int                 p4est3_connectivity_is_valid (const p4est3_connectivity_t
@@ -46,6 +57,8 @@ int                 p4est3_connectivity_is_setup (const p4est3_connectivity_t
 sc3_error_t        *p4est3_connectivity_new (sc3_allocator_t * alloc,
                                              p4est3_connectivity_t ** pc);
 
+sc3_error_t        *p4est3_connectivity_set_vtable
+  (p4est3_connectivity_t * c, p4est3_connectivity_vtable_t * cvt, void *slf);
 sc3_error_t        *p4est3_connectivity_set_num_trees
   (p4est3_connectivity_t * c, p4est3_topidx num_trees);
 
@@ -57,9 +70,11 @@ sc3_error_t        *p4est3_connectivity_destroy (p4est3_connectivity_t ** c);
 sc3_error_t        *p4est3_connectivity_get_num_trees
   (const p4est3_connectivity_t * c, p4est3_topidx * pnum_trees);
 
-sc3_error_t        *p4est3_connectivity_new_unitcube (sc3_allocator_t * alloc,
-                                                      p4est3_connectivity_t **
-                                                      pc);
+sc3_error_t        *p4est3_connectivity_new_num_trees
+  (sc3_allocator_t * alloc, p4est3_topidx num_trees,
+   p4est3_connectivity_t ** pc);
+sc3_error_t        *p4est3_connectivity_new_unitcube
+  (sc3_allocator_t * alloc, p4est3_connectivity_t ** pc);
 
 #ifdef __cplusplus
 #if 0
