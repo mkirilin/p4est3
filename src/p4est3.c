@@ -29,7 +29,7 @@
         (i.e., which library is producing the error?) */
 
 int
-p4est3_is_valid (p4est3_t * p3, char *reason)
+p4est3_is_valid (const p4est3_t * p3, char *reason)
 {
   SC3E_TEST (p3 != NULL, reason);
   SC3E_IS (sc3_refcount_is_valid, &p3->rc, reason);
@@ -56,7 +56,7 @@ p4est3_is_valid (p4est3_t * p3, char *reason)
 }
 
 int
-p4est3_is_new (p4est3_t * p3, char *reason)
+p4est3_is_new (const p4est3_t * p3, char *reason)
 {
   SC3E_IS (p4est3_is_valid, p3, reason);
   SC3E_TEST (!p3->setup, reason);
@@ -64,7 +64,7 @@ p4est3_is_new (p4est3_t * p3, char *reason)
 }
 
 int
-p4est3_is_setup (p4est3_t * p3, char *reason)
+p4est3_is_setup (const p4est3_t * p3, char *reason)
 {
   SC3E_IS (p4est3_is_valid, p3, reason);
   SC3E_TEST (p3->setup, reason);

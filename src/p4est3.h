@@ -65,9 +65,9 @@ typedef struct p4est3 p4est3_t;
 /* p4est construction parameters: connectivity, uniform level, etc. */
 /* While we're not ready defining the connectivity, use abstract trees. */
 
-int                 p4est3_is_valid (p4est3_t * p3, char *reason);
-int                 p4est3_is_new (p4est3_t * p3, char *reason);
-int                 p4est3_is_setup (p4est3_t * p3, char *reason);
+int                 p4est3_is_valid (const p4est3_t * p3, char *reason);
+int                 p4est3_is_new (const p4est3_t * p3, char *reason);
+int                 p4est3_is_setup (const p4est3_t * p3, char *reason);
 
 sc3_error_t        *p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3);
 
