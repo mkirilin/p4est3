@@ -45,7 +45,7 @@ p4est3_connectivity_is_valid (const p4est3_connectivity_t * c, char *reason)
   SC3E_IS (sc3_refcount_is_valid, &c->rc, reason);
   SC3E_IS (sc3_allocator_is_setup, c->alloc, reason);
   if (c->cvt != NULL) {
-    /* check virtual table/object consistency */
+    /* is there anything we should check? */
   }
   else {
     SC3E_TEST (c->num_trees > 0, reason);
@@ -184,6 +184,8 @@ p4est3_connectivity_get_num_trees (const p4est3_connectivity_t * c,
   }
   return NULL;
 }
+
+/* TODO this is demo/convenience code; move away */
 
 typedef struct p4est3_connectivity_ntslf
 {

@@ -35,7 +35,11 @@ extern              "C"
 #endif
 #endif
 
-p4est3_t           *p8est3_new_p4est (p8est_t * p4est);
+sc3_error_t        *p4est3_connectivity_new_p8est (sc3_allocator_t * alloc,
+                                                   p8est_connectivity_t * c4,
+                                                   int autodestroy,
+                                                   p4est3_connectivity_t **
+                                                   conn);
 
 void                p8est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt,
                                            int id);

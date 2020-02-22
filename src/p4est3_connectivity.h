@@ -34,9 +34,10 @@ extern              "C"
 #endif
 #endif
 
+typedef int         (*p4est3_connectivity_is_t) (void *slf, char *reason);
 typedef sc3_error_t *(*p4est3_connectivity_inout_t) (void *slf);
 typedef sc3_error_t *(*p4est3_connectivity_get_topidx_t)
-                    (void *slf, p4est3_topidx * pnum_trees);
+                    (void *slf, p4est3_topidx * ptopidx);
 
 typedef struct p4est3_connectivity_vtable
 {

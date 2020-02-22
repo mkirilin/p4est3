@@ -29,6 +29,55 @@
 #include <p8est_p4est3.h>
 #endif
 
+static sc3_error_t *
+p4est3_connectivity_p4est_get_num_trees (void *vslf,
+                                         p4est3_topidx * pnum_trees)
+{
+  p4est_connectivity_t *c4 = (p4est_connectivity_t *) vslf;
+
+  SC3A_CHECK (c4 != NULL);
+  SC3A_CHECK (pnum_trees != NULL);
+  *pnum_trees = c4->num_trees;
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_connectivity_p4est_destroy (void *vslf)
+{
+  p4est_connectivity_t *c4 = (p4est_connectivity_t *) vslf;
+
+  SC3A_CHECK (c4 != NULL);
+  p4est_connectivity_destroy (c4);
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
+                               p4est_connectivity_t * c4, int autodestroy,
+                               p4est3_connectivity_t ** pc)
+{
+  p4est3_connectivity_t *c;
+  p4est3_connectivity_vtable_t scvt, *cvt = &scvt;
+
+  SC3E_RETVAL (pc, NULL);
+
+  /* create virtual structure */
+  memset (cvt, 0, sizeof (*cvt));
+  cvt->get_num_trees = p4est3_connectivity_p4est_get_num_trees;
+  if (autodestroy) {
+    cvt->destroy = p4est3_connectivity_p4est_destroy;
+  }
+
+  /* create connectivity */
+  SC3E (p4est3_connectivity_new (alloc, &c));
+  SC3E (p4est3_connectivity_set_vtable (c, cvt, c4));
+  SC3E (p4est3_connectivity_setup (c));
+  SC3A_IS (p4est3_connectivity_is_setup, c);
+
+  *pc = c;
+  return NULL;
+}
+
 static int
 p4est_vtable_max_level (void)
 {
