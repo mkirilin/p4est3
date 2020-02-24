@@ -125,19 +125,32 @@ main (int argc, char **argv)
   sc3_MPI_Comm_t      mpicomm;
   p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
 
+  /* v3 standard procedure to isolate memory allocation contexts */
   mainalloc = sc3_allocator_nothread ();
-  mpicomm = SC3_MPI_COMM_WORLD;
 
+  /* legacy wrapping for p4est quadrants */
   p4est_quadrant_vtable (qvt, 0);
+
+  /* command line parameters */
   num_trees = 2;
   level = 3;
 
+  /* this is generally needed for MPI */
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
+
+  /* we don't need init calls for v3.  Just to check legacy wrapping */
+  mpicomm = SC3_MPI_COMM_WORLD;
+  sc_init (mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
+  p4est_init (NULL, SC_LP_DEFAULT);
+
   SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
 
   SC3E_NULL_SET (e, test_p4est_new (alloc, mpicomm, qvt, num_trees, level));
 
   SC3E_NULL_SET (e, free_allocator (&alloc));
+
+  /* again, just to check legacy wrapping */
+  SC3E_NULL_REQ (e, !sc_finalize_noabort ());
 
   /* TODO: call finalize even with errors? */
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
