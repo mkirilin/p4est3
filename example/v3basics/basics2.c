@@ -42,24 +42,37 @@ test_p4est_new (sc3_allocator_t * alloc,
                 p4est3_topidx num_trees, int level)
 {
   int                 i;
+  p4est_connectivity_t *c4;
   p4est3_connectivity_t *conn;
   p4est3_t           *p3;
 
   SC3A_IS (sc3_allocator_is_setup, alloc);
 
-  for (i = 0; i < 3; ++i) {
+  for (i = 0; i < 4; ++i) {
     /* create connectivity structure */
+    fprintf (stderr, "Trying %d\n", i);
     switch (i) {
     case 0:
+      /* default connectivity with one tree */
       SC3E (p4est3_connectivity_new (alloc, &conn));
       SC3E (p4est3_connectivity_setup (conn));
       break;
     case 1:
+      /* virtual connectivity with one tree */
       SC3E (p4est3_connectivity_new_num_trees (alloc, 1, &conn));
       break;
     case 2:
-      /* at this stage this object is still dimension independent */
+      /* at this stage this object is still dimension-independent */
       SC3E (p4est3_connectivity_new_unitcube (alloc, &conn));
+      break;
+    case 3:
+      /* wrapping a p4est connectivity */
+#ifndef P4_TO_P8
+      c4 = p4est_connectivity_new_unitsquare ();
+#else
+      c4 = p8est_connectivity_new_unitcube ();
+#endif
+      SC3E (p4est3_connectivity_new_p4est (alloc, c4, 1, &conn));
       break;
     default:
       SC3E_UNREACH ("Invalid example counter");
