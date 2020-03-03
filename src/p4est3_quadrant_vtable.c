@@ -99,9 +99,23 @@ sc3_error_t        *
 p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
                         const void *q, void *r)
 {
-  P3A_CHECK (qvt != NULL && qvt->quadrant_parent != NULL);
+  P3A_CHECK (qvt != NULL);
 
-  return qvt->quadrant_parent (q, r);
+  if (qvt->quadrant_parent != NULL) {
+    return qvt->quadrant_parent (q, r);
+  }
+  else {
+    int                 level;
+
+    P3A_CHECK (qvt->quadrant_level != NULL);
+    SC3E (qvt->quadrant_level (q, &level));
+    P3A_CHECK (level > 0);
+
+    P3A_CHECK (qvt->quadrant_ancestor != NULL);
+    SC3E (qvt->quadrant_ancestor (q, level - 1, r));
+
+    return NULL;
+  }
 }
 
 sc3_error_t        *
