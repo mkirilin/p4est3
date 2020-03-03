@@ -61,6 +61,14 @@ typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_first_descendant_t;
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_last_descendant_t;
 /* *INDENT-ON* */
 
+/* Would it make sense:
+    - to make max_level a variable
+    - to make quadrant_size a variable
+    - to have num_children depend on the quadrant
+    - to add a max_children variable
+    - to add a num_uniform (level) function
+   This might support anisotropic refinement and even hybrid shape meshes.
+ */
 typedef struct p4est3_quadrant_vtable
 {
   int                 id;
