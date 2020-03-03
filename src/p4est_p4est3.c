@@ -104,9 +104,45 @@ p4est_quadrant_vtable_is_valid (const void *q, char *reason)
 }
 
 static sc3_error_t *
+p4est_quadrant_vtable_level (const void *r, int *l)
+{
+  SC3A_CHECK (r != NULL);
+  SC3A_CHECK (l != NULL);
+
+  *l = ((p4est_quadrant_t *) r)->level;
+  return NULL;
+}
+
+static sc3_error_t *
+p4est_quadrant_vtable_child_id (const void *r, int *j)
+{
+  SC3A_CHECK (j != NULL);
+
+  *j = p4est_quadrant_child_id ((p4est_quadrant_t *) r);
+  return NULL;
+}
+
+static sc3_error_t *
+p4est_quadrant_vtable_ancestor_id (const void *r, int i, int *j)
+{
+  SC3A_CHECK (j != NULL);
+
+  *j = p4est_quadrant_ancestor_id ((p4est_quadrant_t *) r, i);
+  return NULL;
+}
+
+static sc3_error_t *
 p4est_quadrant_vtable_root (void *r)
 {
   p4est_quadrant_set_morton ((p4est_quadrant_t *) r, 0, 0);
+  return NULL;
+}
+
+static sc3_error_t *
+p4est_quadrant_vtable_parent (const void *q, void *r)
+{
+  p4est_quadrant_parent
+    ((const p4est_quadrant_t *) q, (p4est_quadrant_t *) r);
   return NULL;
 }
 
@@ -119,10 +155,10 @@ p4est_quadrant_vtable_child (const void *q, int i, void *r)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_parent (const void *q, void *r)
+p4est_quadrant_vtable_ancestor (const void *q, int l, void *r)
 {
-  p4est_quadrant_parent
-    ((const p4est_quadrant_t *) q, (p4est_quadrant_t *) r);
+  p4est_quadrant_ancestor
+    ((const p4est_quadrant_t *) q, l, (p4est_quadrant_t *) r);
   return NULL;
 }
 
@@ -162,9 +198,13 @@ p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->num_children = p4est_vtable_num_children;
   qvt->quadrant_size = p4est_quadrant_vtable_size;
   qvt->quadrant_is_valid = p4est_quadrant_vtable_is_valid;
+  qvt->quadrant_level = p4est_quadrant_vtable_level;
+  qvt->quadrant_child_id = p4est_quadrant_vtable_child_id;
+  qvt->quadrant_ancestor_id = p4est_quadrant_vtable_ancestor_id;
   qvt->quadrant_root = p4est_quadrant_vtable_root;
-  qvt->quadrant_child = p4est_quadrant_vtable_child;
   qvt->quadrant_parent = p4est_quadrant_vtable_parent;
+  qvt->quadrant_child = p4est_quadrant_vtable_child;
+  qvt->quadrant_ancestor = p4est_quadrant_vtable_ancestor;
   qvt->quadrant_first_descendant = p4est_quadrant_vtable_first_descendant;
   qvt->quadrant_last_descendant = p4est_quadrant_vtable_last_descendant;
   qvt->quadrant_morton = p4est_quadrant_vtable_morton;
