@@ -31,6 +31,7 @@
 #define P3A_CHECK(x) SC3A_CHECK (x)
 #define P3A_STACK(x) SC3A_STACK (x)
 #define P3E(f) SC3E (f)
+#define P3E_TAIL(f) do { SC3E (f); return NULL; } while (0)
 #define P3E_DEMAND(f) SC3E_DEMAND (f)
 
 typedef int         p4est3_topidx;
