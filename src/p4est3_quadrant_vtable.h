@@ -51,6 +51,7 @@ typedef p4est3_quadrant_in_j_t p4est3_quadrant_level_t;
 typedef p4est3_quadrant_in_j_t p4est3_quadrant_child_id_t;
 typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_ancestor_id_t;
 typedef p4est3_quadrant_out_t p4est3_quadrant_root_t;
+typedef p4est3_quadrant_in_out_t p4est3_quadrant_copy_t;
 typedef p4est3_quadrant_in_out_t p4est3_quadrant_parent_t;
 typedef p4est3_quadrant_in_out_t p4est3_quadrant_predecessor_t;
 typedef p4est3_quadrant_in_out_t p4est3_quadrant_successor_t;
@@ -72,6 +73,7 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_child_id_t quadrant_child_id;
   p4est3_quadrant_ancestor_id_t quadrant_ancestor_id;
   p4est3_quadrant_root_t quadrant_root;
+  p4est3_quadrant_copy_t quadrant_copy;
   p4est3_quadrant_parent_t quadrant_parent;
   p4est3_quadrant_predecessor_t quadrant_predecessor;
   p4est3_quadrant_successor_t quadrant_successor;
@@ -99,6 +101,8 @@ sc3_error_t        *p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt,
                                           void *r);
 sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
                                             const void *q, void *r);
+sc3_error_t        *p4est3_quadrant_copy (p4est3_quadrant_vtable_t * qvt,
+                                          const void *q, void *r);
 sc3_error_t        *p4est3_quadrant_predecessor (p4est3_quadrant_vtable_t * qvt,
                                                  const void *q, void *r);
 sc3_error_t        *p4est3_quadrant_successor (p4est3_quadrant_vtable_t * qvt,

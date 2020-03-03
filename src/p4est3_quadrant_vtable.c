@@ -92,6 +92,21 @@ p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt, void *r)
 }
 
 sc3_error_t        *
+p4est3_quadrant_copy (p4est3_quadrant_vtable_t * qvt, const void *q, void *r)
+{
+  P3A_CHECK (qvt != NULL);
+
+  if (qvt->quadrant_copy != NULL) {
+    SC3E (qvt->quadrant_copy (q, r));
+  }
+  else {
+    P3A_CHECK (qvt->quadrant_size != NULL);
+    memcpy (r, q, qvt->quadrant_size ());
+  }
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
                         const void *q, void *r)
 {
