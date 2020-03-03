@@ -152,12 +152,13 @@ main (int argc, char **argv)
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
 
   /* we don't need init calls for v3.  Just to check legacy wrapping */
-  mpicomm = SC3_MPI_COMM_WORLD;
-  sc_init (mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
+  /* must not use SC3_MPI_COMM_WORLD due to incompatible non-mpi wrapping */
+  sc_init (sc_MPI_COMM_WORLD, 1, 1, NULL, SC_LP_DEFAULT);
   p4est_init (NULL, SC_LP_DEFAULT);
 
   SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
 
+  mpicomm = SC3_MPI_COMM_WORLD;
   SC3E_NULL_SET (e, test_p4est_new (alloc, mpicomm, qvt, num_trees, level));
 
   SC3E_NULL_SET (e, free_allocator (&alloc));
