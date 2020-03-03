@@ -156,8 +156,27 @@ sc3_error_t        *
 p4est3_quadrant_ancestor (p4est3_quadrant_vtable_t * qvt,
                           const void *q, int l, void *r)
 {
-  P3A_CHECK (qvt != NULL && qvt->quadrant_ancestor != NULL);
-  P3E_TAIL (qvt->quadrant_ancestor (q, l, r));
+  P3A_CHECK (qvt != NULL);
+
+  if (qvt->quadrant_ancestor != NULL) {
+    SC3E (qvt->quadrant_ancestor (q, l, r));
+  }
+  else {
+    int                 level;
+
+    P3A_CHECK (l >= 0);
+    SC3E (qvt->quadrant_level (q, &level));
+    P3A_CHECK (level >= l);
+
+    SC3E (p4est3_quadrant_copy (qvt, q, r));
+
+    P3A_CHECK (qvt->quadrant_parent != NULL);
+    while (level > l) {
+      SC3E (qvt->quadrant_parent (r, r));
+      SC3E (qvt->quadrant_level (r, &level));
+    }
+  }
+  return NULL;
 }
 
 sc3_error_t        *
