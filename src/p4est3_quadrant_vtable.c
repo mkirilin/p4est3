@@ -105,6 +105,24 @@ p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
+p4est3_quadrant_predecessor (p4est3_quadrant_vtable_t * qvt,
+                             const void *q, void *r)
+{
+  P3A_CHECK (qvt != NULL && qvt->quadrant_predecessor != NULL);
+
+  return qvt->quadrant_predecessor (q, r);
+}
+
+sc3_error_t        *
+p4est3_quadrant_successor (p4est3_quadrant_vtable_t * qvt,
+                           const void *q, void *r)
+{
+  P3A_CHECK (qvt != NULL && qvt->quadrant_successor != NULL);
+
+  return qvt->quadrant_successor (q, r);
+}
+
+sc3_error_t        *
 p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
                        const void *q, int i, void *r)
 {
