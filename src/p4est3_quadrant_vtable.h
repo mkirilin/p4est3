@@ -38,9 +38,9 @@ extern              "C"
 typedef int         (*p4est3_quadrant_int_t) (void);
 typedef size_t      (*p4est3_quadrant_size_t) (void);
 typedef int         (*p4est3_quadrant_is_t) (const void * q, char *reason);
-typedef sc3_error_t *(*p4est3_quadrant_out_t) (void *r);
 typedef sc3_error_t *(*p4est3_quadrant_in_j_t) (const void *q, int *j);
 typedef sc3_error_t *(*p4est3_quadrant_in_i_j_t) (const void *q, int i, int *j);
+typedef sc3_error_t *(*p4est3_quadrant_out_t) (void *r);
 typedef sc3_error_t *(*p4est3_quadrant_in_out_t) (const void *q, void *r);
 typedef sc3_error_t *(*p4est3_quadrant_in_i_out_t) (const void *q, int i,
                                                     void *r);
@@ -107,12 +107,12 @@ sc3_error_t        *p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t *
                                                  int *j);
 sc3_error_t        *p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt,
                                           void *r);
-sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
-                                            const void *q, void *r);
 sc3_error_t        *p4est3_quadrant_copy (p4est3_quadrant_vtable_t * qvt,
                                           const void *q, void *r);
-sc3_error_t        *p4est3_quadrant_predecessor (p4est3_quadrant_vtable_t * qvt,
-                                                 const void *q, void *r);
+sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
+                                            const void *q, void *r);
+sc3_error_t        *p4est3_quadrant_predecessor (p4est3_quadrant_vtable_t *
+                                                 qvt, const void *q, void *r);
 sc3_error_t        *p4est3_quadrant_successor (p4est3_quadrant_vtable_t * qvt,
                                                const void *q, void *r);
 sc3_error_t        *p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
