@@ -132,6 +132,16 @@ p4est_quadrant_vtable_ancestor_id (const void *q, int i, int *j)
 }
 
 static sc3_error_t *
+p4est_quadrant_vtable_compare (const void *q1, const void *q2, int *j)
+{
+  SC3A_CHECK (j != NULL);
+
+  *j = p4est_quadrant_compare ((const p4est_quadrant_t *) q1,
+                               (const p4est_quadrant_t *) q2);
+  return NULL;
+}
+
+static sc3_error_t *
 p4est_quadrant_vtable_root (void *r)
 {
   p4est_quadrant_set_morton ((p4est_quadrant_t *) r, 0, 0);
@@ -224,6 +234,7 @@ p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->quadrant_level = p4est_quadrant_vtable_level;
   qvt->quadrant_child_id = p4est_quadrant_vtable_child_id;
   qvt->quadrant_ancestor_id = p4est_quadrant_vtable_ancestor_id;
+  qvt->quadrant_compare = p4est_quadrant_vtable_compare;
   qvt->quadrant_root = p4est_quadrant_vtable_root;
   qvt->quadrant_copy = p4est_quadrant_vtable_copy;
   qvt->quadrant_parent = p4est_quadrant_vtable_parent;
