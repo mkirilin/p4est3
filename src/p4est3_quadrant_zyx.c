@@ -88,6 +88,76 @@ p4est3_quadrant_zyx_is_parent (const __m128i * q, const __m128i * r
   SC3E_YES (reason);
 }
 
+static sc3_error_t *
+p4est3_quadrant_zyx_child (const __m128i * q, int child_id, __m128i * r)
+{
+  const p4est_qcoord_t level = _mm_extract_epi32 (*q, 0);
+
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  SC3A_CHECK (level < P4EST_QMAXLEVEL);
+  SC3A_CHECK (child_id >= 0 && child_id < P4EST_CHILDREN);
+
+  *r = 
+  _mm_or_si128 (
+    _mm_sllv_epi32 (
+      _mm_srlv_epi32 (
+        _mm_and_si128 (_mm_set_epi32 (child_id, child_id, child_id, 0x00)
+                     , _mm_set_epi32 (0x01, 0x02, 0x04, 0x00))
+      , _mm_set_epi32 (0, 1, 2, 0)
+      )
+    , _mm_set1_epi32 (P4EST_MAXLEVEL - (level + 1))
+    )
+  , *q 
+  );
+  *r = _mm_insert_epi32 (*r, level + 1, 0);
+#ifndef P4_TO_P8
+  *r = _mm_insert_epi32 (*r, 0, 1);
+#endif
+#ifdef SC_ENABLE_DEBUG
+  { //Waiting for the corresponding SC3A_.. macro
+    char _r[SC3_BUFSIZE];
+    if (!(p4est3_quadrant_zyx_is_parent (q, r, _r))) {
+      char _errmsg[SC3_BUFSIZE];
+      snprintf (_errmsg, SC3_BUFSIZE, "%s(%s, %s): %s",
+                 "p4est3_quadrant_zyx_is_parent", "q", "r", _r);
+      return sc3_error_new_fatal (__FILE__, __LINE__, _errmsg);
+    }
+  }
+#endif //SC_ENABLE_DEBUG
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_quadrant_zyx_parent (const __m128i * q, __m128i * r)
+{
+  int32_t level = _mm_extract_epi32 (*q, 0);
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  SC3A_CHECK (level > 0);
+
+  *r = _mm_sub_epi32 (
+          _mm_and_si128 (*q, _mm_set_epi32 (~P4EST_QUADRANT_LEN (level)
+                                          , ~P4EST_QUADRANT_LEN (level)
+                                          , ~P4EST_QUADRANT_LEN (level)
+                                          , 0xFFFFFFFF))
+        , _mm_set_epi32 (0, 0, 0, 1) 
+      );
+
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
+#ifdef SC_ENABLE_DEBUG
+  { //Waiting for the corresponding SC3A_.. macro
+    //There is no such check in original function
+    char _r[SC3_BUFSIZE];
+    if (!(p4est3_quadrant_zyx_is_parent (r, q, _r))) {
+      char _errmsg[SC3_BUFSIZE];
+      snprintf (_errmsg, SC3_BUFSIZE, "%s(%s, %s): %s",
+                 "p4est3_quadrant_zyx_is_parent", "r", "q", _r);
+      return sc3_error_new_fatal (__FILE__, __LINE__, _errmsg);
+    }
+  }
+#endif //SC_ENABLE_DEBUG
+  return NULL;
+}
+
 static int
 p4est3_quadrant_zyx_is_node (const __m128i * q, int inside, char *reason)
 {
