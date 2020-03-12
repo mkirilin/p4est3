@@ -197,3 +197,63 @@ p4est3_quadrant_zyx_is_node (const __m128i * q, int inside, char *reason)
           , reason);
   SC3E_YES (reason);
 }
+
+static sc3_error_t *
+p4est3_quadrant_zyx_compare (const __m128i * q1, const __m128i * q2, int * j)
+{
+  int64_t diff;
+  __m128i p, q;
+
+  { //Waiting for the corresponding SC3A_.. macro
+    SC3A_CHECK (p4est3_quadrant_zyx_is_node (q1, 1, NULL) ||
+                  p4est3_quadrant_zyx_is_valid (q1, NULL));
+    SC3A_CHECK (p4est3_quadrant_zyx_is_node (q2, 1, NULL) ||
+                  p4est3_quadrant_zyx_is_valid (q2, NULL));  
+  }
+  __m128i exclor_coords = _mm_xor_si128 (*q1, *q2);
+  __m128i exclor = _mm_set1_epi32 (_mm_extract_epi32 (exclor_coords, 3)
+                                 | _mm_extract_epi32 (exclor_coords, 2));
+#ifdef P4_TO_P8
+  exclor = _mm_or_si128 (_mm_set_epi32 (0
+                                      , 0
+                                      , _mm_extract_epi32 (exclor_coords, 1)
+                                      , 0)
+                      , exclor);
+#endif
+
+  if (!_mm_extract_epi32 (exclor, 1)) {
+    *j = _mm_cvtsi128_si32 (_mm_sub_epi32 (*q1, *q2));
+    return NULL;
+  }
+
+  __m128i cond = _mm_cmpgt_epi32 (exclor_coords, _mm_xor_si128 (exclor, exclor_coords));
+#ifdef P4_TO_P8
+  if (_mm_extract_epi32 (cond, 1)) {
+    q = _mm_set_epi64x ((int64_t) _mm_extract_epi32 (*q2, 1)
+                      , (int64_t) _mm_extract_epi32 (*q1, 1));
+  } else 
+#if 0
+    ;
+#endif
+#endif
+  if (_mm_extract_epi32 (cond, 2)) {
+    q = _mm_set_epi64x ((int64_t) _mm_extract_epi32 (*q2, 2)
+                      , (int64_t) _mm_extract_epi32 (*q1, 2));
+  } else {
+    q = _mm_set_epi64x ((int64_t) _mm_extract_epi32 (*q2, 3)
+                      , (int64_t) _mm_extract_epi32 (*q1, 3));
+  }
+  
+  p = _mm_or_si128 (_mm_cmpeq_epi64 (q, _mm_setzero_si128 ())
+                  , _mm_cmpgt_epi64 (q, _mm_setzero_si128 ()));
+
+  q = _mm_add_epi64 (q
+      , _mm_set_epi64x (
+            _mm_extract_epi64 (p, 0) ? 0 : ((int64_t) 1 << (P4EST_MAXLEVEL + 2))
+          , _mm_extract_epi64 (p, 1) ? 0 : ((int64_t) 1 << (P4EST_MAXLEVEL + 2))
+        )
+      );
+  diff = _mm_extract_epi64 (q, 0) - _mm_extract_epi64 (q, 1);
+  *j = ((diff == 0) ? 0 : ((diff < 0) ? -1 : 1));
+  return NULL;
+}
