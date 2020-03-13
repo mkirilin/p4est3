@@ -499,3 +499,30 @@ p4est3_quadrant_zyx_morton (int level, p4est3_gloidx id, __m128i * quadrant)
   SC3A_IS (p4est3_quadrant_zyx_is_valid, quadrant);
   return NULL;
 }
+
+void
+p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
+{
+  if (qvt == NULL) {
+    return;
+  }
+  memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
+  qvt->max_level = (p4est3_quadrant_int_t) NULL;
+  qvt->num_children = (p4est3_quadrant_int_t) NULL;
+  qvt->quadrant_size = (p4est3_quadrant_size_t) p4est3_quadrant_zyx_size;
+  qvt->quadrant_is_valid = (p4est3_quadrant_is_t) NULL;
+  qvt->quadrant_level = (p4est3_quadrant_level_t) NULL;
+  qvt->quadrant_child_id = (p4est3_quadrant_child_id_t) NULL;
+  qvt->quadrant_ancestor_id = (p4est3_quadrant_ancestor_id_t) NULL;
+  qvt->quadrant_compare = (p4est3_quadrant_compare_t) p4est3_quadrant_zyx_compare;
+  qvt->quadrant_root = (p4est3_quadrant_root_t) NULL;
+  qvt->quadrant_copy = (p4est3_quadrant_copy_t) NULL;
+  qvt->quadrant_parent = (p4est3_quadrant_parent_t) p4est3_quadrant_zyx_parent;
+  qvt->quadrant_predecessor = (p4est3_quadrant_predecessor_t) p4est3_quadrant_zyx_predecessor;
+  qvt->quadrant_successor = (p4est3_quadrant_successor_t) p4est3_quadrant_zyx_successor;
+  qvt->quadrant_child = (p4est3_quadrant_child_t) p4est3_quadrant_zyx_child;
+  qvt->quadrant_ancestor = (p4est3_quadrant_ancestor_t) p4est3_quadrant_zyx_ancestor;
+  qvt->quadrant_first_descendant = (p4est3_quadrant_first_descendant_t) p4est3_quadrant_zyx_first_descendant;
+  qvt->quadrant_last_descendant = (p4est3_quadrant_last_descendant_t) p4est3_quadrant_zyx_last_descendant;
+  qvt->quadrant_morton = (p4est3_quadrant_morton_t) p4est3_quadrant_zyx_morton;
+}

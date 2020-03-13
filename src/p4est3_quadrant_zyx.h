@@ -32,4 +32,5 @@
 #include <smmintrin.h>
 #include <emmintrin.h>
 
+void p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt);
 #endif
