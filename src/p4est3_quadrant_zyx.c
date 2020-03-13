@@ -353,3 +353,97 @@ p4est3_quadrant_zyx_last_descendant (const __m128i * q, int level
         );
   return NULL;
 }
+
+static sc3_error_t *
+p4est3_quadrant_zyx_successor (const __m128i * q, __m128i * r)
+{
+  int                 level, q_level;
+  int                 successor_id = 0;
+  q_level = level = _mm_extract_epi32 (*q, 0);
+
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  SC3A_CHECK (q_level > 0);
+  
+  SC3E (p4est3_quadrant_zyx_ancestor_id (q, level, &successor_id));
+  successor_id++;
+
+  // iterate until it is possible to increment the child/ancestor_id 
+  while (successor_id == P4EST_CHILDREN) {
+    SC3E (p4est3_quadrant_zyx_ancestor_id (q, --level, &successor_id));
+    successor_id++;
+    SC3A_CHECK (level > 0);
+  }
+  SC3A_CHECK (0 < successor_id && successor_id < P4EST_CHILDREN);
+
+  // compute result 
+  if (level < q_level) {
+    // coarsen to level - 1 and add shifts according to the successor_id
+    *r =
+    _mm_add_epi32 (
+      _mm_sllv_epi32 (
+        _mm_srlv_epi32 (
+          _mm_and_si128 (_mm_set1_epi32 (successor_id)
+                       , _mm_set_epi32  (0x01, 0x02, 0x04, 0x00))
+        , _mm_set_epi32 (0, 1, 2, 0)
+        )
+      , _mm_set1_epi32 (P4EST_MAXLEVEL - level)
+      )
+    , _mm_and_si128 (*q, _mm_set_epi32 (~(P4EST_QUADRANT_LEN (level - 1) - 1)
+                                      , ~(P4EST_QUADRANT_LEN (level - 1) - 1)
+                                      , ~(P4EST_QUADRANT_LEN (level - 1) - 1)
+                                      , 0xFFFFFFFF))
+    );
+  }
+  else {
+    SC3E (p4est3_quadrant_zyx_sibling (q, r, successor_id));
+  }
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_quadrant_zyx_predecessor (const __m128i * q, __m128i * r)
+{
+  int                 level, q_level;
+  int                 predecessor_id;
+  q_level = level = _mm_extract_epi32 (*q, 0);
+
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  SC3A_CHECK (q_level > 0);
+  
+  SC3E (p4est3_quadrant_zyx_ancestor_id (q, level, &predecessor_id));
+  predecessor_id--;
+
+  // iterate until it is possible to decrement the child/ancestor_id 
+  while (predecessor_id == -1) {
+    SC3E (p4est3_quadrant_zyx_ancestor_id (q, --level, &predecessor_id));
+    predecessor_id--;
+    SC3A_CHECK (level > 0);
+  }
+  SC3A_CHECK (0 <= predecessor_id && predecessor_id < P4EST_CHILDREN - 1);
+
+  // compute result 
+  if (level < q_level) {
+    // coarsen to level - 1 and add shifts according to the predecessor_id
+    *r =
+    _mm_add_epi32 (
+      _mm_sllv_epi32 (
+        _mm_srlv_epi32 (
+          _mm_and_si128 (_mm_set1_epi32 (predecessor_id)
+                       , _mm_set_epi32  (0x01, 0x02, 0x04, 0x00))
+        , _mm_set_epi32 (0, 1, 2, 0)
+        )
+      , _mm_set1_epi32 (P4EST_MAXLEVEL - level)
+      )
+    , _mm_and_si128 (*q, _mm_set_epi32 (~(P4EST_QUADRANT_LEN (level - 1) - 1)
+                                      , ~(P4EST_QUADRANT_LEN (level - 1) - 1)
+                                      , ~(P4EST_QUADRANT_LEN (level - 1) - 1)
+                                      , 0xFFFFFFFF))
+    );
+  }
+  else {
+    SC3E (p4est3_quadrant_zyx_sibling (q, r, predecessor_id));
+  }
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
+  return NULL;
+}
