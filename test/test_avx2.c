@@ -109,6 +109,50 @@ is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx
   return NULL;
 }
 
+sc3_error_t *
+is_equal_compare (p4est3_quadrant_vtable_t * qvt_avx
+                , p4est3_quadrant_vtable_t * qvt
+                , const __m128i * v, const p4est_quadrant_t * q, int n_quad)
+{
+  int res, res_avx;
+  for (int i = 0; i < n_quad; ++i) {
+    SC3E (p4est3_quadrant_compare (qvt_avx, &v[i], &v[n_quad - i - 1]
+                                , &res_avx));
+    SC3E (p4est3_quadrant_compare (qvt, &q[i], &q[n_quad - i - 1], &res));
+    SC3E_DEMAND (res_avx == res, "Comparing of quadrant_compare results");
+  }
+  return NULL;
+}
+
+sc3_error_t *
+is_equal_successor (p4est3_quadrant_vtable_t * qvt_avx
+                  , p4est3_quadrant_vtable_t * qvt
+                  , const __m128i * v, const p4est_quadrant_t * q, int n_quad
+                  , __m128i * v_p, p4est_quadrant_t * q_p)
+{
+  int32_t is_equal;
+  for (int i = 1; i < n_quad; i += P4EST_CHILDREN) {
+    for (int j = 0; j < P4EST_CHILDREN - 1 && i+j < n_quad; ++j) {
+      SC3E (p4est3_quadrant_successor (qvt, &q[i + j], q_p));
+      SC3E (p4est3_quadrant_successor (qvt_avx, &v[i + j], v_p));
+      is_equal =
+        (int32_t) q_p->level == _mm_extract_epi32 (*v_p, 0) &&
+        q_p->x == _mm_extract_epi32 (*v_p, 3) &&
+        q_p->y == _mm_extract_epi32 (*v_p, 2) &&
+#ifdef P4_TO_P8
+        q_p->z == _mm_extract_epi32 (*v_p, 1) &&
+#endif
+        1;
+        if(!is_equal)
+        {
+          return NULL;
+        }
+      SC3E_DEMAND (is_equal, "Comparing of quadrant_successor results");
+    }
+  }
+  return NULL;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -144,6 +188,14 @@ main (int argc, char **argv)
   SC3E_NULL_SET (
     e, is_equal_parent (qvt_avx, qvt, v_quads, q_quads, n_quads, &v, &q));
   SC_CHECK_ABORT (e == NULL, "quadrant_parent: non-vec != vec");
+
+  SC3E_NULL_SET (
+    e, is_equal_compare (qvt_avx, qvt, v_quads, q_quads, n_quads));
+  SC_CHECK_ABORT (e == NULL, "quadrant_compare: non-vec != vec");
+  
+  SC3E_NULL_SET (
+    e, is_equal_successor (qvt_avx, qvt, v_quads, q_quads, n_quads, &v, &q));
+  SC_CHECK_ABORT (e == NULL, "quadrant_successor: non-vec != vec");
 
   free (qvt_avx);
   free (qvt);
