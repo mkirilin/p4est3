@@ -69,10 +69,11 @@ include example/spheres/Makefile.am
 include example/steps/Makefile.am
 include example/tetgen/Makefile.am
 include example/timings/Makefile.am
-# Temporarily disabled until merging of latest prev3-develop
-# include example/balance_seeds/Makefile.am
+include example/balance_seeds/Makefile.am
 include example/v3basics/Makefile.am
 
+## This was only used for our lint code, which needs to be replaced.
+##
 ## # lint static syntax checker
 ## ALL_LINT_FLAGS = $(LINT_FLAGS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 ##                  $(MPI_INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) \
