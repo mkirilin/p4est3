@@ -72,6 +72,8 @@ include example/timings/Makefile.am
 include example/balance_seeds/Makefile.am
 include example/v3basics/Makefile.am
 
+## This was only used for our lint code, which needs to be replaced.
+##
 ## # lint static syntax checker
 ## ALL_LINT_FLAGS = $(LINT_FLAGS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 ##                  $(MPI_INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) \
