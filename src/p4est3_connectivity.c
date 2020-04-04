@@ -22,7 +22,7 @@
 */
 
 #include <p4est3_connectivity.h>
-#include <sc3_refcount_internal.h>
+#include <sc3_refcount.h>
 
 struct p4est3_connectivity
 {

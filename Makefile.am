@@ -69,7 +69,8 @@ include example/spheres/Makefile.am
 include example/steps/Makefile.am
 include example/tetgen/Makefile.am
 include example/timings/Makefile.am
-include example/balance_seeds/Makefile.am
+# Temporarily disabled until merging of latest prev3-develop
+# include example/balance_seeds/Makefile.am
 include example/v3basics/Makefile.am
 
 ## # lint static syntax checker

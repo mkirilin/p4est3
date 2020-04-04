@@ -23,7 +23,7 @@
 
 #include <p4est3_internal.h>
 #include <sc3_omp.h>
-#include <sc3_refcount_internal.h>
+#include <sc3_refcount.h>
 
 /* TODO add context information to sc3_error
         (i.e., which library is producing the error?) */
