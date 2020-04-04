@@ -31,6 +31,14 @@
 
 #include <time.h>
 
+#ifndef SC3E_TERR
+/* copied here until we're clear on whether we're keeping it */
+#define SC3E_TERR(f,r) do {                                             \
+  sc3_error_t * _e = (f);                                               \
+  if (_e != NULL) {                                                     \
+    sc3_error_destroy_noerr (&_e, r); return 0; }} while (0)
+#endif
+
 #define test_child(e, pull, qvt, n_quads, exec_time)              \
 ({                                                                \
   int quad, put_ind;                                              \

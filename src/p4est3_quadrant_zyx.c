@@ -120,7 +120,7 @@ p4est3_quadrant_zyx_child (const __m128i * q, int child_id, __m128i * r)
       char _errmsg[SC3_BUFSIZE];
       snprintf (_errmsg, SC3_BUFSIZE, "%s(%s, %s): %s",
                  "p4est3_quadrant_zyx_is_parent", "q", "r", _r);
-      return sc3_error_new_fatal (__FILE__, __LINE__, _errmsg);
+      SC3E_UNREACH (_errmsg);
     }
   }
 #endif //SC_ENABLE_DEBUG
@@ -151,7 +151,7 @@ p4est3_quadrant_zyx_parent (const __m128i * q, __m128i * r)
       char _errmsg[SC3_BUFSIZE];
       snprintf (_errmsg, SC3_BUFSIZE, "%s(%s, %s): %s",
                  "p4est3_quadrant_zyx_is_parent", "r", "q", _r);
-      return sc3_error_new_fatal (__FILE__, __LINE__, _errmsg);
+      SC3E_UNREACH (_errmsg);
     }
   }
 #endif //SC_ENABLE_DEBUG
