@@ -118,8 +118,8 @@ p4est3_quadrant_zyx_child (const __m128i * q, int child_id, __m128i * r)
     char _r[SC3_BUFSIZE];
     if (!(p4est3_quadrant_zyx_is_parent (q, r, _r))) {
       char _errmsg[SC3_BUFSIZE];
-      snprintf (_errmsg, SC3_BUFSIZE, "%s(%s, %s): %s",
-                 "p4est3_quadrant_zyx_is_parent", "q", "r", _r);
+      sc3_snprintf (_errmsg, SC3_BUFSIZE, "%s(%s, %s): %s",
+                    "p4est3_quadrant_zyx_is_parent", "q", "r", _r);
       SC3E_UNREACH (_errmsg);
     }
   }
@@ -149,8 +149,8 @@ p4est3_quadrant_zyx_parent (const __m128i * q, __m128i * r)
     char _r[SC3_BUFSIZE];
     if (!(p4est3_quadrant_zyx_is_parent (r, q, _r))) {
       char _errmsg[SC3_BUFSIZE];
-      snprintf (_errmsg, SC3_BUFSIZE, "%s(%s, %s): %s",
-                 "p4est3_quadrant_zyx_is_parent", "r", "q", _r);
+      sc3_snprintf (_errmsg, SC3_BUFSIZE, "%s(%s, %s): %s",
+                    "p4est3_quadrant_zyx_is_parent", "r", "q", _r);
       SC3E_UNREACH (_errmsg);
     }
   }
@@ -459,7 +459,7 @@ p4est3_quadrant_zyx_morton (int level, p4est3_gloidx id, __m128i * quadrant)
 {
   SC3A_CHECK (0 <= level && level <= P4EST_QMAXLEVEL);
   if (level < P4EST_QMAXLEVEL) {
-    SC3A_CHECK (id < ((uint64_t) 1 << P4EST_DIM * level));
+    SC3A_CHECK (id < (((p4est3_gloidx) 1) << P4EST_DIM * level));
   }
 
   *quadrant = _mm_setzero_si128 ();
