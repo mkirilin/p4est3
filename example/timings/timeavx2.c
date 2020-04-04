@@ -29,6 +29,10 @@
 #include <p8est_p4est3.h>
 #endif
 
+#include <immintrin.h>
+#include <smmintrin.h>
+#include <emmintrin.h>
+
 #include <time.h>
 
 #ifndef SC3E_TERR

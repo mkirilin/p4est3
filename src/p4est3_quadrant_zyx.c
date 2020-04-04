@@ -21,11 +21,18 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifdef P4_TO_P8
-#include <p8est3_quadrant_zyx.h>
-#else
+#ifndef P4_TO_P8
+#include <p4est.h>
 #include <p4est3_quadrant_zyx.h>
+#else
+#include <p8est.h>
+#include <p8est3_quadrant_zyx.h>
 #endif /* !P4_TO_P8 */
+
+/* TODO: make this file independent of __m128i and intrinsics headers */
+#include <immintrin.h>
+#include <smmintrin.h>
+#include <emmintrin.h>
 
 static int
 p4est3_quadrant_zyx_is_inside_root (const __m128i * q, char *reason)
