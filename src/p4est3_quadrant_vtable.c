@@ -210,3 +210,21 @@ p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
   P3A_CHECK (qvt != NULL && qvt->quadrant_morton != NULL);
   P3E_TAIL (qvt->quadrant_morton (level, id, r));
 }
+
+sc3_error_t        *
+p4est3_quadrant_array_new (sc3_allocator_t * alloc,
+                           p4est3_quadrant_vtable_t * qvt,
+                           int n, sc3_array_t ** arr)
+{
+  SC3E_RETVAL (arr, NULL);
+  P3A_IS (sc3_allocator_is_setup, alloc);
+  P3A_CHECK (qvt != NULL && qvt->quadrant_size != NULL);
+  P3A_CHECK (n >= 0);
+
+  SC3E (sc3_array_new (alloc, arr));
+  SC3E (sc3_array_set_elem_size (*arr, qvt->quadrant_size ()));
+  SC3E (sc3_array_set_elem_count (*arr, n));
+  SC3E (sc3_array_setup (*arr));
+
+  return NULL;
+}

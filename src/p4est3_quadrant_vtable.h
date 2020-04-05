@@ -25,6 +25,7 @@
 #define P4EST3_QUADRANT_VTABLE
 
 #include <p4est3_base.h>
+#include <sc3_array.h>
 
 #ifdef __cplusplus
 extern              "C"
@@ -136,6 +137,12 @@ sc3_error_t        *p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t
 sc3_error_t        *p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
                                             int level, p4est3_gloidx id,
                                             void *r);
+
+/**************************** static functions *****************************/
+
+sc3_error_t        *p4est3_quadrant_array_new (sc3_allocator_t * alloc,
+                                               p4est3_quadrant_vtable_t * qvt,
+                                               int n, sc3_array_t ** arr);
 
 #ifdef __cplusplus
 #if 0
