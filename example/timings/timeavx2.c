@@ -109,6 +109,7 @@ main (int argc, char **argv)
   char                reason[SC3_BUFSIZE];
   p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx = &sqvt_avx;
   p4est3_quadrant_vtable_t sqvt, *qvt = &sqvt;
+  sc3_array_t        *qarr_avx, *qarr;
   
   p4est3_quadrant_zyx_vtable (qvt_avx);
   p4est_quadrant_vtable (qvt, 0);
@@ -127,6 +128,14 @@ main (int argc, char **argv)
   } else {
     n_quads = atoll(argv[1]);
   }
+
+  /* TODO create a dedicated allocator for this program */
+  /* TODO use quadrant array instead of manual allocation.
+          This will allow us to not include immintrin.h in this program. */
+  SC3E_SET (e, p4est3_quadrant_array_new (sc3_allocator_nocount (), qvt_avx,
+                                          n_quads, &qarr_avx));
+  SC3E_SET (e, p4est3_quadrant_array_new (sc3_allocator_nocount (), qvt,
+                                          n_quads, &qarr));
 
   __m128i * v_pull2check =
          (__m128i *)malloc (p4est3_quadrant_size (qvt_avx) * n_quads);
@@ -180,6 +189,8 @@ main (int argc, char **argv)
 
   free (v_pull2check);
   free (q_pull2check);
+  SC3E_SET (e, sc3_array_destroy (&qarr_avx));
+  SC3E_SET (e, sc3_array_destroy (&qarr));
 
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
