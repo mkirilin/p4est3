@@ -29,7 +29,6 @@
 #include <p8est3_quadrant_zyx.h>
 #endif /* !P4_TO_P8 */
 
-/* TODO: make this file independent of __m128i and intrinsics headers */
 #include <immintrin.h>
 #include <smmintrin.h>
 #include <emmintrin.h>
@@ -37,7 +36,6 @@
 static int
 p4est3_quadrant_zyx_is_inside_root (const __m128i * q, char *reason)
 {
-
   SC3E_TEST (
     _mm_test_all_ones (
       _mm_cmpgt_epi32 (*q, _mm_set1_epi32(-1)) ) == 1
@@ -69,8 +67,8 @@ p4est3_quadrant_zyx_is_valid (const __m128i * q, char *reason)
 }
 
 static int
-p4est3_quadrant_zyx_is_parent (const __m128i * q, const __m128i * r
-                            , char *reason)
+p4est3_quadrant_zyx_is_parent (const __m128i * q, const __m128i * r,
+                               char *reason)
 {
   SC3E_IS (p4est3_quadrant_zyx_is_valid, q, reason);
   SC3E_IS (p4est3_quadrant_zyx_is_valid, r, reason);
@@ -81,7 +79,7 @@ p4est3_quadrant_zyx_is_parent (const __m128i * q, const __m128i * r
 
   __m128i lhs = _mm_add_epi32 (*q, _mm_set_epi32 (0, 0, 0, 1));
   __m128i rhs = _mm_and_si128 (*r
-                , _mm_set_epi32 ( //Optimized by compiler?
+                , _mm_set_epi32 ( /* Optimized by compiler? */
                                  ~P4EST_QUADRANT_LEN (r_level)
                                , ~P4EST_QUADRANT_LEN (r_level)
 #ifdef P4_TO_P8
@@ -102,7 +100,7 @@ p4est3_quadrant_zyx_child (const __m128i * q, int child_id, __m128i * r)
 
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
   SC3A_CHECK (level < P4EST_QMAXLEVEL);
-  SC3A_CHECK (child_id >= 0 && child_id < P4EST_CHILDREN);
+  SC3A_CHECK (0 <= child_id && child_id < P4EST_CHILDREN);
 
   *r = 
   _mm_or_si128 (
@@ -120,17 +118,7 @@ p4est3_quadrant_zyx_child (const __m128i * q, int child_id, __m128i * r)
 #ifndef P4_TO_P8
   *r = _mm_insert_epi32 (*r, 0, 1);
 #endif
-#ifdef SC_ENABLE_DEBUG
-  { //Waiting for the corresponding SC3A_.. macro
-    char _r[SC3_BUFSIZE];
-    if (!(p4est3_quadrant_zyx_is_parent (q, r, _r))) {
-      char _errmsg[SC3_BUFSIZE];
-      sc3_snprintf (_errmsg, SC3_BUFSIZE, "%s(%s, %s): %s",
-                    "p4est3_quadrant_zyx_is_parent", "q", "r", _r);
-      SC3E_UNREACH (_errmsg);
-    }
-  }
-#endif //SC_ENABLE_DEBUG
+  P3A_IS2 (p4est3_quadrant_zyx_is_parent, q, r);
   return NULL;
 }
 
@@ -150,18 +138,7 @@ p4est3_quadrant_zyx_parent (const __m128i * q, __m128i * r)
       );
 
   SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
-#ifdef SC_ENABLE_DEBUG
-  { //Waiting for the corresponding SC3A_.. macro
-    //There is no such check in original function
-    char _r[SC3_BUFSIZE];
-    if (!(p4est3_quadrant_zyx_is_parent (r, q, _r))) {
-      char _errmsg[SC3_BUFSIZE];
-      sc3_snprintf (_errmsg, SC3_BUFSIZE, "%s(%s, %s): %s",
-                    "p4est3_quadrant_zyx_is_parent", "r", "q", _r);
-      SC3E_UNREACH (_errmsg);
-    }
-  }
-#endif //SC_ENABLE_DEBUG
+  P3A_IS2 (p4est3_quadrant_zyx_is_parent, r, q);
   return NULL;
 }
 
@@ -501,6 +478,8 @@ p4est3_quadrant_zyx_morton (int level, p4est3_gloidx id, __m128i * quadrant)
                   ));
   }
 
+  /* TODO: Is it safe to use *quadrant as both input and output variable?
+           I think yes, but double-check with the standard. */
   *quadrant = _mm_slli_epi32 (*quadrant, P4EST_MAXLEVEL - level);  
   *quadrant = _mm_insert_epi32 (*quadrant, level, 0);
   SC3A_IS (p4est3_quadrant_zyx_is_valid, quadrant);
