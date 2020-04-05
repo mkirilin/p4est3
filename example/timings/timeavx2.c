@@ -107,11 +107,8 @@ main (int argc, char **argv)
 {
   sc3_error_t        *e;
   char                reason[SC3_BUFSIZE];
-
-  p4est3_quadrant_vtable_t *qvt_avx
-      = (p4est3_quadrant_vtable_t *)malloc (sizeof (p4est3_quadrant_vtable_t));
-  p4est3_quadrant_vtable_t *qvt
-      = (p4est3_quadrant_vtable_t *)malloc (sizeof (p4est3_quadrant_vtable_t));
+  p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx = &sqvt_avx;
+  p4est3_quadrant_vtable_t sqvt, *qvt = &sqvt;
   
   p4est3_quadrant_zyx_vtable (qvt_avx);
   p4est_quadrant_vtable (qvt, 0);
@@ -119,7 +116,7 @@ main (int argc, char **argv)
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
 
   __m128i v_r;
-  p4est_quadrant_t q_r; 
+  p4est_quadrant_t q_r;
 
   int32_t n_quads;
   if(argc == 1) {
@@ -181,8 +178,6 @@ main (int argc, char **argv)
           , exec_nonavx == 0. ? 0. : exec_avx / exec_nonavx);
   SC3E_TERR (e, reason);
 
-  free (qvt_avx);
-  free (qvt);
   free (v_pull2check);
   free (q_pull2check);
 
