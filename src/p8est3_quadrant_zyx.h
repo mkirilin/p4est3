@@ -21,16 +21,27 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P8EST_BITS_ZYX_H
-#define P8EST_BITS_ZYX_H
+#ifndef P8EST_QUADRANT_ZYX_H
+#define P8EST_QUADRANT_ZYX_H
 
-#include <p8est.h>
-#include <p4est3_base.h>
 #include <p4est3_quadrant_vtable.h>
 
-#include <immintrin.h>
-#include <smmintrin.h>
-#include <emmintrin.h>
-
-void p8est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt);
+#ifdef __cplusplus
+extern              "C"
+{
+#if 0
+}
 #endif
+#endif
+
+void                p8est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t *
+                                                qvt);
+
+#ifdef __cplusplus
+#if 0
+{
+#endif
+}
+#endif
+
+#endif /* !P8EST_QUADRANT_ZYX_H */
