@@ -35,14 +35,6 @@
 
 #include <time.h>
 
-#ifndef SC3E_TERR
-/* copied here until we're clear on whether we're keeping it */
-#define SC3E_TERR(f,r) do {                                             \
-  sc3_error_t * _e = (f);                                               \
-  if (_e != NULL) {                                                     \
-    sc3_error_destroy_noerr (&_e, r); return 0; }} while (0)
-#endif
-
 #define test_child(pull, qvt, n_quads, exec_time)                 \
 ({                                                                \
   int quad, put_ind;                                              \
@@ -173,11 +165,21 @@ measure_successor(__m128i * v_pull2check, p4est_quadrant_t * q_pull2check,
   return NULL;
 }
 
+static void
+report_errors (sc3_error_t ** pe)
+{
+  char                eflat[SC3_BUFSIZE];
+
+  if (pe != NULL && *pe != NULL) {
+    sc3_error_destroy_noerr (pe, eflat);
+    fprintf (stderr, "Error: %s\n", eflat);
+  }
+}
+
 int
 main (int argc, char **argv)
 {
   sc3_error_t        *e;
-  char                reason[SC3_BUFSIZE];
   p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx = &sqvt_avx;
   p4est3_quadrant_vtable_t sqvt, *qvt = &sqvt;
   sc3_array_t        *qarr_avx, *qarr;
@@ -217,19 +219,19 @@ main (int argc, char **argv)
     printf("Executing time: \n");
     SC3E_SET (e,
       measure_child (v_pull2check, q_pull2check, qvt_avx, qvt, n_quads));
-    SC3E_TERR (e, reason);
+    report_errors (&e);
 
     SC3E_SET (e,
       measure_parent (v_pull2check, q_pull2check, qvt_avx, qvt, n_quads));
-    SC3E_TERR (e, reason);
+    report_errors (&e);
 
     SC3E_SET (e,
       measure_compare (v_pull2check, q_pull2check, qvt_avx, qvt, n_quads));
-    SC3E_TERR (e, reason);
+    report_errors (&e);
 
     SC3E_SET (e,
       measure_successor (v_pull2check, q_pull2check, qvt_avx, qvt, n_quads));
-    SC3E_TERR (e, reason);
+    report_errors (&e);
   }
 
   free (v_pull2check);
@@ -239,6 +241,6 @@ main (int argc, char **argv)
 
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
-  SC3E_TERR (e, reason);
+  report_errors (&e);
   return 0;
 }
