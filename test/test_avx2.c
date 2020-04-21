@@ -153,6 +153,17 @@ is_equal_successor (p4est3_quadrant_vtable_t * qvt_avx
   return NULL;
 }
 
+static void
+report_errors (sc3_error_t ** pe)
+{
+  char                eflat[SC3_BUFSIZE];
+
+  if (pe != NULL && *pe != NULL) {
+    sc3_error_destroy_noerr (pe, eflat);
+    fprintf (stderr, "Error: %s\n", eflat);
+  }
+}
+
 int
 main (int argc, char **argv)
 {
@@ -204,6 +215,6 @@ main (int argc, char **argv)
 
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
-  SC3E_TERR (e, reason);
+  report_errors (&e);
   return 0;
 }
