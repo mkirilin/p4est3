@@ -29,15 +29,12 @@
 #include <p8est_p4est3.h>
 #endif
 
-#include <immintrin.h>
-#include <smmintrin.h>
-#include <emmintrin.h>
-
 #include <time.h>
 
 #define test_child(pull, qvt, n_quads, exec_time)                 \
 ({                                                                \
   int quad, put_ind;                                              \
+  void *p, *q;                                                    \
   clock_t t_b = clock ();                                         \
                                                                   \
   for (quad = 0, put_ind = 1                                      \
@@ -45,25 +42,29 @@
        ; ++quad,  put_ind += P4EST_CHILDREN                       \
       ){                                                          \
     for (int child = 0; child < P4EST_CHILDREN; ++child){         \
-      SC3E (p4est3_quadrant_child (qvt, &pull[quad]               \
-                          , child, &pull[put_ind + child]));      \
+      SC3E (sc3_array_index (pull, quad, &p));                    \
+      SC3E (sc3_array_index (pull, put_ind + child, &q));         \
+      SC3E (p4est3_quadrant_child (qvt, p, child, q));            \
     }                                                             \
   }                                                               \
                                                                   \
   for (int child = 0; child < n_quads - put_ind; ++child) {       \
-    SC3E (p4est3_quadrant_child (qvt, &pull[quad]                 \
-                        , child, &pull[put_ind + child]));        \
+    SC3E (sc3_array_index (pull, quad, &p));                      \
+    SC3E (sc3_array_index (pull, put_ind + child, &q));           \
+    SC3E (p4est3_quadrant_child (qvt, p, child, q));              \
   }                                                               \
   clock_t t_e = clock ();                                         \
                                                                   \
   exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;               \
 });
 
-#define test_parent(p, pull, qvt, n_quads, exec_time)             \
+#define test_parent(q, pull, qvt, n_quads, exec_time)             \
 ({                                                                \
+  void *p;                                                        \
   clock_t t_b = clock();                                          \
   for (int quad = 1; quad < n_quads; ++quad) {                    \
-    SC3E (p4est3_quadrant_parent (qvt, &pull[quad], p));          \
+    SC3E (sc3_array_index (pull, quad, &p));                      \
+    SC3E (p4est3_quadrant_parent (qvt, p, q));                    \
   }                                                               \
   clock_t t_e = clock();                                          \
   exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;               \
@@ -71,22 +72,26 @@
 
 #define test_compare(pull, qvt, n_quads, exec_time)               \
 ({                                                                \
+  void *p, *q;                                                    \
   clock_t t_b = clock();                                          \
   int j;                                                          \
   for (int quad = 0; quad < n_quads; ++quad) {                    \
-    SC3E (p4est3_quadrant_compare (qvt, &pull[quad]               \
-                        , &pull[n_quads - quad - 1], &j));        \
+    SC3E (sc3_array_index (pull, quad, &p));                      \
+    SC3E (sc3_array_index (pull, n_quads - quad - 1, &q));        \
+    SC3E (p4est3_quadrant_compare (qvt, p, q, &j));               \
   }                                                               \
   clock_t t_e = clock();                                          \
   exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;               \
 });
 
-#define test_successor(p, pull, qvt, n_quads, exec_time)                      \
+#define test_successor(q, pull, qvt, n_quads, exec_time)                      \
 ({                                                                            \
+  void *p;                                                                    \
   clock_t t_b = clock();                                                      \
   for (int quad = 1; quad < n_quads-P4EST_CHILDREN; quad += P4EST_CHILDREN) { \
     for (int i = 0; i < P4EST_CHILDREN - 1; ++i) {                            \
-      SC3E (p4est3_quadrant_successor (qvt, &pull[quad + i], p));             \
+      SC3E (sc3_array_index (pull, quad + i, &p));                            \
+      SC3E (p4est3_quadrant_successor (qvt, p, q));                           \
     }                                                                         \
   }                                                                           \
   clock_t t_e = clock();                                                      \
@@ -106,7 +111,7 @@ print_time_info (float exec_avx, float exec_nonavx, const char * name)
 }
 
 static sc3_error_t *
-measure_child (__m128i * v_pull2check, p4est_quadrant_t * q_pull2check,
+measure_child (sc3_array_t * v_pull2check, sc3_array_t * q_pull2check,
                p4est3_quadrant_vtable_t * qvt_avx,
                p4est3_quadrant_vtable_t * qvt, int32_t n_quads)
 {
@@ -120,23 +125,24 @@ measure_child (__m128i * v_pull2check, p4est_quadrant_t * q_pull2check,
 }
 
 static sc3_error_t *
-measure_parent (__m128i * v_pull2check, p4est_quadrant_t * q_pull2check,
+measure_parent (sc3_array_t * v_pull2check, sc3_array_t * q_pull2check,
                 p4est3_quadrant_vtable_t * qvt_avx,
                 p4est3_quadrant_vtable_t * qvt, int32_t n_quads)
 {
   float               exec_avx, exec_nonavx;
-  __m128i             v_r;
-  p4est_quadrant_t    q_r;
+  void               *v, *q;
 
-  test_parent (&v_r, v_pull2check, qvt_avx, n_quads, exec_avx);
-  test_parent (&q_r, q_pull2check, qvt, n_quads, exec_nonavx);
+  SC3E (sc3_array_index (v_pull2check, 0, &v));
+  SC3E (sc3_array_index (q_pull2check, 0, &q));
+  test_parent (v, v_pull2check, qvt_avx, n_quads, exec_avx);
+  test_parent (q, q_pull2check, qvt, n_quads, exec_nonavx);
 
   print_time_info (exec_avx, exec_nonavx, "Parent");
   return NULL;
 }
 
 static sc3_error_t *
-measure_compare (__m128i * v_pull2check, p4est_quadrant_t * q_pull2check,
+measure_compare (sc3_array_t * v_pull2check, sc3_array_t * q_pull2check,
                  p4est3_quadrant_vtable_t * qvt_avx,
                  p4est3_quadrant_vtable_t * qvt, int32_t n_quads)
 {
@@ -150,16 +156,17 @@ measure_compare (__m128i * v_pull2check, p4est_quadrant_t * q_pull2check,
 }
 
 static sc3_error_t *
-measure_successor(__m128i * v_pull2check, p4est_quadrant_t * q_pull2check,
+measure_successor(sc3_array_t * v_pull2check, sc3_array_t * q_pull2check,
                   p4est3_quadrant_vtable_t * qvt_avx,
                   p4est3_quadrant_vtable_t * qvt, int32_t n_quads)
 {
   float               exec_avx, exec_nonavx;
-  __m128i             v_r;
-  p4est_quadrant_t    q_r;
+  void               *v, *q;
 
-  test_successor (&v_r, v_pull2check, qvt_avx, n_quads, exec_avx);
-  test_successor (&q_r, q_pull2check, qvt, n_quads, exec_nonavx);
+  SC3E (sc3_array_index (v_pull2check, 0, &v));
+  SC3E (sc3_array_index (q_pull2check, 0, &q));
+  test_successor (v, v_pull2check, qvt_avx, n_quads, exec_avx);
+  test_successor (q, q_pull2check, qvt, n_quads, exec_nonavx);
 
   print_time_info (exec_avx, exec_nonavx, "Successor");
   return NULL;
@@ -183,6 +190,7 @@ main (int argc, char **argv)
   p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx = &sqvt_avx;
   p4est3_quadrant_vtable_t sqvt, *qvt = &sqvt;
   sc3_array_t        *qarr_avx, *qarr;
+  void               *p;
 
   p4est3_quadrant_zyx_vtable (qvt_avx);
   p4est_quadrant_vtable (qvt, 0);
@@ -200,42 +208,32 @@ main (int argc, char **argv)
   }
 
   /* TODO create a dedicated allocator for this program */
-  /* TODO use quadrant array instead of manual allocation.
-          This will allow us to not include immintrin.h in this program. */
   SC3E_NULL_SET (e, p4est3_quadrant_array_new (sc3_allocator_nocount (),
                                                qvt_avx, n_quads, &qarr_avx));
   SC3E_NULL_SET (e, p4est3_quadrant_array_new (sc3_allocator_nocount (),
                                                qvt, n_quads, &qarr));
 
-  __m128i * v_pull2check =
-         (__m128i *)malloc (p4est3_quadrant_size (qvt_avx) * n_quads);
-  p4est_quadrant_t * q_pull2check =
-          (p4est_quadrant_t *)malloc (p4est3_quadrant_size (qvt) * n_quads);
+  SC3E_NULL_SET (e, sc3_array_index (qarr_avx, 0, &p));
+  SC3E_NULL_SET (e, p4est3_quadrant_root (qvt_avx, p));
 
-  v_pull2check[0] = _mm_setzero_si128 ();
-  ((void) memset ((&q_pull2check[0]), 0, sizeof (p4est_quadrant_t)));
+  SC3E_NULL_SET (e, sc3_array_index (qarr, 0, &p));
+  SC3E_NULL_SET (e, p4est3_quadrant_root (qvt, p));
 
   if (e == NULL) {
     printf("Executing time: \n");
-    SC3E_SET (e,
-      measure_child (v_pull2check, q_pull2check, qvt_avx, qvt, n_quads));
+    SC3E_SET (e, measure_child (qarr_avx, qarr, qvt_avx, qvt, n_quads));
     report_errors (&e);
 
-    SC3E_SET (e,
-      measure_parent (v_pull2check, q_pull2check, qvt_avx, qvt, n_quads));
+    SC3E_SET (e, measure_parent (qarr_avx, qarr, qvt_avx, qvt, n_quads));
     report_errors (&e);
 
-    SC3E_SET (e,
-      measure_compare (v_pull2check, q_pull2check, qvt_avx, qvt, n_quads));
+    SC3E_SET (e, measure_compare (qarr_avx, qarr, qvt_avx, qvt, n_quads));
     report_errors (&e);
 
-    SC3E_SET (e,
-      measure_successor (v_pull2check, q_pull2check, qvt_avx, qvt, n_quads));
+    SC3E_SET (e, measure_successor (qarr_avx, qarr, qvt_avx, qvt, n_quads));
     report_errors (&e);
   }
 
-  free (v_pull2check);
-  free (q_pull2check);
   SC3E_NULL_SET (e, sc3_array_destroy (&qarr_avx));
   SC3E_NULL_SET (e, sc3_array_destroy (&qarr));
 
