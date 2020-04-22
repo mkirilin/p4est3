@@ -33,81 +33,89 @@
 
 #define test_child(pull, qvt, n_quads, exec_time)                 \
 ({                                                                \
-  int quad, put_ind;                                              \
-  void *p, *q;                                                    \
-  clock_t t_b = clock ();                                         \
+  int                 quad, put_ind, child;                       \
+  void               *p, *q;                                      \
+  clock_t             t_b, t_e;                                   \
                                                                   \
+  t_b = clock ();                                                 \
   for (quad = 0, put_ind = 1                                      \
        ; P4EST_CHILDREN * (quad + 1) < n_quads                    \
        ; ++quad,  put_ind += P4EST_CHILDREN                       \
       ){                                                          \
-    for (int child = 0; child < P4EST_CHILDREN; ++child){         \
+    for (child = 0; child < P4EST_CHILDREN; ++child){             \
       SC3E (sc3_array_index (pull, quad, &p));                    \
       SC3E (sc3_array_index (pull, put_ind + child, &q));         \
       SC3E (p4est3_quadrant_child (qvt, p, child, q));            \
     }                                                             \
   }                                                               \
                                                                   \
-  for (int child = 0; child < n_quads - put_ind; ++child) {       \
+  for (child = 0; child < n_quads - put_ind; ++child) {           \
     SC3E (sc3_array_index (pull, quad, &p));                      \
     SC3E (sc3_array_index (pull, put_ind + child, &q));           \
     SC3E (p4est3_quadrant_child (qvt, p, child, q));              \
   }                                                               \
-  clock_t t_e = clock ();                                         \
+  t_e = clock ();                                                 \
                                                                   \
   exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;               \
 });
 
 #define test_parent(q, pull, qvt, n_quads, exec_time)             \
 ({                                                                \
-  void *p;                                                        \
-  clock_t t_b = clock();                                          \
-  for (int quad = 1; quad < n_quads; ++quad) {                    \
+  int                 quad;                                       \
+  void               *p;                                          \
+  clock_t             t_b, t_e;                                   \
+                                                                  \
+  t_b = clock();                                                  \
+  for (quad = 1; quad < n_quads; ++quad) {                        \
     SC3E (sc3_array_index (pull, quad, &p));                      \
     SC3E (p4est3_quadrant_parent (qvt, p, q));                    \
   }                                                               \
-  clock_t t_e = clock();                                          \
+  t_e = clock();                                                  \
   exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;               \
 });
 
 #define test_compare(pull, qvt, n_quads, exec_time)               \
 ({                                                                \
-  void *p, *q;                                                    \
-  clock_t t_b = clock();                                          \
-  int j;                                                          \
-  for (int quad = 0; quad < n_quads; ++quad) {                    \
+  void               *p, *q;                                      \
+  clock_t             t_b, t_e;                                   \
+  int                 j, quad;                                    \
+                                                                  \
+  t_b = clock();                                                  \
+  for (quad = 0; quad < n_quads; ++quad) {                        \
     SC3E (sc3_array_index (pull, quad, &p));                      \
     SC3E (sc3_array_index (pull, n_quads - quad - 1, &q));        \
     SC3E (p4est3_quadrant_compare (qvt, p, q, &j));               \
   }                                                               \
-  clock_t t_e = clock();                                          \
+  t_e = clock();                                                  \
   exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;               \
 });
 
-#define test_successor(q, pull, qvt, n_quads, exec_time)                      \
-({                                                                            \
-  void *p;                                                                    \
-  clock_t t_b = clock();                                                      \
-  for (int quad = 1; quad < n_quads-P4EST_CHILDREN; quad += P4EST_CHILDREN) { \
-    for (int i = 0; i < P4EST_CHILDREN - 1; ++i) {                            \
-      SC3E (sc3_array_index (pull, quad + i, &p));                            \
-      SC3E (p4est3_quadrant_successor (qvt, p, q));                           \
-    }                                                                         \
-  }                                                                           \
-  clock_t t_e = clock();                                                      \
-  exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;                           \
+#define test_successor(q, pull, qvt, n_quads, exec_time)                    \
+({                                                                          \
+  int                 i, quad;                                              \
+  void               *p;                                                    \
+  clock_t             t_b, t_e;                                             \
+                                                                            \
+  t_b = clock();                                                            \
+  for (quad = 1; quad < n_quads-P4EST_CHILDREN; quad += P4EST_CHILDREN) {   \
+    for (i = 0; i < P4EST_CHILDREN - 1; ++i) {                              \
+      SC3E (sc3_array_index (pull, quad + i, &p));                          \
+      SC3E (p4est3_quadrant_successor (qvt, p, q));                         \
+    }                                                                       \
+  }                                                                         \
+  t_e = clock();                                                            \
+  exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;                         \
 });
 
 static inline void
-print_time_info (float exec_avx, float exec_nonavx, const char * name)
+print_time_info (float exec_avx, float exec_nonavx, const char *name)
 {
-    printf ("  %s: \n"
-            "    Vectorized:        %f\n"
-            "    Non-Vectorized:    %f\n"
-            "    Vect/Non-Vect Ratio:  %f\n"
-            , name
-            , exec_avx, exec_nonavx
-            , exec_nonavx == 0. ? 0. : exec_avx / exec_nonavx);
+  printf ("  %s: \n"
+          "    Vectorized:        %f\n"
+          "    Non-Vectorized:    %f\n"
+          "    Vect/Non-Vect Ratio:  %f\n",
+          name, exec_avx, exec_nonavx,
+          exec_nonavx == 0. ? 0. : exec_avx / exec_nonavx);
 }
 
 static sc3_error_t *
@@ -149,16 +157,16 @@ measure_compare (sc3_array_t * v_pull2check, sc3_array_t * q_pull2check,
   float               exec_avx, exec_nonavx;
 
   test_compare (v_pull2check, qvt_avx, n_quads, exec_avx);
-  test_compare (q_pull2check, qvt,  n_quads, exec_nonavx);
+  test_compare (q_pull2check, qvt, n_quads, exec_nonavx);
 
   print_time_info (exec_avx, exec_nonavx, "Compare");
   return NULL;
 }
 
 static sc3_error_t *
-measure_successor(sc3_array_t * v_pull2check, sc3_array_t * q_pull2check,
-                  p4est3_quadrant_vtable_t * qvt_avx,
-                  p4est3_quadrant_vtable_t * qvt, int32_t n_quads)
+measure_successor (sc3_array_t * v_pull2check, sc3_array_t * q_pull2check,
+                   p4est3_quadrant_vtable_t * qvt_avx,
+                   p4est3_quadrant_vtable_t * qvt, int32_t n_quads)
 {
   float               exec_avx, exec_nonavx;
   void               *v, *q;
@@ -197,14 +205,15 @@ main (int argc, char **argv)
 
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
 
-  int32_t n_quads;
-  if(argc == 1) {
+  int32_t             n_quads;
+  if (argc == 1) {
     n_quads = 0;
-    for (int i = 0; i < 10; ++i){
+    for (int i = 0; i < 10; ++i) {
       n_quads += (1 << (i * P4EST_DIM));
     }
-  } else {
-    n_quads = atoll(argv[1]);
+  }
+  else {
+    n_quads = atoll (argv[1]);
   }
 
   /* TODO create a dedicated allocator for this program */
@@ -220,7 +229,7 @@ main (int argc, char **argv)
   SC3E_NULL_SET (e, p4est3_quadrant_root (qvt, p));
 
   if (e == NULL) {
-    printf("Executing time: \n");
+    printf ("Executing time: \n");
     SC3E_SET (e, measure_child (qarr_avx, qarr, qvt_avx, qvt, n_quads));
     report_errors (&e);
 
