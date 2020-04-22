@@ -33,19 +33,17 @@
 
 #define N_QUADS_2_TEST 6000000
 
-sc3_error_t *
-create_quadrants (p4est3_quadrant_vtable_t * qvt_avx
-                , p4est3_quadrant_vtable_t * qvt
-                , sc3_array_t * v
-                , sc3_array_t * q, int n_quad)
+sc3_error_t        *
+create_quadrants (p4est3_quadrant_vtable_t * qvt_avx,
+                  p4est3_quadrant_vtable_t * qvt, sc3_array_t * v,
+                  sc3_array_t * q, int n_quad)
 {
-  int quad, put_ind;
+  int                 quad, put_ind, child;
   void               *in, *out;
-  for (quad = 0, put_ind = 1
-       ; P4EST_CHILDREN * (quad + 1) < n_quad
-       ; ++quad,  put_ind += P4EST_CHILDREN
-      ){
-    for (int child = 0; child < P4EST_CHILDREN; ++child){
+
+  for (quad = 0, put_ind = 1; P4EST_CHILDREN * (quad + 1) < n_quad;
+       ++quad, put_ind += P4EST_CHILDREN) {
+    for (child = 0; child < P4EST_CHILDREN; ++child) {
       SC3E (sc3_array_index (v, quad, &in));
       SC3E (sc3_array_index (v, put_ind + child, &out));
       SC3E (p4est3_quadrant_child (qvt_avx, in, child, out));
@@ -56,7 +54,7 @@ create_quadrants (p4est3_quadrant_vtable_t * qvt_avx
     }
   }
 
-  for (int child = 0; child < n_quad - put_ind; ++child) {
+  for (child = 0; child < n_quad - put_ind; ++child) {
     SC3E (sc3_array_index (v, quad, &in));
     SC3E (sc3_array_index (v, put_ind + child, &out));
     SC3E (p4est3_quadrant_child (qvt_avx, in, child, out));
@@ -68,12 +66,12 @@ create_quadrants (p4est3_quadrant_vtable_t * qvt_avx
   return NULL;
 }
 
-sc3_error_t *
-is_equal_child (p4est3_quadrant_vtable_t * qvt_avx
-              , p4est3_quadrant_vtable_t * qvt
-              , sc3_array_t * v, sc3_array_t * q, int32_t n_quad)
+sc3_error_t        *
+is_equal_child (p4est3_quadrant_vtable_t * qvt_avx,
+                p4est3_quadrant_vtable_t * qvt, sc3_array_t * v,
+                sc3_array_t * q, int32_t n_quad)
 {
-  int32_t is_equal;
+  int32_t             is_equal, i;
   void               *p;
   __m128i            *v_row;
   p4est_quadrant_t   *q_row;
@@ -85,7 +83,7 @@ is_equal_child (p4est3_quadrant_vtable_t * qvt_avx
   SC3E (sc3_array_index (q, 0, &p));
   q_row = (p4est_quadrant_t *) p;
 
-  for (int i = 0; i < n_quad; ++i) {
+  for (i = 0; i < n_quad; ++i) {
     is_equal =
       (int32_t) q_row[i].level == _mm_extract_epi32 (v_row[i], 0) &&
       q_row[i].x == _mm_extract_epi32 (v_row[i], 3) &&
@@ -99,12 +97,12 @@ is_equal_child (p4est3_quadrant_vtable_t * qvt_avx
   return NULL;
 }
 
-sc3_error_t *
-is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx
-               , p4est3_quadrant_vtable_t * qvt, sc3_array_t * v
-               , sc3_array_t * q, int n_quad)
+sc3_error_t        *
+is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx,
+                 p4est3_quadrant_vtable_t * qvt, sc3_array_t * v,
+                 sc3_array_t * q, int n_quad)
 {
-  int32_t is_equal;
+  int32_t             is_equal, i;
   __m128i            *v_p;
   p4est_quadrant_t   *q_p;
   void               *in, *p;
@@ -115,7 +113,7 @@ is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx
   SC3E (sc3_array_index (q, 0, &p));
   q_p = (p4est_quadrant_t *) p;
 
-  for (int i = 1; i < n_quad; ++i) {
+  for (i = 1; i < n_quad; ++i) {
     SC3E (sc3_array_index (v, i, &in));
     SC3E (p4est3_quadrant_parent (qvt_avx, in, v_p));
 
@@ -134,14 +132,14 @@ is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx
   return NULL;
 }
 
-sc3_error_t *
-is_equal_compare (p4est3_quadrant_vtable_t * qvt_avx
-                , p4est3_quadrant_vtable_t * qvt
-                , sc3_array_t * v, sc3_array_t * q, int n_quad)
+sc3_error_t        *
+is_equal_compare (p4est3_quadrant_vtable_t * qvt_avx,
+                  p4est3_quadrant_vtable_t * qvt, sc3_array_t * v,
+                  sc3_array_t * q, int n_quad)
 {
-  int res, res_avx;
+  int                 res, res_avx, i;
   void               *lhs, *rhs;
-  for (int i = 0; i < n_quad; ++i) {
+  for (i = 0; i < n_quad; ++i) {
     SC3E (sc3_array_index (v, i, &lhs));
     SC3E (sc3_array_index (v, n_quad - i - 1, &rhs));
     SC3E (p4est3_quadrant_compare (qvt_avx, lhs, rhs, &res_avx));
@@ -154,12 +152,12 @@ is_equal_compare (p4est3_quadrant_vtable_t * qvt_avx
   return NULL;
 }
 
-sc3_error_t *
-is_equal_successor (p4est3_quadrant_vtable_t * qvt_avx
-                  , p4est3_quadrant_vtable_t * qvt
-                  , sc3_array_t * v, sc3_array_t * q, int n_quad)
+sc3_error_t        *
+is_equal_successor (p4est3_quadrant_vtable_t * qvt_avx,
+                    p4est3_quadrant_vtable_t * qvt, sc3_array_t * v,
+                    sc3_array_t * q, int n_quad)
 {
-  int32_t is_equal;
+  int32_t             is_equal, i, j;
   __m128i            *v_p;
   p4est_quadrant_t   *q_p;
   void               *in, *p;
@@ -170,11 +168,11 @@ is_equal_successor (p4est3_quadrant_vtable_t * qvt_avx
   SC3E (sc3_array_index (q, 0, &p));
   q_p = (p4est_quadrant_t *) p;
 
-  for (int i = 1; i < n_quad; i += P4EST_CHILDREN) {
-    for (int j = 0; j < P4EST_CHILDREN - 1 && i+j < n_quad; ++j) {
+  for (i = 1; i < n_quad; i += P4EST_CHILDREN) {
+    for (j = 0; j < P4EST_CHILDREN - 1 && i + j < n_quad; ++j) {
       SC3E (sc3_array_index (v, i + j, &in));
       SC3E (p4est3_quadrant_successor (qvt_avx, in, v_p));
-      
+
       SC3E (sc3_array_index (q, i + j, &in));
       SC3E (p4est3_quadrant_successor (qvt, in, q_p));
       is_equal =
@@ -185,10 +183,9 @@ is_equal_successor (p4est3_quadrant_vtable_t * qvt_avx
         q_p->z == _mm_extract_epi32 (*v_p, 1) &&
 #endif
         1;
-        if(!is_equal)
-        {
-          return NULL;
-        }
+      if (!is_equal) {
+        return NULL;
+      }
       SC3E_DEMAND (is_equal, "Comparing of quadrant_successor results");
     }
   }
@@ -209,6 +206,7 @@ report_errors (sc3_error_t ** pe)
 int
 main (int argc, char **argv)
 {
+  const int32_t       n_quads = N_QUADS_2_TEST;
   sc3_error_t        *e;
   p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx = &sqvt_avx;
   p4est3_quadrant_vtable_t sqvt, *qvt = &sqvt;
@@ -220,7 +218,6 @@ main (int argc, char **argv)
 
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
 
-  const int32_t n_quads = N_QUADS_2_TEST;
   SC3E_NULL_SET (e, p4est3_quadrant_array_new (sc3_allocator_nocount (),
                                                qvt_avx, n_quads, &qarr_avx));
   SC3E_NULL_SET (e, p4est3_quadrant_array_new (sc3_allocator_nocount (),
@@ -232,20 +229,17 @@ main (int argc, char **argv)
   SC3E_NULL_SET (e, sc3_array_index (qarr, 0, &p));
   SC3E_NULL_SET (e, p4est3_quadrant_root (qvt, p));
 
-  SC3E_NULL_SET (
-    e, is_equal_child (qvt_avx, qvt, qarr_avx, qarr, n_quads));
+  SC3E_NULL_SET (e, is_equal_child (qvt_avx, qvt, qarr_avx, qarr, n_quads));
   SC_CHECK_ABORT (e == NULL, "quadrant_child: non-vec != vec");
-  
-  SC3E_NULL_SET (
-    e, is_equal_parent (qvt_avx, qvt, qarr_avx, qarr, n_quads));
+
+  SC3E_NULL_SET (e, is_equal_parent (qvt_avx, qvt, qarr_avx, qarr, n_quads));
   SC_CHECK_ABORT (e == NULL, "quadrant_parent: non-vec != vec");
 
-  SC3E_NULL_SET (
-    e, is_equal_compare (qvt_avx, qvt, qarr_avx, qarr, n_quads));
+  SC3E_NULL_SET (e, is_equal_compare (qvt_avx, qvt, qarr_avx, qarr, n_quads));
   SC_CHECK_ABORT (e == NULL, "quadrant_compare: non-vec != vec");
-  
-  SC3E_NULL_SET (
-    e, is_equal_successor (qvt_avx, qvt, qarr_avx, qarr, n_quads));
+
+  SC3E_NULL_SET (e,
+                 is_equal_successor (qvt_avx, qvt, qarr_avx, qarr, n_quads));
   SC_CHECK_ABORT (e == NULL, "quadrant_successor: non-vec != vec");
 
   SC3E_NULL_SET (e, sc3_array_destroy (&qarr_avx));
