@@ -362,7 +362,7 @@ p4est3_quadrant_zyx_successor (const __m128i * q, __m128i * r)
   SC3E (p4est3_quadrant_zyx_ancestor_id (q, level, &successor_id));
   successor_id++;
 
-  // iterate until it is possible to increment the child/ancestor_id 
+  /* iterate until it is possible to increment the child/ancestor_id */
   while (successor_id == P4EST_CHILDREN) {
     SC3E (p4est3_quadrant_zyx_ancestor_id (q, --level, &successor_id));
     successor_id++;
@@ -370,7 +370,7 @@ p4est3_quadrant_zyx_successor (const __m128i * q, __m128i * r)
   }
   SC3A_CHECK (0 < successor_id && successor_id < P4EST_CHILDREN);
 
-  // compute result 
+  /* compute result */
   if (level < q_level) {
     /* coarsen to level - 1 and add shifts according to the successor_id */
 /* *INDENT-OFF* */
@@ -411,7 +411,7 @@ p4est3_quadrant_zyx_predecessor (const __m128i * q, __m128i * r)
   SC3E (p4est3_quadrant_zyx_ancestor_id (q, level, &predecessor_id));
   predecessor_id--;
 
-  // iterate until it is possible to decrement the child/ancestor_id 
+  /* iterate until it is possible to decrement the child/ancestor_id */
   while (predecessor_id == -1) {
     SC3E (p4est3_quadrant_zyx_ancestor_id (q, --level, &predecessor_id));
     predecessor_id--;
@@ -419,7 +419,7 @@ p4est3_quadrant_zyx_predecessor (const __m128i * q, __m128i * r)
   }
   SC3A_CHECK (0 <= predecessor_id && predecessor_id < P4EST_CHILDREN - 1);
 
-  // compute result 
+  /* compute result */
   if (level < q_level) {
     /* coarsen to level - 1 and add shifts according to the predecessor_id */
 /* *INDENT-OFF* */
@@ -465,7 +465,7 @@ p4est3_quadrant_zyx_morton (int level, p4est3_gloidx id, __m128i * quadrant)
 
   *quadrant = _mm_setzero_si128 ();
 
-  // this may set the sign bit to create negative numbers 
+  /* this may set the sign bit to create negative numbers */
   for (i = 0; i < level; ++i) {
 /* *INDENT-OFF* */
     __m128i xy_coord_id =
@@ -491,7 +491,7 @@ p4est3_quadrant_zyx_morton (int level, p4est3_gloidx id, __m128i * quadrant)
                         >> ((P4EST_DIM - 1) * i + 2))
 #else
                     , 0
-#endif //P4_TO_P8
+#endif /* P4_TO_P8 */
                     , 0
                   ));
 /* *INDENT-ON* */
