@@ -31,8 +31,7 @@
 
 #include <time.h>
 
-#define test_child(pull, qvt, n_quads, exec_time)                 \
-({                                                                \
+#define test_child(pull, qvt, n_quads, exec_time) do {            \
   int                 quad, put_ind, child;                       \
   void               *p, *q;                                      \
   clock_t             t_b, t_e;                                   \
@@ -57,10 +56,9 @@
   t_e = clock ();                                                 \
                                                                   \
   exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;               \
-});
+  } while (0)
 
-#define test_parent(q, pull, qvt, n_quads, exec_time)             \
-({                                                                \
+#define test_parent(q, pull, qvt, n_quads, exec_time) do {        \
   int                 quad;                                       \
   void               *p;                                          \
   clock_t             t_b, t_e;                                   \
@@ -72,10 +70,9 @@
   }                                                               \
   t_e = clock();                                                  \
   exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;               \
-});
+  } while (0)
 
-#define test_compare(pull, qvt, n_quads, exec_time)               \
-({                                                                \
+#define test_compare(pull, qvt, n_quads, exec_time) do {          \
   void               *p, *q;                                      \
   clock_t             t_b, t_e;                                   \
   int                 j, quad;                                    \
@@ -88,10 +85,9 @@
   }                                                               \
   t_e = clock();                                                  \
   exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;               \
-});
+  } while (0)
 
-#define test_successor(q, pull, qvt, n_quads, exec_time)                    \
-({                                                                          \
+#define test_successor(q, pull, qvt, n_quads, exec_time) do {               \
   int                 i, quad;                                              \
   void               *p;                                                    \
   clock_t             t_b, t_e;                                             \
@@ -105,7 +101,7 @@
   }                                                                         \
   t_e = clock();                                                            \
   exec_time = (float) (t_e - t_b) / CLOCKS_PER_SEC;                         \
-});
+  } while (0)
 
 static inline void
 print_time_info (float exec_avx, float exec_nonavx, const char *name)
