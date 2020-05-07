@@ -29,8 +29,6 @@
 #include <p8est_p4est3.h>
 #endif
 
-#include <immintrin.h>
-
 #define N_QUADS_2_TEST 6000000
 
 sc3_error_t        *
@@ -72,24 +70,31 @@ is_equal_child (p4est3_quadrant_vtable_t * qvt_avx,
                 sc3_array_t * q, int32_t n_quad)
 {
   int32_t             is_equal, i;
+  int32_t             x, y, l;
+#ifdef P4_TO_P8
+  int32_t             z;
+#endif
   void               *p;
-  __m128i            *v_row;
+  void               *v_p;
   p4est_quadrant_t   *q_row;
 
   SC3E (create_quadrants (qvt_avx, qvt, v, q, n_quad));
-  SC3E (sc3_array_index (v, 0, &p));
-  v_row = (__m128i *) p;
 
   SC3E (sc3_array_index (q, 0, &p));
   q_row = (p4est_quadrant_t *) p;
 
   for (i = 0; i < n_quad; ++i) {
-    is_equal =
-      (int32_t) q_row[i].level == _mm_extract_epi32 (v_row[i], 0) &&
-      q_row[i].x == _mm_extract_epi32 (v_row[i], 3) &&
-      q_row[i].y == _mm_extract_epi32 (v_row[i], 2) &&
+    SC3E (sc3_array_index (v, i, &v_p));
+    SC3E (p4est3_quadrant_level (qvt_avx, v_p, &l));
+    SC3E (p4est3_quadrant_coordinate (qvt_avx, v_p, 0, &x));
+    SC3E (p4est3_quadrant_coordinate (qvt_avx, v_p, 1, &y));
 #ifdef P4_TO_P8
-      q_row[i].z == _mm_extract_epi32 (v_row[i], 1) &&
+    SC3E (p4est3_quadrant_coordinate (qvt_avx, v_p, 2, &z));
+#endif
+    is_equal =
+      (int32_t) q_row[i].level == l && q_row[i].x == x && q_row[i].y == y &&
+#ifdef P4_TO_P8
+      q_row[i].z == z &&
 #endif
       1;
     SC3E_DEMAND (is_equal, "Comparing of quadrant_child results");
@@ -103,12 +108,15 @@ is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx,
                  sc3_array_t * q, int n_quad)
 {
   int32_t             is_equal, i;
-  __m128i            *v_p;
+  int32_t             x, y, l;
+#ifdef P4_TO_P8
+  int32_t             z;
+#endif
+  void               *v_p;
   p4est_quadrant_t   *q_p;
   void               *in, *p;
 
-  SC3E (sc3_array_index (v, 0, &p));
-  v_p = (__m128i *) p;
+  SC3E (sc3_array_index (v, 0, &v_p));
 
   SC3E (sc3_array_index (q, 0, &p));
   q_p = (p4est_quadrant_t *) p;
@@ -119,12 +127,16 @@ is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx,
 
     SC3E (sc3_array_index (q, i, &in));
     SC3E (p4est3_quadrant_parent (qvt, in, q_p));
-    is_equal =
-      (int32_t) q_p->level == _mm_extract_epi32 (*v_p, 0) &&
-      q_p->x == _mm_extract_epi32 (*v_p, 3) &&
-      q_p->y == _mm_extract_epi32 (*v_p, 2) &&
+
+    SC3E (p4est3_quadrant_level (qvt_avx, v_p, &l));
+    SC3E (p4est3_quadrant_coordinate (qvt_avx, v_p, 0, &x));
+    SC3E (p4est3_quadrant_coordinate (qvt_avx, v_p, 1, &y));
 #ifdef P4_TO_P8
-      q_p->z == _mm_extract_epi32 (*v_p, 1) &&
+    SC3E (p4est3_quadrant_coordinate (qvt_avx, v_p, 2, &z));
+#endif
+    is_equal = (int32_t) q_p->level == l && q_p->x == x && q_p->y == y &&
+#ifdef P4_TO_P8
+      q_p->z == z &&
 #endif
       1;
     SC3E_DEMAND (is_equal, "Comparing of quadrant_parent results");
@@ -158,12 +170,15 @@ is_equal_successor (p4est3_quadrant_vtable_t * qvt_avx,
                     sc3_array_t * q, int n_quad)
 {
   int32_t             is_equal, i, j;
-  __m128i            *v_p;
+  int32_t             x, y, l;
+#ifdef P4_TO_P8
+  int32_t             z;
+#endif
+  void               *v_p;
   p4est_quadrant_t   *q_p;
   void               *in, *p;
 
-  SC3E (sc3_array_index (v, 0, &p));
-  v_p = (__m128i *) p;
+  SC3E (sc3_array_index (v, 0, &v_p));
 
   SC3E (sc3_array_index (q, 0, &p));
   q_p = (p4est_quadrant_t *) p;
@@ -175,12 +190,16 @@ is_equal_successor (p4est3_quadrant_vtable_t * qvt_avx,
 
       SC3E (sc3_array_index (q, i + j, &in));
       SC3E (p4est3_quadrant_successor (qvt, in, q_p));
-      is_equal =
-        (int32_t) q_p->level == _mm_extract_epi32 (*v_p, 0) &&
-        q_p->x == _mm_extract_epi32 (*v_p, 3) &&
-        q_p->y == _mm_extract_epi32 (*v_p, 2) &&
+
+      SC3E (p4est3_quadrant_level (qvt_avx, v_p, &l));
+      SC3E (p4est3_quadrant_coordinate (qvt_avx, v_p, 0, &x));
+      SC3E (p4est3_quadrant_coordinate (qvt_avx, v_p, 1, &y));
 #ifdef P4_TO_P8
-        q_p->z == _mm_extract_epi32 (*v_p, 1) &&
+      SC3E (p4est3_quadrant_coordinate (qvt_avx, v_p, 2, &z));
+#endif
+      is_equal = (int32_t) q_p->level == l && q_p->x == x && q_p->y == y &&
+#ifdef P4_TO_P8
+        q_p->z == z &&
 #endif
         1;
       if (!is_equal) {
