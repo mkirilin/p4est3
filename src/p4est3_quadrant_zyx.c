@@ -280,6 +280,36 @@ p4est3_quadrant_zyx_ancestor_id (const __m128i * q, int level, int *j)
 }
 
 static sc3_error_t *
+p4est_quadrant_zyx_coordinate (const __m128i * q, int n, int *j)
+{
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  SC3E_DEMAND (0 <= n && n < P4EST_DIM,
+               "An access to an unexisting coordinate");
+  switch (n) {
+  case 0:
+    *j = _mm_extract_epi32 (*q, 3);
+    break;
+  case 1:
+    *j = _mm_extract_epi32 (*q, 2);
+    break;
+  case 2:
+    *j = _mm_extract_epi32 (*q, 1);
+    break;
+  default:
+    break;
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+p4est_quadrant_zyx_level (const __m128i * q, int *l)
+{
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  *l = _mm_extract_epi32 (*q, 0);
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_quadrant_zyx_ancestor (const __m128i * q, int level, __m128i * r)
 {
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
@@ -525,11 +555,14 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_is_valid = (p4est3_quadrant_is_t) NULL;
 
-  qvt->quadrant_level = (p4est3_quadrant_level_t) NULL;
+  qvt->quadrant_level = (p4est3_quadrant_level_t) p4est_quadrant_zyx_level;
 
   qvt->quadrant_child_id = (p4est3_quadrant_child_id_t) NULL;
 
   qvt->quadrant_ancestor_id = (p4est3_quadrant_ancestor_id_t) NULL;
+
+  qvt->quadrant_coordinate =
+    (p4est3_quadrant_coordinate_t) p4est_quadrant_zyx_coordinate;
 
   qvt->quadrant_compare =
     (p4est3_quadrant_compare_t) p4est3_quadrant_zyx_compare;
