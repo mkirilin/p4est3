@@ -85,6 +85,14 @@ p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
+p4est3_quadrant_coordinate (p4est3_quadrant_vtable_t * qvt,
+                            const void *q, int n, int *j)
+{
+  P3A_CHECK (qvt != NULL && qvt->quadrant_coordinate != NULL);
+  P3E_TAIL (qvt->quadrant_coordinate (q, n, j));
+}
+
+sc3_error_t        *
 p4est3_quadrant_compare (p4est3_quadrant_vtable_t * qvt,
                          const void *q1, const void *q2, int *j)
 {
