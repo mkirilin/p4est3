@@ -231,8 +231,9 @@ p4est3_setup (p4est3_t * p3)
   /* create tree and quadrant metadata */
   SC3E (p4est3_internal_setup_tree (p3, num_uniform));
 
-  /* create quadrants by the morton method, which is presumably slowest */
-  SC3E (p4est3_internal_setup_morton (p3));
+  /* create quadrants by the previously specified method,
+     default is morton, which is presumably slowest */
+  SC3E (p4est3_internal_setup_quadrants (p3));
 
   /* we are done creating a valid forest */
   p3->setup = 1;
