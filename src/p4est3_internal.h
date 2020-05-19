@@ -67,6 +67,7 @@ struct p4est3
   int                 qmaxlevel;
   int                 num_children;
   int                 qsize;
+  int                 setup_mode;
 
   int                 max_threads;
   char              **temp_quad;
@@ -81,6 +82,14 @@ struct p4est3
   p4est3_topidx       fltree, lltree, nltrees;
   sc3_array_t        *trees;
 };
+
+typedef enum p4est3_setup_mode
+{
+  P4EST3_NEW_MORTON = 1,        /**< Set every quadrant by its Morton index */
+  P4EST3_NEW_SUCCESSOR = 2,     /**< Set every quadrant by the previous one */
+  P4EST3_NEW_MAX_TYPE = 4       /**< Unused bounding value */
+}
+p4est3_setup_mode_t;
 
 #ifdef __cplusplus
 extern              "C"
