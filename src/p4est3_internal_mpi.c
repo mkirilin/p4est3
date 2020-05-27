@@ -326,6 +326,67 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_lowest_children (p4est3_t * p3, const void *q, int level,
+                        sc3_array_t * levelq, char *threadq)
+{
+  int                 i;
+  void               *child;
+
+  if (level < p3->level - 1) {
+    SC3E (sc3_array_index (levelq, level + 1, &child));
+    for (i = 0; i < p3->num_children; ++i) {
+      SC3E (p4est3_quadrant_child (p3->qvt, q, i, child));
+      SC3E (p4est3_lowest_children (p3, child, level + 1, levelq, threadq));
+    }
+  }
+  else if (level == p3->level - 1) {
+    for (i = 0; i < p3->num_children; ++i, threadq += p3->qsize) {
+      SC3E (p4est3_quadrant_child (p3->qvt, q, i, threadq));
+      SC3A_CHECK (p4est3_quadrant_is_valid
+                  (p3->qvt, threadq, "quadrant isn't valid"));
+    }
+  }
+  else {
+    SC3E (p4est3_quadrant_copy (p3->qvt, q, threadq));
+    threadq += p3->qsize;
+  }
+
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_recursive_partition (p4est3_t * p3, int level,
+                            p4est3_locidx rf,
+                            p4est3_locidx rl,
+                            p4est3_locidx mf,
+                            p4est3_locidx ml,
+                            sc3_array_t * levelq, char *threadq)
+{
+  int                 i;
+  p4est3_locidx       n_lowerq;
+  void               *q;
+
+  if (rf >= mf && rl <= ml) {
+    SC3E (sc3_array_index (levelq, level, &q));
+    SC3E (p4est3_quadrant_morton (p3->qvt, level, rf, q));
+    SC3E (p4est3_lowest_children (p3, q, level, levelq, threadq));
+  }
+  else if (rf > ml || rl < mf) {
+    return NULL;
+  }
+  else {
+    n_lowerq = (rl - rf + 1) / p3->num_children;
+    rl = rf + n_lowerq;
+    for (i = 0; i < p3->num_children; ++i, rf += n_lowerq, rl += n_lowerq) {
+      SC3E (p4est3_recursive_partition (p3, level + 1, rf, rl, mf, ml,
+                                        levelq, threadq));
+    }
+  }
+
+  return NULL;
+}
+
 /** Binary search a local quad number in the local trees */
 static sc3_error_t *
 p4est3_local_quad_tree (p4est3_t * p3,
