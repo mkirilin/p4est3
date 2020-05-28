@@ -193,6 +193,14 @@ p4est3_quadrant_zyx_is_node (const __m128i * q, int inside, char *reason)
 }
 
 static sc3_error_t *
+p4est3_quadrant_zyx_copy (const __m128i * q, __m128i * copy)
+{
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  *copy = *q;
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_quadrant_zyx_compare (const __m128i * q1, const __m128i * q2, int *j)
 {
   int64_t             diff;
@@ -569,7 +577,7 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_root = (p4est3_quadrant_root_t) p4est3_quadrant_zyx_root;
 
-  qvt->quadrant_copy = (p4est3_quadrant_copy_t) NULL;
+  qvt->quadrant_copy = (p4est3_quadrant_copy_t) p4est3_quadrant_zyx_copy;
 
   qvt->quadrant_parent =
     (p4est3_quadrant_parent_t) p4est3_quadrant_zyx_parent;
