@@ -65,7 +65,8 @@ sc3_error_t        *
 p4est3_quadrant_level (p4est3_quadrant_vtable_t * qvt, const void *q, int *l)
 {
   P3A_CHECK (qvt != NULL && qvt->quadrant_level != NULL);
-  P3E_TAIL (qvt->quadrant_level (q, l));
+  P3E (qvt->quadrant_level (q, l));
+  return NULL;
 }
 
 sc3_error_t        *
@@ -73,7 +74,8 @@ p4est3_quadrant_child_id (p4est3_quadrant_vtable_t * qvt,
                           const void *q, int *j)
 {
   P3A_CHECK (qvt != NULL && qvt->quadrant_child_id != NULL);
-  P3E_TAIL (qvt->quadrant_child_id (q, j));
+  P3E (qvt->quadrant_child_id (q, j));
+  return NULL;
 }
 
 sc3_error_t        *
@@ -81,7 +83,8 @@ p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t * qvt,
                              const void *q, int l, int *j)
 {
   P3A_CHECK (qvt != NULL && qvt->quadrant_ancestor_id != NULL);
-  P3E_TAIL (qvt->quadrant_ancestor_id (q, l, j));
+  P3E (qvt->quadrant_ancestor_id (q, l, j));
+  return NULL;
 }
 
 sc3_error_t        *
@@ -89,14 +92,16 @@ p4est3_quadrant_compare (p4est3_quadrant_vtable_t * qvt,
                          const void *q1, const void *q2, int *j)
 {
   P3A_CHECK (qvt != NULL && qvt->quadrant_compare != NULL);
-  P3E_TAIL (qvt->quadrant_compare (q1, q2, j));
+  P3E (qvt->quadrant_compare (q1, q2, j));
+  return NULL;
 }
 
 sc3_error_t        *
 p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt, void *r)
 {
   P3A_CHECK (qvt != NULL && qvt->quadrant_root != NULL);
-  P3E_TAIL (qvt->quadrant_root (r));
+  P3E (qvt->quadrant_root (r));
+  return NULL;
 }
 
 sc3_error_t        *
@@ -141,7 +146,8 @@ p4est3_quadrant_predecessor (p4est3_quadrant_vtable_t * qvt,
                              const void *q, void *r)
 {
   P3A_CHECK (qvt != NULL && qvt->quadrant_predecessor != NULL);
-  P3E_TAIL (qvt->quadrant_predecessor (q, r));
+  P3E (qvt->quadrant_predecessor (q, r));
+  return NULL;
 }
 
 sc3_error_t        *
@@ -149,7 +155,8 @@ p4est3_quadrant_successor (p4est3_quadrant_vtable_t * qvt,
                            const void *q, void *r)
 {
   P3A_CHECK (qvt != NULL && qvt->quadrant_successor != NULL);
-  P3E_TAIL (qvt->quadrant_successor (q, r));
+  P3E (qvt->quadrant_successor (q, r));
+  return NULL;
 }
 
 sc3_error_t        *
@@ -157,7 +164,8 @@ p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
                        const void *q, int i, void *r)
 {
   P3A_CHECK (qvt != NULL && qvt->quadrant_child != NULL);
-  P3E_TAIL (qvt->quadrant_child (q, i, r));
+  P3E (qvt->quadrant_child (q, i, r));
+  return NULL;
 }
 
 sc3_error_t        *
@@ -192,7 +200,8 @@ p4est3_quadrant_first_descendant (p4est3_quadrant_vtable_t * qvt,
                                   const void *q, int l, void *r)
 {
   P3A_CHECK (qvt != NULL && qvt->quadrant_first_descendant != NULL);
-  P3E_TAIL (qvt->quadrant_first_descendant (q, l, r));
+  P3E (qvt->quadrant_first_descendant (q, l, r));
+  return NULL;
 }
 
 sc3_error_t        *
@@ -200,7 +209,8 @@ p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t * qvt,
                                  const void *q, int l, void *r)
 {
   P3A_CHECK (qvt != NULL && qvt->quadrant_last_descendant != NULL);
-  P3E_TAIL (qvt->quadrant_last_descendant (q, l, r));
+  P3E (qvt->quadrant_last_descendant (q, l, r));
+  return NULL;
 }
 
 sc3_error_t        *
@@ -208,5 +218,6 @@ p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
                         int level, p4est3_gloidx id, void *r)
 {
   P3A_CHECK (qvt != NULL && qvt->quadrant_morton != NULL);
-  P3E_TAIL (qvt->quadrant_morton (level, id, r));
+  P3E (qvt->quadrant_morton (level, id, r));
+  return NULL;
 }
