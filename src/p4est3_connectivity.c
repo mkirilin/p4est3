@@ -78,7 +78,7 @@ p4est3_connectivity_new (sc3_allocator_t * alloc, p4est3_connectivity_t ** pc)
   SC3A_IS (sc3_allocator_is_setup, alloc);
 
   SC3E (sc3_allocator_ref (alloc));
-  SC3E_ALLOCATOR_CALLOC (alloc, p4est3_connectivity_t, 1, c);
+  SC3E (sc3_allocator_calloc_one (alloc, sizeof (p4est3_connectivity_t), &c));
   SC3E (sc3_refcount_init (&c->rc));
   c->alloc = alloc;
   c->num_trees = 1;
@@ -149,7 +149,7 @@ p4est3_connectivity_unref (p4est3_connectivity_t ** pc)
 
     /* remove allocation */
     alloc = c->alloc;
-    SC3E_ALLOCATOR_FREE (alloc, p4est3_connectivity_t, c);
+    SC3E (sc3_allocator_free (alloc, c));
     SC3E (sc3_allocator_unref (&alloc));
   }
   return NULL;
@@ -214,7 +214,7 @@ p4est3_connectivity_dstr (void *vslf)
   p4est3_connectivity_ntslf_t *slf = (p4est3_connectivity_ntslf_t *) vslf;
   SC3A_CHECK (slf != NULL);
 
-  SC3E_ALLOCATOR_FREE (slf->alloc, p4est3_connectivity_ntslf_t, slf);
+  SC3E (sc3_allocator_free (slf->alloc, slf));
   return NULL;
 }
 
@@ -230,7 +230,8 @@ p4est3_connectivity_new_num_trees (sc3_allocator_t * alloc,
   SC3A_CHECK (num_trees > 0);
 
   /* create virtual structure */
-  SC3E_ALLOCATOR_CALLOC (alloc, p4est3_connectivity_ntslf_t, 1, slf);
+  SC3E (sc3_allocator_calloc_one
+        (alloc, sizeof (p4est3_connectivity_ntslf_t), &slf));
   slf->alloc = alloc;
   slf->num_trees = num_trees;
   slf->scvt.get_num_trees = p4est3_connectivity_gnt;

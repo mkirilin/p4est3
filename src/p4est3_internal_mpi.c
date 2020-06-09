@@ -276,7 +276,8 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   }
 
   /* create shared quadrant storage */
-  SC3E_ALLOCATOR_MALLOC (p3->alloc, char *, p3->nodesize, p3->nodequads);
+  SC3E (sc3_allocator_malloc (p3->alloc, p3->nodesize * sizeof (char *),
+                              &p3->nodequads));
   quadbytes = p3->local_num_quads * p3->qsize;
   SC3E (sc3_MPI_Win_allocate_shared
         (quadbytes, p3->qsize,
