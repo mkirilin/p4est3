@@ -369,7 +369,9 @@ p4est3_recursive_partition (p4est3_t * p3, int level,
 
   if (rf >= mf && rl <= ml) {
     SC3E (sc3_array_index (levelq, level, &q));
-    SC3E (p4est3_quadrant_morton (p3->qvt, level, rf, q));
+    SC3E (p4est3_quadrant_morton (p3->qvt, level,
+                                  rf >> (p3->qvt->dim * (p3->level - level)),
+                                  q));
     SC3E (p4est3_lowest_children (p3, q, level, levelq, threadq));
   }
   else if (rf > ml || rl < mf) {
