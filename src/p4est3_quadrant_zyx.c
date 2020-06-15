@@ -34,6 +34,18 @@
 #include <emmintrin.h>
 
 static int
+p4est3_quadrant_zyx_max_level (void)
+{
+  return P4EST_QMAXLEVEL;
+}
+
+static int
+p4est3_quadrant_zyx_num_children (void)
+{
+  return P4EST_CHILDREN;
+}
+
+static int
 p4est3_quadrant_zyx_is_inside_root (const __m128i * q, char *reason)
 {
 /* *INDENT-OFF* */
@@ -555,9 +567,13 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
     return;
   }
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
-  qvt->max_level = (p4est3_quadrant_int_t) NULL;
 
-  qvt->num_children = (p4est3_quadrant_int_t) NULL;
+  qvt->dim = P4EST_DIM;
+
+  qvt->max_level = (p4est3_quadrant_int_t) p4est3_quadrant_zyx_max_level;
+
+  qvt->num_children =
+    (p4est3_quadrant_int_t) p4est3_quadrant_zyx_num_children;
 
   qvt->quadrant_size = (p4est3_quadrant_size_t) p4est3_quadrant_zyx_size;
 
