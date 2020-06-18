@@ -427,8 +427,52 @@ p4est3_local_quad_tree (p4est3_t * p3,
   }
 }
 
+static sc3_error_t *
+p4est3_internal_populate_morton (p4est3_locidx tmine, p4est3_t * p3,
+                                 p4est3_locidx * tq, p4est3_gloidx * gq,
+                                 char *charq)
+{
+  for (; *tq < tmine; ++(*tq), ++(*gq), charq += p3->qsize) {
+    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, *gq, charq));
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_internal_populate_successor (p4est3_locidx tmine, p4est3_t * p3,
+                                    p4est3_locidx * tq, p4est3_gloidx * gq,
+                                    char *charq)
+{
+  char               *cq_prev = charq;
+  SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, *gq, charq));
+  ++(*tq);
+  ++(*gq);
+  charq += p3->qsize;
+  for (; *tq < tmine; ++(*tq), ++(*gq), cq_prev = charq, charq += p3->qsize) {
+    SC3E (p4est3_quadrant_successor (p3->qvt, cq_prev, charq));
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_internal_populate (p4est3_locidx tmine, p4est3_t * p3,
+                          p4est3_locidx * tq, p4est3_gloidx * gq, char *charq)
+{
+  switch (p3->setup_mode) {
+  case P4EST3_NEW_MORTON:
+    SC3E (p4est3_internal_populate_morton (tmine, p3, tq, gq, charq));
+    break;
+  case P4EST3_NEW_SUCCESSOR:
+    SC3E (p4est3_internal_populate_successor (tmine, p3, tq, gq, charq));
+    break;
+  default:
+    SC3E_UNREACH ("wrong setup mode");
+  }
+  return NULL;
+}
+
 sc3_error_t        *
-p4est3_internal_setup_morton (p4est3_t * p3)
+p4est3_internal_setup_quadrants (p4est3_t * p3)
 {
   sc3_omp_esync_t     esync, *s = &esync;
 
@@ -466,12 +510,10 @@ p4est3_internal_setup_morton (p4est3_t * p3)
         SC3E_NULL_REQ (e, tq < tree->quad_offset + tree->num_quads);
         tmine = SC3_MIN (end_quad_num, tree->quad_offset + tree->num_quads);
 
-        /* loop over quadrants in local tree */
-        for (; tq < tmine; ++tq, ++gq, charq += p3->qsize) {
-          SC3E_NULL_SET
-            (e, p4est3_quadrant_morton (p3->qvt, p3->level, gq, charq));
-          SC3E_NULL_BREAK (e);
-        }
+        /* loop over quadrants in local tree with creating of quadrants
+           by selected method */
+        p4est3_internal_populate (tmine, p3, &tq, &gq, charq);
+
         SC3E_NULL_REQ (e, tq <= end_quad_num);
         if (tq == end_quad_num) {
           break;
