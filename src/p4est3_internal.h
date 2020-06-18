@@ -87,7 +87,8 @@ typedef enum p4est3_setup_mode
 {
   P4EST3_NEW_MORTON = 1,        /**< Set every quadrant by its Morton index */
   P4EST3_NEW_SUCCESSOR = 2,     /**< Set every quadrant by the previous one */
-  P4EST3_NEW_MAX_TYPE = 4       /**< Unused bounding value */
+  P4EST3_NEW_RECURSIVE = 4,     /**< Recursive calling the child function */
+  P4EST3_NEW_MAX_TYPE = 8       /**< Unused bounding value */
 }
 p4est3_setup_mode_t;
 

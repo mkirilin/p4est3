@@ -455,6 +455,27 @@ p4est3_internal_populate_successor (p4est3_locidx tmine, p4est3_t * p3,
 }
 
 static sc3_error_t *
+p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
+                                    p4est3_locidx * tq, p4est3_gloidx * gq,
+                                    char *charq)
+{
+  sc3_array_t        *levelq;
+  const p4est3_locidx rl = p3->num_children * p3->level - 1;
+  const p4est3_locidx ml = *gq + (tmine - *tq) - 1;
+
+  SC3E (sc3_array_set_elem_size (levelq, p3->qsize));
+  SC3E (sc3_array_set_elem_alloc (levelq, p3->level));
+  SC3E (sc3_array_set_resizable (levelq, 1));
+  SC3E (sc3_array_setup (levelq));
+  SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, charq));
+  SC3E (sc3_array_destroy (&levelq));
+  *tq = tmine;
+  *gq = ml;
+
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_internal_populate (p4est3_locidx tmine, p4est3_t * p3,
                           p4est3_locidx * tq, p4est3_gloidx * gq, char *charq)
 {
@@ -464,6 +485,9 @@ p4est3_internal_populate (p4est3_locidx tmine, p4est3_t * p3,
     break;
   case P4EST3_NEW_SUCCESSOR:
     SC3E (p4est3_internal_populate_successor (tmine, p3, tq, gq, charq));
+    break;
+  case P4EST3_NEW_RECURSIVE:
+    SC3E (p4est3_internal_populate_recursive (tmine, p3, tq, gq, charq));
     break;
   default:
     SC3E_UNREACH ("wrong setup mode");
