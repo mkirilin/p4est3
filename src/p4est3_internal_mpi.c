@@ -380,7 +380,7 @@ p4est3_recursive_partition (p4est3_t * p3, int level,
   }
   else {
     n_lowerq = (rl - rf + 1) / p3->num_children;
-    rl = rf + n_lowerq;
+    rl = rf + n_lowerq - 1;
     for (i = 0; i < p3->num_children; ++i, rf += n_lowerq, rl += n_lowerq) {
       SC3E (p4est3_recursive_partition (p3, level + 1, rf, rl, mf, ml,
                                         levelq, threadq));
@@ -461,11 +461,13 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
                                     char *charq)
 {
   sc3_array_t        *levelq;
-  const p4est3_locidx rl = p3->num_children * p3->level - 1;
+  const p4est3_locidx rl = (1 << (p3->qvt->dim * p3->level)) - 1;
   const p4est3_locidx ml = *gq + (tmine - *tq) - 1;
 
+  SC3E (sc3_array_new (sc3_allocator_nocount (), &levelq));
   SC3E (sc3_array_set_elem_size (levelq, p3->qsize));
   SC3E (sc3_array_set_elem_alloc (levelq, p3->level));
+  SC3E (sc3_array_set_elem_count (levelq, p3->level));
   SC3E (sc3_array_set_resizable (levelq, 1));
   SC3E (sc3_array_setup (levelq));
   SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, &charq));
@@ -537,7 +539,7 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
 
         /* loop over quadrants in local tree with creating of quadrants
            by selected method */
-        p4est3_internal_populate (tmine, p3, &tq, &gq, charq);
+        SC3E_SET (e, p4est3_internal_populate (tmine, p3, &tq, &gq, charq));
 
         SC3E_NULL_REQ (e, tq <= end_quad_num);
         if (tq == end_quad_num) {
