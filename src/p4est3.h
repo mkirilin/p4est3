@@ -71,6 +71,11 @@ sc3_error_t        *p4est3_destroy (p4est3_t ** pp3);
 
 /*----------------------- accessing quadrants ------------------------*/
 
+sc3_error_t        *p4est3_get_quadrants (const p4est3_t * p3, char ** q);
+
+sc3_error_t        *p4est3_get_global_num_quads (const p4est3_t * p3,
+                                                 p4est3_gloidx * n);
+
 #if 0
 
 p4est3_quadrant_t  *p4est3_quadrant_range (p4est3_t * p3,
