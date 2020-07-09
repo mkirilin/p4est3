@@ -2,7 +2,7 @@ dnl  P4EST_CHECK_AVX2([PREFIX])
 dnl  If --disable-avx2 feature is not set:
 dnl  chech if target CPU supports SIMD avx2 intrinsics.
 dnl  If it is supported, set conditional PREFIX_HAVE_AVX2.
-dnl  If it is supported, set valid right-hand side for a 
+dnl  If it is supported, set valid right-hand side for a
 dnl  C #define PREFIX_HAVE_AVX2_INSTRUCTIONS as well.
 dnl
 dnl   See also P4EST_SIMD_GCC_CPU_SUPPORTS(INSTRUCTION-SET,
@@ -48,7 +48,7 @@ AC_DEFUN([P4EST_CHECK_AVX2],
  [ AM_CONDITIONAL([$1_HAVE_AVX2], [test "xyes" != xno])
    AM_COND_IF([P4EST_ENABLE_AVX2],[
      P4EST_SIMD_GCC_CPU_SUPPORTS(avx2, [$1],
-      [SIMD_FEATURE_CFLAGS="-m[]avx2"       
+      [SIMD_FEATURE_CFLAGS="-m[]avx2"
        $1_HAVE_AVX2="yes"],
       [$1_HAVE_AVX2="no"]
      )

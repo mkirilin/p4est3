@@ -82,5 +82,5 @@ This is OK if the following does not matter to you:
 Ordinary bits operations functions will be using instead of vectorized ones.
 They may work more slowly.
 ])
-fi   
+fi
 ])
