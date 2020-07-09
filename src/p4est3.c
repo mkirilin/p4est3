@@ -81,7 +81,7 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   SC3A_IS (sc3_allocator_is_setup, alloc);
 
   SC3E (sc3_allocator_ref (alloc));
-  SC3E_ALLOCATOR_CALLOC (alloc, p4est3_t, 1, p3);
+  SC3E (sc3_allocator_calloc_one (alloc, sizeof (p4est3_t), &p3));
   SC3E (sc3_refcount_init (&p3->rc));
   p3->alloc = alloc;
   p3->mpicomm = SC3_MPI_COMM_WORLD;
@@ -207,9 +207,10 @@ p4est3_setup (p4est3_t * p3)
 
   /* allocate one temporary quadrant per thread */
   p3->max_threads = sc3_omp_max_threads ();
-  SC3E_ALLOCATOR_MALLOC (p3->alloc, char *, p3->max_threads, p3->temp_quad);
+  SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),
+                              &p3->temp_quad));
   for (ti = 0; ti < p3->max_threads; ++ti) {
-    SC3E_ALLOCATOR_MALLOC (p3->alloc, char, qsize, p3->temp_quad[ti]);
+    SC3E (sc3_allocator_malloc (p3->alloc, qsize, &p3->temp_quad[ti]));
   }
 
   /* compute partition cuts and create shared partition arrays */
@@ -266,12 +267,12 @@ p4est3_unref (p4est3_t ** pp3)
 
       /* deallocate internal storage */
       for (ti = 0; ti < p3->max_threads; ++ti) {
-        SC3E_ALLOCATOR_FREE (p3->alloc, char, p3->temp_quad[ti]);
+        SC3E (sc3_allocator_free (p3->alloc, p3->temp_quad[ti]));
       }
-      SC3E_ALLOCATOR_FREE (p3->alloc, char *, p3->temp_quad);
+      SC3E (sc3_allocator_free (p3->alloc, p3->temp_quad));
 
       SC3E (sc3_array_destroy (&p3->trees));
-      SC3E_ALLOCATOR_FREE (p3->alloc, char *, p3->nodequads);
+      SC3E (sc3_allocator_free (p3->alloc, p3->nodequads));
     }
 
     /* release data that has been referenced before setup */
@@ -281,7 +282,7 @@ p4est3_unref (p4est3_t ** pp3)
     if (p3->commdup) {
       SC3E (sc3_MPI_Comm_free (&p3->mpicomm));
     }
-    SC3E_ALLOCATOR_FREE (alloc, p4est3_t, p3);
+    SC3E (sc3_allocator_free (alloc, p3));
     SC3E (sc3_allocator_unref (&alloc));
   }
   return NULL;

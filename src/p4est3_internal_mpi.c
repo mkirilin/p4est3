@@ -102,7 +102,7 @@ p4est3_internal_setup_comm (p4est3_t * p3)
     /* access shared memory written by other process */
     SC3E (sc3_MPI_Barrier (p3->nodecomm));
     p3->num_nodes = nodesizemem[0];
-    SC3A_CHECK (nodeabytes ==
+    SC3A_CHECK (nodeabytes >=
                 (sc3_MPI_Aint_t) ((2 + 2 * p3->num_nodes + 1) *
                                   sizeof (int)));
     p3->node_num = nodesizemem[1];
@@ -152,17 +152,17 @@ p4est3_internal_setup_cut (p4est3_t * p3,
   if (p3->noderank > 0) {
     SC3E (sc3_MPI_Win_shared_query (p3->gftreewin, 0,
                                     &tempbytes, &dispunit, &gftreemem));
-    SC3A_CHECK (gftreebytes == tempbytes);
+    SC3A_CHECK (tempbytes >= gftreebytes);
     SC3A_CHECK (dispunit == sizeof (p4est3_topidx));
     SC3A_CHECK (gftreemem != NULL);
     SC3E (sc3_MPI_Win_shared_query (p3->gfposwin, 0,
                                     &tempbytes, &dispunit, &gfposmem));
-    SC3A_CHECK (gfposbytes == tempbytes);
+    SC3A_CHECK (tempbytes >= gfposbytes);
     SC3A_CHECK (dispunit == qsize);
     SC3A_CHECK (gfposmem != NULL);
     SC3E (sc3_MPI_Win_shared_query (p3->goffsetwin, 0,
                                     &tempbytes, &dispunit, &goffsetmem));
-    SC3A_CHECK (goffsetbytes == tempbytes);
+    SC3A_CHECK (tempbytes >= goffsetbytes);
     SC3A_CHECK (dispunit == (int) sizeof (p4est3_gloidx));
     SC3A_CHECK (goffsetmem != NULL);
   }
@@ -276,7 +276,8 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   }
 
   /* create shared quadrant storage */
-  SC3E_ALLOCATOR_MALLOC (p3->alloc, char *, p3->nodesize, p3->nodequads);
+  SC3E (sc3_allocator_malloc (p3->alloc, p3->nodesize * sizeof (char *),
+                              &p3->nodequads));
   quadbytes = p3->local_num_quads * p3->qsize;
   SC3E (sc3_MPI_Win_allocate_shared
         (quadbytes, p3->qsize,
@@ -284,7 +285,7 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   for (n = 0; n < p3->nodesize; ++n) {
     SC3E (sc3_MPI_Win_shared_query (p3->quadwin, n,
                                     &tempbytes, &dispunit, &nqmem));
-    SC3A_CHECK (tempbytes == (sc3_MPI_Aint_t)
+    SC3A_CHECK (tempbytes >= (sc3_MPI_Aint_t)
                 ((p3->goffset[p3->node_frank + n + 1] -
                   p3->goffset[p3->node_frank + n]) * p3->qsize));
     SC3A_CHECK (dispunit == p3->qsize);
