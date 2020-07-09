@@ -311,6 +311,7 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
       tree->end_tquad = end_quad - tt_offset;
     }
     else {
+      /* TODO: double check whether tt_offset is needed here or not. */
       tree->end_tquad = tt_offset += num_uniform;
     }
     /* by construction each local tree contains at least one element */
@@ -428,6 +429,7 @@ p4est3_local_quad_tree (p4est3_t * p3,
   }
 }
 
+/* TODO: char * is a good convention for type? */
 static sc3_error_t *
 p4est3_internal_populate_morton (p4est3_locidx tmine, p4est3_t * p3,
                                  p4est3_locidx * tq, p4est3_gloidx * gq,
@@ -464,6 +466,7 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
   const p4est3_locidx rl = (1 << (p3->qvt->dim * p3->level)) - 1;
   const p4est3_locidx ml = *gq + (tmine - *tq) - 1;
 
+  /* TODO: use per-thread allocotor here */
   SC3E (sc3_array_new (sc3_allocator_nocount (), &levelq));
   SC3E (sc3_array_set_elem_size (levelq, p3->qsize));
   SC3E (sc3_array_set_elem_alloc (levelq, p3->level));
@@ -521,6 +524,13 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
     p4est3_locidx       first_quad_num, end_quad_num, tmine, tq;
     p4est3_gloidx       gq;
     p4est3_tree_t      *tree;
+
+    /* TODO: if recursive mode is selected, create one allocator per thread
+             derived from p3->alloc.
+             Please see sc/example/v3basics/basics.c
+             Would it make sense to allocate the per-thread allocators
+             persistent through the lifetime of the p4est3 object.
+     */
 
     /* find tree sub-range for each thread separately */
     first_quad_num = p4est3_loccut (p3->local_num_quads, tnum, tid);

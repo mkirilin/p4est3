@@ -39,6 +39,17 @@ extern              "C"
 
 typedef struct p4est3 p4est3_t;
 
+/* TODO: document */
+/* TODO: index from 0 to LAST */
+typedef enum p4est3_setup_mode
+{
+  P4EST3_NEW_MORTON = 1,        /**< Set every quadrant by its Morton index */
+  P4EST3_NEW_SUCCESSOR = 2,     /**< Set every quadrant by the previous one */
+  P4EST3_NEW_RECURSIVE = 4,     /**< Recursive calling the child function */
+  P4EST3_NEW_MAX_TYPE = 8       /**< Unused bounding value */
+}
+p4est3_setup_mode_t;
+
 /* p4est construction parameters: connectivity, uniform level, etc. */
 /* While we're not ready defining the connectivity, use abstract trees. */
 
@@ -62,7 +73,10 @@ sc3_error_t        *p4est3_set_connectivity (p4est3_t * p3,
 sc3_error_t        *p4est3_set_vtable (p4est3_t * p3,
                                        p4est3_quadrant_vtable_t * qvt);
 sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
-sc3_error_t        *p4est3_set_setup_mode (p4est3_t * p3, int mode);
+
+/* TODO: document default value for all _set_ */
+sc3_error_t        *p4est3_set_setup_mode (p4est3_t * p3,
+                                           p4est3_setup_mode_t mode);
 sc3_error_t        *p4est3_setup (p4est3_t * p3);
 
 sc3_error_t        *p4est3_ref (p4est3_t * p3);
@@ -71,6 +85,7 @@ sc3_error_t        *p4est3_destroy (p4est3_t ** pp3);
 
 /*----------------------- accessing quadrants ------------------------*/
 
+/* TODO: think about this interface */
 sc3_error_t        *p4est3_get_quadrants (const p4est3_t * p3, char ** q);
 
 sc3_error_t        *p4est3_get_global_num_quads (const p4est3_t * p3,
