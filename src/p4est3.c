@@ -335,3 +335,15 @@ p4est3_get_global_num_quads (const p4est3_t * p3, p4est3_gloidx * n)
   }
   return NULL;
 }
+
+sc3_error_t        *
+p4est3_get_local_num_quads (const p4est3_t * p3, p4est3_locidx * n)
+{
+  SC3E_RETOPT (n, 0L);
+  SC3A_IS (p4est3_is_setup, p3);
+
+  if (n != NULL) {
+    *n = p3->local_num_quads;
+  }
+  return NULL;
+}
