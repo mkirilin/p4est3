@@ -312,7 +312,8 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
       tree->end_tquad = end_quad - tt_offset;
     }
     else {
-      tree->end_tquad = tt_offset += num_uniform;
+      tree->end_tquad = num_uniform;
+      tt_offset += num_uniform;
     }
     /* by construction each local tree contains at least one element */
     SC3A_CHECK (0 <= tree->first_tquad &&
