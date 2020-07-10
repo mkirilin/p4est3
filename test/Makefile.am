@@ -46,7 +46,8 @@ p4est_test_programs += \
         test/p8est_test_conn_reduce test/p8est_test_plex \
         test/p8est_test_connrefine \
         test/p8est_test_subcomm \
-        test/p8est_test_nodes
+        test/p8est_test_nodes \
+        test/p8est3_test_setup
 if P4EST_WITH_METIS
 p4est_test_programs += \
         test/p8est_test_reorder
@@ -135,6 +136,7 @@ test_p8est_test_plex_SOURCES = test/test_plex3.c
 test_p8est_test_connrefine_SOURCES = test/test_connrefine3.c
 test_p8est_test_subcomm_SOURCES = test/test_subcomm3.c
 test_p8est_test_nodes_SOURCES = test/test_nodes3.c
+test_p8est3_test_setup_SOURCES = test/test_setup3.c
 if P4EST_WITH_METIS
 test_p8est_test_reorder_SOURCES = test/test_reorder3.c
 endif
@@ -212,6 +214,7 @@ LINT_CSOURCES += \
         $(test_p8est_test_connrefine_SOURCES) \
         $(test_p8est_test_subcomm_SOURCES) \
         $(test_p8est_test_nodes_SOURCES) \
+        $(test_p8est3_test_setup_SOURCES) \
         $(test_p6est_test_all_SOURCES)
 
 if P4EST_WITH_METIS
