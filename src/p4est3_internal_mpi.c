@@ -449,13 +449,15 @@ p4est3_internal_populate_successor (p4est3_locidx tmine, p4est3_t * p3,
                                     p4est3_locidx * tq, p4est3_gloidx * gq,
                                     char *charq)
 {
-  char               *cq_prev = charq;
-  SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, *gq, charq));
-  ++(*tq);
-  ++(*gq);
-  charq += p3->qsize;
-  for (; *tq < tmine; ++(*tq), ++(*gq), cq_prev = charq, charq += p3->qsize) {
-    SC3E (p4est3_quadrant_successor (p3->qvt, cq_prev, charq));
+  if (*tq < tmine) {
+    char               *cq_prev = charq;
+    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, *gq, charq));
+    ++(*tq);
+    ++(*gq);
+    charq += p3->qsize;
+    for (; *tq < tmine; ++(*tq), ++(*gq), cq_prev = charq, charq += p3->qsize) {
+      SC3E (p4est3_quadrant_successor (p3->qvt, cq_prev, charq));
+    }
   }
   return NULL;
 }
@@ -465,22 +467,23 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
                                     p4est3_locidx * tq, p4est3_gloidx * gq,
                                     char *charq)
 {
-  sc3_array_t        *levelq;
-  const p4est3_locidx rl = (1 << (p3->qvt->dim * p3->level)) - 1;
-  const p4est3_locidx ml = *gq + (tmine - *tq) - 1;
+  if (*tq < tmine) {
+    sc3_array_t        *levelq;
+    const p4est3_locidx rl = (1 << (p3->qvt->dim * p3->level)) - 1;
+    const p4est3_locidx ml = *gq + (tmine - *tq) - 1;
 
   /* TODO: use per-thread allocotor here */
-  SC3E (sc3_array_new (sc3_allocator_nocount (), &levelq));
-  SC3E (sc3_array_set_elem_size (levelq, p3->qsize));
-  SC3E (sc3_array_set_elem_alloc (levelq, p3->level));
-  SC3E (sc3_array_set_elem_count (levelq, p3->level));
-  SC3E (sc3_array_set_resizable (levelq, 1));
-  SC3E (sc3_array_setup (levelq));
-  SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, &charq));
-  SC3E (sc3_array_destroy (&levelq));
-  *tq = tmine;
-  *gq = ml;
-
+    SC3E (sc3_array_new (sc3_allocator_nocount (), &levelq));
+    SC3E (sc3_array_set_elem_size (levelq, p3->qsize));
+    SC3E (sc3_array_set_elem_alloc (levelq, p3->level + 1));
+    SC3E (sc3_array_set_elem_count (levelq, p3->level + 1));
+    SC3E (sc3_array_set_resizable (levelq, 1));
+    SC3E (sc3_array_setup (levelq));
+    SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, &charq));
+    SC3E (sc3_array_destroy (&levelq));
+    *tq = tmine;
+    *gq = ml;
+  }
   return NULL;
 }
 
