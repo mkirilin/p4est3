@@ -159,7 +159,7 @@ p4est3_set_level (p4est3_t * p3, int level)
 }
 
 sc3_error_t        *
-p4est3_set_setup_mode (p4est3_t * p3, int mode)
+p4est3_set_setup_mode (p4est3_t * p3, p4est3_setup_mode_t mode)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (SC3_ISPOWOF2 (mode) && mode < P4EST3_NEW_MAX_TYPE);
