@@ -74,6 +74,12 @@ sc3_error_t        *p4est3_set_vtable (p4est3_t * p3,
 sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
 
 /* TODO: document default value for all _set_ */
+/** Set a way that creates quadrants in a tree in a setup p4est3 phase.
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] mode         See \ref p4est3_setup_mode_t type for
+ *                          available options. Default value is
+ *                          P4EST3_NEW_MORTON.
+ */
 sc3_error_t        *p4est3_set_setup_mode (p4est3_t * p3,
                                            p4est3_setup_mode_t mode);
 sc3_error_t        *p4est3_setup (p4est3_t * p3);
