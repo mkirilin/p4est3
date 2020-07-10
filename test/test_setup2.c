@@ -60,7 +60,8 @@ compare_p4est3_quadrants (const p4est3_t *lhs, const p4est3_t *rhs,
                           p4est3_quadrant_vtable_t * qvt)
 {
   p4est3_gloidx i;
-  p4est3_gloidx ln, rn;
+  p4est3_gloidx gln, grn;
+  p4est3_locidx lln, lrn;
   int is_eq;
   char *lchar_q = NULL, *rchar_q = NULL;
 
@@ -68,12 +69,16 @@ compare_p4est3_quadrants (const p4est3_t *lhs, const p4est3_t *rhs,
   SC3E (p4est3_get_quadrants (rhs, &rchar_q));
   size_t q_size = p4est3_quadrant_size (qvt);
 
-  SC3E (p4est3_get_global_num_quads (lhs, &ln));
-  SC3E (p4est3_get_global_num_quads (rhs, &rn));
-  SC3E_DEMAND (ln == rn,
+  SC3E (p4est3_get_global_num_quads (lhs, &gln));
+  SC3E (p4est3_get_global_num_quads (rhs, &grn));
+  SC3E (p4est3_get_local_num_quads (lhs, &lln));
+  SC3E (p4est3_get_local_num_quads (rhs, &lrn));
+  SC3E_DEMAND (gln == grn,
+               "different setup modes have different output");
+  SC3E_DEMAND (lln == lrn,
                "different setup modes have different output");
   //lhs and rhs should be valid
-  for (i = 0; i < ln; ++i, lchar_q += q_size, rchar_q += q_size) {
+  for (i = 0; i < lln; ++i, lchar_q += q_size, rchar_q += q_size) {
     SC3E (p4est3_quadrant_compare (qvt, lchar_q, rchar_q, &is_eq));
     SC3E_DEMAND (is_eq == 0, "setup mod's results differ");
   }
