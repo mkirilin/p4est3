@@ -37,8 +37,7 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
 
   SC3E_TEST (p3->mpicomm != SC3_MPI_COMM_NULL, reason);
   SC3E_TEST (p3->level >= 0, reason);
-  SC3E_TEST (SC3_ISPOWOF2 (p3->setup_mode) &&
-             p3->setup_mode < P4EST3_NEW_MAX_TYPE, reason);
+  SC3E_TEST (p3->setup_mode < P4EST3_NEW_MODE_LAST, reason);
 
   if (!p3->setup) {
     SC3E_TEST (p3->mpisize == 0 && p3->mpirank == 0, reason);
@@ -162,7 +161,7 @@ sc3_error_t        *
 p4est3_set_setup_mode (p4est3_t * p3, p4est3_setup_mode_t mode)
 {
   SC3A_IS (p4est3_is_new, p3);
-  SC3A_CHECK (SC3_ISPOWOF2 (mode) && mode < P4EST3_NEW_MAX_TYPE);
+  SC3A_CHECK (mode < P4EST3_NEW_MODE_LAST);
 
   p3->setup_mode = mode;
   return NULL;

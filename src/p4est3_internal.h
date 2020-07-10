@@ -68,7 +68,7 @@ struct p4est3
   int                 qmaxlevel;
   int                 num_children;
   int                 qsize;
-  int                 setup_mode;
+  p4est3_setup_mode_t setup_mode;
 
   int                 max_threads;
   char              **temp_quad;

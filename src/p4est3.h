@@ -39,14 +39,13 @@ extern              "C"
 
 typedef struct p4est3 p4est3_t;
 
-/* TODO: document */
-/* TODO: index from 0 to LAST */
+/* Use to choose a way of filling a tree with quadrants.*/
 typedef enum p4est3_setup_mode
 {
-  P4EST3_NEW_MORTON = 1,        /**< Set every quadrant by its Morton index */
-  P4EST3_NEW_SUCCESSOR = 2,     /**< Set every quadrant by the previous one */
-  P4EST3_NEW_RECURSIVE = 4,     /**< Recursive calling the child function */
-  P4EST3_NEW_MAX_TYPE = 8       /**< Unused bounding value */
+  P4EST3_NEW_MORTON,    /**< Set every quadrant by its Morton index */
+  P4EST3_NEW_SUCCESSOR, /**< Set every quadrant by the previous one */
+  P4EST3_NEW_RECURSIVE, /**< Recursive calling the child function */
+  P4EST3_NEW_MODE_LAST  /**< Unused bounding value */
 }
 p4est3_setup_mode_t;
 
