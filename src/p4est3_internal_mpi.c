@@ -436,10 +436,10 @@ p4est3_local_quad_tree (p4est3_t * p3,
 static sc3_error_t *
 p4est3_internal_populate_morton (p4est3_locidx tmine, p4est3_t * p3,
                                  p4est3_locidx * tq, p4est3_gloidx * gq,
-                                 char *charq)
+                                 char **charq)
 {
-  for (; *tq < tmine; ++(*tq), ++(*gq), charq += p3->qsize) {
-    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, *gq, charq));
+  for (; *tq < tmine; ++(*tq), ++(*gq), *charq += p3->qsize) {
+    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, *gq, *charq));
   }
   return NULL;
 }
@@ -447,16 +447,16 @@ p4est3_internal_populate_morton (p4est3_locidx tmine, p4est3_t * p3,
 static sc3_error_t *
 p4est3_internal_populate_successor (p4est3_locidx tmine, p4est3_t * p3,
                                     p4est3_locidx * tq, p4est3_gloidx * gq,
-                                    char *charq)
+                                    char **charq)
 {
   if (*tq < tmine) {
-    char               *cq_prev = charq;
-    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, *gq, charq));
+    char               *cq_prev = *charq;
+    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, *gq, *charq));
     ++(*tq);
     ++(*gq);
-    charq += p3->qsize;
-    for (; *tq < tmine; ++(*tq), ++(*gq), cq_prev = charq, charq += p3->qsize) {
-      SC3E (p4est3_quadrant_successor (p3->qvt, cq_prev, charq));
+    *charq += p3->qsize;
+    for (; *tq < tmine; ++(*tq), ++(*gq), cq_prev = *charq, *charq += p3->qsize) {
+      SC3E (p4est3_quadrant_successor (p3->qvt, cq_prev, *charq));
     }
   }
   return NULL;
@@ -465,7 +465,7 @@ p4est3_internal_populate_successor (p4est3_locidx tmine, p4est3_t * p3,
 static sc3_error_t *
 p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
                                     p4est3_locidx * tq, p4est3_gloidx * gq,
-                                    char *charq)
+                                    char **charq)
 {
   if (*tq < tmine) {
     sc3_array_t        *levelq;
@@ -479,7 +479,7 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
     SC3E (sc3_array_set_elem_count (levelq, p3->level + 1));
     SC3E (sc3_array_set_resizable (levelq, 1));
     SC3E (sc3_array_setup (levelq));
-    SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, &charq));
+    SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, charq));
     SC3E (sc3_array_destroy (&levelq));
     *tq = tmine;
     *gq = ml;
@@ -489,7 +489,7 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
 
 static sc3_error_t *
 p4est3_internal_populate (p4est3_locidx tmine, p4est3_t * p3,
-                          p4est3_locidx * tq, p4est3_gloidx * gq, char *charq)
+                          p4est3_locidx * tq, p4est3_gloidx * gq, char **charq)
 {
   switch (p3->setup_mode) {
   case P4EST3_NEW_MORTON:
@@ -555,7 +555,7 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
 
         /* loop over quadrants in local tree with creating of quadrants
            by selected method */
-        SC3E_SET (e, p4est3_internal_populate (tmine, p3, &tq, &gq, charq));
+        SC3E_SET (e, p4est3_internal_populate (tmine, p3, &tq, &gq, &charq));
 
         SC3E_NULL_REQ (e, tq <= end_quad_num);
         if (tq == end_quad_num) {
