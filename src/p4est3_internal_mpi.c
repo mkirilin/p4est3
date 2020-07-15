@@ -469,11 +469,13 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
 {
   if (*tq < tmine) {
     sc3_array_t        *levelq;
+    sc3_allocator_t    *alloc;
     const p4est3_locidx rl = (1 << (p3->qvt->dim * p3->level)) - 1;
     const p4est3_locidx ml = *gq + (tmine - *tq) - 1;
 
   /* TODO: use per-thread allocotor here */
-    SC3E (sc3_array_new (sc3_allocator_nocount (), &levelq));
+    SC3E (sc3_array_index (p3->talloc, sc3_omp_thread_num (), (void **) &(alloc)));
+    SC3E (sc3_array_new (*(sc3_allocator_t **)alloc, &levelq));
     SC3E (sc3_array_set_elem_size (levelq, p3->qsize));
     SC3E (sc3_array_set_elem_alloc (levelq, p3->level + 1));
     SC3E (sc3_array_set_elem_count (levelq, p3->level + 1));
@@ -511,6 +513,8 @@ sc3_error_t        *
 p4est3_internal_setup_quadrants (p4est3_t * p3)
 {
   sc3_omp_esync_t     esync, *s = &esync;
+  int                 tcount;
+  sc3_allocator_t    *malloc;
 
   /* this is a special-purpose function to simplify p4est3_setup */
   SC3A_CHECK (p3 != NULL && p3->quads != NULL);
@@ -530,6 +534,7 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
     p4est3_locidx       first_quad_num, end_quad_num, tmine, tq;
     p4est3_gloidx       gq;
     p4est3_tree_t      *tree;
+    sc3_allocator_t    *alloc;
 
     /* TODO: if recursive mode is selected, create one allocator per thread
              derived from p3->alloc.
@@ -542,6 +547,23 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
     first_quad_num = p4est3_loccut (p3->local_num_quads, tnum, tid);
     end_quad_num = p4est3_loccut (p3->local_num_quads, tnum, tid + 1);
     SC3E_SET (e, p4est3_local_quad_tree (p3, first_quad_num, &tree));
+
+    if (p3->setup_mode == P4EST3_NEW_RECURSIVE) {
+      if (tid == 0) {
+        SC3E_NULL_SET (e, sc3_array_new (p3->alloc, &p3->talloc));
+        SC3E_NULL_SET (e, sc3_array_set_elem_size (p3->talloc, sizeof(sc3_allocator_t*)));
+        SC3E_NULL_SET (e, sc3_array_set_elem_count (p3->talloc, tnum));
+        SC3E_NULL_SET (e, sc3_array_setup (p3->talloc));
+      }
+#pragma omp barrier
+      SC3E_NULL_SET (e, sc3_array_index (p3->talloc, tid, (void **) &(alloc)));
+#pragma omp critical
+      {
+        SC3E_NULL_SET (e, sc3_allocator_new (p3->alloc, (sc3_allocator_t **)alloc));
+        SC3E_NULL_SET (e, sc3_allocator_setup (*(sc3_allocator_t **)alloc));
+        sc3_omp_esync_in_critical (s, &e);
+      }
+    }
     if (e == NULL) {
       tq = first_quad_num;
       gq = tree->first_tquad + (first_quad_num - tree->quad_offset);
@@ -571,6 +593,14 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
     sc3_omp_esync (s, &e);
   }
   SC3E (sc3_omp_esync_summary (s));
+  if (p3->setup_mode == P4EST3_NEW_RECURSIVE) {
+    SC3E (sc3_array_get_elem_count (p3->talloc, &tcount));
+    for (int i = 0; i < tcount; ++i) {
+      SC3E (sc3_array_index (p3->talloc, i, (void **) &(malloc)));
+      SC3E (sc3_allocator_destroy ((sc3_allocator_t **)malloc));
+    }
+    SC3E (sc3_array_destroy (&p3->talloc));
+  }
   SC3E (sc3_MPI_Win_unlock (p3->noderank, p3->quadwin));
   SC3E (sc3_MPI_Barrier (p3->nodecomm));
   return NULL;
