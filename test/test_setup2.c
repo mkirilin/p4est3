@@ -42,7 +42,8 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
 static sc3_error_t *
 make_new_p4est3 (p4est3_t ** p3, sc3_allocator_t * alloc,
                  p4est3_connectivity_t * conn, sc3_MPI_Comm_t mpicomm,
-                 p4est3_quadrant_vtable_t * qvt, int level, int32_t mode)
+                 p4est3_quadrant_vtable_t * qvt, int level,
+                 p4est3_setup_mode_t mode)
 {
   SC3A_IS (sc3_allocator_is_setup, alloc);
 
