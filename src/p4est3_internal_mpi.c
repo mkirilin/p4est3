@@ -394,6 +394,41 @@ p4est3_recursive_partition (p4est3_t * p3, int level,
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_recursive_partition_child (p4est3_t * p3, int level,
+                                  p4est3_locidx rf,
+                                  p4est3_locidx rl,
+                                  p4est3_locidx mf,
+                                  p4est3_locidx ml,
+                                  sc3_array_t * levelq, char **threadq)
+{
+  int                 i;
+  p4est3_locidx       n_lowerq;
+  void               *q, *r;
+
+  if (rf >= mf && rl <= ml) {
+    SC3E (sc3_array_index (levelq, level, &q));
+    SC3E (p4est3_lowest_children (p3, q, levelq, threadq));
+  }
+  else if (rf > ml || rl < mf) {
+    return NULL;
+  }
+  else {
+    n_lowerq = (rl - rf + 1) / p3->num_children;
+    rl = rf + n_lowerq - 1;
+    for (i = 0; i < p3->num_children; ++i, rf += n_lowerq, rl += n_lowerq) {
+      SC3A_CHECK (level < p3->level);
+      SC3E (sc3_array_index (levelq, level, &q));
+      SC3E (sc3_array_index (levelq, level + 1, &r));
+      p4est3_quadrant_child (p3->qvt, q, i, r);
+      SC3E (p4est3_recursive_partition (p3, level + 1, rf, rl, mf, ml,
+                                        levelq, threadq));
+    }
+  }
+
+  return NULL;
+}
+
 /** Binary search a local quad number in the local trees */
 static sc3_error_t *
 p4est3_local_quad_tree (p4est3_t * p3,
@@ -479,9 +514,10 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
     SC3E (sc3_array_set_elem_size (levelq, p3->qsize));
     SC3E (sc3_array_set_elem_alloc (levelq, p3->level + 1));
     SC3E (sc3_array_set_elem_count (levelq, p3->level + 1));
-    SC3E (sc3_array_set_resizable (levelq, 1));
+    SC3E (sc3_array_set_initzero (levelq, 1));
     SC3E (sc3_array_setup (levelq));
-    SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, charq));
+    //SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, charq));
+    SC3E (p4est3_recursive_partition_child (p3, 0, 0, rl, *gq, ml, levelq, charq));
     SC3E (sc3_array_destroy (&levelq));
     *tq = tmine;
     *gq = ml;
