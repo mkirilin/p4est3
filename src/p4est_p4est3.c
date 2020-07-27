@@ -90,7 +90,7 @@ p4est_vtable_num_children (void)
   return P4EST_CHILDREN;
 }
 
-static              size_t
+static size_t
 p4est_quadrant_vtable_size (void)
 {
   return sizeof (p4est_quadrant_t);
@@ -218,6 +218,31 @@ p4est_quadrant_vtable_morton (int level, p4est_gloidx_t id, void *r)
   return NULL;
 }
 
+static sc3_error_t *
+p4est_vtable_nearest_common_ancestor (const void *q1, const void *q2, void *r)
+{
+  p4est_nearest_common_ancestor ((const p4est_quadrant_t *) q1,
+                                 (const p4est_quadrant_t *) q2,
+                                 (p4est_quadrant_t *) r);
+  return NULL;
+}
+
+static sc3_error_t *
+p4est_quadrant_vtable_linear_id (const void *q, int level,
+                                 p4est_gloidx_t * id)
+{
+  *id = p4est_quadrant_linear_id ((const p4est_quadrant_t *) q, level);
+  return NULL;
+}
+
+static sc3_error_t *
+p4est_quadrant_vtable_is_ancestor (const void *q1, const void *q2, int *j)
+{
+  *j = p4est_quadrant_is_ancestor ((const p4est_quadrant_t *) q1,
+                                   (const p4est_quadrant_t *) q2);
+  return NULL;
+}
+
 void
 p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt, int id)
 {
@@ -245,4 +270,7 @@ p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->quadrant_first_descendant = p4est_quadrant_vtable_first_descendant;
   qvt->quadrant_last_descendant = p4est_quadrant_vtable_last_descendant;
   qvt->quadrant_morton = p4est_quadrant_vtable_morton;
+  qvt->nearest_common_ancestor = p4est_vtable_nearest_common_ancestor;
+  qvt->quadrant_linear_id = p4est_quadrant_vtable_linear_id;
+  qvt->quadrant_is_ancestor = p4est_quadrant_vtable_is_ancestor;
 }

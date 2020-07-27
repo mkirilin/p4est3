@@ -48,6 +48,13 @@ typedef sc3_error_t *(*p4est3_quadrant_in_i_out_t) (const void *q, int i,
                                                     void *r);
 typedef sc3_error_t *(*p4est3_quadrant_morton_t) (int l, p4est3_gloidx i,
                                                   void *r);
+typedef sc3_error_t *(*p4est3_nearest_common_ancestor_t) (const void *q1,
+                                                          const void *q2,
+                                                          void *r);
+typedef sc3_error_t *(*p4est3_quadrant_linear_id_t) (const void *q, int l,
+                                                     p4est3_gloidx *i);
+typedef sc3_error_t *(*p4est3_quadrant_is_ancestor_t) (const void *q1,
+                                                       const void *q2, int *j);
 
 typedef p4est3_quadrant_in_j_t p4est3_quadrant_level_t;
 typedef p4est3_quadrant_in_j_t p4est3_quadrant_child_id_t;
@@ -94,6 +101,9 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_first_descendant_t quadrant_first_descendant;
   p4est3_quadrant_last_descendant_t quadrant_last_descendant;
   p4est3_quadrant_morton_t quadrant_morton;
+  p4est3_nearest_common_ancestor_t nearest_common_ancestor;
+  p4est3_quadrant_linear_id_t quadrant_linear_id;
+  p4est3_quadrant_is_ancestor_t quadrant_is_ancestor;
 }
 p4est3_quadrant_vtable_t;
 
@@ -136,6 +146,17 @@ sc3_error_t        *p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t
 sc3_error_t        *p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
                                             int level, p4est3_gloidx id,
                                             void *r);
+sc3_error_t        *p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t
+                                                    * qvt, const void *q1,
+                                                    const void *q2, void *r);
+
+sc3_error_t        *p4est3_quadrant_linear_id (p4est3_quadrant_vtable_t * qvt,
+                                               const void *q, int l,
+                                               p4est3_gloidx * id);
+
+sc3_error_t        *p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t
+                                                 * qvt, const void *q1,
+                                                 const void *q2, int *j);
 
 #ifdef __cplusplus
 #if 0
