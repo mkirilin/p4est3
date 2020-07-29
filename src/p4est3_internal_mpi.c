@@ -421,8 +421,8 @@ p4est3_recursive_partition_child (p4est3_t * p3, int level,
       SC3E (sc3_array_index (levelq, level, &q));
       SC3E (sc3_array_index (levelq, level + 1, &r));
       SC3E (p4est3_quadrant_child (p3->qvt, q, i, r));
-      SC3E (p4est3_recursive_partition (p3, level + 1, rf, rl, mf, ml,
-                                        levelq, threadq));
+      SC3E (p4est3_recursive_partition_child (p3, level + 1, rf, rl, mf, ml,
+                                              levelq, threadq));
     }
   }
 
