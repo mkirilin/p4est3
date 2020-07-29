@@ -542,6 +542,56 @@ p4est3_region_end (p4est3_t * p3, void * a, void * b, sc3_array_t * region)
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_recursive_partition_region (p4est3_t * p3, int is_region_end,
+                                   p4est3_locidx mf, p4est3_locidx ml,
+                                   sc3_array_t * levelq, char **threadq)
+{
+  sc3_allocator_t    *alloc;
+  sc3_array_t        *region;
+  void               *a, *b;
+  char               *threadq_ptr;
+  int                 rcount, i;
+  p4est3_gloidx       id;
+
+  SC3E (sc3_array_index (levelq, 0, &a));
+  SC3E (sc3_array_index (levelq, 1, &b));
+  SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, mf, a));
+
+  if (mf == ml) {
+    SC3E (p4est3_quadrant_copy (p3->qvt, a, *threadq));
+    *threadq += p3->qsize;
+    return NULL;
+  }
+
+  SC3E (sc3_array_index (p3->talloc, sc3_omp_thread_num (), (void **) &(alloc)));
+  SC3E (sc3_array_new (*(sc3_allocator_t **)alloc, &region));
+  SC3E (sc3_array_set_elem_size (region, p3->qsize));
+  SC3E (sc3_array_set_resizable (region, 1));
+  SC3E (sc3_array_setup (region));
+
+  if (is_region_end) {
+    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, ml, b));
+    SC3E (p4est3_region_end (p3, a, b, region));
+  }
+  else {
+    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, ml + 1, b));
+    SC3E (p4est3_region (p3, a, b, region));
+  }
+
+  SC3E (sc3_array_get_elem_count (region, &rcount));
+  for (i = 0; i < rcount; ++i) {
+    SC3E (sc3_array_index (region, i, &a));
+    SC3E (p4est3_quadrant_linear_id (p3->qvt, a, p3->level, &id));
+    threadq_ptr = *threadq + p3->qsize * (id - mf);
+    SC3E (p4est3_lowest_children (p3, a, levelq, &threadq_ptr));
+  }
+  *threadq += p3->qsize * (ml - mf + 1);
+
+  SC3E (sc3_array_destroy (&region));
+  return NULL;
+}
+
 /** Binary search a local quad number in the local trees */
 static sc3_error_t *
 p4est3_local_quad_tree (p4est3_t * p3,
@@ -630,7 +680,8 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
     SC3E (sc3_array_set_initzero (levelq, 1));
     SC3E (sc3_array_setup (levelq));
     //SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, charq));
-    SC3E (p4est3_recursive_partition_child (p3, 0, 0, rl, *gq, ml, levelq, charq));
+    //SC3E (p4est3_recursive_partition_child (p3, 0, 0, rl, *gq, ml, levelq, charq));
+    SC3E (p4est3_recursive_partition_region (p3, ml == rl ? 1 : 0, *gq, ml, levelq, charq));
     SC3E (sc3_array_destroy (&levelq));
     *tq = tmine;
     *gq = ml;
