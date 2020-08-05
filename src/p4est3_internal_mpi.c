@@ -701,9 +701,9 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
     SC3E (sc3_array_set_elem_count (levelq, p3->level + 1));
     SC3E (sc3_array_set_initzero (levelq, 1));
     SC3E (sc3_array_setup (levelq));
-    //SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, charq));
+    SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, charq));
     //SC3E (p4est3_recursive_partition_child (p3, 0, 0, rl, *gq, ml, levelq, charq));
-    SC3E (p4est3_recursive_partition_region (p3, ml == rl ? 1 : 0, *gq, ml, levelq, charq));
+    //SC3E (p4est3_recursive_partition_region (p3, ml == rl ? 1 : 0, *gq, ml, levelq, charq));
     SC3E (sc3_array_destroy (&levelq));
     *tq = tmine;
     *gq = ml;
