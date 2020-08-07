@@ -314,7 +314,7 @@ p4est3_destroy (p4est3_t ** pp3)
 }
 
 sc3_error_t        *
-p4est3_get_quadrants (const p4est3_t * p3, char ** q)
+p4est3_get_quadrants (const p4est3_t * p3, char **q)
 {
   SC3A_IS (p4est3_is_setup, p3);
 
