@@ -24,6 +24,7 @@ p4est_test_programs += \
         test/p4est_test_subcomm \
         test/p4est_test_nodes \
         test/p4est3_test_setup
+        test/p4est_test_avx
 if P4EST_WITH_METIS
 p4est_test_programs += \
         test/p4est_test_reorder
@@ -48,6 +49,7 @@ p4est_test_programs += \
         test/p8est_test_subcomm \
         test/p8est_test_nodes \
         test/p8est3_test_setup
+        test/p8est_test_avx
 if P4EST_WITH_METIS
 p4est_test_programs += \
         test/p8est_test_reorder
@@ -99,6 +101,7 @@ test_p4est_test_connrefine_SOURCES = test/test_connrefine2.c
 test_p4est_test_subcomm_SOURCES = test/test_subcomm2.c
 test_p4est_test_nodes_SOURCES = test/test_nodes2.c
 test_p4est3_test_setup_SOURCES = test/test_setup2.c
+test_p4est_test_avx_SOURCES = test/test_avx2.c
 if P4EST_WITH_METIS
 test_p4est_test_reorder_SOURCES = test/test_reorder2.c
 endif
@@ -137,6 +140,7 @@ test_p8est_test_connrefine_SOURCES = test/test_connrefine3.c
 test_p8est_test_subcomm_SOURCES = test/test_subcomm3.c
 test_p8est_test_nodes_SOURCES = test/test_nodes3.c
 test_p8est3_test_setup_SOURCES = test/test_setup3.c
+test_p8est_test_avx_SOURCES = test/test_avx3.c
 if P4EST_WITH_METIS
 test_p8est_test_reorder_SOURCES = test/test_reorder3.c
 endif
@@ -186,6 +190,7 @@ LINT_CSOURCES += \
         $(test_p4est_test_subcomm_SOURCES) \
         $(test_p4est_test_nodes_SOURCES) \
         $(test_p4est3_test_setup_SOURCES) \
+        $(test_p4est_test_avx_SOURCES) \
         $(test_p8est_test_quadrants_SOURCES) \
         $(test_p8est_test_balance_SOURCES) \
         $(test_p8est_test_partition_SOURCES) \
@@ -215,6 +220,7 @@ LINT_CSOURCES += \
         $(test_p8est_test_subcomm_SOURCES) \
         $(test_p8est_test_nodes_SOURCES) \
         $(test_p8est3_test_setup_SOURCES) \
+        $(test_p8est_test_avx_SOURCES) \
         $(test_p6est_test_all_SOURCES)
 
 if P4EST_WITH_METIS

@@ -28,9 +28,24 @@
 #include <sc3_error.h>
 #include <p4est3_config.h>
 
-#define P3A_CHECK(x) SC3A_CHECK (x)
-#define P3A_STACK(x) SC3A_STACK (x)
+#define P3A_IS(f,o) SC3A_IS (f,o)
+#ifndef P4EST_ENABLE_DEBUG
+#define P3A_IS2(f,o,p) SC3_NOOP
+#else
+#define P3A_IS2(f,o,p) do {                                             \
+  char _r[SC3_BUFSIZE];                                                 \
+  if (!(f ((o), (p), _r))) {                                            \
+    char _errmsg[SC3_BUFSIZE];                                          \
+    sc3_snprintf (_errmsg, SC3_BUFSIZE,                                 \
+                  "%s(%s,%s): %s", #f, #o, #p, _r);                     \
+    return sc3_error_new_bug (__FILE__, __LINE__, _errmsg);             \
+  }} while (0)
+#endif
+#define P3A_CHECK(f) SC3A_CHECK (f)
+#define P3A_STACK(f) SC3A_STACK (f)
 #define P3E(f) SC3E (f)
+
+/* TODO: P3E_TAIL will be removed */
 #define P3E_TAIL(f) do { SC3E (f); return NULL; } while (0)
 #define P3E_DEMAND(f) SC3E_DEMAND (f)
 
