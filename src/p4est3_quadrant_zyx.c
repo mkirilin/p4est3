@@ -680,13 +680,15 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_size = (p4est3_quadrant_size_t) p4est3_quadrant_zyx_size;
 
-  qvt->quadrant_is_valid = (p4est3_quadrant_is_t) NULL;
+  qvt->quadrant_is_valid =
+    (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_valid;
 
   qvt->quadrant_level = (p4est3_quadrant_level_t) p4est_quadrant_zyx_level;
 
   qvt->quadrant_child_id = (p4est3_quadrant_child_id_t) NULL;
 
-  qvt->quadrant_ancestor_id = (p4est3_quadrant_ancestor_id_t) NULL;
+  qvt->quadrant_ancestor_id =
+    (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_zyx_ancestor_id;
 
   qvt->quadrant_coordinate =
     (p4est3_quadrant_coordinate_t) p4est_quadrant_zyx_coordinate;
