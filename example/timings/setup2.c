@@ -22,12 +22,20 @@
 */
 
 #ifndef P4_TO_P8
+#include <p4est3_quadrant_zyx.h>
 #include <p4est_p4est3.h>
 #else
+#include <p8est3_quadrant_zyx.h>
 #include <p8est_p4est3.h>
 #endif
 
 #include <time.h>
+
+#define test(SETUP_MODE, qvt, t) do {                                       \
+  SC3E_NULL_SET (e, make_new_p4est3 (&p3, alloc, conn, mpicomm, qvt,        \
+                                     level, SETUP_MODE, &tb, &te));         \
+  SC3E_NULL_SET (e, measure_setup (tb, te, mpicomm, mpirank, mpisize, &t)); \
+  } while (0)
 
 static sc3_error_t *
 make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
@@ -129,17 +137,20 @@ main (int argc, char **argv)
   sc3_error_t        *e;
   sc3_MPI_Comm_t      mpicomm;
   p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
+  p4est3_quadrant_vtable_t vtable_avx, *qvt_avx = &vtable_avx;
   p4est3_t           *p3;
   p4est3_connectivity_t *conn;
   clock_t             tb, te;
   int                 level, mpirank, mpisize;
-  float               mtime, stime, rtime;
+  float               mtime, stime, rtime,
+                      mtime_avx, stime_avx, rtime_avx;
 
   /* v3 standard procedure to isolate memory allocation contexts */
   mainalloc = sc3_allocator_nothread ();
   mpicomm = SC3_MPI_COMM_WORLD;
 
   /* legacy wrapping for p4est quadrants */
+  p4est3_quadrant_zyx_vtable (qvt_avx);
   p4est_quadrant_vtable (qvt, 0);
 
   /* this is generally needed for MPI */
@@ -172,31 +183,39 @@ main (int argc, char **argv)
   SC3E_NULL_SET (e, sc3_MPI_Comm_rank (mpicomm, &mpirank));
   SC3E_NULL_SET (e, sc3_MPI_Comm_size (mpicomm, &mpisize));
 
-  //P4EST3_NEW_MORTON
-  SC3E_NULL_SET (e, make_new_p4est3 (&p3, alloc, conn, mpicomm, qvt,
-                                     level, P4EST3_NEW_MORTON, &tb, &te));
-  SC3E_NULL_SET (e, measure_setup (tb, te, mpicomm, mpirank, mpisize,
-                                   &mtime));
+  test (P4EST3_NEW_MORTON, qvt, mtime);
+  test (P4EST3_NEW_SUCCESSOR, qvt, stime);
+  test (P4EST3_NEW_RECURSIVE, qvt, rtime);
 
-  //P4EST3_NEW_SUCCESSOR
-  SC3E_NULL_SET (e, make_new_p4est3 (&p3, alloc, conn, mpicomm, qvt,
-                                     level, P4EST3_NEW_SUCCESSOR, &tb, &te));
-  SC3E_NULL_SET (e, measure_setup (tb, te, mpicomm, mpirank, mpisize,
-                                   &stime));
-  //P4EST3_NEW_RECURSIVE
-  SC3E_NULL_SET (e, make_new_p4est3 (&p3, alloc, conn, mpicomm, qvt,
-                                     level, P4EST3_NEW_RECURSIVE, &tb, &te));
-  SC3E_NULL_SET (e, measure_setup (tb, te, mpicomm, mpirank, mpisize,
-                                   &rtime));
+  //SIMD/AVX area
+  test (P4EST3_NEW_MORTON, qvt_avx, mtime_avx);
+  test (P4EST3_NEW_SUCCESSOR, qvt_avx, stime_avx);
+  test (P4EST3_NEW_RECURSIVE, qvt_avx, rtime_avx);
 
   SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn));
   SC3E_NULL_SET (e, free_allocator (&alloc));
 
   if (mpirank == 0) {
     printf ("Setup time mesurements: \n"
-            "  Morton:        %f\n"
-            "  Successor:     %f\n"
-            "  Recursive:     %f\n", mtime, stime, rtime);
+            "  Morton: \n"
+            "    Vectorized:           %f\n"
+            "      Rec/Mort Ratio:     %f\n"
+            "    Non-Vectorized:       %f\n"
+            "      Rec/Mort Ratio:     %f\n"
+            "    Vect/Non-Vect Ratio:  %f\n"
+            "\nSuccessor: \n"
+            "    Vectorized:           %f\n"
+            "      Rec/Succ Ratio:     %f\n"
+            "    Non-Vectorized:       %f\n"
+            "      Rec/Succ Ratio:     %f\n"
+            "    Vect/Non-Vect Ratio:  %f\n"
+            "\nRecursive: \n"
+            "    Vectorized:           %f\n"
+            "    Non-Vectorized:       %f\n"
+            "    Vect/Non-Vect Ratio:  %f\n",
+    mtime_avx, rtime_avx / mtime_avx, mtime, rtime / mtime, mtime_avx / mtime,
+    stime_avx, rtime_avx / stime_avx, stime, rtime / stime, stime_avx / stime,
+    rtime_avx, rtime, rtime_avx / rtime);
   }
   /* again, just to check legacy wrapping */
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
