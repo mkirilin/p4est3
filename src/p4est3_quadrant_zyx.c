@@ -34,6 +34,18 @@
 #include <emmintrin.h>
 
 static int
+p4est3_quadrant_zyx_max_level (void)
+{
+  return P4EST_QMAXLEVEL;
+}
+
+static int
+p4est3_quadrant_zyx_num_children (void)
+{
+  return P4EST_CHILDREN;
+}
+
+static int
 p4est3_quadrant_zyx_is_inside_root (const __m128i * q, char *reason)
 {
 /* *INDENT-OFF* */
@@ -190,6 +202,14 @@ p4est3_quadrant_zyx_is_node (const __m128i * q, int inside, char *reason)
           , reason);
 /* *INDENT-ON* */
   SC3E_YES (reason);
+}
+
+static sc3_error_t *
+p4est3_quadrant_zyx_copy (const __m128i * q, __m128i * copy)
+{
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  *copy = *q;
+  return NULL;
 }
 
 static sc3_error_t *
@@ -547,9 +567,13 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
     return;
   }
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
-  qvt->max_level = (p4est3_quadrant_int_t) NULL;
 
-  qvt->num_children = (p4est3_quadrant_int_t) NULL;
+  qvt->dim = P4EST_DIM;
+
+  qvt->max_level = (p4est3_quadrant_int_t) p4est3_quadrant_zyx_max_level;
+
+  qvt->num_children =
+    (p4est3_quadrant_int_t) p4est3_quadrant_zyx_num_children;
 
   qvt->quadrant_size = (p4est3_quadrant_size_t) p4est3_quadrant_zyx_size;
 
@@ -569,7 +593,7 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_root = (p4est3_quadrant_root_t) p4est3_quadrant_zyx_root;
 
-  qvt->quadrant_copy = (p4est3_quadrant_copy_t) NULL;
+  qvt->quadrant_copy = (p4est3_quadrant_copy_t) p4est3_quadrant_zyx_copy;
 
   qvt->quadrant_parent =
     (p4est3_quadrant_parent_t) p4est3_quadrant_zyx_parent;

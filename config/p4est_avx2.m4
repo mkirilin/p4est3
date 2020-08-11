@@ -35,7 +35,7 @@ AC_DEFUN([P4EST_SIMD_GCC_CPU_SUPPORTS],
    AC_LANG_POP([C])
    AS_VAR_IF([simd_cv_gcc_check_cpu_init],[yes],
          [AC_DEFINE(
-           AS_TR_CPP([$2_HAVE_$$1_INSTRUCTIONS]),
+           AS_TR_CPP([$2_HAVE_$1_INSTRUCTIONS]),
            [1],
            [Define if $1 instructions are supported])
           $3],
