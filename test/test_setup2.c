@@ -163,13 +163,13 @@ main (int argc, char **argv)
 
       //P4EST3_NEW_MORTON
       SC3E_NULL_SET (e, make_new_p4est3 (&p3m, alloc, conn, mpicomm, qvt,
-                                         level, 1));
+                                         level, P4EST3_NEW_MORTON));
       //P4EST3_NEW_SUCCESSOR
       SC3E_NULL_SET (e, make_new_p4est3 (&p3s, alloc, conn, mpicomm, qvt,
-                                         level, 2));
+                                         level, P4EST3_NEW_SUCCESSOR));
       //P4EST3_NEW_RECURSIVE
       SC3E_NULL_SET (e, make_new_p4est3 (&p3r, alloc, conn, mpicomm, qvt,
-                                         level, 4));
+                                         level, P4EST3_NEW_RECURSIVE));
       SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3s, qvt));
       SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3r, qvt));
 
