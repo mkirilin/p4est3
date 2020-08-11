@@ -23,7 +23,7 @@ p4est_test_programs += \
         test/p4est_test_connrefine \
         test/p4est_test_subcomm \
         test/p4est_test_nodes \
-        test/p4est3_test_setup
+        test/p4est3_test_setup \
         test/p4est_test_avx
 if P4EST_WITH_METIS
 p4est_test_programs += \
@@ -48,7 +48,7 @@ p4est_test_programs += \
         test/p8est_test_connrefine \
         test/p8est_test_subcomm \
         test/p8est_test_nodes \
-        test/p8est3_test_setup
+        test/p8est3_test_setup \
         test/p8est_test_avx
 if P4EST_WITH_METIS
 p4est_test_programs += \
