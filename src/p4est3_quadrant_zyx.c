@@ -120,10 +120,11 @@ p4est3_quadrant_zyx_is_ancestor (const __m128i * q, const __m128i * r, int *j)
   P3A_IS (p4est3_quadrant_zyx_is_valid, q);
   P3A_IS (p4est3_quadrant_zyx_is_valid, r);
 
-  lq = _mm_extract_epi32 (*q, 3);
-  lr = _mm_extract_epi32 (*r, 3);
+  lq = _mm_extract_epi32 (*q, 0);
+  lr = _mm_extract_epi32 (*r, 0);
   if (lq >= lr) {
-    return 0;
+    *j = 0;
+    return NULL;
   }
 /* *INDENT-OFF* */
   exclor = _mm_srlv_epi32 (
@@ -135,7 +136,7 @@ p4est3_quadrant_zyx_is_ancestor (const __m128i * q, const __m128i * r, int *j)
            );
 /* *INDENT-ON* */
   *j = _mm_test_all_zeros (exclor, _mm_set1_epi32 (0xFFFFFFFF));
-  return (NULL);
+  return NULL;
 }
 
 static sc3_error_t *
@@ -430,9 +431,9 @@ static sc3_error_t *
 p4est3_zyx_nearest_common_ancestor (const __m128i * q1, const __m128i * q2,
                                     __m128i * r)
 {
-  int                 maxlevel;
+  int                 maxlevel, min;
   __m128i             exclor;
-  uint32_t            maxclor;
+  int32_t             maxclor;
 
   P3A_IS (p4est3_quadrant_zyx_is_valid, q1);
   P3A_IS (p4est3_quadrant_zyx_is_valid, q2);
@@ -453,18 +454,13 @@ p4est3_zyx_nearest_common_ancestor (const __m128i * q1, const __m128i * q2,
   maxlevel = SC_LOG2_32 (maxclor) + 1;
 
   P3A_CHECK (maxlevel <= P4EST_MAXLEVEL);
+  *r = _mm_and_si128 (*q1, _mm_set1_epi32 (~((1 << maxlevel) - 1)));
 /* *INDENT-OFF* */
-  *r = _mm_and_si128 (*q1,
-          _mm_set_epi32 (
-            ~((1 << maxlevel) - 1)
-          , ~((1 << maxlevel) - 1)
-          , ~((1 << maxlevel) - 1)
-          , (int8_t) SC_MIN (P4EST_MAXLEVEL - maxlevel,
-                             SC_MIN (_mm_cvtsi128_si32 (*q1)
-                                   , _mm_cvtsi128_si32 (*q2)))
-          )
-        );
+  min = (int) SC_MIN (P4EST_MAXLEVEL - maxlevel,
+                       SC_MIN (_mm_extract_epi32 (*q1, 0)
+                             , _mm_extract_epi32 (*q2, 0)));
 /* *INDENT-ON* */
+  *r = _mm_insert_epi32 (*r, min, 0);
   P3A_IS (p4est3_quadrant_zyx_is_valid, r);
   return NULL;
 }
@@ -587,7 +583,7 @@ p4est3_quadrant_zyx_linear_id (const __m128i * quadrant, int level,
   shifted =
     _mm_srlv_epi32 (*quadrant, _mm_set1_epi32 (P4EST_MAXLEVEL - level));
 
-  id = 0;
+  *id = (p4est3_gloidx) 0;
   for (i = 0; i < level; ++i) {
 /* *INDENT-OFF* */
     res = _mm_sllv_epi32 (
