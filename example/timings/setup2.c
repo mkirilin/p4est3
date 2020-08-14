@@ -129,6 +129,20 @@ measure_setup (clock_t tb, clock_t te, sc3_MPI_Comm_t mpicomm,
   return NULL;
 }
 
+void
+print_stats (const char *name, float time, float time_avx, float min_rec,
+             float min_rec_avx)
+{
+  printf ("\n%s: \n"
+          "  Vectorized:            %f\n"
+          "    Rec/Curr Ratio:      %f\n"
+          "  Non-Vectorized:        %f\n"
+          "    Rec/Curr Ratio:      %f\n"
+          "  Vect/Non-Vect Ratio:   %f\n",
+          name, time_avx, min_rec_avx / time_avx, time, min_rec / time,
+          time_avx / time);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -142,8 +156,9 @@ main (int argc, char **argv)
   p4est3_connectivity_t *conn;
   clock_t             tb, te;
   int                 level, mpirank, mpisize;
-  float               mtime, stime, rtime,
-                      mtime_avx, stime_avx, rtime_avx;
+  float               mtime, stime, rtime, rctime, rrtime,
+    mtime_avx, stime_avx, rtime_avx, rctime_avx, rrtime_avx;
+  float               min_rec, min_rec_avx;
 
   /* v3 standard procedure to isolate memory allocation contexts */
   mainalloc = sc3_allocator_nothread ();
@@ -186,36 +201,28 @@ main (int argc, char **argv)
   test (P4EST3_NEW_MORTON, qvt, mtime);
   test (P4EST3_NEW_SUCCESSOR, qvt, stime);
   test (P4EST3_NEW_RECURSIVE, qvt, rtime);
+  test (P4EST3_NEW_RECURSIVE_CHILD, qvt, rctime);
+  test (P4EST3_NEW_RECURSIVE_REGION, qvt, rrtime);
 
   //SIMD/AVX area
   test (P4EST3_NEW_MORTON, qvt_avx, mtime_avx);
   test (P4EST3_NEW_SUCCESSOR, qvt_avx, stime_avx);
   test (P4EST3_NEW_RECURSIVE, qvt_avx, rtime_avx);
+  test (P4EST3_NEW_RECURSIVE_CHILD, qvt_avx, rctime_avx);
+  test (P4EST3_NEW_RECURSIVE_REGION, qvt_avx, rrtime_avx);
 
   SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn));
   SC3E_NULL_SET (e, free_allocator (&alloc));
 
   if (mpirank == 0) {
-    printf ("Setup time mesurements: \n"
-            "  Morton: \n"
-            "    Vectorized:           %f\n"
-            "      Rec/Mort Ratio:     %f\n"
-            "    Non-Vectorized:       %f\n"
-            "      Rec/Mort Ratio:     %f\n"
-            "    Vect/Non-Vect Ratio:  %f\n"
-            "\nSuccessor: \n"
-            "    Vectorized:           %f\n"
-            "      Rec/Succ Ratio:     %f\n"
-            "    Non-Vectorized:       %f\n"
-            "      Rec/Succ Ratio:     %f\n"
-            "    Vect/Non-Vect Ratio:  %f\n"
-            "\nRecursive: \n"
-            "    Vectorized:           %f\n"
-            "    Non-Vectorized:       %f\n"
-            "    Vect/Non-Vect Ratio:  %f\n",
-    mtime_avx, rtime_avx / mtime_avx, mtime, rtime / mtime, mtime_avx / mtime,
-    stime_avx, rtime_avx / stime_avx, stime, rtime / stime, stime_avx / stime,
-    rtime_avx, rtime, rtime_avx / rtime);
+    min_rec = SC_MIN (SC_MIN (rtime, rctime), rrtime);
+    min_rec_avx = SC_MIN (SC_MIN (rtime_avx, rctime_avx), rrtime_avx);
+    print_stats ("Morton", mtime, mtime_avx, min_rec, min_rec_avx);
+    print_stats ("Successor", stime, stime_avx, min_rec, min_rec_avx);
+    print_stats ("Recursive", rtime, rtime_avx, min_rec, min_rec_avx);
+    print_stats ("Recursive_child", rctime, rctime_avx, min_rec, min_rec_avx);
+    print_stats ("Recursive_region", rrtime, rrtime_avx, min_rec,
+                 min_rec_avx);
   }
   /* again, just to check legacy wrapping */
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
