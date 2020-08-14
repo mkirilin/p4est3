@@ -701,9 +701,22 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
     SC3E (sc3_array_set_elem_count (levelq, p3->level + 1));
     SC3E (sc3_array_set_initzero (levelq, 1));
     SC3E (sc3_array_setup (levelq));
-    SC3E (p4est3_recursive_partition (p3, 0, 0, rl, *gq, ml, levelq, charq));
-    //SC3E (p4est3_recursive_partition_child (p3, 0, 0, rl, *gq, ml, levelq, charq));
-    //SC3E (p4est3_recursive_partition_region (p3, ml == rl ? 1 : 0, *gq, ml, levelq, charq));
+    switch (p3->setup_mode) {
+    case P4EST3_NEW_RECURSIVE:
+      SC3E (p4est3_recursive_partition
+            (p3, 0, 0, rl, *gq, ml, levelq, charq));
+      break;
+    case P4EST3_NEW_RECURSIVE_CHILD:
+      SC3E (p4est3_recursive_partition_child
+            (p3, 0, 0, rl, *gq, ml, levelq, charq));
+      break;
+    case P4EST3_NEW_RECURSIVE_REGION:
+      SC3E (p4est3_recursive_partition_region
+            (p3, ml == rl ? 1 : 0, *gq, ml, levelq, charq));
+      break;
+    default:
+      SC3E_UNREACH ("wrong setup mode");
+    }
     SC3E (sc3_array_destroy (&levelq));
     *tq = tmine;
     *gq = ml;
@@ -724,6 +737,12 @@ p4est3_internal_populate (p4est3_locidx tmine, p4est3_t * p3,
     SC3E (p4est3_internal_populate_successor (tmine, p3, tq, gq, charq));
     break;
   case P4EST3_NEW_RECURSIVE:
+    SC3E (p4est3_internal_populate_recursive (tmine, p3, tq, gq, charq));
+    break;
+  case P4EST3_NEW_RECURSIVE_CHILD:
+    SC3E (p4est3_internal_populate_recursive (tmine, p3, tq, gq, charq));
+    break;
+  case P4EST3_NEW_RECURSIVE_REGION:
     SC3E (p4est3_internal_populate_recursive (tmine, p3, tq, gq, charq));
     break;
   default:
@@ -771,7 +790,9 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
     end_quad_num = p4est3_loccut (p3->local_num_quads, tnum, tid + 1);
     SC3E_SET (e, p4est3_local_quad_tree (p3, first_quad_num, &tree));
 
-    if (p3->setup_mode == P4EST3_NEW_RECURSIVE) {
+    if (p3->setup_mode == P4EST3_NEW_RECURSIVE
+        || p3->setup_mode == P4EST3_NEW_RECURSIVE_CHILD
+        || p3->setup_mode == P4EST3_NEW_RECURSIVE_REGION) {
       if (tid == 0) {
         SC3E_NULL_SET (e, sc3_array_new (p3->alloc, &p3->talloc));
         SC3E_NULL_SET (e,
@@ -821,7 +842,9 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
     sc3_omp_esync (s, &e);
   }
   SC3E (sc3_omp_esync_summary (s));
-  if (p3->setup_mode == P4EST3_NEW_RECURSIVE) {
+  if (p3->setup_mode == P4EST3_NEW_RECURSIVE
+      || p3->setup_mode == P4EST3_NEW_RECURSIVE_CHILD
+      || p3->setup_mode == P4EST3_NEW_RECURSIVE_REGION) {
     SC3E (sc3_array_get_elem_count (p3->talloc, &tcount));
     for (int i = 0; i < tcount; ++i) {
       SC3E (sc3_array_index (p3->talloc, i, (void **) &(malloc)));

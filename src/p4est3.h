@@ -45,6 +45,8 @@ typedef enum p4est3_setup_mode
   P4EST3_NEW_MORTON,    /**< Set every quadrant by its Morton index */
   P4EST3_NEW_SUCCESSOR, /**< Set every quadrant by the previous one */
   P4EST3_NEW_RECURSIVE, /**< Recursive calling the child function */
+  P4EST3_NEW_RECURSIVE_CHILD,
+  P4EST3_NEW_RECURSIVE_REGION,
   P4EST3_NEW_MODE_LAST  /**< Unused bounding value */
 }
 p4est3_setup_mode_t;
