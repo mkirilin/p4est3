@@ -42,8 +42,7 @@ static              int32_t
 p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
                                      char *reason)
 {
-  SC3E_TEST (0 <= q->coords &&
-             q->coords < ((uint64_t) 1 << P4EST_QMAXLEVEL * P4EST_DIM),
+  SC3E_TEST (q->coords < ((uint64_t) 1 << P4EST_QMAXLEVEL * P4EST_DIM),
              reason);
   SC3E_YES (reason);
 }
@@ -59,12 +58,12 @@ p4est3_quadrant_mort_is_valid (const p4est3_quadrant_mort_t * q, char *reason)
 }
 
 static sc3_error_t *
-p4est3_quadrant_mort_coord (const p4est3_quadrant_mort_t * q, uint8_t dim,
-                            int32_t * coord)
+p4est3_quadrant_mort_coord (const p4est3_quadrant_mort_t * q, int32_t dim,
+                            p4est_qcoord_t * coord)
 {
   int                 i, forward, backward;
 
-  P3A_CHECK (0 <= dim && dim <= P4EST_DIM);
+  P3A_CHECK (dim <= P4EST_DIM);
   P3A_IS (p4est3_quadrant_mort_is_valid, q);
 
   *coord = 0;
@@ -79,16 +78,16 @@ p4est3_quadrant_mort_coord (const p4est3_quadrant_mort_t * q, uint8_t dim,
   return NULL;
 }
 
-static              int32_t
+static              p4est_qcoord_t
 p4est3_quadrant_mort_coord_noerr (const p4est3_quadrant_mort_t * q,
-                                  uint8_t dim, char *reason)
+                                  int32_t dim, char *reason)
 {
   int                 i, forward, backward;
-  int32_t             coord;
-  if (0 > dim || dim > P4EST_DIM) {
+  p4est_qcoord_t      coord;
+  if (dim > P4EST_DIM) {
     return -1;
   }
-  if (!p4est3_quadrant_mort_is_valid (q, reason)){
+  if (!p4est3_quadrant_mort_is_valid (q, reason)) {
     return -1;
   }
 
@@ -157,7 +156,7 @@ p4est3_quadrant_mort_is_ancestor (const p4est3_quadrant_mort_t * q,
 
 static sc3_error_t *
 p4est3_quadrant_mort_child (const p4est3_quadrant_mort_t * q,
-                            p4est3_quadrant_mort_t * r, int32_t child_id)
+                            int32_t child_id, p4est3_quadrant_mort_t * r)
 {
   const uint64_t      shift = P4EST3_QUADRANT_MORT_LEN (0x01, q->level + 1);
 
@@ -292,8 +291,8 @@ p4est3_quadrant_mort_ancestor (const p4est3_quadrant_mort_t * q,
 
 static sc3_error_t *
 p4est3_quadrant_mort_first_descendant (const p4est3_quadrant_mort_t * q,
-                                       p4est3_quadrant_mort_t * fd,
-                                       int32_t level)
+                                       int32_t level,
+                                       p4est3_quadrant_mort_t * fd)
 {
   P3A_IS (p4est3_quadrant_mort_is_valid, q);
   P3A_CHECK ((int32_t) q->level <= level && level <= P4EST_QMAXLEVEL);
@@ -361,18 +360,18 @@ p4est3_quadrant_mort_linear_id (const p4est3_quadrant_mort_t * quadrant,
 
   *id = quadrant->coords >> (P4EST_DIM * (P4EST_MAXLEVEL - level));
   if (level < P4EST_QMAXLEVEL) {
-    P3A_CHECK (0 <= *id && *id < ((uint64_t) 1 << P4EST_DIM * level));
+    P3A_CHECK (0 <= *id && *id < ((p4est3_gloidx) 1 << P4EST_DIM * level));
   }
   return NULL;
 }
 
 static sc3_error_t *
-p4est3_quadrant_mort_morton (int level, uint64_t id,
+p4est3_quadrant_mort_morton (int level, p4est3_gloidx id,
                              p4est3_quadrant_mort_t * quadrant)
 {
   P3A_CHECK (0 <= level && level <= P4EST_QMAXLEVEL);
   if (level < P4EST_QMAXLEVEL) {
-    P3A_CHECK (id < ((uint64_t) 1 << P4EST_DIM * level));
+    P3A_CHECK (id < ((p4est3_gloidx) 1 << P4EST_DIM * level));
   }
 
   quadrant->level = (int8_t) level;
@@ -469,8 +468,7 @@ p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_ancestor =
     (p4est3_quadrant_ancestor_t) p4est3_quadrant_mort_ancestor;
 
-  qvt->quadrant_first_descendant =
-    (p4est3_quadrant_first_descendant_t)
+  qvt->quadrant_first_descendant = (p4est3_quadrant_first_descendant_t)
     p4est3_quadrant_mort_first_descendant;
 
   qvt->quadrant_last_descendant =
