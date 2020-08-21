@@ -54,7 +54,8 @@ libp4est_installed_headers += \
         src/p8est_tets_hexes.h src/p8est_balance.h src/p8est_io.h \
         src/p8est_wrap.h src/p8est_plex.h \
         src/p8est_empty.h src/p4est_to_p8est_empty.h src/p8est_p4est3.h \
-        src/p8est3_quadrant_zyx.h
+        src/p8est3_quadrant_zyx.h \
+        src/p8est3_quadrant_mort.h
 libp4est_compiled_sources += \
         src/p8est_connectivity.c src/p8est.c \
         src/p8est_bits.c src/p8est_search.c src/p8est_build.c  \
@@ -66,7 +67,8 @@ libp4est_compiled_sources += \
         src/p8est_connrefine.c \
         src/p8est_wrap.c src/p8est_plex.c \
         src/p8est_empty.c src/p8est_p4est3.c \
-        src/p8est3_quadrant_zyx.c
+        src/p8est3_quadrant_zyx.c \
+        src/p8est3_quadrant_mort.c
 endif
 if P4EST_ENABLE_BUILD_2D
 if P4EST_ENABLE_BUILD_3D

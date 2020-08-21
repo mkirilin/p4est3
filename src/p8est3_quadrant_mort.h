@@ -21,24 +21,41 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P4EST3_TO_P8EST3_H
-#define P4EST3_TO_P8EST3_H
+#ifndef P8EST3_QUADRANT_MORT_H
+#define P8EST3_QUADRANT_MORT_H
 
-#ifdef P4EST3_H
-#error "The include files p4est3.h and p4est3_to_p8est3.h cannot be combined"
+#include <p8est.h>
+#include <p4est3_quadrant_vtable.h>
+
+#ifdef __cplusplus
+extern              "C"
+{
+#if 0
+}
 #endif
-#define P4_TO_P8
+#endif
 
-/* redefine macros */
-#define P4EST3_QUADRANT_MORT_LEN            P8EST3_QUADRANT_MORT_LEN
+#define P8EST3_QUADRANT_MORT_LEN(n, l) ((uint64_t) (n) << P4EST_DIM * (P4EST_MAXLEVEL - (l)))
 
-/* redefine types */
-#define p4est3_quadrant_mort_t              p8est3_quadrant_mort_t
+typedef struct p8est3_quadrant_mort
+{
+  /*@{ */
+  uint64_t            coords;  /**< coordinates */
+  /*@} */
+  int8_t              level,    /**< level of refinement */
+                      pad8;     /**< padding */
+  int16_t             pad16;    /**< padding */
+}
+p8est3_quadrant_mort_t;
 
-/* functions in p4est_quadrant_zyx */
-#define p4est3_quadrant_zyx_vtable          p8est3_quadrant_zyx_vtable
+void                p8est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t
+                                                 * qvt);
 
-/* functions in p4est_quadrant_mort */
-#define p4est3_quadrant_mort_vtable         p8est3_quadrant_mort_vtable
+#ifdef __cplusplus
+#if 0
+{
+#endif
+}
+#endif
 
-#endif /* !P4EST3_TO_P8EST3_H */
+#endif /* !P8EST3_QUADRANT_MORT_H */
