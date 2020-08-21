@@ -199,27 +199,29 @@ p4est3_quadrant_mort_is_node (const p4est3_quadrant_mort_t * q, int inside,
 {
   int32_t             x = p4est3_quadrant_mort_coord_noerr (q, 0, reason);
   int32_t             y = p4est3_quadrant_mort_coord_noerr (q, 1, reason);
+  int32_t             res;
 #ifdef P4_TO_P8
   int32_t             z = p4est3_quadrant_mort_coord_noerr (q, 2, reason);
-  SC3E_TEST (x != -1 && y != -1 && z != -1, reason);
+  SC3E_TEST (z != -1, reason);
 #endif
   SC3E_TEST (x != -1 && y != -1, reason);
 
-  SC3E_TEST (q->level == P4EST_MAXLEVEL &&
-             x >= 0 && x <= P4EST_ROOT_LEN - (inside ? 1 : 0) &&
-             y >= 0 && y <= P4EST_ROOT_LEN - (inside ? 1 : 0) &&
+  res = q->level == P4EST_MAXLEVEL &&
+    x >= 0 && x <= P4EST_ROOT_LEN - (inside ? 1 : 0) &&
+    y >= 0 && y <= P4EST_ROOT_LEN - (inside ? 1 : 0) &&
 #ifdef P4_TO_P8
-             z >= 0 && z <= P4EST_ROOT_LEN - (inside ? 1 : 0) &&
+    z >= 0 && z <= P4EST_ROOT_LEN - (inside ? 1 : 0) &&
 #endif
-             (!(x & ((1 << (P4EST_MAXLEVEL - P4EST_QMAXLEVEL)) - 1))
-              || (inside && x == P4EST_ROOT_LEN - 1)) &&
-             (!(y & ((1 << (P4EST_MAXLEVEL - P4EST_QMAXLEVEL)) - 1))
-              || (inside && y == P4EST_ROOT_LEN - 1)) &&
+    (!(x & ((1 << (P4EST_MAXLEVEL - P4EST_QMAXLEVEL)) - 1))
+     || (inside && x == P4EST_ROOT_LEN - 1)) &&
+    (!(y & ((1 << (P4EST_MAXLEVEL - P4EST_QMAXLEVEL)) - 1))
+     || (inside && y == P4EST_ROOT_LEN - 1)) &&
 #ifdef P4_TO_P8
-             (!(z & ((1 << (P4EST_MAXLEVEL - P4EST_QMAXLEVEL)) - 1))
-              || (inside && z == P4EST_ROOT_LEN - 1)) &&
+    (!(z & ((1 << (P4EST_MAXLEVEL - P4EST_QMAXLEVEL)) - 1))
+     || (inside && z == P4EST_ROOT_LEN - 1)) &&
 #endif
-             1, reason);
+    1;
+  SC3E_TEST (res, reason);
   SC3E_YES (reason);
 }
 
