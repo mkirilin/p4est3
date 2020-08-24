@@ -122,6 +122,7 @@ sc3_error_t        *p4est3_quadrant_child_id (p4est3_quadrant_vtable_t * qvt,
 sc3_error_t        *p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t *
                                                  qvt, const void *q, int l,
                                                  int *j);
+/* TODO: rename to _coordinates; demand n == dimension and return all */
 sc3_error_t        *p4est3_quadrant_coordinate (p4est3_quadrant_vtable_t *
                                                 qvt, const void *q, int n,
                                                 int *j);
@@ -149,9 +150,9 @@ sc3_error_t        *p4est3_quadrant_first_descendant (p4est3_quadrant_vtable_t
 sc3_error_t        *p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t
                                                      * qvt, const void *q,
                                                      int l, void *r);
+/* This function works up to level l=21 */
 sc3_error_t        *p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
-                                            int level, p4est3_gloidx id,
-                                            void *r);
+                                            int l, p4est3_gloidx id, void *r);
 sc3_error_t        *p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t
                                                     * qvt, const void *q1,
                                                     const void *q2, void *r);

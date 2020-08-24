@@ -178,7 +178,7 @@ p4est3_quadrant_zyx_parent (const __m128i * q, __m128i * r)
   SC3A_CHECK (level > 0);
 
 /* *INDENT-OFF* */
-  *r = 
+  *r =
    _mm_sub_epi32 (
      _mm_and_si128 (*q, _mm_set_epi32 (~P4EST_QUADRANT_LEN (level)
                                      , ~P4EST_QUADRANT_LEN (level)

@@ -21,24 +21,6 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P4EST3_TO_P8EST3_H
-#define P4EST3_TO_P8EST3_H
-
-#ifdef P4EST3_H
-#error "The include files p4est3.h and p4est3_to_p8est3.h cannot be combined"
-#endif
-#define P4_TO_P8
-
-/* redefine macros */
-#define P4EST3_QUADRANT_MORT_LEN            P8EST3_QUADRANT_MORT_LEN
-
-/* redefine types */
-#define p4est3_quadrant_mort_t              p8est3_quadrant_mort_t
-
-/* functions in p4est_quadrant_zyx */
-#define p4est3_quadrant_zyx_vtable          p8est3_quadrant_zyx_vtable
-
-/* functions in p4est_quadrant_mort */
-#define p4est3_quadrant_mort_vtable         p8est3_quadrant_mort_vtable
-
-#endif /* !P4EST3_TO_P8EST3_H */
+#include <p4est_to_p8est.h>
+#include <p4est3_to_p8est3.h>
+#include "p4est3_quadrant_mort.c"
