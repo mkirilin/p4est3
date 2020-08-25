@@ -451,7 +451,6 @@ p4est3_region (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
         (p3->talloc, sc3_omp_thread_num (), (void **) &(alloc)));
   SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &testq));
   SC3E (sc3_array_set_elem_size (testq, p3->qsize));
-  SC3E (sc3_array_set_elem_count (testq, p3->num_children + 1));
   SC3E (sc3_array_set_resizable (testq, 1));
   SC3E (sc3_array_setup (testq));
 
@@ -462,10 +461,10 @@ p4est3_region (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
 
   SC3E (p4est3_quadrant_compare (p3->qvt, a, b, &j1));
   SC3A_CHECK (j1 < 0);
-  SC3E (sc3_array_index (testq, 0, &c));
+  SC3E (sc3_array_push (testq, &c));
   SC3E (p4est3_nearest_common_ancestor (p3->qvt, a, b, c));
   for (i = 0; i < p3->num_children; ++i) {
-    SC3E (sc3_array_index (testq, i + 1, &q));
+    SC3E (sc3_array_push (testq, &q));
     SC3E (p4est3_quadrant_child (p3->qvt, c, i, q));
   }
   SC3E (sc3_array_get_elem_count (testq, &ecount));
@@ -474,23 +473,19 @@ p4est3_region (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
     SC3E (sc3_array_index (testq, i, &c));
     SC3E (p4est3_quadrant_linear_id (p3->qvt, c, p3->level, &cid));
     SC3E (p4est3_quadrant_level (p3->qvt, c, &lc));
-    SC3E (p4est3_quadrant_is_ancestor (p3->qvt, c, b, &j1));
+    SC3E (p4est3_quadrant_is_ancestor (p3->qvt, c, b, &j2));
     if ((aid < cid || (aid == cid && la <= lc))
         && (cid < bid || (cid == bid && lc < lb))
-        && !j1) {
-      SC3E (sc3_array_push (region, c));
+        && !j2) {
+      SC3E (sc3_array_push (region, &q));
+      SC3E (p4est3_quadrant_copy (p3->qvt, c, q));
     }
     else {
       SC3E (p4est3_quadrant_is_ancestor (p3->qvt, c, a, &j1));
-      SC3E (p4est3_quadrant_is_ancestor (p3->qvt, c, b, &j2));
       if (j1 || j2) {
-        SC3E (sc3_array_index (buff, 0, &q));
-        SC3E (p4est3_quadrant_copy (p3->qvt, c, q));
-        c = q;
         for (j = 0; j < p3->num_children; ++j) {
-          SC3E (sc3_array_index (buff, 1, &q));
+          SC3E (sc3_array_push (testq, &q));
           SC3E (p4est3_quadrant_child (p3->qvt, c, j, q));
-          SC3E (sc3_array_push (testq, q));
         }
         ecount += p3->num_children;
       }
@@ -520,7 +515,6 @@ p4est3_region_end (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
         (p3->talloc, sc3_omp_thread_num (), (void **) &(alloc)));
   SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &testq));
   SC3E (sc3_array_set_elem_size (testq, p3->qsize));
-  SC3E (sc3_array_set_elem_count (testq, 2));
   SC3E (sc3_array_set_resizable (testq, 1));
   SC3E (sc3_array_setup (testq));
 
@@ -529,28 +523,25 @@ p4est3_region_end (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
   SC3E (sc3_array_set_elem_count (buff, 2));
   SC3E (sc3_array_setup (buff));
 
-  SC3E (sc3_array_index (testq, 1, &c));
+  SC3E (sc3_array_push(testq, &c));
   SC3E (p4est3_nearest_common_ancestor (p3->qvt, a, b, c));
 
   SC3E (sc3_array_get_elem_count (testq, &ecount));
-  SC3A_CHECK (ecount == 2);
-  for (i = 1; i < ecount; ++i) {
+  SC3A_CHECK (ecount == 1);
+  for (i = 0; i < ecount; ++i) {
     SC3E (sc3_array_index (testq, i, &c));
     SC3E (p4est3_quadrant_linear_id (p3->qvt, c, p3->level, &cid));
     SC3E (p4est3_quadrant_level (p3->qvt, c, &lc));
     if (aid < cid || (aid == cid && la <= lc)) {
-      SC3E (sc3_array_push (region, c));
+      SC3E (sc3_array_push (region, &q));
+      SC3E (p4est3_quadrant_copy (p3->qvt, c, q));
     }
     else {
       SC3E (p4est3_quadrant_is_ancestor (p3->qvt, c, a, &j1));
       if (j1) {
-        SC3E (sc3_array_index (buff, 0, &q));
-        SC3E (p4est3_quadrant_copy (p3->qvt, c, q));
-        c = q;
         for (j = 0; j < p3->num_children; ++j) {
-          SC3E (sc3_array_index (buff, 1, &q));
+          SC3E (sc3_array_push (testq, &q));
           SC3E (p4est3_quadrant_child (p3->qvt, c, j, q));
-          SC3E (sc3_array_push (testq, q));
         }
         ecount += p3->num_children;
       }
