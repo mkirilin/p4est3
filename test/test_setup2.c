@@ -22,13 +22,57 @@
 */
 
 #ifndef P4_TO_P8
+#include <p4est3_quadrant_zyx.h>
+#include <p4est3_quadrant_mort.h>
 #include <p4est_p4est3.h>
 #else
+#include <p8est3_quadrant_zyx.h>
+#include <p8est3_quadrant_mort.h>
 #include <p8est_p4est3.h>
 #endif
 
 #define MAX_TEST_LEVEL 5
 #define MAX_TEST_TREES 5
+
+#define test_setup(qvt) do {                                                 \
+  for (level = 4; level < 5; ++level) {                         \
+    for (num_trees = 4; num_trees < 5; ++num_trees) {           \
+      printf ("l = %d, t = %d\n", level, num_trees); \
+      SC3E_NULL_SET (e, sc3_MPI_Barrier (mpicomm));                          \
+                                                                             \
+      SC3E_NULL_SET (e, p4est3_connectivity_new (alloc, &conn));             \
+      SC3E_NULL_SET (e, p4est3_connectivity_set_num_trees (conn, num_trees));\
+      SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));                   \
+                                                                             \
+      /*P4EST3_NEW_MORTON*/                                                  \
+      SC3E_NULL_SET (e, make_new_p4est3 (&p3m, alloc, conn, mpicomm, qvt,    \
+                                         level, P4EST3_NEW_MORTON));         \
+      /*P4EST3_NEW_SUCCESSOR*/                                               \
+      SC3E_NULL_SET (e, make_new_p4est3 (&p3s, alloc, conn, mpicomm, qvt,    \
+                                         level, P4EST3_NEW_SUCCESSOR));      \
+      /*P4EST3_NEW_RECURSIVE*/                                               \
+      SC3E_NULL_SET (e, make_new_p4est3 (&p3r, alloc, conn, mpicomm, qvt,    \
+                                         level, P4EST3_NEW_RECURSIVE));      \
+      /*P4EST3_NEW_RECURSIVE_CHILD*/                                         \
+      SC3E_NULL_SET (e, make_new_p4est3 (&p3rc, alloc, conn, mpicomm, qvt,   \
+                                         level, P4EST3_NEW_RECURSIVE_CHILD));\
+      /*P4EST3_NEW_RECURSIVE_REGION*/                                        \
+      SC3E_NULL_SET (e, make_new_p4est3 (&p3rr, alloc, conn, mpicomm, qvt,   \
+                                        level, P4EST3_NEW_RECURSIVE_REGION));\
+      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3s, qvt));           \
+      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3r, qvt));           \
+      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3rc, qvt));          \
+      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3rr, qvt));          \
+                                                                             \
+      SC3E_NULL_SET (e, p4est3_destroy (&p3m));                              \
+      SC3E_NULL_SET (e, p4est3_destroy (&p3s));                              \
+      SC3E_NULL_SET (e, p4est3_destroy (&p3r));                              \
+      SC3E_NULL_SET (e, p4est3_destroy (&p3rc));                             \
+      SC3E_NULL_SET (e, p4est3_destroy (&p3rr));                             \
+      SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn));                \
+    }                                                                        \
+  }                                                                          \
+  } while (0)
 
 static sc3_error_t *
 make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
@@ -135,6 +179,8 @@ main (int argc, char **argv)
   sc3_error_t        *e;
   sc3_MPI_Comm_t      mpicomm;
   p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
+  p4est3_quadrant_vtable_t vtavx, *qvtavx = &vtavx;
+  p4est3_quadrant_vtable_t vtmort, *qvtmort = &vtmort;
   p4est3_t           *p3m, *p3s, *p3r, *p3rc, *p3rr;
   p4est3_connectivity_t *conn;
 
@@ -143,6 +189,8 @@ main (int argc, char **argv)
 
   /* legacy wrapping for p4est quadrants */
   p4est_quadrant_vtable (qvt, 0);
+  p4est3_quadrant_zyx_vtable (qvtavx);
+  p4est3_quadrant_mort_vtable (qvtmort);
 
   /* this is generally needed for MPI */
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
@@ -153,42 +201,9 @@ main (int argc, char **argv)
   sc_init (mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
   p4est_init (NULL, SC_LP_DEFAULT);
   SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
-  for (level = 1; level < MAX_TEST_LEVEL; ++level) {
-    for (num_trees = 1; num_trees < MAX_TEST_TREES; ++num_trees) {
-      SC3E_NULL_SET (e, sc3_MPI_Barrier (mpicomm));
-
-      SC3E_NULL_SET (e, p4est3_connectivity_new (alloc, &conn));
-      SC3E_NULL_SET (e, p4est3_connectivity_set_num_trees (conn, num_trees));
-      SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));
-
-      //P4EST3_NEW_MORTON
-      SC3E_NULL_SET (e, make_new_p4est3 (&p3m, alloc, conn, mpicomm, qvt,
-                                         level, P4EST3_NEW_MORTON));
-      //P4EST3_NEW_SUCCESSOR
-      SC3E_NULL_SET (e, make_new_p4est3 (&p3s, alloc, conn, mpicomm, qvt,
-                                         level, P4EST3_NEW_SUCCESSOR));
-      //P4EST3_NEW_RECURSIVE
-      SC3E_NULL_SET (e, make_new_p4est3 (&p3r, alloc, conn, mpicomm, qvt,
-                                         level, P4EST3_NEW_RECURSIVE));
-      //P4EST3_NEW_RECURSIVE_CHILD
-      SC3E_NULL_SET (e, make_new_p4est3 (&p3rc, alloc, conn, mpicomm, qvt,
-                                         level, P4EST3_NEW_RECURSIVE_CHILD));
-      //P4EST3_NEW_RECURSIVE_REGION
-      SC3E_NULL_SET (e, make_new_p4est3 (&p3rr, alloc, conn, mpicomm, qvt,
-                                         level, P4EST3_NEW_RECURSIVE_REGION));
-      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3s, qvt));
-      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3r, qvt));
-      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3rc, qvt));
-      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3rr, qvt));
-
-      SC3E_NULL_SET (e, p4est3_destroy (&p3m));
-      SC3E_NULL_SET (e, p4est3_destroy (&p3s));
-      SC3E_NULL_SET (e, p4est3_destroy (&p3r));
-      SC3E_NULL_SET (e, p4est3_destroy (&p3rc));
-      SC3E_NULL_SET (e, p4est3_destroy (&p3rr));
-      SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn));
-    }
-  }
+  test_setup (qvt);
+  test_setup (qvtavx);
+  test_setup (qvtmort);
   SC3E_NULL_SET (e, free_allocator (&alloc));
 
   /* again, just to check legacy wrapping */
