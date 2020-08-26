@@ -135,7 +135,7 @@ main (int argc, char **argv)
   sc3_error_t        *e;
   sc3_MPI_Comm_t      mpicomm;
   p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
-  p4est3_t           *p3m, *p3s, *p3r;
+  p4est3_t           *p3m, *p3s, *p3r, *p3rc, *p3rr;
   p4est3_connectivity_t *conn;
 
   /* v3 standard procedure to isolate memory allocation contexts */
@@ -170,12 +170,22 @@ main (int argc, char **argv)
       //P4EST3_NEW_RECURSIVE
       SC3E_NULL_SET (e, make_new_p4est3 (&p3r, alloc, conn, mpicomm, qvt,
                                          level, P4EST3_NEW_RECURSIVE));
+      //P4EST3_NEW_RECURSIVE_CHILD
+      SC3E_NULL_SET (e, make_new_p4est3 (&p3rc, alloc, conn, mpicomm, qvt,
+                                         level, P4EST3_NEW_RECURSIVE_CHILD));
+      //P4EST3_NEW_RECURSIVE_REGION
+      SC3E_NULL_SET (e, make_new_p4est3 (&p3rr, alloc, conn, mpicomm, qvt,
+                                         level, P4EST3_NEW_RECURSIVE_REGION));
       SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3s, qvt));
       SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3r, qvt));
+      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3rc, qvt));
+      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3rr, qvt));
 
       SC3E_NULL_SET (e, p4est3_destroy (&p3m));
       SC3E_NULL_SET (e, p4est3_destroy (&p3s));
       SC3E_NULL_SET (e, p4est3_destroy (&p3r));
+      SC3E_NULL_SET (e, p4est3_destroy (&p3rc));
+      SC3E_NULL_SET (e, p4est3_destroy (&p3rr));
       SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn));
     }
   }
