@@ -42,7 +42,7 @@ static              int32_t
 p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
                                      char *reason)
 {
-  SC3E_TEST (q->coords < ((uint64_t) 1 << P4EST_QMAXLEVEL * P4EST_DIM),
+  SC3E_TEST (q->coords < ((uint64_t) 1 << P4EST_MAXLEVEL * P4EST_DIM),
              reason);
   SC3E_YES (reason);
 }
@@ -145,7 +145,8 @@ p4est3_quadrant_mort_is_ancestor (const p4est3_quadrant_mort_t * q,
   P3A_IS (p4est3_quadrant_mort_is_valid, r);
 
   if (q->level >= r->level) {
-    return 0;
+    *j = 0;
+    return NULL;
   }
 
   exclor =
@@ -339,7 +340,7 @@ p4est3_mort_nearest_common_ancestor (const p4est3_quadrant_mort_t * q1,
 
   P3A_CHECK (maxlevel <= P4EST_MAXLEVEL);
 
-  r->coords = q1->coords & ~((1 << (maxlevel * P4EST_DIM)) - 1);
+  r->coords = q1->coords & ~(((uint64_t) 1 << (maxlevel * P4EST_DIM)) - 1);
   r->level = (int8_t) SC_MIN (P4EST_MAXLEVEL - maxlevel,
                               (int) SC_MIN (q1->level, q2->level));
 
@@ -388,7 +389,7 @@ p4est3_quadrant_mort_successor (const p4est3_quadrant_mort_t * q,
                                 p4est3_quadrant_mort_t * r)
 {
   P3A_IS (p4est3_quadrant_mort_is_valid, q);
-  P3A_CHECK (q->coords < ((uint64_t) 1 << (P4EST_QMAXLEVEL * P4EST_DIM)) - 1);
+  P3A_CHECK (q->coords < ((uint64_t) 1 << (P4EST_MAXLEVEL * P4EST_DIM)) - 1);
 
   r->coords = q->coords + P4EST3_QUADRANT_MORT_LEN (0x01, q->level);
   r->level = (int8_t) q->level;
