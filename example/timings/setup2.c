@@ -23,19 +23,18 @@
 
 #ifndef P4_TO_P8
 #include <p4est3_quadrant_zyx.h>
+#include <p4est3_quadrant_mort.h>
 #include <p4est_p4est3.h>
 #else
 #include <p8est3_quadrant_zyx.h>
+#include <p8est3_quadrant_mort.h>
 #include <p8est_p4est3.h>
 #endif
 
-#include <time.h>
+#include <sc_statistics.h>
+#include <sc_flops.h>
 
-#define test(SETUP_MODE, qvt, t) do {                                       \
-  SC3E_NULL_SET (e, make_new_p4est3 (&p3, alloc, conn, mpicomm, qvt,        \
-                                     level, SETUP_MODE, &tb, &te));         \
-  SC3E_NULL_SET (e, measure_setup (tb, te, mpicomm, mpirank, mpisize, &t)); \
-  } while (0)
+#include <string.h>
 
 static sc3_error_t *
 make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
@@ -43,30 +42,6 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
   SC3A_IS (sc3_allocator_is_setup, oa);
   SC3E (sc3_allocator_new (oa, alloc));
   SC3E (sc3_allocator_setup (*alloc));
-  return NULL;
-}
-
-static sc3_error_t *
-make_new_p4est3 (p4est3_t ** p3, sc3_allocator_t * alloc,
-                 p4est3_connectivity_t * conn, sc3_MPI_Comm_t mpicomm,
-                 p4est3_quadrant_vtable_t * qvt, int level,
-                 p4est3_setup_mode_t mode, clock_t * tb, clock_t * te)
-{
-  SC3A_IS (sc3_allocator_is_setup, alloc);
-
-  /* create p4est object with connectivity */
-  SC3E (p4est3_new (alloc, p3));
-  SC3E (p4est3_set_comm (*p3, mpicomm, 1));
-  SC3E (p4est3_set_connectivity (*p3, conn));
-  SC3E (p4est3_set_vtable (*p3, qvt));
-  SC3E (p4est3_set_level (*p3, level));
-  SC3E (p4est3_set_setup_mode (*p3, mode));
-
-  *tb = clock ();
-  SC3E (p4est3_setup (*p3));
-  *te = clock ();
-
-  SC3E (p4est3_destroy (p3));
   return NULL;
 }
 
@@ -88,7 +63,7 @@ report_errors (sc3_allocator_t * mainalloc, sc3_error_t ** pe)
     /* TODO print error messages in a nicer way */
     sc3_error_destroy_noerr (pe, eflat);
     fprintf (stderr, "Error: %s\n", eflat);
-    SC_CHECK_ABORT (0, "Setup's tests failed\n");
+    SC_CHECK_ABORT (0, "Setup's timings failed\n");
   }
 
   if (!sc3_allocator_is_free (mainalloc, reason)) {
@@ -108,39 +83,33 @@ report_errors (sc3_allocator_t * mainalloc, sc3_error_t ** pe)
 #endif
 }
 
-static sc3_error_t *
-measure_setup (clock_t tb, clock_t te, sc3_MPI_Comm_t mpicomm,
-               int mpirank, int mpisize, float *time)
-{
-  float              *times;
-  int                 i;
-  *time = (float) (te - tb) / CLOCKS_PER_SEC;
-  times = (float *) malloc (sizeof (float) * mpisize);
-
-  SC3E (sc3_MPI_Allgather (time, 1, SC3_MPI_FLOAT,
-                           times, 1, SC3_MPI_FLOAT, mpicomm));
-  for (i = 0, *time = -1.; i < mpisize; ++i) {
-    if (*time < times[i]) {
-      *time = times[i];
-    }
-  }
-
-  free (times);
-  return NULL;
-}
-
 void
-print_stats (const char *name, float time, float time_avx, float min_rec,
-             float min_rec_avx)
+wrong_input (const char *name, int n)
 {
-  printf ("\n%s: \n"
-          "  Vectorized:            %f\n"
-          "    Rec/Curr Ratio:      %f\n"
-          "  Non-Vectorized:        %f\n"
-          "    Rec/Curr Ratio:      %f\n"
-          "  Vect/Non-Vect Ratio:   %f\n",
-          name, time_avx, min_rec_avx / time_avx, time, min_rec / time,
-          time_avx / time);
+  printf ("Wrong input parameter: \n");
+  switch (n) {
+  case 1:
+    printf ("Setup mode %s is not valid\n"
+            "Valid setup parameters: "
+            "MORTON, SUCCESSOR, RECURSIVE, RECURSIVE_CHILD, RECURSIVE_REGION"
+            "\n", name);
+    break;
+  case 2:
+    printf ("Quadrant type %s is not valid\n"
+            "Valid quadrant types: " "STANDART, AVX, MORT_ORD\n", name);
+    break;
+  case 3:
+    printf ("The number of levels %s is not valid\n"
+            "Valid value: " "positiv int\n", name);
+    break;
+  case 4:
+    printf ("The number of trees %s is not valid\n"
+            "Valid value: " "positiv int\n", name);
+  default:
+    break;
+  }
+  printf ("Parameter's format: "
+          "<SETUP MODE> <QUADRANT TYPE> <#levels> <#trees>\n");
 }
 
 int
@@ -151,37 +120,110 @@ main (int argc, char **argv)
   sc3_error_t        *e;
   sc3_MPI_Comm_t      mpicomm;
   p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
-  p4est3_quadrant_vtable_t vtable_avx, *qvt_avx = &vtable_avx;
   p4est3_t           *p3;
   p4est3_connectivity_t *conn;
-  clock_t             tb, te;
   int                 level, mpirank, mpisize;
-  float               mtime, stime, rtime, rctime, rrtime,
-    mtime_avx, stime_avx, rtime_avx, rctime_avx, rrtime_avx;
-  float               min_rec, min_rec_avx;
+  sc_flopinfo_t       fi, snapshot;
+  sc_statinfo_t       stats;
 
   /* v3 standard procedure to isolate memory allocation contexts */
   mainalloc = sc3_allocator_nothread ();
   mpicomm = SC3_MPI_COMM_WORLD;
 
-  /* legacy wrapping for p4est quadrants */
-  p4est3_quadrant_zyx_vtable (qvt_avx);
-  p4est_quadrant_vtable (qvt, 0);
-
   /* this is generally needed for MPI */
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
 
+  /* default parameters */
+  p4est3_setup_mode_t mode = P4EST3_NEW_MORTON;
+  p4est_quadrant_vtable (qvt, 0);
   level = 1;
   num_trees = 1;
-  if (argc == 2) {
-    level = atoi (argv[1]);
-    num_trees = 1;
+
+  SC3E_NULL_SET (e, sc3_MPI_Comm_rank (mpicomm, &mpirank));
+  SC3E_NULL_SET (e, sc3_MPI_Comm_size (mpicomm, &mpisize));
+
+  if (argc == 1 && mpirank == 0) {
+    printf ("Execution without parameters. "
+            "Default parameters are applied.\n"
+            "Parameter's format: "
+            "<SETUP MODE> <QUADRANT TYPE> <#levels> <#trees>\n");
   }
-  else if (argc == 3) {
-    level = atoi (argv[1]);
-    num_trees = atoi (argv[2]);
+  if (argc > 1) {
+    if (strcmp (argv[1], "MORTON") == 0) {
+      mode = P4EST3_NEW_MORTON;
+    }
+    else if (strcmp (argv[1], "SUCCESSOR") == 0) {
+      mode = P4EST3_NEW_SUCCESSOR;
+    }
+    else if (strcmp (argv[1], "RECURSIVE") == 0) {
+      mode = P4EST3_NEW_RECURSIVE;
+    }
+    else if (strcmp (argv[1], "RECURSIVE_CHILD") == 0) {
+      mode = P4EST3_NEW_RECURSIVE_CHILD;
+    }
+    else if (strcmp (argv[1], "RECURSIVE_REGION") == 0) {
+      mode = P4EST3_NEW_RECURSIVE_REGION;
+    }
+    else {
+      if (mpirank == 0) {
+        wrong_input (argv[1], 1);
+        sc_MPI_Abort (mpicomm, -1);
+      }
+    }
+  }
+  if (argc > 2) {
+    if (strcmp (argv[2], "STANDART") == 0) {
+      p4est_quadrant_vtable (qvt, 0);
+    }
+    else if (strcmp (argv[2], "AVX") == 0) {
+      p4est3_quadrant_zyx_vtable (qvt);
+    }
+    else if (strcmp (argv[2], "MORT_ORD") == 0) {
+      p4est3_quadrant_mort_vtable (qvt);
+    }
+    else {
+      if (mpirank == 0) {
+        wrong_input (argv[2], 2);
+        sc_MPI_Abort (mpicomm, -1);
+      }
+    }
+  }
+  if (argc > 3) {
+    level = atoi (argv[3]);
+    if (level == 0 && mpirank == 0) {
+      wrong_input (argv[3], 3);
+      sc_MPI_Abort (mpicomm, -1);
+    }
+  }
+  if (argc > 4) {
+    num_trees = atoi (argv[4]);
+    if (num_trees == 0 && mpirank == 0) {
+      wrong_input (argv[4], 4);
+      sc_MPI_Abort (mpicomm, -1);
+    }
+  }
+  sc3_MPI_Barrier (mpicomm);
+
+  char               *heading;
+  if (argc > 2) {
+    heading = (char *) malloc (strlen (argv[1]) + 1 + strlen (argv[2]) + 1);
+    strcpy (heading, argv[1]);
+    strcat (heading, " ");
+    strcat (heading, argv[2]);
+  }
+  else if (argc == 2) {
+    heading = (char *) malloc (strlen (argv[1]) + 1 + strlen ("STANDART") + 1);
+    strcpy (heading, argv[1]);
+    strcat (heading, " ");
+    strcat (heading, "STANDART");
   }
   else {
+    heading = (char *) malloc (strlen ("MORTON") + 1 + strlen ("STANDART") + 1);
+    strcpy (heading, "MORTON");
+    strcat (heading, " ");
+    strcat (heading, "STANDART");
+  }
+  if (heading == NULL) {
     sc_MPI_Abort (mpicomm, -1);
   }
 
@@ -195,35 +237,28 @@ main (int argc, char **argv)
   SC3E_NULL_SET (e, p4est3_connectivity_set_num_trees (conn, num_trees));
   SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));
 
-  SC3E_NULL_SET (e, sc3_MPI_Comm_rank (mpicomm, &mpirank));
-  SC3E_NULL_SET (e, sc3_MPI_Comm_size (mpicomm, &mpisize));
+  /* create p4est object with connectivity */
+  SC3E_NULL_SET (e, p4est3_new (alloc, &p3));
+  SC3E_NULL_SET (e, p4est3_set_comm (p3, mpicomm, 1));
+  SC3E_NULL_SET (e, p4est3_set_connectivity (p3, conn));
+  SC3E_NULL_SET (e, p4est3_set_vtable (p3, qvt));
+  SC3E_NULL_SET (e, p4est3_set_level (p3, level));
+  SC3E_NULL_SET (e, p4est3_set_setup_mode (p3, mode));
 
-  test (P4EST3_NEW_MORTON, qvt, mtime);
-  test (P4EST3_NEW_SUCCESSOR, qvt, stime);
-  test (P4EST3_NEW_RECURSIVE, qvt, rtime);
-  test (P4EST3_NEW_RECURSIVE_CHILD, qvt, rctime);
-  test (P4EST3_NEW_RECURSIVE_REGION, qvt, rrtime);
+  sc_flops_snap (&fi, &snapshot);
+  SC3E_NULL_SET (e, p4est3_setup (p3));
+  sc_flops_shot (&fi, &snapshot);
+  sc_stats_set1 (&stats, snapshot.iwtime, heading);
 
-  //SIMD/AVX area
-  test (P4EST3_NEW_MORTON, qvt_avx, mtime_avx);
-  test (P4EST3_NEW_SUCCESSOR, qvt_avx, stime_avx);
-  test (P4EST3_NEW_RECURSIVE, qvt_avx, rtime_avx);
-  test (P4EST3_NEW_RECURSIVE_CHILD, qvt_avx, rctime_avx);
-  test (P4EST3_NEW_RECURSIVE_REGION, qvt_avx, rrtime_avx);
+  sc_stats_compute (mpicomm, 1, &stats);
+  sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+
+  free (heading);
+  SC3E_NULL_SET (e, p4est3_destroy (&p3));
 
   SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn));
   SC3E_NULL_SET (e, free_allocator (&alloc));
 
-  if (mpirank == 0) {
-    min_rec = SC_MIN (SC_MIN (rtime, rctime), rrtime);
-    min_rec_avx = SC_MIN (SC_MIN (rtime_avx, rctime_avx), rrtime_avx);
-    print_stats ("Morton", mtime, mtime_avx, min_rec, min_rec_avx);
-    print_stats ("Successor", stime, stime_avx, min_rec, min_rec_avx);
-    print_stats ("Recursive", rtime, rtime_avx, min_rec, min_rec_avx);
-    print_stats ("Recursive_child", rctime, rctime_avx, min_rec, min_rec_avx);
-    print_stats ("Recursive_region", rrtime, rrtime_avx, min_rec,
-                 min_rec_avx);
-  }
   /* again, just to check legacy wrapping */
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
 
