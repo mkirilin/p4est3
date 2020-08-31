@@ -225,6 +225,8 @@ report_errors (sc3_error_t ** pe)
 int
 main (int argc, char **argv)
 {
+#if defined(P4EST_ENABLE_AVX2) && defined(P4EST_HAVE_AVX2_INSTRUCTIONS)
+
   const int32_t       n_quads = N_QUADS_2_TEST;
   sc3_error_t        *e;
   p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx = &sqvt_avx;
@@ -267,5 +269,6 @@ main (int argc, char **argv)
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
   report_errors (&e);
+#endif /*defined(P4EST_ENABLE_AVX2) && defined(P4EST_HAVE_AVX2_INSTRUCTIONS)*/
   return 0;
 }

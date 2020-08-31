@@ -29,6 +29,8 @@
 #include <p8est3_quadrant_zyx.h>
 #endif /* !P4_TO_P8 */
 
+#if defined(P4EST_ENABLE_AVX2) && defined(P4EST_HAVE_AVX2_INSTRUCTIONS)
+
 #include <immintrin.h>
 #include <smmintrin.h>
 #include <emmintrin.h>
@@ -618,3 +620,22 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_morton =
     (p4est3_quadrant_morton_t) p4est3_quadrant_zyx_morton;
 }
+
+#else
+
+#ifndef P4_TO_P8
+#include <p4est_p4est3.h>
+#else
+#include <p8est_p4est3.h>
+#endif /* !P4_TO_P8 */
+
+void
+p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
+{
+  if (qvt == NULL) {
+    return;
+  }
+  p4est_quadrant_vtable (qvt, 0);
+}
+
+#endif /*defined(P4EST_ENABLE_AVX2) && defined(P4EST_HAVE_AVX2_INSTRUCTIONS)*/

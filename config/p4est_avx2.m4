@@ -35,7 +35,7 @@ AC_DEFUN([P4EST_SIMD_GCC_CPU_SUPPORTS],
    AC_LANG_POP([C])
    AS_VAR_IF([simd_cv_gcc_check_cpu_init],[yes],
          [AC_DEFINE(
-           AS_TR_CPP([$2_HAVE_$1_INSTRUCTIONS]),
+           AS_TR_CPP([HAVE_$1_INSTRUCTIONS]),
            [1],
            [Define if $1 instructions are supported])
           $3],
@@ -48,7 +48,7 @@ AC_DEFUN([P4EST_CHECK_AVX2],
  [ AM_CONDITIONAL([$1_HAVE_AVX2], [test "xyes" != xno])
    AM_COND_IF([P4EST_ENABLE_AVX2],[
      P4EST_SIMD_GCC_CPU_SUPPORTS(avx2, [$1],
-      [SIMD_FEATURE_CFLAGS="-m[]avx2"       
+      [SIMD_FEATURE_CFLAGS="-m[]avx2"
        $1_HAVE_AVX2="yes"],
       [$1_HAVE_AVX2="no"]
      )
