@@ -29,7 +29,7 @@
 #include <p8est3_quadrant_zyx.h>
 #endif /* !P4_TO_P8 */
 
-#if defined(P4EST_ENABLE_AVX2) && defined(P4EST_HAVE_AVX2_INSTRUCTIONS)
+#ifdef P4EST_ENABLE_AVX2
 
 #include <immintrin.h>
 #include <smmintrin.h>
@@ -562,12 +562,13 @@ p4est3_quadrant_zyx_root (__m128i * r)
   return NULL;
 }
 
-void
+#endif /* P4EST_ENABLE_AVX2 */
+
+sc3_error_t        *
 p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
 {
-  if (qvt == NULL) {
-    return;
-  }
+  SC3E_DEMAND (qvt != NULL, "Virtual table need to be allocated");
+#ifdef P4EST_ENABLE_AVX2
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
 
   qvt->dim = P4EST_DIM;
@@ -619,23 +620,10 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_morton =
     (p4est3_quadrant_morton_t) p4est3_quadrant_zyx_morton;
-}
-
+  return NULL;
 #else
-
-#ifndef P4_TO_P8
-#include <p4est_p4est3.h>
-#else
-#include <p8est_p4est3.h>
-#endif /* !P4_TO_P8 */
-
-void
-p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
-{
-  if (qvt == NULL) {
-    return;
-  }
-  p4est_quadrant_vtable (qvt, 0);
+  return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
+                             " of AVX-base virtual table is denied since AVX2"
+                             " is disabled");
+#endif /* P4EST_ENABLE_AVX2 */
 }
-
-#endif /*defined(P4EST_ENABLE_AVX2) && defined(P4EST_HAVE_AVX2_INSTRUCTIONS)*/

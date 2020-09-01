@@ -35,7 +35,7 @@ extern              "C"
 #endif
 #endif
 
-void                p8est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t *
+sc3_error_t        *p8est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t *
                                                 qvt);
 
 #ifdef __cplusplus
