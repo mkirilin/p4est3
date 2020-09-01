@@ -31,7 +31,7 @@ P4EST_ARG_DISABLE([vtk-zlib], [disable zlib compression for vtk binary data],
 P4EST_ARG_DISABLE([2d], [disable the 2D library], [BUILD_2D])
 P4EST_ARG_DISABLE([3d], [disable the 3D library], [BUILD_3D])
 P4EST_ARG_DISABLE([p6est], [disable hybrid 2D+1D p6est library], [BUILD_P6EST])
-P4EST_ARG_DISABLE([avx2], [disable the simd avx2 feature], [AVX2])
+P4EST_ARG_DISABLE_AVX2([avx2], [disable the simd avx2 feature], [AVX2])
 
 echo "o---------------------------------------"
 echo "| Checking MPI and related programs"

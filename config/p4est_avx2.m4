@@ -1,15 +1,7 @@
-dnl  P4EST_CHECK_AVX2([PREFIX])
-dnl  If --disable-avx2 feature is not set:
-dnl  chech if target CPU supports SIMD avx2 intrinsics.
-dnl  If it is supported, set conditional PREFIX_HAVE_AVX2.
-dnl  If it is supported, set valid right-hand side for a 
-dnl  C #define PREFIX_HAVE_AVX2_INSTRUCTIONS as well.
+dnl   P4EST_SIMD_GCC_CPU_SUPPORTS(INSTRUCTION-SET,
+dnl   PREFIX, ACTION-IF-FOUND, ACTION-IF-NOT-FOUND)
+dnl   This macro performs the checks for the avx2 instruction sets
 dnl
-dnl   See also P4EST_SIMD_GCC_CPU_SUPPORTS(INSTRUCTION-SET,
-dnl   [PREFIX], [ACTION-IF-FOUND],[ACTION-IF-NOT-FOUND])
-dnl   which is the actual macro that perform
-dnl   the checks for the instruction sets.
-
 AC_DEFUN([P4EST_SIMD_GCC_CPU_SUPPORTS],
   [AC_REQUIRE([AC_PROG_CC])
    AC_LANG_PUSH([C])
@@ -33,26 +25,33 @@ AC_DEFUN([P4EST_SIMD_GCC_CPU_SUPPORTS],
    )
    CFLAGS="$BACKUP_CFLAGS"
    AC_LANG_POP([C])
-   AS_VAR_IF([simd_cv_gcc_check_cpu_init],[yes],
-         [AC_DEFINE(
-           AS_TR_CPP([HAVE_$1_INSTRUCTIONS]),
-           [1],
-           [Define if $1 instructions are supported])
-          $3],
-          [$4]
-         )
+   AS_VAR_IF([simd_cv_gcc_check_cpu_init], [yes], [$3], [$4])
    AS_VAR_POPDEF([simd_cv_gcc_check_cpu_init])
 ])
 
-AC_DEFUN([P4EST_CHECK_AVX2],
- [ AM_CONDITIONAL([$1_HAVE_AVX2], [test "xyes" != xno])
-   AM_COND_IF([P4EST_ENABLE_AVX2],[
-     P4EST_SIMD_GCC_CPU_SUPPORTS(avx2, [$1],
-      [SIMD_FEATURE_CFLAGS="-m[]avx2"
-       $1_HAVE_AVX2="yes"],
-      [$1_HAVE_AVX2="no"]
-     )
-     AC_SUBST([SIMD_FEATURE_CFLAGS])
-     [CFLAGS="$CFLAGS $SIMD_FEATURE_CFLAGS"]
-     ],[])
+dnl  P4EST_ARG_DISABLE_AVX2(NAME, COMMENT, TOKEN)
+dnl  Check for --enable/disable-NAME using shell variable P4EST_ENABLE_TOKEN
+dnl  If shell variable is set beforehand it overrides the option
+dnl  If enabled, define TOKEN to 1, set conditional P4EST_TOKEN and
+dnl  add -mavx2 to the CFLAGS
+dnl  Default is enabled
+dnl
+AC_DEFUN([P4EST_ARG_DISABLE_AVX2],
+[
+AC_ARG_ENABLE([$1],
+              [AS_HELP_STRING([--disable-$1$5], [$2])],,
+              [enableval=yes])
+AM_CONDITIONAL([P4EST_HAVE_AVX2], [test "xyes" != xno])
+if test "x$enableval" != xno ; then
+  P4EST_SIMD_GCC_CPU_SUPPORTS(avx2, [P4EST],
+    [AC_DEFINE([$3], 1, [DEPRECATED (use P4EST_ENABLE_$3 instead)])
+     AC_DEFINE([ENABLE_$3], 1, [Undefine if: $2])
+     SIMD_FEATURE_CFLAGS="-m[]avx2"
+     CFLAGS="$CFLAGS $SIMD_FEATURE_CFLAGS"
+     P4EST_HAVE_AVX2="yes"],
+    [P4EST_HAVE_AVX2="no"]
+  )
+fi
+AM_CONDITIONAL([P4EST_ENABLE_$3], [test "x$enableval" != xno])
+P4EST_ENABLE_$3="$enableval"
 ])
