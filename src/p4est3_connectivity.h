@@ -21,6 +21,15 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+/** \file p4est3_connectivity.h
+ * File looks ok in general.  Issues remaining:
+ *   - Doxygenate everything
+ *   - Implement \ref p4est3_connectivity_vtable_is_valid and use it
+ *   - Write test/test3_connectivity.c
+ *   - Move connectivity_new_num_trees and implementation to the test
+ *   - Implement leak error for unref and destroy calls
+ */
+
 #ifndef P4EST3_CONNECTIVITY_H
 #define P4EST3_CONNECTIVITY_H
 
@@ -34,17 +43,25 @@ extern              "C"
 #endif
 #endif
 
+#if 0
 typedef int         (*p4est3_connectivity_is_t) (void *slf, char *reason);
+#endif
 typedef sc3_error_t *(*p4est3_connectivity_inout_t) (void *slf);
 typedef sc3_error_t *(*p4est3_connectivity_get_topidx_t)
                     (void *slf, p4est3_topidx * ptopidx);
 
 typedef struct p4est3_connectivity_vtable
 {
+  /* necessary to provide as non-NULL functions */
   p4est3_connectivity_get_topidx_t get_num_trees;
+
+  /* these functions may be NULL for no action */
   p4est3_connectivity_inout_t destroy;
 }
 p4est3_connectivity_vtable_t;
+
+int p4est3_connectivity_vtable_is_valid
+  (const p4est3_connectivity_vtable_t * cvt, char *reason);
 
 typedef struct p4est3_connectivity p4est3_connectivity_t;
 
