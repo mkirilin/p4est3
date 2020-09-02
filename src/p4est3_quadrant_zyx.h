@@ -35,6 +35,7 @@ extern              "C"
 #endif
 #endif
 
+/** TODO: document */
 sc3_error_t        *p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t *
                                                 qvt);
 

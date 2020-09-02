@@ -567,9 +567,10 @@ p4est3_quadrant_zyx_root (__m128i * r)
 sc3_error_t        *
 p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
 {
-  SC3E_DEMAND (qvt != NULL, "Virtual table need to be allocated");
-#ifdef P4EST_ENABLE_AVX2
+  SC3A_CHECK (qvt != NULL);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
+
+#ifdef P4EST_ENABLE_AVX2
 
   qvt->dim = P4EST_DIM;
 
@@ -623,7 +624,7 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
   return NULL;
 #else
   return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
-                             " of AVX-base virtual table is denied since AVX2"
-                             " is disabled");
+                             " of AVX2-based virtual table is denied since AVX2"
+                             " is disabled or not found working");
 #endif /* P4EST_ENABLE_AVX2 */
 }
