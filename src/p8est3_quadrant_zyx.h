@@ -24,6 +24,7 @@
 #ifndef P8EST_QUADRANT_ZYX_H
 #define P8EST_QUADRANT_ZYX_H
 
+#include <p4est3_base.h>
 #include <p4est3_quadrant_vtable.h>
 
 #ifdef __cplusplus
@@ -34,7 +35,7 @@ extern              "C"
 #endif
 #endif
 
-void                p8est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t *
+sc3_error_t        *p8est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t *
                                                 qvt);
 
 #ifdef __cplusplus

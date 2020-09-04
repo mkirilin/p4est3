@@ -191,12 +191,22 @@ int
 main (int argc, char **argv)
 {
   sc3_error_t        *e;
+  sc3_error_kind_t    kind = SC3_ERROR_KIND_LAST;
   p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx = &sqvt_avx;
   p4est3_quadrant_vtable_t sqvt, *qvt = &sqvt;
   sc3_array_t        *qarr_avx, *qarr;
   void               *p;
 
-  p4est3_quadrant_zyx_vtable (qvt_avx);
+  e = p4est3_quadrant_zyx_vtable (qvt_avx);
+  if (e != NULL) {
+    sc3_error_t        *e_;
+    SC3E_SET (e_, sc3_error_get_kind (e, &kind));
+    report_errors (&e_);
+    if (kind == SC3_ERROR_RUNTIME) {
+      report_errors (&e);
+      return 0;
+    }
+  }
   p4est_quadrant_vtable (qvt, 0);
 
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
