@@ -244,28 +244,15 @@ p4est_quadrant_vtable_is_ancestor (const void *q1, const void *q2, int *j)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_coordinate (const void *q, int n, int *j)
+p4est_quadrant_vtable_coordinates (const void *q, int *coords)
 {
   SC3A_CHECK (p4est_quadrant_is_valid ((const p4est_quadrant_t *) q));
-  SC3E_DEMAND (0 <= n && n < P4EST_DIM,
-               "An access to an unexisting coordinate");
-  switch (n) {
-  case 0:
-    *j = ((const p4est_quadrant_t *) q)->x;
-    break;
-  case 1:
-    *j = ((const p4est_quadrant_t *) q)->y;
-    break;
-  case 2:
-    *j = -1;
+  coords[0] = ((const p4est_quadrant_t *) q)->x;
+  coords[1] = ((const p4est_quadrant_t *) q)->y;
 #ifdef P4_TO_P8
-    *j = ((const p4est_quadrant_t *) q)->z;
+  coords[2] = ((const p4est_quadrant_t *) q)->z;
 #endif /* P4_TO_P8 */
-    break;
-  default:
-    *j = -1;
-    break;
-  }
+
   return NULL;
 }
 
@@ -299,5 +286,5 @@ p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->nearest_common_ancestor = p4est_vtable_nearest_common_ancestor;
   qvt->quadrant_linear_id = p4est_quadrant_vtable_linear_id;
   qvt->quadrant_is_ancestor = p4est_quadrant_vtable_is_ancestor;
-  qvt->quadrant_coordinate = p4est_quadrant_vtable_coordinate;
+  qvt->quadrant_coordinates = p4est_quadrant_vtable_coordinates;
 }

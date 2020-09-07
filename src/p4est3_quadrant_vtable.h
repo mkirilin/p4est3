@@ -60,7 +60,7 @@ typedef sc3_error_t *(*p4est3_quadrant_is_ancestor_t) (const void *q1,
 typedef p4est3_quadrant_in_j_t p4est3_quadrant_level_t;
 typedef p4est3_quadrant_in_j_t p4est3_quadrant_child_id_t;
 typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_ancestor_id_t;
-typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_coordinate_t;
+typedef p4est3_quadrant_in_j_t p4est3_quadrant_coordinates_t;
 typedef p4est3_quadrant_in2_j_t p4est3_quadrant_compare_t;
 typedef p4est3_quadrant_out_t p4est3_quadrant_root_t;
 typedef p4est3_quadrant_in_out_t p4est3_quadrant_copy_t;
@@ -92,7 +92,7 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_level_t quadrant_level;
   p4est3_quadrant_child_id_t quadrant_child_id;
   p4est3_quadrant_ancestor_id_t quadrant_ancestor_id;
-  p4est3_quadrant_coordinate_t quadrant_coordinate;
+  p4est3_quadrant_coordinates_t quadrant_coordinates;
   p4est3_quadrant_compare_t quadrant_compare;
   p4est3_quadrant_root_t quadrant_root;
   p4est3_quadrant_copy_t quadrant_copy;
@@ -122,10 +122,8 @@ sc3_error_t        *p4est3_quadrant_child_id (p4est3_quadrant_vtable_t * qvt,
 sc3_error_t        *p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t *
                                                  qvt, const void *q, int l,
                                                  int *j);
-/* TODO: rename to _coordinates; demand n == dimension and return all */
-sc3_error_t        *p4est3_quadrant_coordinate (p4est3_quadrant_vtable_t *
-                                                qvt, const void *q, int n,
-                                                int *j);
+sc3_error_t        *p4est3_quadrant_coordinates (p4est3_quadrant_vtable_t *
+                                                 qvt, const void *q, int *j);
 sc3_error_t        *p4est3_quadrant_compare (p4est3_quadrant_vtable_t *
                                              qvt, const void *q1,
                                              const void *q2, int *j);

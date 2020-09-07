@@ -89,12 +89,11 @@ compare_p4est3_quadrants (const p4est3_t * lhs, const p4est3_t * rhs,
   p4est3_gloidx       i;
   p4est3_gloidx       gln, grn;
   p4est3_locidx       lln, lrn;
-  int                 is_eq, ll, rl, lx, rx, ly, ry;
-#ifdef P4_TO_P8
-  int                 lz, rz;
-#endif
+  int                 is_eq, ll, rl;
   char               *lchar_q = NULL;
   char               *rchar_q = NULL;
+  int                 lc[P4EST_DIM];
+  int                 rc[P4EST_DIM];
 
   SC3E (p4est3_get_quadrants (lhs, &lchar_q));
   SC3E (p4est3_get_quadrants (rhs, &rchar_q));
@@ -112,17 +111,11 @@ compare_p4est3_quadrants (const p4est3_t * lhs, const p4est3_t * rhs,
   for (i = 0; i < lln; ++i, lchar_q += lq_size, rchar_q += rq_size) {
     SC3E (p4est3_quadrant_level (lqvt, lchar_q, &ll));
     SC3E (p4est3_quadrant_level (rqvt, rchar_q, &rl));
-    SC3E (p4est3_quadrant_coordinate (lqvt, lchar_q, 0, &lx));
-    SC3E (p4est3_quadrant_coordinate (rqvt, rchar_q, 0, &rx));
-    SC3E (p4est3_quadrant_coordinate (lqvt, lchar_q, 1, &ly));
-    SC3E (p4est3_quadrant_coordinate (rqvt, rchar_q, 1, &ry));
+    SC3E (p4est3_quadrant_coordinates (lqvt, lchar_q, lc));
+    SC3E (p4est3_quadrant_coordinates (rqvt, rchar_q, rc));
+    is_eq = (int) (ll == rl && lc[0] == rc[0] && lc[1] == rc[1] &&
 #ifdef P4_TO_P8
-    SC3E (p4est3_quadrant_coordinate (lqvt, lchar_q, 2, &lz));
-    SC3E (p4est3_quadrant_coordinate (rqvt, rchar_q, 2, &rz));
-#endif
-    is_eq = (int) (ll == rl && lx == rx && ly == ry &&
-#ifdef P4_TO_P8
-                   lz == rz &&
+                   lc[2] == rc[2] &&
 #endif
                    1);
     SC3E_DEMAND (is_eq == 1, "setup mod's results differ");

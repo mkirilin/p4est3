@@ -58,23 +58,34 @@ p4est3_quadrant_mort_is_valid (const p4est3_quadrant_mort_t * q, char *reason)
 }
 
 static sc3_error_t *
-p4est3_quadrant_mort_coord (const p4est3_quadrant_mort_t * q, int32_t dim,
-                            p4est_qcoord_t * coord)
+p4est3_quadrant_mort_coords (const p4est3_quadrant_mort_t * q,
+                             p4est_qcoord_t * coords)
 {
   int                 i, forward, backward;
 
-  P3A_CHECK (dim <= P4EST_DIM);
   P3A_IS (p4est3_quadrant_mort_is_valid, q);
 
-  *coord = 0;
+  coords[0] = 0;
+  coords[1] = 0;
+#ifdef P4_TO_P8
+  coords[2] = 0;
+#endif /* P4_TO_P8 */
   for (i = 1; i < q->level + 2; ++i) {
-    forward = P4EST_DIM * (P4EST_MAXLEVEL - i) + dim;
+    forward = P4EST_DIM * (P4EST_MAXLEVEL - i);
     backward = forward - (P4EST_MAXLEVEL - i);
-    *coord |= (p4est_qcoord_t) ((q->coords & (1ULL << forward)) >> backward);
+    coords[0] |= (p4est_qcoord_t) ((q->coords & (1ULL << forward)) >> backward);
+    coords[1] |= (p4est_qcoord_t) ((q->coords & (1ULL << (forward + 1))) >> (backward + 1));
+#ifdef P4_TO_P8
+    coords[2] |= (p4est_qcoord_t) ((q->coords & (1ULL << (forward + 2))) >> (backward + 2));
+#endif /* P4_TO_P8 */
   }
 
   /**???*/
-  P3A_CHECK (0 <= *coord && *coord < P4EST_ROOT_LEN);
+  P3A_CHECK (0 <= coords[0] && coords[0] < P4EST_ROOT_LEN);
+  P3A_CHECK (0 <= coords[1] && coords[1] < P4EST_ROOT_LEN);
+#ifdef P4_TO_P8
+  P3A_CHECK (0 <= coords[2] && coords[2] < P4EST_ROOT_LEN);
+#endif /* P4_TO_P8 */
   return NULL;
 }
 
@@ -447,8 +458,8 @@ p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_ancestor_id =
     (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_mort_ancestor_id;
 
-  qvt->quadrant_coordinate =
-    (p4est3_quadrant_coordinate_t) p4est3_quadrant_mort_coord;
+  qvt->quadrant_coordinates =
+    (p4est3_quadrant_coordinates_t) p4est3_quadrant_mort_coords;
 
   qvt->quadrant_compare =
     (p4est3_quadrant_compare_t) p4est3_quadrant_mort_compare;
