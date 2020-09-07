@@ -38,7 +38,7 @@ p4est3_quadrant_mort_num_children (void)
   return P4EST_CHILDREN;
 }
 
-static              int32_t
+static              int
 p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
                                      char *reason)
 {
@@ -47,7 +47,7 @@ p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
   SC3E_YES (reason);
 }
 
-static              int32_t
+static              int
 p4est3_quadrant_mort_is_valid (const p4est3_quadrant_mort_t * q, char *reason)
 {
   SC3E_TEST ((q->level >= 0 && q->level <= P4EST_QMAXLEVEL) &&
@@ -124,7 +124,7 @@ p4est3_quadrant_mort_level (const p4est3_quadrant_mort_t * q, int *l)
   return NULL;
 }
 
-static              int32_t
+static              int
 p4est3_quadrant_mort_is_parent (const p4est3_quadrant_mort_t * q,
                                 const p4est3_quadrant_mort_t * r,
                                 char *reason)
@@ -205,7 +205,7 @@ p4est3_quadrant_mort_parent (const p4est3_quadrant_mort_t * q,
   return NULL;
 }
 
-static              int32_t
+static              int
 p4est3_quadrant_mort_is_node (const p4est3_quadrant_mort_t * q, int inside,
                               char *reason)
 {
