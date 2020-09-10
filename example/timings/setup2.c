@@ -205,100 +205,6 @@ set_heading (int argc, char **argv, sc3_MPI_Comm_t mpicomm)
   }
   return heading;
 }
-#ifndef P4_TO_P8
-p4est_connectivity_t *
-p4est_connectivity_new_row (int trees)
-{
-  const p4est_topidx_t num_vertices = trees * 2 + 2;
-  const p4est_topidx_t num_trees = trees;
-  const p4est_topidx_t num_ctt = 0;
-  double              *vertices;
-  int                  i;
-  vertices = (double *) malloc (sizeof (double) * num_vertices * 3);
-  for (i = 0; i < num_trees; ++i) {
-    vertices[i * 2 * 3] = i;
-    vertices[i * 2 * 3 + 1] = 0;
-    vertices[i * 2 * 3 + 2] = 0;
-
-    vertices[i * 2 * 3 + 3] = i;
-    vertices[i * 2 * 3 + 4] = 1;
-    vertices[i * 2 * 3 + 5] = 0;
-  }
-  vertices[num_vertices * 3 - 6] = num_trees;
-  vertices[num_vertices * 3 - 5] = 0;
-  vertices[num_vertices * 3 - 4] = 0;
-
-  vertices[num_vertices * 3 - 3] = num_trees;
-  vertices[num_vertices * 3 - 2] = 1;
-  vertices[num_vertices * 3 - 1] = 0;
-
-  p4est_topidx_t *tree_to_vertex;
-  tree_to_vertex =
-    (p4est_topidx_t *) malloc (sizeof (p4est_topidx_t) * num_trees * 4);
-  for (i = 0; i < num_trees; ++i) {
-    tree_to_vertex[i * 4] = i * 2;
-    tree_to_vertex[i * 4 + 1] = i * 2 + 2;
-    tree_to_vertex[i * 4 + 2] = i * 2 + 1;
-    tree_to_vertex[i * 4 + 3] = i * 2 + 3;
-  }
-
-  p4est_topidx_t *tree_to_tree;
-  tree_to_tree =
-    (p4est_topidx_t *) malloc (sizeof (p4est_topidx_t) * num_trees * 4);
-  if (num_trees == 1) {
-    tree_to_tree[0] = 0;
-    tree_to_tree[1] = 0;
-    tree_to_tree[2] = 0;
-    tree_to_tree[3] = 0;
-  }
-  else {
-    tree_to_tree[0] = 0;
-    tree_to_tree[1] = 1;
-    tree_to_tree[2] = 0;
-    tree_to_tree[3] = 0;
-    for (i = 1; i < num_trees - 1; ++i){
-      tree_to_tree[i * 4] = i - 1;
-      tree_to_tree[i * 4 + 1] = i + 1;
-      tree_to_tree[i * 4 + 2] = i;
-      tree_to_tree[i * 4 + 3] = i;
-    }
-    tree_to_tree[num_trees * 4 - 4] = num_trees - 2;
-    tree_to_tree[num_trees * 4 - 3] = num_trees - 1;
-    tree_to_tree[num_trees * 4 - 2] = num_trees - 1;
-    tree_to_tree[num_trees * 4 - 1] = num_trees - 1;
-  }
-
-  int8_t *tree_to_face;
-  tree_to_face =
-    (int8_t *) malloc (sizeof (int8_t) * num_trees * 4);
-  if (num_trees == 1) {
-    tree_to_face[0] = 0;
-    tree_to_face[1] = 1;
-    tree_to_face[2] = 2;
-    tree_to_face[3] = 3;
-  }
-  else {
-    tree_to_face[0] = 0;
-    tree_to_face[1] = 0;
-    tree_to_face[2] = 2;
-    tree_to_face[3] = 3;
-    for (i = 1; i < num_trees - 1; ++i){
-      tree_to_face[i * 4] = 1;
-      tree_to_face[i * 4 + 1] = 0;
-      tree_to_face[i * 4 + 2] = 2;
-      tree_to_face[i * 4 + 3] = 3;
-    }
-    tree_to_face[num_trees * 4 - 4] = 1;
-    tree_to_face[num_trees * 4 - 3] = 1;
-    tree_to_face[num_trees * 4 - 2] = 2;
-    tree_to_face[num_trees * 4 - 1] = 3;
-  }
-  return p4est_connectivity_new_copy (num_vertices, num_trees, 0,
-                                      vertices, tree_to_vertex,
-                                      tree_to_tree, tree_to_face,
-                                      NULL, &num_ctt, NULL, NULL);
-}
-#endif /* !P4_TO_P8 */
 
 int
 main (int argc, char **argv)
@@ -366,9 +272,9 @@ main (int argc, char **argv)
 
   /* make the old style connectivity */
 #ifdef P4_TO_P8
-  conn_old = p8est_connectivity_new_unitcube ();
+  conn_old = p8est_connectivity_new_brick (num_trees, 1, 1, 0, 0, 0);
 #else
-  conn_old = p4est_connectivity_new_row (num_trees);
+  conn_old = p4est_connectivity_new_brick (num_trees, 1, 0, 0);
 #endif /* P4_TO_P8 */
   /* make the p4est3 style connectivity */
   SC3E_NULL_SET (e, p4est3_connectivity_new (alloc, &conn));
