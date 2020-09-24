@@ -808,13 +808,13 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
     if (e == NULL) {
       tq = first_quad_num;
       gq = tree->first_tquad + (first_quad_num - tree->quad_offset);
-      charq = p3->quads + first_quad_num * p3->qsize;
+      charq = p3->quads + (p4est3_gloidx) first_quad_num * p3->qsize;
 
       /* loop over subset of local trees */
       for (;;) {
         SC3E_NULL_REQ (e, tree->quad_offset <= tq);
         SC3E_NULL_REQ (e, tq < tree->quad_offset + tree->num_quads);
-        tmine = SC3_MIN (end_quad_num, tree->quad_offset + tree->num_quads);
+        tmine = SC3_MIN (end_quad_num, (p4est3_gloidx) tree->quad_offset + tree->num_quads);
 
         /* loop over quadrants in local tree with creating of quadrants
            by selected method */
