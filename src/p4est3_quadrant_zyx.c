@@ -29,6 +29,8 @@
 #include <p8est3_quadrant_zyx.h>
 #endif /* !P4_TO_P8 */
 
+#ifdef P4EST_ENABLE_AVX2
+
 #include <immintrin.h>
 #include <smmintrin.h>
 #include <emmintrin.h>
@@ -649,13 +651,15 @@ p4est3_quadrant_zyx_root (__m128i * r)
   return NULL;
 }
 
-void
+#endif /* P4EST_ENABLE_AVX2 */
+
+sc3_error_t        *
 p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
 {
-  if (qvt == NULL) {
-    return;
-  }
+  SC3A_CHECK (qvt != NULL);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
+
+#ifdef P4EST_ENABLE_AVX2
 
   qvt->dim = P4EST_DIM;
 
@@ -717,4 +721,10 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_is_ancestor =
     (p4est3_quadrant_is_ancestor_t) p4est3_quadrant_zyx_is_ancestor;
+  return NULL;
+#else
+  return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
+                             " of AVX2-based virtual table is denied since AVX2"
+                             " is disabled or not found working");
+#endif /* P4EST_ENABLE_AVX2 */
 }

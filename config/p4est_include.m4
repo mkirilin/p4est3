@@ -49,7 +49,6 @@ AC_DEFUN([P4EST_CHECK_LIBRARIES],
 [
 P4EST_CHECK_METIS([$1])
 P4EST_CHECK_PETSC([$1])
-P4EST_CHECK_AVX2([$1])
 ])
 
 dnl P4EST_AS_SUBPACKAGE(PREFIX)
@@ -74,13 +73,12 @@ You can fix this by compiling a working zlib and pointing LIBS to it,
 or by using the p4est configure option --disable-vtk-zlib.
 ])
 fi
-if test "x$$1_ENABLE_AVX2" = xyes && \
-   test "x$$1_HAVE_AVX2" != xyes ; then
+if test "x$$1_ENABLE_AVX2" != xyes; then
 AC_MSG_NOTICE([- $1 -------------------------------------------------
-SIMD AVX2 intrinsics are enabled, but the target CPU does not support them.
+SIMD AVX2 intrinsics are disabled.
 This is OK if the following does not matter to you:
-Ordinary bits operations functions will be using instead of vectorized ones.
-They may work more slowly.
+AVX2 based quadrants will not be available for you.
+They might have worked a bit faster.
 ])
 fi
 ])
