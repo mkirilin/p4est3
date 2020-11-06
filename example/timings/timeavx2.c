@@ -77,20 +77,25 @@ test_parent (void *q, sc3_array_t * pull, p4est3_quadrant_vtable * qvt,
   return NULL;
 }
 
-#define test_compare(pull, qvt, n_quads, exec_time) do {          \
-  void               *p, *q;                                      \
-  int                 j, quad;                                    \
-  double              t_b, t_e;                                   \
-                                                                  \
-  t_b = sc3_MPI_Wtime ();                                         \
-  for (quad = 0; quad < n_quads; ++quad) {                        \
-    SC3E (sc3_array_index (pull, quad, &p));                      \
-    SC3E (sc3_array_index (pull, n_quads - quad - 1, &q));        \
-    SC3E (p4est3_quadrant_compare (qvt, p, q, &j));               \
-  }                                                               \
-  t_e = sc3_MPI_Wtime ();                                         \
-  exec_time = t_e - t_b;                                          \
-  } while (0)
+static sc3_error_t *
+test_compare (sc3_array_t * pull, p4est3_quadrant_vtable_t * qvt,
+              p4est3_locidx n_quads, double *exec_time)
+{
+  p4est3_locidx       quad;
+  int                 j;
+  void               *p, *q;
+  double              t_b, t_e;
+
+  t_b = sc3_MPI_Wtime ();
+  for (quad = 0; quad < n_quads; ++quad) {
+    SC3E (sc3_array_index (pull, quad, &p));
+    SC3E (sc3_array_index (pull, n_quads - quad - 1, &q));
+    SC3E (p4est3_quadrant_compare (qvt, p, q, &j));
+  }
+  t_e = sc3_MPI_Wtime ();
+  *exec_time = t_e - t_b;
+  return NULL;
+}
 
 static sc3_error_t *
 test_successor (void *q, sc3_array_t * pull, p4est3_quadrant_vtable_t * qvt,
@@ -162,8 +167,8 @@ measure_compare (sc3_array_t * v_pull2check, sc3_array_t * q_pull2check,
 {
   double              exec_avx, exec_nonavx;
 
-  test_compare (v_pull2check, qvt_avx, n_quads, exec_avx);
-  test_compare (q_pull2check, qvt, n_quads, exec_nonavx);
+  SC3E (test_compare (v_pull2check, qvt_avx, n_quads, &exec_avx));
+  SC3E (test_compare (q_pull2check, qvt, n_quads, &exec_nonavx));
 
   print_time_info (exec_avx, exec_nonavx, "Compare");
   return NULL;
