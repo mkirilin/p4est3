@@ -38,6 +38,10 @@ test_child (sc3_array_t * pull, p4est3_quadrant_vtable * qvt,
   void               *p, *q;
   double              t_b, t_e;
 
+  SC3A_IS (sc3_array_is_valid, pull);
+  SC3A_CHECK (qvt != NULL);
+  SC3A_CHECK (exec_time != NULL);
+
   t_b = sc3_MPI_Wtime ();
   for (quad = 0, put_ind = 1; P4EST_CHILDREN * (quad + 1) < n_quads;
        ++quad, put_ind += P4EST_CHILDREN) {
@@ -67,6 +71,11 @@ test_parent (void *q, sc3_array_t * pull, p4est3_quadrant_vtable * qvt,
   void               *p;
   double              t_b, t_e;
 
+  SC3A_CHECK (q != NULL);
+  SC3A_IS (sc3_array_is_valid, pull);
+  SC3A_CHECK (qvt != NULL);
+  SC3A_CHECK (exec_time != NULL);
+
   t_b = sc3_MPI_Wtime ();
   for (quad = 1; quad < n_quads; ++quad) {
     SC3E (sc3_array_index (pull, quad, &p));
@@ -85,6 +94,10 @@ test_compare (sc3_array_t * pull, p4est3_quadrant_vtable_t * qvt,
   int                 j;
   void               *p, *q;
   double              t_b, t_e;
+
+  SC3A_IS (sc3_array_is_valid, pull);
+  SC3A_CHECK (qvt != NULL);
+  SC3A_CHECK (exec_time != NULL);
 
   t_b = sc3_MPI_Wtime ();
   for (quad = 0; quad < n_quads; ++quad) {
@@ -106,6 +119,11 @@ test_successor (void *q, sc3_array_t * pull, p4est3_quadrant_vtable_t * qvt,
   void               *p;
   double              t_b, t_e;
 
+  SC3A_CHECK (q != NULL);
+  SC3A_IS (sc3_array_is_valid, pull);
+  SC3A_CHECK (qvt != NULL);
+  SC3A_CHECK (exec_time != NULL);
+
   t_b = sc3_MPI_Wtime ();
   for (quad = 1; quad < n_quads - P4EST_CHILDREN; quad += P4EST_CHILDREN) {
     for (i = 0; i < P4EST_CHILDREN - 1; ++i) {
@@ -126,7 +144,7 @@ print_time_info (double exec_avx, double exec_nonavx, const char *name)
           "    Non-Vectorized:    %g\n"
           "    Vect/Non-Vect Ratio:  %g\n",
           name, exec_avx, exec_nonavx,
-          exec_nonavx == 0. ? 0. : exec_avx / exec_nonavx);
+          exec_nonavx <= 0. ? 0. : exec_avx / exec_nonavx);
 }
 
 static sc3_error_t *
