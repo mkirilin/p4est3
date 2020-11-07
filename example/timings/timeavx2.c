@@ -209,6 +209,8 @@ measure_successor (sc3_array_t * v_pull2check, sc3_array_t * q_pull2check,
   return NULL;
 }
 
+#if 0
+
 static void
 report_errors (sc3_error_t ** pe)
 {
@@ -220,31 +222,119 @@ report_errors (sc3_error_t ** pe)
   }
 }
 
+#endif
+
+typedef struct timeavx2
+{
+  int           mpirank;
+  p4est3_locidx n_quads;
+
+  sc3_allocator_t *alloc;
+  sc3_array_t *qarr;
+  sc3_array_t *qarr_avx;
+  p4est3_quadrant_vtable_t sqvt, *qvt;
+  p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx;
+}
+timeavx2_t;
+
+static sc3_error_t *
+timeavx2_prepare (timeavx2_t * t, int *retval)
+{
+  void *p;
+  sc3_error_t * e;
+
+  SC3E_RETVAL (retval, -1);
+  SC3A_CHECK (t != NULL);
+  SC3A_CHECK (t->n_quads > 0);
+
+  /* static initializers */
+  t->qvt = &t->sqvt;
+  t->qvt_avx = &t->sqvt_avx;
+
+  /* the standard p4est2 virtual table always exists */
+  p4est_quadrant_vtable (t->qvt, 0);
+
+  /* the AVX virtual table can only be set with hardware support */
+  SC3F (p4est3_quadrant_zyx_vtable (t->qvt_avx), e);
+  if (sc3_error_is_kind (e, SC3_ERROR_RUNTIME, NULL)) {
+    /* AVX is not supported by hardware */
+    if (t->mpirank == 0) {
+      char buffer[SC3_BUFSIZE];
+      SC3E (sc3_error_get_text (e, -1, 1, buffer, SC3_BUFSIZE));
+      fprintf (stderr, "%s\nWill not proceed\n", buffer);
+    }
+    SC3E (sc3_error_unref (&e));
+
+    /* return value has been initialized to failure above */
+    return NULL;
+  }
+  SC3A_CHECK (e == NULL);
+
+  /* create a toplevel allocator */
+  SC3E (sc3_allocator_new (sc3_allocator_nocount (), &t->alloc));
+  SC3E (sc3_allocator_setup (t->alloc));
+
+  /* allocate quadrant arrays */
+  SC3E (p4est3_quadrant_array_new (t->alloc,
+                                   t->qvt, t->n_quads, &t->qarr));
+  SC3E (p4est3_quadrant_array_new (t->alloc,
+                                   t->qvt_avx, t->n_quads, &t->qarr_avx));
+
+  /* initialize first element */
+  SC3E (sc3_array_index (t->qarr, 0, &p));
+  SC3E (p4est3_quadrant_root (t->qvt, p));
+  SC3E (sc3_array_index (t->qarr_avx, 0, &p));
+  SC3E (p4est3_quadrant_root (t->qvt_avx, p));
+
+  /* clean and successful return */
+  *retval = 0;
+  return NULL;
+}
+
+static sc3_error_t *
+timeavx2_measure (timeavx2_t * t)
+{
+  SC3A_CHECK (t != NULL);
+  SC3A_CHECK (t->n_quads > 0);
+
+  SC3E (measure_child (t->qarr_avx, t->qarr, t->qvt_avx, t->qvt, t->n_quads));
+  SC3E (measure_parent (t->qarr_avx, t->qarr, t->qvt_avx, t->qvt, t->n_quads));
+  SC3E (measure_compare (t->qarr_avx, t->qarr, t->qvt_avx, t->qvt, t->n_quads));
+  SC3E (measure_successor (t->qarr_avx, t->qarr, t->qvt_avx, t->qvt, t->n_quads));
+  return NULL;
+}
+
+static sc3_error_t *
+timeavx2_cleanup (timeavx2_t * t)
+{
+  SC3A_CHECK (t != NULL);
+  SC3A_CHECK (t->n_quads > 0);
+
+  SC3E (sc3_array_destroy (&t->qarr_avx));
+  SC3E (sc3_array_destroy (&t->qarr));
+  SC3E (sc3_allocator_destroy (&t->alloc));
+  return NULL;
+}
+
 int
 main (int argc, char **argv)
 {
-  sc3_error_t        *e;
-  sc3_error_kind_t    kind = SC3_ERROR_KIND_LAST;
+  int                 retval;
   p4est3_locidx       n_quads;
+#if 0
   p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx = &sqvt_avx;
   p4est3_quadrant_vtable_t sqvt, *qvt = &sqvt;
+  sc3_error_t        *e;
   sc3_array_t        *qarr_avx, *qarr;
   void               *p;
+#endif
+  timeavx2_t          st, *t = &st;
 
-  e = p4est3_quadrant_zyx_vtable (qvt_avx);
-  if (e != NULL) {
-    sc3_error_t        *e_;
-    SC3E_SET (e_, sc3_error_get_kind (e, &kind));
-    report_errors (&e_);
-    if (kind == SC3_ERROR_RUNTIME) {
-      report_errors (&e);
-      return 0;
-    }
-  }
-  p4est_quadrant_vtable (qvt, 0);
+  /* MPI_Init comes first in a program.  We abort should this go wrong. */
+  SC3X (sc3_MPI_Init (&argc, &argv));
+  SC3X (sc3_MPI_Comm_rank (SC3_MPI_COMM_WORLD, &t->mpirank));
 
-  SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
-
+  /* interpret command line arguments */
   if (argc == 1) {
     n_quads = 0;
     for (int i = 0; i < 10; ++i) {
@@ -254,7 +344,12 @@ main (int argc, char **argv)
   else {
     n_quads = atoll (argv[1]);
   }
+  t->n_quads = n_quads = SC3_MAX (n_quads, 1);
 
+  /* choose virtual tables and initialize resources */
+  SC3X (timeavx2_prepare (t, &retval));
+
+#if 0
   /* TODO create a dedicated allocator for this program */
   SC3E_NULL_SET (e, p4est3_quadrant_array_new (sc3_allocator_nocount (),
                                                qvt_avx, n_quads, &qarr_avx));
@@ -266,7 +361,12 @@ main (int argc, char **argv)
 
   SC3E_NULL_SET (e, sc3_array_index (qarr, 0, &p));
   SC3E_NULL_SET (e, p4est3_quadrant_root (qvt, p));
+#endif
 
+  if (!retval) {
+    SC3X (timeavx2_measure (t));
+
+#if 0
   if (e == NULL) {
     printf ("Executing time: \n");
     SC3E_SET (e, measure_child (qarr_avx, qarr, qvt_avx, qvt, n_quads));
@@ -281,12 +381,20 @@ main (int argc, char **argv)
     SC3E_SET (e, measure_successor (qarr_avx, qarr, qvt_avx, qvt, n_quads));
     report_errors (&e);
   }
+#endif
 
+    SC3X (timeavx2_cleanup (t));
+  }
+
+#if 0
   SC3E_NULL_SET (e, sc3_array_destroy (&qarr_avx));
   SC3E_NULL_SET (e, sc3_array_destroy (&qarr));
 
-  SC3E_NULL_REQ (e, !sc_finalize_noabort ());
-  SC3E_NULL_SET (e, sc3_MPI_Finalize ());
+  /* A program is not guaranteed to exist beyond MPI_Finalize. */
   report_errors (&e);
+#endif
+
+  /* MPI_Finalize comes last in a program.  We abort should this go wrong. */
+  SC3X (sc3_MPI_Finalize ());
   return 0;
 }
