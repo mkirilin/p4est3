@@ -30,7 +30,7 @@
 #endif
 
 static sc3_error_t *
-test_child (sc3_array_t * pull, p4est3_quadrant_vtable * qvt,
+test_child (sc3_array_t * pull, p4est3_quadrant_vtable_t * qvt,
             p4est3_locidx n_quads, double *exec_time)
 {
   p4est3_locidx       quad, put_ind;
@@ -64,7 +64,7 @@ test_child (sc3_array_t * pull, p4est3_quadrant_vtable * qvt,
 }
 
 static sc3_error_t *
-test_parent (void *q, sc3_array_t * pull, p4est3_quadrant_vtable * qvt,
+test_parent (void *q, sc3_array_t * pull, p4est3_quadrant_vtable_t * qvt,
              p4est3_locidx n_quads, double *exec_time)
 {
   p4est3_locidx       quad;
