@@ -256,7 +256,7 @@ timeavx2_prepare (timeavx2_t * t, int *retval)
 
   /* the AVX virtual table can only be set with hardware support */
   SC3F (p4est3_quadrant_zyx_vtable (t->qvt_avx), e);
-  if (sc3_error_is_kind (e, SC3_ERROR_RUNTIME, NULL)) {
+  if (sc3_error_is2_kind (e, SC3_ERROR_RUNTIME, NULL)) {
     /* AVX is not supported by hardware */
     if (t->mpirank == 0) {
       char buffer[SC3_BUFSIZE];

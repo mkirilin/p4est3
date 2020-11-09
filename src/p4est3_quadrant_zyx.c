@@ -140,7 +140,7 @@ p4est3_quadrant_zyx_child (const __m128i * q, int child_id, __m128i * r)
 #ifndef P4_TO_P8
   *r = _mm_insert_epi32 (*r, 0, 1);
 #endif
-  P3A_IS2 (p4est3_quadrant_zyx_is_parent, q, r);
+  SC3A_IS2 (p4est3_quadrant_zyx_is_parent, q, r);
   return NULL;
 }
 
@@ -163,7 +163,7 @@ p4est3_quadrant_zyx_parent (const __m128i * q, __m128i * r)
 /* *INDENT-ON* */
 
   SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
-  P3A_IS2 (p4est3_quadrant_zyx_is_parent, r, q);
+  SC3A_IS2 (p4est3_quadrant_zyx_is_parent, r, q);
   return NULL;
 }
 
@@ -558,7 +558,7 @@ p4est3_quadrant_zyx_morton (int level, p4est3_gloidx id, __m128i * quadrant)
 static sc3_error_t *
 p4est3_quadrant_zyx_root (__m128i * r)
 {
-  P3E (p4est3_quadrant_zyx_morton (0, 0, r));
+  SC3E (p4est3_quadrant_zyx_morton (0, 0, r));
   return NULL;
 }
 
