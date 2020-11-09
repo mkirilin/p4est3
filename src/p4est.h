@@ -29,9 +29,17 @@
  * \ingroup p4est
  */
 
-/** \defgroup p4est p4est
+/** \defgroup p4est p4est version up to 2
  *
- * The 2D version of the p4est library.
+ * The 2D version of the p4est library: standard interface and code.
+ * Development began in November 2007 and the code has been in production
+ * for a rough decade.  We will continue to maintain this code in the future.
+ *
+ * The branches master and develop preserve the conventions of about 2015.
+ * The branch prev3-develop has been stripped of unnecessary dependencies
+ * and is the version recommended to specify when developing applicatons,
+ * both evolving existing ones and starting new ones.
+ * prev3-develop is expected to be the most portable.
  */
 
 #ifndef P4EST_H
