@@ -21,6 +21,13 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+/** \file p4est3.h
+ *
+ * Main interface file to construct and interact with a version 3 forest.
+ *
+ * \ingroup p4est3
+ */
+
 #ifndef P4EST3_H
 #define P4EST3_H
 
@@ -53,14 +60,28 @@ sc3_error_t        *p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3);
  *                          If it is dupd, we also set it to return errors.
  * \param [in] dup          If true, the input communicator is dupd
  *                          and set to return errors.
+ * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_set_comm (p4est3_t * p3,
                                      sc3_MPI_Comm_t comm, int dup);
+
+/** Provide a connectivity to be used in creating the forest.
+ * This function is mandatory to call at least once before \ref p4est3_setup.
+ * \param [in,out] p3       Forest object under construction.
+ * \param [in] conn         Valid connectivity structure.
+ * \return                  NULL on success, error object otherwise.
+ */
 sc3_error_t        *p4est3_set_connectivity (p4est3_t * p3,
                                              p4est3_connectivity_t * conn);
 sc3_error_t        *p4est3_set_vtable (p4est3_t * p3,
                                        p4est3_quadrant_vtable_t * qvt);
 sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
+
+/** Finalize construction of a forest.
+ * Afterwards, no more \c p4est3_set_* functions may be called.
+ * \param [in,out] p3      Forest under construction will be finalized.
+ * \return                 NULL on success, error object otherwise.
+ */
 sc3_error_t        *p4est3_setup (p4est3_t * p3);
 
 sc3_error_t        *p4est3_ref (p4est3_t * p3);
