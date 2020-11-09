@@ -97,7 +97,7 @@ echo "| TESTS:       $P4EST_MPIRUN $P4EST_MPI_TEST_FLAGS"
 echo "o----------------------------------"
 
 # Create output files.
-AC_CONFIG_FILES([Makefile Makefile.p4est.pre Doxyfile])
+AC_CONFIG_FILES([Makefile Makefile.p4est.pre doc/Doxyfile])
 AC_OUTPUT
 
 # Final messages.
