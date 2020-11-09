@@ -124,7 +124,7 @@ p4est3_set_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
   SC3A_IS (p4est3_connectivity_is_setup, conn);
 
   if (p3->conn != NULL) {
-    SC3E (p4est3_connectivity_unref (&p3->conn));
+    SC3E (p4est3_connectivity_unref (p3->conn));
   }
   p3->conn = conn;
   SC3E (p4est3_connectivity_ref (p3->conn));
@@ -277,7 +277,7 @@ p4est3_unref (p4est3_t ** pp3)
 
     /* release data that has been referenced before setup */
     if (p3->conn != NULL) {
-      SC3E (p4est3_connectivity_unref (&p3->conn));
+      SC3E (p4est3_connectivity_unref (p3->conn));
     }
     if (p3->commdup) {
       SC3E (sc3_MPI_Comm_free (&p3->mpicomm));

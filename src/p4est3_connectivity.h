@@ -32,11 +32,6 @@
  *
  * To create a forest, one connectivity structure is required.
  *
- * File looks ok in general.  Issues remaining:
- *   - Doxygenate everything!
- *   - Treat all sc3 leak errors as fatal.
- *   - ref and unref merely count.  Deallocation happens in destroy.
- *
  * \ingroup p4est3
  */
 
@@ -148,16 +143,32 @@ sc3_error_t        *p4est3_connectivity_set_num_trees
 
 /** Finalize a connectivity under construction for use with a forest.
  * \param [in,out] c        Connectivity must be valid but not yet setup.
+ *                          It is returned with a reference count of one.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_setup (p4est3_connectivity_t * c);
 
+/** Increase reference counter of a connectivity after setup.
+ * \param [in,out] c        Must be setup.  Increase its reference counter.
+ * \return                  NULL on success, error object otherwise.
+ */
 sc3_error_t        *p4est3_connectivity_ref (p4est3_connectivity_t * c);
-sc3_error_t        *p4est3_connectivity_unref (p4est3_connectivity_t ** c);
+
+/** Decrease reference counter of a connectivity after setup.
+ * The lowest legal value for the reference counter is one, as after setup.
+ * This function never destroys the object: it is not legal to unref below one.
+ * The only way to deallocate a connectivity is \ref p4est3_connectivity_destroy.
+ * \param [in,out] c        Must be setup and have reference counter greater one.
+ *                          Decrease its reference counter.
+ *                          When the count reaches one, nothing happens.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_unref (p4est3_connectivity_t * c);
 
 /** Destroy a connectivity that must be valid, but may or may not be setup.
- * It is required that all additional references have been dropped beforehand.
- * \param [in,out] c    Valid connectivity on input.  NULL on output.
+ * It must have a reference count of exactly one.  Otherwise we return an error.
+ * Thus, all additional references must have been dropped before calling.
+ * \param [in,out] c    Valid connectivity with one reference.  NULL on output.
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_destroy (p4est3_connectivity_t ** c);

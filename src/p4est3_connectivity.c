@@ -137,42 +137,41 @@ p4est3_connectivity_ref (p4est3_connectivity_t * c)
 }
 
 sc3_error_t        *
-p4est3_connectivity_unref (p4est3_connectivity_t ** pc)
+p4est3_connectivity_unref (p4est3_connectivity_t * c)
 {
   int                 waslast;
-  sc3_allocator_t    *alloc;
-  p4est3_connectivity_t *c;
 
-  SC3E_INOUTP (pc, c);
-  SC3A_IS (p4est3_connectivity_is_valid, c);
-
+  SC3A_IS (p4est3_connectivity_is_setup, c);
   SC3E (sc3_refcount_unref (&c->rc, &waslast));
-  if (waslast) {
-    *pc = NULL;
 
-    /* destruction callback if one was provided */
-    if (c->cvt != NULL && c->cvt->destroy != NULL) {
-      SC3E (c->cvt->destroy (c->slf));
-    }
-
-    /* remove allocation */
-    alloc = c->alloc;
-    SC3E (sc3_allocator_free (alloc, c));
-    SC3E (sc3_allocator_unref (&alloc));
-  }
+  /* This is a hard check that we do not unref below a count of one. */
+  SC3E_DEMAND (!waslast, "Connectivity unrefd below a count of one");
   return NULL;
 }
 
 sc3_error_t        *
 p4est3_connectivity_destroy (p4est3_connectivity_t ** pc)
 {
+  sc3_allocator_t    *alloc;
   p4est3_connectivity_t *c;
 
   SC3E_INULLP (pc, c);
-  SC3E_DEMIS (sc3_refcount_is_last, &c->rc);
-  SC3E (p4est3_connectivity_unref (&c));
+  SC3A_IS (p4est3_connectivity_is_valid, c);
 
-  SC3A_CHECK (c == NULL);
+  /* This is a hard check for a reference count of exactly one. */
+  SC3E_DEMIS (sc3_refcount_is_last, &c->rc);
+
+  /* destruction callback if one was provided */
+  if (c->cvt != NULL && c->cvt->destroy != NULL) {
+    SC3E (c->cvt->destroy (c->slf));
+  }
+
+  /* remove allocation */
+  alloc = c->alloc;
+  SC3E (sc3_allocator_free (alloc, c));
+  SC3E (sc3_allocator_unref (&alloc));
+
+  /* nothing is left */
   return NULL;
 }
 

@@ -45,6 +45,16 @@
  * the original version 2 object may be used by version 2 code as before.
  *
  * The interface of version 3 is shared between 2D and 3D.
+ *
+ * The reference counting mechanism of p4est is different from libsc.
+ * We use \c p4est3_<object>_ref and \c p4est3_<object>_unref purely to
+ * count up and down, respectively.  It is forbidden to count below one.
+ * Destruction of an object is exclusively performed with \c
+ * p4est3_<object>_destroy.  This, in turn, is only legal if the object's
+ * reference count is one.  The intention is that the user is responsible to
+ * know where in the program the last instance of an object lives.
+ * We see reference counting as an additional safety feature, not to provide
+ * additional flexibility by magical auto-destruction.
  */
 
 #ifndef P4EST3_BASE_H
