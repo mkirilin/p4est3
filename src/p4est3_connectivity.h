@@ -31,6 +31,9 @@
  * The forest is composed of all roots and their connections.
  *
  * To create a forest, one connectivity structure is required.
+ * We provide the convenience constructors \ref
+ * p4est3_connectivity_new_unitsquare (2D) and \ref
+ * p4est3_connectivity_new_unitcube (3D).
  *
  * \ingroup p4est3
  */
@@ -181,7 +184,16 @@ sc3_error_t        *p4est3_connectivity_destroy (p4est3_connectivity_t ** c);
 sc3_error_t        *p4est3_connectivity_get_num_trees
   (const p4est3_connectivity_t * c, p4est3_topidx * pnum_trees);
 
-/** Create a connectivity readily setup to represent the unit cube.
+/** Create a connectivity readily setup to represent the 2D unit square.
+ * \param [in,out] alloc   Allocator must be setup.  It is referenced
+ *                         and kept around while connectivity is live.
+ * \param [out] pc         Connectivity is setup on output.
+ * \return                 NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_new_unitsquare
+  (sc3_allocator_t * alloc, p4est3_connectivity_t ** pc);
+
+/** Create a connectivity readily setup to represent the 3D unit cube.
  * \param [in,out] alloc   Allocator must be setup.  It is referenced
  *                         and kept around while connectivity is live.
  * \param [out] pc         Connectivity is setup on output.

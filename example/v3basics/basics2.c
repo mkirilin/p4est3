@@ -123,8 +123,12 @@ test_p4est_new (sc3_allocator_t * alloc,
       SC3E (basics_connectivity_new_virtual (alloc, 1, &conn));
       break;
     case 2:
-      /* at this stage this object is still dimension-independent */
+      /* use convenience constructors */
+#ifndef P4_TO_P8
+      SC3E (p4est3_connectivity_new_unitsquare (alloc, &conn));
+#else
       SC3E (p4est3_connectivity_new_unitcube (alloc, &conn));
+#endif
       break;
     case 3:
       /* wrapping a p4est connectivity */

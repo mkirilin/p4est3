@@ -193,6 +193,21 @@ p4est3_connectivity_get_num_trees (const p4est3_connectivity_t * c,
 }
 
 sc3_error_t        *
+p4est3_connectivity_new_unitsquare (sc3_allocator_t * alloc,
+                                    p4est3_connectivity_t ** pc)
+{
+  p4est3_connectivity_t *c;
+
+  SC3E_RETVAL (pc, NULL);
+  SC3E (p4est3_connectivity_new (alloc, &c));
+  SC3E (p4est3_connectivity_setup (c));
+  SC3A_IS (p4est3_connectivity_is_setup, c);
+
+  *pc = c;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_connectivity_new_unitcube (sc3_allocator_t * alloc,
                                   p4est3_connectivity_t ** pc)
 {
