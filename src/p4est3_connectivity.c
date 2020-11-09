@@ -38,6 +38,14 @@ struct p4est3_connectivity
   p4est3_topidx       num_trees;
 };
 
+int                 p4est3_connectivity_vtable_is_valid
+  (const p4est3_connectivity_vtable_t * cvt, char *reason)
+{
+  SC3E_TEST (cvt != NULL, reason);
+  SC3E_TEST (cvt->get_num_trees != NULL, reason);
+  SC3E_YES (reason);
+}
+
 int
 p4est3_connectivity_is_valid (const p4est3_connectivity_t * c, char *reason)
 {
@@ -45,7 +53,7 @@ p4est3_connectivity_is_valid (const p4est3_connectivity_t * c, char *reason)
   SC3E_IS (sc3_refcount_is_valid, &c->rc, reason);
   SC3E_IS (sc3_allocator_is_setup, c->alloc, reason);
   if (c->cvt != NULL) {
-    /* is there anything we should check? */
+    SC3E_IS (p4est3_connectivity_vtable_is_valid, c->cvt, reason);
   }
   else {
     SC3E_TEST (c->num_trees > 0, reason);
@@ -93,7 +101,7 @@ p4est3_connectivity_set_vtable (p4est3_connectivity_t * c,
                                 p4est3_connectivity_vtable_t * cvt, void *slf)
 {
   SC3A_IS (p4est3_connectivity_is_new, c);
-  SC3A_CHECK (cvt != NULL);
+  SC3A_IS (p4est3_connectivity_vtable_is_valid, cvt);
 
   /* make deep copy of virtual table */
   *(c->cvt = &c->scvt) = *cvt;
