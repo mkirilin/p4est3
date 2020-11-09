@@ -226,12 +226,12 @@ report_errors (sc3_error_t ** pe)
 
 typedef struct timeavx2
 {
-  int           mpirank;
-  p4est3_locidx n_quads;
+  int                 mpirank;
+  p4est3_locidx       n_quads;
 
-  sc3_allocator_t *alloc;
-  sc3_array_t *qarr;
-  sc3_array_t *qarr_avx;
+  sc3_allocator_t    *alloc;
+  sc3_array_t        *qarr;
+  sc3_array_t        *qarr_avx;
   p4est3_quadrant_vtable_t sqvt, *qvt;
   p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx;
 }
@@ -240,8 +240,8 @@ timeavx2_t;
 static sc3_error_t *
 timeavx2_prepare (timeavx2_t * t, int *retval)
 {
-  void *p;
-  sc3_error_t * e;
+  void               *p;
+  sc3_error_t        *e;
 
   SC3E_RETVAL (retval, -1);
   SC3A_CHECK (t != NULL);
@@ -259,7 +259,7 @@ timeavx2_prepare (timeavx2_t * t, int *retval)
   if (sc3_error_is2_kind (e, SC3_ERROR_RUNTIME, NULL)) {
     /* AVX is not supported by hardware */
     if (t->mpirank == 0) {
-      char buffer[SC3_BUFSIZE];
+      char                buffer[SC3_BUFSIZE];
       SC3E (sc3_error_get_text (e, -1, 1, buffer, SC3_BUFSIZE));
       fprintf (stderr, "%s\nWill not proceed\n", buffer);
     }
@@ -275,8 +275,7 @@ timeavx2_prepare (timeavx2_t * t, int *retval)
   SC3E (sc3_allocator_setup (t->alloc));
 
   /* allocate quadrant arrays */
-  SC3E (p4est3_quadrant_array_new (t->alloc,
-                                   t->qvt, t->n_quads, &t->qarr));
+  SC3E (p4est3_quadrant_array_new (t->alloc, t->qvt, t->n_quads, &t->qarr));
   SC3E (p4est3_quadrant_array_new (t->alloc,
                                    t->qvt_avx, t->n_quads, &t->qarr_avx));
 
@@ -298,9 +297,12 @@ timeavx2_measure (timeavx2_t * t)
   SC3A_CHECK (t->n_quads > 0);
 
   SC3E (measure_child (t->qarr_avx, t->qarr, t->qvt_avx, t->qvt, t->n_quads));
-  SC3E (measure_parent (t->qarr_avx, t->qarr, t->qvt_avx, t->qvt, t->n_quads));
-  SC3E (measure_compare (t->qarr_avx, t->qarr, t->qvt_avx, t->qvt, t->n_quads));
-  SC3E (measure_successor (t->qarr_avx, t->qarr, t->qvt_avx, t->qvt, t->n_quads));
+  SC3E (measure_parent
+        (t->qarr_avx, t->qarr, t->qvt_avx, t->qvt, t->n_quads));
+  SC3E (measure_compare
+        (t->qarr_avx, t->qarr, t->qvt_avx, t->qvt, t->n_quads));
+  SC3E (measure_successor
+        (t->qarr_avx, t->qarr, t->qvt_avx, t->qvt, t->n_quads));
   return NULL;
 }
 
@@ -367,20 +369,20 @@ main (int argc, char **argv)
     SC3X (timeavx2_measure (t));
 
 #if 0
-  if (e == NULL) {
-    printf ("Executing time: \n");
-    SC3E_SET (e, measure_child (qarr_avx, qarr, qvt_avx, qvt, n_quads));
-    report_errors (&e);
+    if (e == NULL) {
+      printf ("Executing time: \n");
+      SC3E_SET (e, measure_child (qarr_avx, qarr, qvt_avx, qvt, n_quads));
+      report_errors (&e);
 
-    SC3E_SET (e, measure_parent (qarr_avx, qarr, qvt_avx, qvt, n_quads));
-    report_errors (&e);
+      SC3E_SET (e, measure_parent (qarr_avx, qarr, qvt_avx, qvt, n_quads));
+      report_errors (&e);
 
-    SC3E_SET (e, measure_compare (qarr_avx, qarr, qvt_avx, qvt, n_quads));
-    report_errors (&e);
+      SC3E_SET (e, measure_compare (qarr_avx, qarr, qvt_avx, qvt, n_quads));
+      report_errors (&e);
 
-    SC3E_SET (e, measure_successor (qarr_avx, qarr, qvt_avx, qvt, n_quads));
-    report_errors (&e);
-  }
+      SC3E_SET (e, measure_successor (qarr_avx, qarr, qvt_avx, qvt, n_quads));
+      report_errors (&e);
+    }
 #endif
 
     SC3X (timeavx2_cleanup (t));
