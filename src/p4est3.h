@@ -73,8 +73,8 @@ sc3_error_t        *p4est3_set_comm (p4est3_t * p3,
  */
 sc3_error_t        *p4est3_set_connectivity (p4est3_t * p3,
                                              p4est3_connectivity_t * conn);
-sc3_error_t        *p4est3_set_vtable (p4est3_t * p3,
-                                       p4est3_quadrant_vtable_t * qvt);
+sc3_error_t        *p4est3_set_quadrant_vtable (p4est3_t * p3,
+                                                p4est3_quadrant_vtable_t * qvt);
 sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
 
 /** Finalize construction of a forest.

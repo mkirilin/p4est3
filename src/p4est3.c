@@ -135,7 +135,7 @@ p4est3_set_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
 }
 
 sc3_error_t        *
-p4est3_set_vtable (p4est3_t * p3, p4est3_quadrant_vtable_t * qvt)
+p4est3_set_quadrant_vtable (p4est3_t * p3, p4est3_quadrant_vtable_t * qvt)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (qvt != NULL);

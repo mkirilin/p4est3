@@ -21,10 +21,14 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+/* TODO: we do not need this file since p4est3.h is dimension independent.
+ *       Still, in the future we may use dimension-specific algorithms
+ *       for which this file may renamed as the beginning. */
+
 #ifndef P8EST3_H
 #define P8EST3_H
 
-#if 0 /* 3D not ready yet */
+#if 0                           /* 3D not ready yet */
 
 #include <sc.h>
 #include <p4est3_base.h>
@@ -41,8 +45,6 @@ extern              "C"
 /** In the 3D implementation, this is the number of a quadrant's children. */
 #define P8EST3_CHILDREN 8
 
-#endif /* 0 */
-
 #ifdef __cplusplus
 #if 0
 {
@@ -50,3 +52,6 @@ extern              "C"
 }
 #endif
 
+#endif /* 0 */
+
+#endif /* P8EST3_H */

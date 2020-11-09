@@ -110,7 +110,7 @@ test_p4est_new (sc3_allocator_t * alloc,
       break;
     case 1:
       /* virtual connectivity with one tree */
-      SC3E (basics_connectivity_new_virtual (alloc, 1, &conn));
+      SC3E (basics_connectivity_new_virtual (alloc, num_trees, &conn));
       break;
     case 2:
       /* use convenience constructors */
@@ -137,7 +137,7 @@ test_p4est_new (sc3_allocator_t * alloc,
     SC3E (p4est3_new (alloc, &p3));
     SC3E (p4est3_set_comm (p3, mpicomm, 1));
     SC3E (p4est3_set_connectivity (p3, conn));
-    SC3E (p4est3_set_vtable (p3, qvt));
+    SC3E (p4est3_set_quadrant_vtable (p3, qvt));
     SC3E (p4est3_set_level (p3, level));
     SC3E (p4est3_setup (p3));
 
