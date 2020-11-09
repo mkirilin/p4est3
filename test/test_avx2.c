@@ -23,10 +23,10 @@
 
 #ifndef P4_TO_P8
 #include <p4est3_quadrant_zyx.h>
-#include <p4est_p4est3.h>
+#include <p4est3_p4est.h>
 #else
 #include <p8est3_quadrant_zyx.h>
-#include <p8est_p4est3.h>
+#include <p4est3_p8est.h>
 #endif
 
 #define N_QUADS_2_TEST 6000000
@@ -243,7 +243,7 @@ main (int argc, char **argv)
       return 0;
     }
   }
-  p4est_quadrant_vtable (qvt, 0);
+  p4est3_quadrant_vtable_p4est (qvt, 0);
 
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
 

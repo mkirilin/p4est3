@@ -23,10 +23,10 @@
 
 #ifndef P4_TO_P8
 #include <p4est_bits.h>
-#include <p4est_p4est3.h>
+#include <p4est3_p4est.h>
 #else
 #include <p8est_bits.h>
-#include <p8est_p4est3.h>
+#include <p4est3_p8est.h>
 #endif
 
 static sc3_error_t *
@@ -219,7 +219,7 @@ p4est_quadrant_vtable_morton (int level, p4est_gloidx_t id, void *r)
 }
 
 void
-p4est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt, int id)
+p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
 {
   if (qvt == NULL) {
     return;

@@ -23,10 +23,10 @@
 
 #ifndef P4_TO_P8
 #include <p4est3_quadrant_zyx.h>
-#include <p4est_p4est3.h>
+#include <p4est3_p4est.h>
 #else
 #include <p8est3_quadrant_zyx.h>
-#include <p8est_p4est3.h>
+#include <p4est3_p8est.h>
 #endif
 
 static sc3_error_t *
@@ -252,7 +252,7 @@ timeavx2_prepare (timeavx2_t * t, int *retval)
   t->qvt_avx = &t->sqvt_avx;
 
   /* the standard p4est2 virtual table always exists */
-  p4est_quadrant_vtable (t->qvt, 0);
+  p4est3_quadrant_vtable_p4est (t->qvt, 0);
 
   /* the AVX virtual table can only be set with hardware support */
   SC3F (p4est3_quadrant_zyx_vtable (t->qvt_avx), e);

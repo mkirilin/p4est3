@@ -22,9 +22,9 @@
 */
 
 #ifndef P4_TO_P8
-#include <p4est_p4est3.h>
+#include <p4est3_p4est.h>
 #else
-#include <p8est_p4est3.h>
+#include <p4est3_p8est.h>
 #endif
 
 static sc3_error_t *
@@ -128,7 +128,7 @@ v3basics_prepare (v3basics_t * t)
   p4est_init (NULL, SC_LP_DEFAULT);
 
   /* legacy wrapping for p4est quadrants */
-  p4est_quadrant_vtable (t->qvt_legacy, 0);
+  p4est3_quadrant_vtable_p4est (t->qvt_legacy, 0);
 
   /* perspectively make one allocator for each thread */
   SC3E (make_allocator (sc3_allocator_nothread (), &t->alloc));

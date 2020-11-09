@@ -29,7 +29,10 @@
 #endif
 #define P4_TO_P8
 
-/* functions in p4est_bits_zyx */
+/* functions in p4est3_p4est */
+#define p4est3_quadrant_vtable_p4est        p4est3_quadrant_vtable_p8est
+
+/* functions in p4est3_quadrant_zyx */
 #define p4est3_quadrant_zyx_vtable          p8est3_quadrant_zyx_vtable
 
 #endif /* !P4EST3_TO_P8EST3_H */
