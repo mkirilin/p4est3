@@ -33,9 +33,7 @@
  * To create a forest, one connectivity structure is required.
  *
  * File looks ok in general.  Issues remaining:
- *   - Doxygenate everything
- *   - Write test/test3_connectivity.c
- *   - Move connectivity_new_num_trees and implementation to the test
+ *   - Doxygenate everything!
  *   - Treat all sc3 leak errors as fatal.
  *   - ref and unref merely count.  Deallocation happens in destroy.
  *
@@ -171,11 +169,6 @@ sc3_error_t        *p4est3_connectivity_destroy (p4est3_connectivity_t ** c);
  */
 sc3_error_t        *p4est3_connectivity_get_num_trees
   (const p4est3_connectivity_t * c, p4est3_topidx * pnum_trees);
-
-/* TODO remove me */
-sc3_error_t        *p4est3_connectivity_new_num_trees
-  (sc3_allocator_t * alloc, p4est3_topidx num_trees,
-   p4est3_connectivity_t ** pc);
 
 /** Create a connectivity readily setup to represent the unit cube.
  * \param [in,out] alloc   Allocator must be setup.  It is referenced

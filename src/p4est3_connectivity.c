@@ -193,68 +193,6 @@ p4est3_connectivity_get_num_trees (const p4est3_connectivity_t * c,
   return NULL;
 }
 
-/* TODO this is demo/convenience code; move away */
-
-typedef struct p4est3_connectivity_ntslf
-{
-  sc3_allocator_t    *alloc;
-  p4est3_topidx       num_trees;
-
-  /* no need really to allocate this here since it is deep copied */
-  p4est3_connectivity_vtable_t scvt;
-}
-p4est3_connectivity_ntslf_t;
-
-static sc3_error_t *
-p4est3_connectivity_gnt (void *vslf, p4est3_topidx * pnt)
-{
-  p4est3_connectivity_ntslf_t *slf = (p4est3_connectivity_ntslf_t *) vslf;
-  SC3A_CHECK (slf != NULL);
-  SC3A_CHECK (pnt != NULL);
-
-  *pnt = slf->num_trees;
-  return NULL;
-}
-
-static sc3_error_t *
-p4est3_connectivity_dstr (void *vslf)
-{
-  p4est3_connectivity_ntslf_t *slf = (p4est3_connectivity_ntslf_t *) vslf;
-  SC3A_CHECK (slf != NULL);
-
-  SC3E (sc3_allocator_free (slf->alloc, slf));
-  return NULL;
-}
-
-sc3_error_t        *
-p4est3_connectivity_new_num_trees (sc3_allocator_t * alloc,
-                                   p4est3_topidx num_trees,
-                                   p4est3_connectivity_t ** pc)
-{
-  p4est3_connectivity_ntslf_t *slf;
-  p4est3_connectivity_t *c;
-
-  SC3E_RETVAL (pc, NULL);
-  SC3A_CHECK (num_trees > 0);
-
-  /* create virtual structure */
-  SC3E (sc3_allocator_calloc_one
-        (alloc, sizeof (p4est3_connectivity_ntslf_t), &slf));
-  slf->alloc = alloc;
-  slf->num_trees = num_trees;
-  slf->scvt.get_num_trees = p4est3_connectivity_gnt;
-  slf->scvt.destroy = p4est3_connectivity_dstr;
-
-  /* create connectivity */
-  SC3E (p4est3_connectivity_new (alloc, &c));
-  SC3E (p4est3_connectivity_set_vtable (c, &slf->scvt, slf));
-  SC3E (p4est3_connectivity_setup (c));
-  SC3A_IS (p4est3_connectivity_is_setup, c);
-
-  *pc = c;
-  return NULL;
-}
-
 sc3_error_t        *
 p4est3_connectivity_new_unitcube (sc3_allocator_t * alloc,
                                   p4est3_connectivity_t ** pc)
