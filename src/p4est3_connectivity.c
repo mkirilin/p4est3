@@ -35,6 +35,7 @@ struct p4est3_connectivity
   void               *slf;
 
   /* parameters fixed after setup call */
+  int                 dim;
   p4est3_topidx       num_trees;
 };
 
@@ -42,7 +43,8 @@ int                 p4est3_connectivity_vtable_is_valid
   (const p4est3_connectivity_vtable_t * cvt, char *reason)
 {
   SC3E_TEST (cvt != NULL, reason);
-  SC3E_TEST (cvt->get_num_trees != NULL, reason);
+  SC3E_TEST (0 < cvt->dim && cvt->dim <= 3, reason);
+  SC3E_TEST (cvt->num_trees > 0, reason);
   SC3E_YES (reason);
 }
 
@@ -56,6 +58,7 @@ p4est3_connectivity_is_valid (const p4est3_connectivity_t * c, char *reason)
     SC3E_IS (p4est3_connectivity_vtable_is_valid, c->cvt, reason);
   }
   else {
+    SC3E_TEST (0 < c->dim && c->dim <= 3, reason);
     SC3E_TEST (c->num_trees > 0, reason);
   }
   SC3E_YES (reason);
@@ -89,6 +92,7 @@ p4est3_connectivity_new (sc3_allocator_t * alloc, p4est3_connectivity_t ** pc)
   SC3E (sc3_allocator_calloc_one (alloc, sizeof (p4est3_connectivity_t), &c));
   SC3E (sc3_refcount_init (&c->rc));
   c->alloc = alloc;
+  c->dim = 2;
   c->num_trees = 1;
   SC3A_IS (p4est3_connectivity_is_new, c);
 
@@ -106,6 +110,15 @@ p4est3_connectivity_set_vtable (p4est3_connectivity_t * c,
   /* make deep copy of virtual table */
   *(c->cvt = &c->scvt) = *cvt;
   c->slf = slf;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_connectivity_set_dim (p4est3_connectivity_t * c, int dim)
+{
+  SC3A_IS (p4est3_connectivity_is_new, c);
+  SC3A_CHECK (0 < dim && dim <= 3);
+  c->dim = dim;
   return NULL;
 }
 
@@ -176,6 +189,21 @@ p4est3_connectivity_destroy (p4est3_connectivity_t ** pc)
 }
 
 sc3_error_t        *
+p4est3_connectivity_get_dim (const p4est3_connectivity_t * c, int *pdim)
+{
+  SC3A_IS (p4est3_connectivity_is_setup, c);
+  SC3A_CHECK (pdim != NULL);
+
+  if (c->cvt != NULL) {
+    *pdim = c->cvt->dim;
+  }
+  else {
+    *pdim = c->dim;
+  }
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_connectivity_get_num_trees (const p4est3_connectivity_t * c,
                                    p4est3_topidx * pnum_trees)
 {
@@ -183,8 +211,7 @@ p4est3_connectivity_get_num_trees (const p4est3_connectivity_t * c,
   SC3A_CHECK (pnum_trees != NULL);
 
   if (c->cvt != NULL) {
-    SC3A_CHECK (c->cvt->get_num_trees != NULL);
-    SC3E (c->cvt->get_num_trees (c->slf, pnum_trees));
+    *pnum_trees = c->cvt->num_trees;
   }
   else {
     *pnum_trees = c->num_trees;

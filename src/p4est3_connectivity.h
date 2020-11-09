@@ -51,28 +51,24 @@ extern              "C"
 #endif
 #endif
 
-#if 0
-typedef int         (*p4est3_connectivity_is_t) (void *slf, char *reason);
-#endif
-
 /** General virtual function taking one in-out argument. */
 typedef sc3_error_t *(*p4est3_connectivity_inout_t) (void *slf);
-
-/** Virtual function with one \ref p4est3_topidx output argument. */
-typedef sc3_error_t *(*p4est3_connectivity_get_topidx_t)
-                    (void *slf, p4est3_topidx * ptopidx);
 
 /** One way to create a connectivity is to provide a virtual table with state.
  * The members of this table must be set before passing it to \ref
  * p4est3_connectivity_set_vtable, where we make a deep copy.
+ *
+ * Whenever a non-NULL virtual table is set in a connectivity at the time of
+ * \ref p4est3_connectivity_setup, it will override all other settings.
+ *
  * This method is suited to wrap any third-party object into p4est.
  */
 typedef struct p4est3_connectivity_vtable
 {
-  /** Necessary function to return a positive number of trees. */
-  p4est3_connectivity_get_topidx_t get_num_trees;
+  int                 dim;      /**< Space dimension is 1, 2 or 3. */
+  p4est3_topidx       num_trees;    /**< Number of trees is positive. */
 
-  /** This function may be NULL, e.g. when no state requires destruction */
+  /** This function may be NULL, e.g.\ when no state requires destruction */
   p4est3_connectivity_inout_t destroy;
 }
 p4est3_connectivity_vtable_t;
@@ -99,6 +95,7 @@ int                 p4est3_connectivity_is_valid (const p4est3_connectivity_t
                                                   * c, char *reason);
 
 /** Check whether a connectivity is valid and not setup yet.
+ * The connectivity defaults to dimension 2 and one tree.
  * \param [in] c        Any pointer.  NULL is considered not new.
  * \param [out] reason  May be NULL.  Otherwise, will be filled with the
  *                      empty string on validity or the issue found otherwise.
@@ -135,6 +132,14 @@ sc3_error_t        *p4est3_connectivity_new (sc3_allocator_t * alloc,
  */
 sc3_error_t        *p4est3_connectivity_set_vtable
   (p4est3_connectivity_t * c, p4est3_connectivity_vtable_t * cvt, void *slf);
+
+/** Set the spatial dimension of this connectivity.
+ * \param [in,out] c        Connectivity under construction.
+ * \param [in] dim          Dimension from 1 to 3.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_set_dim
+  (p4est3_connectivity_t * c, int dim);
 
 /** Set the number of trees that constitute this connectivity.
  * \param [in,out] c        Connectivity under construction.
@@ -175,6 +180,14 @@ sc3_error_t        *p4est3_connectivity_unref (p4est3_connectivity_t * c);
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_destroy (p4est3_connectivity_t ** c);
+
+/** Query spatial dimension of a connectivity.
+ * \param [in] c            Connectivity must be setup.
+ * \param [out] pdim        Not NULL.  Dimension is placed here.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_get_dim
+  (const p4est3_connectivity_t * c, int *pdim);
 
 /** Query number of trees in a connectivity.
  * \param [in] c            Connectivity must be setup.

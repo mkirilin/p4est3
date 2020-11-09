@@ -30,18 +30,6 @@
 #endif
 
 static sc3_error_t *
-p4est3_connectivity_p4est_get_num_trees (void *vslf,
-                                         p4est3_topidx * pnum_trees)
-{
-  p4est_connectivity_t *c4 = (p4est_connectivity_t *) vslf;
-
-  SC3A_CHECK (c4 != NULL);
-  SC3A_CHECK (pnum_trees != NULL);
-  *pnum_trees = c4->num_trees;
-  return NULL;
-}
-
-static sc3_error_t *
 p4est3_connectivity_p4est_destroy (void *vslf)
 {
   p4est_connectivity_t *c4 = (p4est_connectivity_t *) vslf;
@@ -66,7 +54,8 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
 
   /* create virtual structure */
   memset (cvt, 0, sizeof (*cvt));
-  cvt->get_num_trees = p4est3_connectivity_p4est_get_num_trees;
+  cvt->dim = P4EST_DIM;
+  cvt->num_trees = c4->num_trees;
   if (autodestroy) {
     cvt->destroy = p4est3_connectivity_p4est_destroy;
   }
