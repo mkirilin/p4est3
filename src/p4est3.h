@@ -25,7 +25,6 @@
 #define P4EST3_H
 
 #include <sc3_mpi.h>
-#include <p4est3_base.h>
 #include <p4est3_connectivity.h>
 #include <p4est3_quadrant_vtable.h>
 

@@ -24,8 +24,8 @@
 #ifndef P4EST3_QUADRANT_VTABLE
 #define P4EST3_QUADRANT_VTABLE
 
-#include <p4est3_base.h>
 #include <sc3_array.h>
+#include <p4est3_base.h>
 
 #ifdef __cplusplus
 extern              "C"

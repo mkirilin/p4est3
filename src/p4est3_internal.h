@@ -24,9 +24,9 @@
 #ifndef P4EST3_INTERNAL_H
 #define P4EST3_INTERNAL_H
 
-#include <p4est3.h>
 #include <sc3_array.h>
 #include <sc3_refcount.h>
+#include <p4est3.h>
 
 typedef struct p4est3_tree
 {
