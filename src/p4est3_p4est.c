@@ -59,7 +59,10 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
   p4est3_connectivity_t *c;
   p4est3_connectivity_vtable_t scvt, *cvt = &scvt;
 
+  /* verify arguments */
   SC3E_RETVAL (pc, NULL);
+  SC3A_IS (sc3_allocator_is_valid, alloc);
+  SC3A_CHECK (c4 != NULL && p4est_connectivity_is_valid (c4));
 
   /* create virtual structure */
   memset (cvt, 0, sizeof (*cvt));
@@ -70,7 +73,11 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
 
   /* create connectivity */
   SC3E (p4est3_connectivity_new (alloc, &c));
+
+  /* this works because the virtual table is deep copied */
   SC3E (p4est3_connectivity_set_vtable (c, cvt, c4));
+
+  /* finalize connectivity */
   SC3E (p4est3_connectivity_setup (c));
   SC3A_IS (p4est3_connectivity_is_setup, c);
 
@@ -90,7 +97,7 @@ p4est_vtable_num_children (void)
   return P4EST_CHILDREN;
 }
 
-static              size_t
+static size_t
 p4est_quadrant_vtable_size (void)
 {
   return sizeof (p4est_quadrant_t);
