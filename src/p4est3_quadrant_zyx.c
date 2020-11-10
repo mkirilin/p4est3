@@ -29,22 +29,19 @@
 #include <p8est3_quadrant_zyx.h>
 #endif /* !P4_TO_P8 */
 
-#ifdef P4EST_ENABLE_AVX2_DEACT
+#ifdef P4EST_ENABLE_AVX2
 
 #include <immintrin.h>
 #include <smmintrin.h>
 #include <emmintrin.h>
 
-static int
-p4est3_quadrant_zyx_max_level (void)
+static              p4est3_gloidx
+p4est3_quadrant_zyx_num_uniform (int level)
 {
-  return P4EST_QMAXLEVEL;
-}
-
-static int
-p4est3_quadrant_zyx_num_children (void)
-{
-  return P4EST_CHILDREN;
+  if (level < 0) {
+    return -1;
+  }
+  return p4est3_glopow (P4EST_CHILDREN, level);
 }
 
 static int
@@ -302,29 +299,21 @@ p4est3_quadrant_zyx_ancestor_id (const __m128i * q, int level, int *j)
 }
 
 static sc3_error_t *
-p4est_quadrant_zyx_coordinate (const __m128i * q, int n, int *j)
+p4est3_quadrant_zyx_coordinates (const __m128i * q, int n, int *j)
 {
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
-  SC3E_DEMAND (0 <= n && n < P4EST_DIM,
-               "An access to an unexisting coordinate");
-  switch (n) {
-  case 0:
-    *j = _mm_extract_epi32 (*q, 3);
-    break;
-  case 1:
-    *j = _mm_extract_epi32 (*q, 2);
-    break;
-  case 2:
-    *j = _mm_extract_epi32 (*q, 1);
-    break;
-  default:
-    break;
-  }
+  SC3A_CHECK (n == P4EST_DIM);
+
+  j[0] = _mm_extract_epi32 (*q, 3);
+  j[1] = _mm_extract_epi32 (*q, 2);
+#ifdef P4_TO_P8
+  j[2] = _mm_extract_epi32 (*q, 1);
+#endif
   return NULL;
 }
 
 static sc3_error_t *
-p4est_quadrant_zyx_level (const __m128i * q, int *l)
+p4est3_quadrant_zyx_level (const __m128i * q, int *l)
 {
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
   *l = _mm_extract_epi32 (*q, 0);
@@ -499,12 +488,6 @@ p4est3_quadrant_zyx_predecessor (const __m128i * q, __m128i * r)
   return NULL;
 }
 
-static size_t
-p4est3_quadrant_zyx_size (void)
-{
-  return sizeof (__m128i);
-}
-
 static sc3_error_t *
 p4est3_quadrant_zyx_morton (int level, p4est3_gloidx id, __m128i * quadrant)
 {
@@ -570,27 +553,24 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
   SC3A_CHECK (qvt != NULL);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
 
-#ifdef P4EST_ENABLE_AVX2_DEACT
-
+#ifdef P4EST_ENABLE_AVX2
   qvt->dim = P4EST_DIM;
+  qvt->max_level = P4EST_MAXLEVEL;
+  qvt->max_children = P4EST_CHILDREN;
+  qvt->quadrant_size = sizeof (__m128i);
 
-  qvt->max_level = (p4est3_quadrant_int_t) p4est3_quadrant_zyx_max_level;
-
-  qvt->num_children =
-    (p4est3_quadrant_int_t) p4est3_quadrant_zyx_num_children;
-
-  qvt->quadrant_size = (p4est3_quadrant_size_t) p4est3_quadrant_zyx_size;
+  qvt->quadrant_num_uniform = p4est3_quadrant_zyx_num_uniform;
 
   qvt->quadrant_is_valid = (p4est3_quadrant_is_t) NULL;
 
-  qvt->quadrant_level = (p4est3_quadrant_level_t) p4est_quadrant_zyx_level;
+  qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_zyx_level;
 
   qvt->quadrant_child_id = (p4est3_quadrant_child_id_t) NULL;
 
   qvt->quadrant_ancestor_id = (p4est3_quadrant_ancestor_id_t) NULL;
 
-  qvt->quadrant_coordinate =
-    (p4est3_quadrant_coordinate_t) p4est_quadrant_zyx_coordinate;
+  qvt->quadrant_coordinates =
+    (p4est3_quadrant_coordinates_t) p4est3_quadrant_zyx_coordinates;
 
   qvt->quadrant_compare =
     (p4est3_quadrant_compare_t) p4est3_quadrant_zyx_compare;
@@ -621,10 +601,12 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_morton =
     (p4est3_quadrant_morton_t) p4est3_quadrant_zyx_morton;
+
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt);
   return NULL;
 #else
   return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
                              " of AVX2-based virtual table is denied since AVX2"
                              " is disabled or not found working");
-#endif /* P4EST_ENABLE_AVX2 */
+#endif /* !P4EST_ENABLE_AVX2 */
 }
