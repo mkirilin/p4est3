@@ -101,7 +101,7 @@ is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx,
                  sc3_array_t * q, int n_quad)
 {
   int32_t             is_equal, i;
-  int                 xy[2], l;
+  int                 xy[P4EST_DIM], l;
   void               *v_p;
   p4est_quadrant_t   *q_p;
   void               *in, *p;
