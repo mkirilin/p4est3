@@ -65,11 +65,18 @@ sc3_error_t        *p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
                                                    p4est3_connectivity_t **
                                                    conn);
 
-#if 0
-
-p4est3_t           *p4est3_new_p4est (p4est_t * p4est);
-
-#endif
+/** Create a setup forest object from a \ref p4est_t.
+ * \param [in,out] alloc    This allocator must be setup and is refd.
+ * \param [in] p4           Valid 2D p4est object must remain alive.
+ * \param [in] autodestroy  If set to true, call \ref p4est_destroy when the
+ *                          forest constructed expires.  This does *not* touch
+ *                          the p4est_connectivity_t pointer stored inside.
+ * \param [out] pp3         Setup forest object ready for use.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_new_p4est (sc3_allocator_t * alloc,
+                                      p4est_t * p4, int autodestroy,
+                                      p4est3_t ** pp3);
 
 /** Populate a quadrant virtual table to use standard 2D p4est quadrants.
  * \param [out] qvt     Pointer to a virtual table that will be populated.

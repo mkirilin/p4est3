@@ -67,6 +67,15 @@ typedef struct p4est3_vtable
 }
 p4est3_vtable_t;
 
+/** Check whether a forest virtual table is valid, thus ready to use.
+ * \param [in] pvt      Any pointer.  NULL is considered not valid.
+ * \param [out] reason  May be NULL.  Otherwise, will be filled with the
+ *                      empty string on validity or the issue found otherwise.
+ * \return              Boolean value.
+ */
+int                 p4est3_vtable_is_valid (const p4est3_vtable_t * pvt,
+                                            char *reason);
+
 /** The forest is an opaque structure. */
 typedef struct p4est3 p4est3_t;
 
@@ -103,6 +112,7 @@ int                 p4est3_is_setup (const p4est3_t * p3, char *reason);
 sc3_error_t        *p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3);
 
 /** Select the virtual table creation method for the forest.
+ * This overrides all other \c p4est3_set_* calls made before or after.
  * \param [in,out] p3   Forest under construction.
  * \param [in] pvt      Valid forest virtual table.  We make a deep copy.
  * \param [in] slf      Self (state) of virtual forest passed along.

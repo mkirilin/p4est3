@@ -65,6 +65,19 @@ sc3_error_t        *p4est3_connectivity_new_p8est (sc3_allocator_t * alloc,
                                                    p4est3_connectivity_t **
                                                    conn);
 
+/** Create a setup forest object from a \ref p8est_t.
+ * \param [in,out] alloc    This allocator must be setup and is refd.
+ * \param [in] p8           Valid 3D p8est object must remain alive.
+ * \param [in] autodestroy  If set to true, call \ref p8est_destroy when the
+ *                          forest constructed expires.  This does *not* touch
+ *                          the p8est_connectivity_t pointer stored inside.
+ * \param [out] pp3         Setup forest object ready for use.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_new_p8est (sc3_allocator_t * alloc,
+                                      p8est_t * p8, int autodestroy,
+                                      p4est3_t ** pp3);
+
 /** Populate a quadrant virtual table to use standard 3D p8est quadrants.
  * \param [out] qvt     Pointer to a virtual table that will be populated.
  * \param [in] id       This user-defined id is put into the virtual table.

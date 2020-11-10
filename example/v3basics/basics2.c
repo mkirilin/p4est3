@@ -94,11 +94,12 @@ test_p4est_new (sc3_allocator_t * alloc,
   p4est_connectivity_t *c4;
   p4est3_connectivity_t *conn;
   p4est3_t           *p3;
+  p4est_t            *p4;
 
   SC3A_IS (sc3_allocator_is_setup, alloc);
 
   for (i = 0; i < 4; ++i) {
-    /* create connectivity structure */
+    /* create p4est3_connectivity_t structure */
     fprintf (stderr, "Trying %d\n", i);
     switch (i) {
     case 0:
@@ -133,7 +134,7 @@ test_p4est_new (sc3_allocator_t * alloc,
       SC3E_UNREACH ("Invalid example counter");
     }
 
-    /* create p4est object with connectivity */
+    /* create p4est3_t object with p4est3_connectivity_t */
     SC3E (p4est3_new (alloc, &p3));
     SC3E (p4est3_set_comm (p3, mpicomm, 1));
     SC3E (p4est3_set_connectivity (p3, conn));
@@ -141,8 +142,23 @@ test_p4est_new (sc3_allocator_t * alloc,
     SC3E (p4est3_set_level (p3, level));
     SC3E (p4est3_setup (p3));
 
+    /* this leaves the connectivity intact */
     SC3E (p4est3_destroy (&p3));
+
+    if (i == 3) {
+      SC3A_CHECK (c4 != NULL);
+
+      /* create p4est object from legacy p4est */
+      fprintf (stderr, "Variant %d\n", i);
+      p4 = p4est_new (sc_MPI_COMM_WORLD, c4, 0, NULL, NULL);
+      SC3E (p4est3_new_p4est (alloc, p4, 1, &p3));
+
+      SC3E (p4est3_destroy (&p3));
+    }
+
+    /* this deletes the standard connectivity in case 3 */
     SC3E (p4est3_connectivity_destroy (&conn));
+    c4 = NULL;
   }
   return NULL;
 }

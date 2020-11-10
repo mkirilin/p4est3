@@ -44,6 +44,10 @@ struct p4est3
   sc3_allocator_t    *alloc;
   int                 setup;
 
+  /* this forest may be wrapping a virtual implementation */
+  p4est3_vtable_t     spvt, *pvt;
+  void               *slf;
+
   sc3_MPI_Comm_t      mpicomm;
   int                 commdup;
   p4est3_connectivity_t *conn;

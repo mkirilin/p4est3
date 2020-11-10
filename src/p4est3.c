@@ -25,8 +25,13 @@
 #include <sc3_omp.h>
 #include <sc3_refcount.h>
 
-/* TODO add context information to sc3_error
-        (i.e., which library is producing the error?) */
+int
+p4est3_vtable_is_valid (const p4est3_vtable_t * pvt, char *reason)
+{
+  SC3E_TEST (pvt != NULL, reason);
+  SC3E_TEST (0 < pvt->dim && pvt->dim <= 3, reason);
+  SC3E_YES (reason);
+}
 
 int
 p4est3_is_valid (const p4est3_t * p3, char *reason)
@@ -35,6 +40,12 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
   SC3E_IS (sc3_refcount_is_valid, &p3->rc, reason);
   SC3E_IS (sc3_allocator_is_setup, p3->alloc, reason);
 
+  if (p3->pvt != NULL) {
+    SC3E_IS (p4est3_vtable_is_valid, p3->pvt, reason);
+
+    /* TODO check whatever else happens with a forest virtual table */
+  }
+  else {
   SC3E_TEST (p3->mpicomm != SC3_MPI_COMM_NULL, reason);
   SC3E_TEST (p3->level >= 0, reason);
 
@@ -51,6 +62,7 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
     SC3E_TEST (p3->nodecomm != SC3_MPI_COMM_NULL, reason);
 
     /* TODO thoroughly test all member variables */
+  }
   }
 
   SC3E_YES (reason);
@@ -91,6 +103,18 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   SC3A_IS (p4est3_is_new, p3);
 
   *pp3 = p3;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_set_vtable (p4est3_t * p3, p4est3_vtable_t * pvt, void *slf)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  SC3A_IS (p4est3_vtable_is_valid, pvt);
+
+  /* make deep copy of virtual table */
+  *(p3->pvt = &p3->spvt) = *pvt;
+  p3->slf = slf;
   return NULL;
 }
 
@@ -155,6 +179,12 @@ p4est3_set_level (p4est3_t * p3, int level)
   return NULL;
 }
 
+static sc3_error_t        *
+p4est3_setup_vtable (p4est3_t * p3)
+{
+  return NULL;
+}
+
 sc3_error_t        *
 p4est3_setup (p4est3_t * p3)
 {
@@ -171,6 +201,11 @@ p4est3_setup (p4est3_t * p3)
    */
 
   SC3A_IS (p4est3_is_new, p3);
+
+  if (p3->pvt != NULL) {
+    SC3E (p4est3_setup_vtable (p3));
+  }
+  else {
 
   /* check conditions that arise due to omitting mandatory _set_ functions */
   SC3E_DEMAND (p3->conn != NULL, "Connectivity must be set");
@@ -222,6 +257,7 @@ p4est3_setup (p4est3_t * p3)
 
   /* create quadrants by the morton method, which is presumably slowest */
   SC3E (p4est3_internal_setup_morton (p3));
+  }
 
   /* we are done creating a valid forest */
   p3->setup = 1;
@@ -267,8 +303,9 @@ p4est3_destroy (p4est3_t ** pp3)
     SC3E (p3->pvt->destroy (p3->slf));
   }
 
-  /* remove allocation */
-  alloc = p3->alloc;
+  /* free memory that has been populated during non-virtual setup */
+  if (p3->pvt == NULL) {
+
   if (p3->setup) {
     int                 ti;
 
@@ -301,6 +338,11 @@ p4est3_destroy (p4est3_t ** pp3)
   if (p3->commdup) {
     SC3E (sc3_MPI_Comm_free (&p3->mpicomm));
   }
+
+  }
+
+  /* remove allocation */
+  alloc = p3->alloc;
   SC3E (sc3_allocator_free (alloc, p3));
   SC3E (sc3_allocator_unref (&alloc));
   return NULL;

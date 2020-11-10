@@ -23,16 +23,18 @@
 
 #ifndef P4_TO_P8
 #include <p4est_bits.h>
+#include <p4est_algorithms.h>
 #include <p4est3_p4est.h>
 #else
 #include <p8est_bits.h>
+#include <p8est_algorithms.h>
 #include <p4est3_p8est.h>
 #endif
 
 static sc3_error_t *
-p4est3_connectivity_p4est_destroy (void *vslf)
+p4est3_connectivity_p4est_destroy (void *cslf)
 {
-  p4est_connectivity_t *c4 = (p4est_connectivity_t *) vslf;
+  p4est_connectivity_t *c4 = (p4est_connectivity_t *) cslf;
 
   SC3A_CHECK (c4 != NULL);
   p4est_connectivity_destroy (c4);
@@ -71,6 +73,50 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
   SC3A_IS (p4est3_connectivity_is_setup, c);
 
   *pc = c;
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_p4est_destroy (void *pslf)
+{
+  p4est_t *p4 = (p4est_t *) pslf;
+
+  /* leave p4->connectivity alone */
+  SC3A_CHECK (p4 != NULL);
+  p4est_destroy (p4);
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_new_p4est (sc3_allocator_t * alloc, p4est_t * p4,
+                  int autodestroy, p4est3_t ** pp3)
+{
+  p4est3_t *p3;
+  p4est3_vtable_t spvt, *pvt = &spvt;
+
+  /* verify arguments */
+  SC3E_RETVAL (pp3, NULL);
+  SC3A_IS (sc3_allocator_is_valid, alloc);
+  SC3A_CHECK (p4 != NULL && p4est_is_valid (p4));
+
+  /* create virtual structure */
+  memset (pvt, 0, sizeof (*pvt));
+  pvt->dim = P4EST_DIM;
+  if (autodestroy) {
+    pvt->destroy = p4est3_p4est_destroy;
+  }
+
+  /* create forest */
+  SC3E (p4est3_new (alloc, &p3));
+
+  /* this works because the virtual table is deep copied */
+  SC3E (p4est3_set_vtable (p3, pvt, p4));
+
+  /* finalize forest */
+  SC3E (p4est3_setup (p3));
+  SC3A_IS (p4est3_is_setup, p3);
+
+  *pp3 = p3;
   return NULL;
 }
 

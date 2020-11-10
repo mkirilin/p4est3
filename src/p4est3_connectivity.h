@@ -125,6 +125,7 @@ sc3_error_t        *p4est3_connectivity_new (sc3_allocator_t * alloc,
                                              p4est3_connectivity_t ** pc);
 
 /** Select the virtual table creation method for the connectivity.
+ * This overrides all other \c p4est3_connectivity_set_* calls made.
  * \param [in,out] c    Connectivity under construction.
  * \param [in] cvt      Valid connectivity virtual table.  We make a deep copy.
  * \param [in] slf      Self (state) of virtual connectivity passed along.
