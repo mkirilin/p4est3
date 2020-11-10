@@ -21,6 +21,22 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+/** \file p4est3_p8est.h
+ *
+ * Wrap standard p8est objects for use in the version 3 implementation.
+ *
+ * We may use the standard quadrants to construct a version 3 forest.
+ * To this end, call \ref p4est3_quadrant_vtable_p8est to populate a virtual
+ * table suitable for passing it to \ref p4est3_set_quadrant_vtable.
+ *
+ * We may use \ref p8est_connectivity_t and \ref p8est_t objects in version 3
+ * by constructing the respective connectivity and forest objects from
+ * a virtual table.
+ * This file provides the associated convenience constructors.
+ *
+ * \ingroup p4est3
+ */
+
 #ifndef P4EST3_P8EST_H
 #define P4EST3_P8EST_H
 
@@ -35,12 +51,25 @@ extern              "C"
 #endif
 #endif
 
+/** Create a setup connectivity object from a \ref p8est_connectivity_t.
+ * \param [in,out] alloc    This allocator must be setup and is refd.
+ * \param [in] c4           Valid 3D connectivity object must remain alive.
+ * \param [in] autodestroy  If set to true, call \ref p8est_connectivity_destroy
+ *                          when the connectivity constructed here expires.
+ * \param [out] conn        Setup connectivity object ready for use.
+ * \return              NULL on success, error object otherwise.
+ */
 sc3_error_t        *p4est3_connectivity_new_p8est (sc3_allocator_t * alloc,
                                                    p8est_connectivity_t * c4,
                                                    int autodestroy,
                                                    p4est3_connectivity_t **
                                                    conn);
 
+/** Populate a quadrant virtual table to use standard 3D p8est quadrants.
+ * \param [out] qvt     Pointer to a virtual table that will be populated.
+ * \param [in] id       This user-defined id is put into the virtual table.
+ * \return              NULL on success, error object otherwise.
+ */
 sc3_error_t        *p4est3_quadrant_vtable_p8est
   (p4est3_quadrant_vtable_t * qvt, int id);
 
