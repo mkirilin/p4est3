@@ -366,7 +366,9 @@ main (int argc, char **argv)
 #endif
 
   if (!retval) {
-    SC3X (timeavx2_measure (t));
+    if (t->mpirank == 0) {
+      SC3X (timeavx2_measure (t));
+    }
 
 #if 0
     if (e == NULL) {
