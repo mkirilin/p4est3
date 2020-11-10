@@ -41,7 +41,7 @@ sc3_error_t        *p4est3_connectivity_new_p8est (sc3_allocator_t * alloc,
                                                    p4est3_connectivity_t **
                                                    conn);
 
-void                p4est3_quadrant_vtable_p8est
+sc3_error_t        *p4est3_quadrant_vtable_p8est
   (p4est3_quadrant_vtable_t * qvt, int id);
 
 #ifdef __cplusplus

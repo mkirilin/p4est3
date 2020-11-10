@@ -29,7 +29,7 @@
 #include <p8est3_quadrant_zyx.h>
 #endif /* !P4_TO_P8 */
 
-#ifdef P4EST_ENABLE_AVX2
+#ifdef P4EST_ENABLE_AVX2_DEACT
 
 #include <immintrin.h>
 #include <smmintrin.h>
@@ -570,7 +570,7 @@ p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t * qvt)
   SC3A_CHECK (qvt != NULL);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
 
-#ifdef P4EST_ENABLE_AVX2
+#ifdef P4EST_ENABLE_AVX2_DEACT
 
   qvt->dim = P4EST_DIM;
 

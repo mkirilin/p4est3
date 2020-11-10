@@ -183,7 +183,7 @@ v3basics_prepare (v3basics_t * t)
   p4est_init (NULL, SC_LP_DEFAULT);
 
   /* legacy wrapping for p4est quadrants */
-  p4est3_quadrant_vtable_p4est (t->qvt_legacy, 0);
+  SC3E (p4est3_quadrant_vtable_p4est (t->qvt_legacy, 0));
 
   /* perspectively make one allocator for each thread */
   SC3E (make_allocator (sc3_allocator_nothread (), &t->alloc));

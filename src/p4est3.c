@@ -187,14 +187,15 @@ p4est3_setup (p4est3_t * p3)
   SC3A_CHECK (qsize > 0);
 
   /* determine principal and initial refinement level */
-  p3->qmaxlevel = p4est3_max_level (p3->qvt);
+  p3->qmaxlevel = p4est3_quadrant_max_level (p3->qvt);
   SC3A_CHECK (p3->qmaxlevel >= 0);
   p3->level = SC3_MIN (p3->level, p3->qmaxlevel);
 
   /* TODO make sure that the number of local quadrants stays bounded */
 
   /* with number of children determine number of elements per tree */
-  p3->num_children = p4est3_num_children (p3->qvt);
+  /* TODO use uniform_level function and consider variable num_children */
+  p3->num_children = p4est3_quadrant_max_children (p3->qvt);
   SC3A_CHECK (p3->num_children > 0);
   high_uniform = P4EST3_GLOIDX_MAX / p3->num_children;
   for (num_uniform = 1, lev = 0;

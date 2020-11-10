@@ -47,7 +47,7 @@ p4est3_t           *p4est3_new_p4est (p4est_t * p4est);
 
 #endif
 
-void                p4est3_quadrant_vtable_p4est
+sc3_error_t        *p4est3_quadrant_vtable_p4est
   (p4est3_quadrant_vtable_t * qvt, int id);
 
 #ifdef __cplusplus

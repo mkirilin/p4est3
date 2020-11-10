@@ -243,9 +243,10 @@ main (int argc, char **argv)
       return 0;
     }
   }
-  p4est3_quadrant_vtable_p4est (qvt, 0);
 
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
+
+  SC3E_NULL_SET (e, p4est3_quadrant_vtable_p4est (qvt, 0));
 
   SC3E_NULL_SET (e, p4est3_quadrant_array_new (sc3_allocator_nocount (),
                                                qvt_avx, n_quads, &qarr_avx));
