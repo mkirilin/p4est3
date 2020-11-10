@@ -238,66 +238,70 @@ p4est3_ref (p4est3_t * p3)
 }
 
 sc3_error_t        *
-p4est3_unref (p4est3_t ** pp3)
+p4est3_unref (p4est3_t * p3)
 {
   int                 waslast;
-  sc3_allocator_t    *alloc;
-  p4est3_t           *p3;
 
-  SC3E_INOUTP (pp3, p3);
-  SC3A_IS (p4est3_is_valid, p3);
+  SC3A_IS (p4est3_is_setup, p3);
   SC3E (sc3_refcount_unref (&p3->rc, &waslast));
-  if (waslast) {
-    *pp3 = NULL;
 
-    alloc = p3->alloc;
-    if (p3->setup) {
-      int                 ti;
-
-      /* free internal MPI objects */
-      SC3E (sc3_MPI_Win_free (&p3->nodesizewin));
-      SC3E (sc3_MPI_Win_free (&p3->gfposwin));
-      SC3E (sc3_MPI_Win_free (&p3->gftreewin));
-      SC3E (sc3_MPI_Win_free (&p3->goffsetwin));
-      SC3E (sc3_MPI_Win_free (&p3->quadwin));
-      if (p3->noderank == 0) {
-        SC3E (sc3_MPI_Comm_free (&p3->headcomm));
-      }
-      SC3E (sc3_MPI_Comm_free (&p3->nodecomm));
-      SC3E (sc3_MPI_Info_free (&p3->info_noncontig));
-
-      /* deallocate internal storage */
-      for (ti = 0; ti < p3->max_threads; ++ti) {
-        SC3E (sc3_allocator_free (p3->alloc, p3->temp_quad[ti]));
-      }
-      SC3E (sc3_allocator_free (p3->alloc, p3->temp_quad));
-
-      SC3E (sc3_array_destroy (&p3->trees));
-      SC3E (sc3_allocator_free (p3->alloc, p3->nodequads));
-    }
-
-    /* release data that has been referenced before setup */
-    if (p3->conn != NULL) {
-      SC3E (p4est3_connectivity_unref (p3->conn));
-    }
-    if (p3->commdup) {
-      SC3E (sc3_MPI_Comm_free (&p3->mpicomm));
-    }
-    SC3E (sc3_allocator_free (alloc, p3));
-    SC3E (sc3_allocator_unref (&alloc));
-  }
+  /* This is a hard check that we do not unref below a count of one. */
+  SC3E_DEMAND (!waslast, "Forest unrefd below a count of one");
   return NULL;
 }
 
 sc3_error_t        *
 p4est3_destroy (p4est3_t ** pp3)
 {
+  sc3_allocator_t    *alloc;
   p4est3_t           *p3;
 
   SC3E_INULLP (pp3, p3);
-  SC3E_DEMIS (sc3_refcount_is_last, &p3->rc);
-  SC3E (p4est3_unref (&p3));
+  SC3A_IS (p4est3_is_valid, p3);
 
-  SC3A_CHECK (p3 == NULL);
+  /* This is a hard check for a reference count of exactly one. */
+  SC3E_DEMIS (sc3_refcount_is_last, &p3->rc);
+
+  /* destruction callback if one was provided */
+  if (p3->pvt != NULL && p3->pvt->destroy != NULL) {
+    SC3E (p3->pvt->destroy (p3->slf));
+  }
+
+  /* remove allocation */
+  alloc = p3->alloc;
+  if (p3->setup) {
+    int                 ti;
+
+    /* free internal MPI objects */
+    SC3E (sc3_MPI_Win_free (&p3->nodesizewin));
+    SC3E (sc3_MPI_Win_free (&p3->gfposwin));
+    SC3E (sc3_MPI_Win_free (&p3->gftreewin));
+    SC3E (sc3_MPI_Win_free (&p3->goffsetwin));
+    SC3E (sc3_MPI_Win_free (&p3->quadwin));
+    if (p3->noderank == 0) {
+      SC3E (sc3_MPI_Comm_free (&p3->headcomm));
+    }
+    SC3E (sc3_MPI_Comm_free (&p3->nodecomm));
+    SC3E (sc3_MPI_Info_free (&p3->info_noncontig));
+
+    /* deallocate internal storage */
+    for (ti = 0; ti < p3->max_threads; ++ti) {
+      SC3E (sc3_allocator_free (p3->alloc, p3->temp_quad[ti]));
+    }
+    SC3E (sc3_allocator_free (p3->alloc, p3->temp_quad));
+
+    SC3E (sc3_array_destroy (&p3->trees));
+    SC3E (sc3_allocator_free (p3->alloc, p3->nodequads));
+  }
+
+  /* release data that has been referenced before setup */
+  if (p3->conn != NULL) {
+    SC3E (p4est3_connectivity_unref (p3->conn));
+  }
+  if (p3->commdup) {
+    SC3E (sc3_MPI_Comm_free (&p3->mpicomm));
+  }
+  SC3E (sc3_allocator_free (alloc, p3));
+  SC3E (sc3_allocator_unref (&alloc));
   return NULL;
 }

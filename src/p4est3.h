@@ -154,8 +154,29 @@ sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
  */
 sc3_error_t        *p4est3_setup (p4est3_t * p3);
 
+/** Increase reference counter of a forest after setup.
+ * \param [in,out] p3       Must be setup.  Increase its reference counter.
+ * \return                  NULL on success, error object otherwise.
+ */
 sc3_error_t        *p4est3_ref (p4est3_t * p3);
-sc3_error_t        *p4est3_unref (p4est3_t ** pp3);
+
+/** Decrease reference counter of a forest after setup.
+ * The lowest legal value for the reference counter is one, as after setup.
+ * This function never destroys the object: it is not legal to unref below one.
+ * The only way to deallocate a forest is \ref p4est3_destroy.
+ * \param [in,out] p3       Must be setup and have reference counter greater one.
+ *                          Decrease its reference counter.
+ *                          When the count reaches one, nothing happens.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_unref (p4est3_t * p3);
+
+/** Destroy a forest that must be valid, but may or may not be setup.
+ * It must have a reference count of exactly one.  Otherwise we return an error.
+ * Thus, all additional references must have been dropped before calling.
+ * \param [in,out] pp3      Valid forest with one reference.  NULL on output.
+ * \return                  NULL on success, error object otherwise.
+ */
 sc3_error_t        *p4est3_destroy (p4est3_t ** pp3);
 
 /*----------------------- accessing quadrants ------------------------*/
