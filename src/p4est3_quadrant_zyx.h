@@ -23,7 +23,7 @@
 
 /** \file p4est3_quadrant_zyx.h
  *
- * 2D quadrant implementation using a 128 bit AVX accelerated data type.
+ * 3D quadrant implementation using a 128 bit AVX accelerated data type.
  *
  * \ingroup p4est3
  */
@@ -41,8 +41,8 @@ extern              "C"
 #endif
 #endif
 
-/** Populate a 2D quadrant virtual table with an AVX implementation.
- * We use the level and x, y coordinates inside a 4x32 bit hardware type.
+/** Populate a 3D quadrant virtual table with an AVX implementation.
+ * We use the level and x, y, z coordinates inside a 4x32 bit hardware type.
  * \param [out] qvt     Members populated with virtual functions.
  * \return              NULL on success, error object otherwise.
  *                      If AVX hardware support is not available,

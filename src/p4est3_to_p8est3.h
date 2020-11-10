@@ -33,6 +33,6 @@
 #define p4est3_quadrant_vtable_p4est        p4est3_quadrant_vtable_p8est
 
 /* functions in p4est3_quadrant_zyx */
-#define p4est3_quadrant_zyx_vtable          p8est3_quadrant_zyx_vtable
+#define p4est3_quadrant_yx_vtable           p4est3_quadrant_zyx_vtable
 
 #endif /* !P4EST3_TO_P8EST3_H */
