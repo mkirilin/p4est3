@@ -79,7 +79,7 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
 static sc3_error_t *
 p4est3_p4est_destroy (void *pslf)
 {
-  p4est_t *p4 = (p4est_t *) pslf;
+  p4est_t            *p4 = (p4est_t *) pslf;
 
   /* leave p4->connectivity alone */
   SC3A_CHECK (p4 != NULL);
@@ -91,8 +91,8 @@ sc3_error_t        *
 p4est3_new_p4est (sc3_allocator_t * alloc, p4est_t * p4,
                   int autodestroy, p4est3_t ** pp3)
 {
-  p4est3_t *p3;
-  p4est3_vtable_t spvt, *pvt = &spvt;
+  p4est3_t           *p3;
+  p4est3_vtable_t     spvt, *pvt = &spvt;
 
   /* verify arguments */
   SC3E_RETVAL (pp3, NULL);
