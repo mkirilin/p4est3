@@ -772,7 +772,7 @@ INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = sc.h sc_*.h \
                          p4est.h p4est_*.h p8est.h p8est_*.h \
                          p6est.h p6est_*.h p?est_step*.c \
-                         p4est3*.h
+                         p4est3*.h p8est3*.h
 
 # The RECURSIVE tag can be used to specify whether or not subdirectories should
 # be searched for input files as well.
