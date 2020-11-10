@@ -61,7 +61,7 @@ typedef sc3_error_t *(*p4est3_connectivity_inout_t) (void *slf);
  * Whenever a non-NULL virtual table is set in a connectivity at the time of
  * \ref p4est3_connectivity_setup, it will override all other settings.
  *
- * This method is suited to wrap any third-party object into p4est.
+ * This method is suited to wrap any compatible third-party object into p4est.
  */
 typedef struct p4est3_connectivity_vtable
 {

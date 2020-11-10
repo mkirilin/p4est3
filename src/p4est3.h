@@ -24,6 +24,9 @@
 /** \file p4est3.h
  *
  * Main interface file to construct and interact with a version 3 forest.
+ * The forest may be constructed piece by piece using the setter functions.
+ * It may also be defined by populating and passing a forest virtual table.
+ * The latter approach allows third-party objects to pass as a legal forest.
  *
  * \ingroup p4est3
  */
@@ -43,18 +46,72 @@ extern              "C"
 #endif
 #endif
 
+/** General virtual function taking one in-out argument. */
+typedef sc3_error_t *(*p4est3_inout_t) (void *slf);
+
+/** One way to create a forest is to provide a virtual table with state.
+ * The members of this table must be set before passing it to \ref
+ * p4est3_set_vtable, where we make a deep copy.
+ *
+ * Whenever a non-NULL virtual table is set in a forest at the time of
+ * \ref p4est3_setup, it will override all other settings.
+ *
+ * This method is suited to wrap any compatible third-party object into p4est.
+ */
+typedef struct p4est3_vtable
+{
+  int                 dim;      /**< Space dimension is 1, 2 or 3. */
+
+  /** This function may be NULL, e.g.\ when no state requires destruction */
+  p4est3_inout_t      destroy;
+}
+p4est3_vtable_t;
+
+/** The forest is an opaque structure. */
 typedef struct p4est3 p4est3_t;
 
-/* p4est construction parameters: connectivity, uniform level, etc. */
-/* While we're not ready defining the connectivity, use abstract trees. */
-
+/** Check whether a forest is valid (no matter if setup or not).
+ * \param [in] p3       Forest pointer.  NULL is considered not valid.
+ * \param [out] reason  May be NULL.  Otherwise, will be filled with the
+ *                      empty string on validity or the issue found otherwise.
+ * \return              Boolean value.
+ */
 int                 p4est3_is_valid (const p4est3_t * p3, char *reason);
+
+/** Check whether a forest is valid and not yet setup.
+ * \param [in] p3       Forest pointer.  NULL is considered not valid.
+ * \param [out] reason  May be NULL.  Otherwise, will be filled with the
+ *                      empty string on validity or the issue found otherwise.
+ * \return              Boolean value.
+ */
 int                 p4est3_is_new (const p4est3_t * p3, char *reason);
+
+/** Check whether a forest is valid and setup.
+ * \param [in] p3      Forest pointer.  NULL is considered not valid.
+ * \param [out] reason  May be NULL.  Otherwise, will be filled with the
+ *                      empty string on validity or the issue found otherwise.
+ * \return              Boolean value.
+ */
 int                 p4est3_is_setup (const p4est3_t * p3, char *reason);
 
+/** Begin life cycle of a forest object.
+ * \param [in,out] alloc    Allocator must be setup.  It is referenced
+ *                          and kept around while forest is live.
+ * \param [out] pp3         Pointer to a pointer, the latter will be updated.
+ * \return                  NULL on success, error object otherwise.
+ */
 sc3_error_t        *p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3);
 
-/** Provide a communicator to use.
+/** Select the virtual table creation method for the forest.
+ * \param [in,out] p3   Forest under construction.
+ * \param [in] pvt      Valid forest virtual table.  We make a deep copy.
+ * \param [in] slf      Self (state) of virtual forest passed along.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_set_vtable (p4est3_t * p3,
+                                       p4est3_vtable_t * pvt, void *slf);
+
+/** Provide an MPI communicator to use.
  * \param [in,out] p3       The forest must not have been setup.
  * \param [in] comm         This communicator replaces any previous one.
  *                          If it is dupd, we also set it to return errors.
@@ -68,7 +125,7 @@ sc3_error_t        *p4est3_set_comm (p4est3_t * p3,
 /** Provide a connectivity to be used in creating the forest.
  * This function is mandatory to call at least once before \ref p4est3_setup.
  * \param [in,out] p3       Forest object under construction.
- * \param [in] conn         Valid connectivity structure.
+ * \param [in] conn         Connectivity structure must be setup.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_set_connectivity (p4est3_t * p3,
@@ -82,6 +139,12 @@ sc3_error_t        *p4est3_set_connectivity (p4est3_t * p3,
 sc3_error_t        *p4est3_set_quadrant_vtable (p4est3_t * p3,
                                                 p4est3_quadrant_vtable_t *
                                                 qvt);
+
+/** Set minimum refinement level on creation of the forest.
+ * \param [in,out] p3       Forest under construction.
+ * \param [in] level        Range must match quadrant virtual table.
+ * \return                  NULL on success, error object otherwise.
+ */
 sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
 
 /** Finalize construction of a forest.
