@@ -121,7 +121,7 @@ typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_last_descendant_t;
 
 /** We abstract the operations on quadrants to allow for multiple implementations.
  * The virtual table must be populated by the members defining the implementation.
- * It is then passed to \ref p4est3_set_quadrant_vtable and deep copied.
+ * It is then passed to \ref p4est3_set_quadrant_vtable and its contents copied.
  *
  * The functions placed in this table are supposted to return NULL on
  * successful operation and an \c sc3_error_t object otherwise.

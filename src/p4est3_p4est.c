@@ -65,7 +65,7 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
   /* create connectivity */
   SC3E (p4est3_connectivity_new (alloc, &c));
 
-  /* this works because the virtual table is deep copied */
+  /* legal to pass stack variable because the virtual table is shallow copied */
   SC3E (p4est3_connectivity_set_vtable (c, cvt, c4));
 
   /* finalize connectivity */
@@ -109,7 +109,7 @@ p4est3_new_p4est (sc3_allocator_t * alloc, p4est_t * p4,
   /* create forest */
   SC3E (p4est3_new (alloc, &p3));
 
-  /* this works because the virtual table is deep copied */
+  /* legal to pass stack variable because the virtual table is shallow copied */
   SC3E (p4est3_set_vtable (p3, pvt, p4));
 
   /* finalize forest */

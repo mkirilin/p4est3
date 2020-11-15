@@ -56,7 +56,7 @@ typedef sc3_error_t *(*p4est3_connectivity_inout_t) (void *slf);
 
 /** One way to create a connectivity is to provide a virtual table with state.
  * The members of this table must be set before passing it to \ref
- * p4est3_connectivity_set_vtable, where we make a deep copy.
+ * p4est3_connectivity_set_vtable, where we make a shallow copy.
  *
  * Whenever a non-NULL virtual table is set in a connectivity at the time of
  * \ref p4est3_connectivity_setup, it will override all other settings.
@@ -127,7 +127,8 @@ sc3_error_t        *p4est3_connectivity_new (sc3_allocator_t * alloc,
 /** Select the virtual table creation method for the connectivity.
  * This overrides all other \c p4est3_connectivity_set_* calls made.
  * \param [in,out] c    Connectivity under construction.
- * \param [in] cvt      Valid connectivity virtual table.  We make a deep copy.
+ * \param [in] cvt      Valid connectivity virtual table.
+ *                      We make a shallow copy, that is, copy all elements.
  * \param [in] slf      Self (state) of virtual connectivity passed along.
  * \return              NULL on success, error object otherwise.
  */

@@ -113,7 +113,7 @@ p4est3_set_vtable (p4est3_t * p3, p4est3_vtable_t * pvt, void *slf)
   SC3A_IS (p4est3_is_new, p3);
   SC3A_IS (p4est3_vtable_is_valid, pvt);
 
-  /* make deep copy of virtual table */
+  /* make shallow copy of virtual table */
   *(p3->pvt = &p3->spvt) = *pvt;
   p3->slf = slf;
   return NULL;
@@ -165,7 +165,7 @@ p4est3_set_quadrant_vtable (p4est3_t * p3, p4est3_quadrant_vtable_t * qvt)
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (qvt != NULL);
 
-  /* make deep copy of virtual table */
+  /* make shallow copy of virtual table */
   *(p3->qvt = &p3->sqvt) = *qvt;
   return NULL;
 }

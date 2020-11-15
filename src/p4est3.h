@@ -51,7 +51,7 @@ typedef sc3_error_t *(*p4est3_inout_t) (void *slf);
 
 /** One way to create a forest is to provide a virtual table with state.
  * The members of this table must be set before passing it to \ref
- * p4est3_set_vtable, where we make a deep copy.
+ * p4est3_set_vtable, where we make a shallow copy.
  *
  * Whenever a non-NULL virtual table is set in a forest at the time of
  * \ref p4est3_setup, it will override all other settings.
@@ -114,7 +114,8 @@ sc3_error_t        *p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3);
 /** Select the virtual table creation method for the forest.
  * This overrides all other \c p4est3_set_* calls made before or after.
  * \param [in,out] p3   Forest under construction.
- * \param [in] pvt      Valid forest virtual table.  We make a deep copy.
+ * \param [in] pvt      Valid forest virtual table.
+ *                      We make a shallow copy, that is, copy all elements.
  * \param [in] slf      Self (state) of virtual forest passed along.
  * \return              NULL on success, error object otherwise.
  */
@@ -143,7 +144,8 @@ sc3_error_t        *p4est3_set_connectivity (p4est3_t * p3,
 
 /** Set a virtual quadrant implementation to use in the forest.
  * \param [in,out] p3       Forest under construction.
- * \param [in] qvt          Valid virtual quadrant table is deep copied.
+ * \param [in] qvt          Valid virtual quadrant table.
+ *                          We make a shallow copy, that is, copy all elements.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_set_quadrant_vtable (p4est3_t * p3,
