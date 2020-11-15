@@ -40,6 +40,13 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
   SC3E_IS (sc3_refcount_is_valid, &p3->rc, reason);
   SC3E_IS (sc3_allocator_is_setup, p3->alloc, reason);
 
+  if (!p3->setup) {
+    SC3E_TEST (p3->accessed_conn == 0, reason);
+  }
+  else {
+    SC3E_TEST (p3->accessed_conn >= 0, reason);
+  }
+
   if (p3->pvt != NULL) {
     SC3E_IS (p4est3_vtable_is_valid, p3->pvt, reason);
 
@@ -297,6 +304,7 @@ p4est3_destroy (p4est3_t ** pp3)
 
   SC3E_INULLP (pp3, p3);
   SC3A_IS (p4est3_is_valid, p3);
+  SC3A_CHECK (p3->accessed_conn == 0);
 
   /* This is a hard check for a reference count of exactly one. */
   SC3E_DEMIS (sc3_refcount_is_last, &p3->rc);
@@ -346,5 +354,29 @@ p4est3_destroy (p4est3_t ** pp3)
   alloc = p3->alloc;
   SC3E (sc3_allocator_free (alloc, p3));
   SC3E (sc3_allocator_unref (&alloc));
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_access_connectivity (p4est3_t * p3, p4est3_connectivity_t ** pconn)
+{
+  SC3E_RETVAL (pconn, NULL);
+  SC3A_IS (p4est3_is_setup, p3);
+
+  SC3E (p4est3_connectivity_ref (p3->conn));
+  *pconn = p3->conn;
+  ++p3->accessed_conn;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_restore_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
+{
+  SC3A_IS (p4est3_is_setup, p3);
+  SC3A_CHECK (conn == p3->conn);
+  SC3A_CHECK (p3->accessed_conn > 0);
+
+  SC3E (p4est3_connectivity_unref (p3->conn));
+  --p3->accessed_conn;
   return NULL;
 }

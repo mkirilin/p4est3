@@ -52,6 +52,8 @@ struct p4est3
   int                 commdup;
   p4est3_connectivity_t *conn;
 
+  int                 accessed_conn;
+
   sc3_MPI_Comm_t      nodecomm, headcomm;
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Win_t       nodesizewin;

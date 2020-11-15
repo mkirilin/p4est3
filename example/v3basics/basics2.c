@@ -90,9 +90,10 @@ test_p4est_new (sc3_allocator_t * alloc,
                 sc3_MPI_Comm_t mpicomm, p4est3_quadrant_vtable_t * qvt,
                 p4est3_topidx num_trees, int level)
 {
-  int                 i;
+  int                 i, j;
   p4est_connectivity_t *c4;
   p4est3_connectivity_t *conn;
+  p4est3_connectivity_t *aconn;
   p4est3_t           *p3;
   p4est_t            *p4;
 
@@ -141,6 +142,12 @@ test_p4est_new (sc3_allocator_t * alloc,
     SC3E (p4est3_set_quadrant_vtable (p3, qvt));
     SC3E (p4est3_set_level (p3, level));
     SC3E (p4est3_setup (p3));
+
+    /* do something with the forest */
+    for (j = 0; j < 4; ++j) {
+      SC3E (p4est3_access_connectivity (p3, &aconn));
+      SC3E (p4est3_restore_connectivity (p3, aconn));
+    }
 
     /* this leaves the connectivity intact */
     SC3E (p4est3_destroy (&p3));

@@ -191,6 +191,29 @@ sc3_error_t        *p4est3_unref (p4est3_t * p3);
  */
 sc3_error_t        *p4est3_destroy (p4est3_t ** pp3);
 
+/** Retrieve the connectivity registered with the forest.
+ * It must be returned to the forest before the forest is destructed.
+ * To this end, use \ref p4est3_restore_connectivity.
+ * We allow an arbitrary number of simultaneous or staggered accesses.
+ * \param [in,out] p3       Must be setup.  We increment its access count.
+ * \param [out] pconn       Non-NULL reference argument.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_access_connectivity (p4est3_t * p3,
+                                                p4est3_connectivity_t **
+                                                pconn);
+
+/** Release a connectivity previously obtained
+ * with \ref p4est3_access_connectivity.
+ * Every connectivity access must be restored before \ref p4est3_destroy.
+ * \param [in,out] p3       Must be setup.  We decrement the access count.
+ * \param [out] conn        Same pointer as passed to corresponding access.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_restore_connectivity (p4est3_t * p3,
+                                                 p4est3_connectivity_t *
+                                                 conn);
+
 /*----------------------- accessing quadrants ------------------------*/
 
 #if 0
