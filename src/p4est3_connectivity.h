@@ -129,6 +129,7 @@ sc3_error_t        *p4est3_connectivity_new (sc3_allocator_t * alloc,
  * \param [in,out] c    Connectivity under construction.
  * \param [in] cvt      Valid connectivity virtual table.
  *                      We make a shallow copy, that is, copy all elements.
+ *                      It is thus safe if \c *cvt lives on the stack.
  * \param [in] slf      Self (state) of virtual connectivity passed along.
  * \return              NULL on success, error object otherwise.
  */

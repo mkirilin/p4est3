@@ -61,6 +61,10 @@ typedef sc3_error_t *(*p4est3_inout_t) (void *slf);
 typedef struct p4est3_vtable
 {
   int                 dim;      /**< Space dimension is 1, 2 or 3. */
+  p4est3_connectivity_t *c3;    /**< This connectivity must match the virtual
+                                     forest to create.  It must be setup. */
+  p4est3_quadrant_vtable_t *qvt;        /**< Quadrant table must match forest.
+                                             We make a shallow copy. */
 
   /** This function may be NULL, e.g.\ when no state requires destruction */
   p4est3_inout_t      destroy;
@@ -116,6 +120,9 @@ sc3_error_t        *p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3);
  * \param [in,out] p3   Forest under construction.
  * \param [in] pvt      Valid forest virtual table.
  *                      We make a shallow copy, that is, copy all elements.
+ *                      We call \ref p4est3_set_connectivity and \ref
+ *                      p4est3_set_quadrant_vtable with the table contents.
+ *                      It is thus safe if \c *pvt lives on the stack.
  * \param [in] slf      Self (state) of virtual forest passed along.
  * \return              NULL on success, error object otherwise.
  */
@@ -146,6 +153,7 @@ sc3_error_t        *p4est3_set_connectivity (p4est3_t * p3,
  * \param [in,out] p3       Forest under construction.
  * \param [in] qvt          Valid virtual quadrant table.
  *                          We make a shallow copy, that is, copy all elements.
+ *                          It is thus safe if \c *qvt lives on the stack.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_set_quadrant_vtable (p4est3_t * p3,

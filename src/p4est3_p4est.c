@@ -76,14 +76,28 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
   return NULL;
 }
 
+typedef struct p4est3_p4est_self
+{
+  int                 autodestroy;
+  sc3_allocator_t    *alloc;
+  p4est3_connectivity_t *c3;
+  p4est_t            *p4;
+}
+p4est3_p4est_self_t;
+
 static sc3_error_t *
 p4est3_p4est_destroy (void *pslf)
 {
-  p4est_t            *p4 = (p4est_t *) pslf;
+  p4est3_p4est_self_t *slf = (p4est3_p4est_self_t *) pslf;
 
   /* leave p4->connectivity alone */
-  SC3A_CHECK (p4 != NULL);
-  p4est_destroy (p4);
+  SC3A_CHECK (slf != NULL);
+  SC3A_CHECK (slf->p4 != NULL);
+  if (slf->autodestroy) {
+    p4est_destroy (slf->p4);
+  }
+  SC3E (p4est3_connectivity_destroy (&slf->c3));
+  SC3E (sc3_allocator_free (slf->alloc, slf));
   return NULL;
 }
 
@@ -91,26 +105,36 @@ sc3_error_t        *
 p4est3_new_p4est (sc3_allocator_t * alloc, p4est_t * p4,
                   int autodestroy, p4est3_t ** pp3)
 {
+  p4est3_p4est_self_t *slf;
   p4est3_t           *p3;
   p4est3_vtable_t     spvt, *pvt = &spvt;
+  p4est3_quadrant_vtable_t sqvt;
 
   /* verify arguments */
   SC3E_RETVAL (pp3, NULL);
   SC3A_IS (sc3_allocator_is_valid, alloc);
   SC3A_CHECK (p4 != NULL && p4est_is_valid (p4));
 
-  /* create virtual structure */
+  /* wrap connectivity into a p4est3_connectivity_t object and build context */
+  SC3E (sc3_allocator_malloc (alloc, sizeof (p4est3_p4est_self_t), &slf));
+  SC3E (p4est3_connectivity_new_p4est (alloc, p4->connectivity, 0, &slf->c3));
+  slf->autodestroy = autodestroy;
+  slf->alloc = alloc;
+  slf->p4 = p4;
+
+  /* create forest and quadrant virtual tables on the stack */
   memset (pvt, 0, sizeof (*pvt));
   pvt->dim = P4EST_DIM;
-  if (autodestroy) {
-    pvt->destroy = p4est3_p4est_destroy;
-  }
+  pvt->c3 = slf->c3;
+  pvt->qvt = &sqvt;
+  SC3E (p4est3_quadrant_vtable_p4est (pvt->qvt, 0));
+  pvt->destroy = p4est3_p4est_destroy;
 
   /* create forest */
   SC3E (p4est3_new (alloc, &p3));
 
   /* legal to pass stack variable because the virtual table is shallow copied */
-  SC3E (p4est3_set_vtable (p3, pvt, p4));
+  SC3E (p4est3_set_vtable (p3, pvt, slf));
 
   /* finalize forest */
   SC3E (p4est3_setup (p3));
@@ -281,12 +305,14 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   SC3A_CHECK (id >= 0);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
 
-  /* populate members */
+  /* populate scalar members */
   qvt->id = id;
   qvt->dim = P4EST_DIM;
   qvt->max_level = P4EST_QMAXLEVEL;
   qvt->max_children = P4EST_CHILDREN;
   qvt->quadrant_size = sizeof (p4est_quadrant_t);
+
+  /* populate member functions */
   qvt->quadrant_is_valid = p4est_quadrant_vtable_is_valid;
   qvt->quadrant_is_equal = p4est_quadrant_vtable_is_equal;
   qvt->quadrant_num_uniform = p4est_quadrant_vtable_num_uniform;

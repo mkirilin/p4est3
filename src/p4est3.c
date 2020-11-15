@@ -30,6 +30,11 @@ p4est3_vtable_is_valid (const p4est3_vtable_t * pvt, char *reason)
 {
   SC3E_TEST (pvt != NULL, reason);
   SC3E_TEST (0 < pvt->dim && pvt->dim <= 3, reason);
+
+  /* check object variables as well */
+  SC3E_IS (p4est3_connectivity_is_valid, pvt->c3, reason);
+  SC3E_IS (p4est3_quadrant_vtable_is_valid, pvt->qvt, reason);
+
   SC3E_YES (reason);
 }
 
@@ -122,6 +127,14 @@ p4est3_set_vtable (p4est3_t * p3, p4est3_vtable_t * pvt, void *slf)
 
   /* make shallow copy of virtual table */
   *(p3->pvt = &p3->spvt) = *pvt;
+
+  /* use objects passed in table now and overwrite them with our own */
+  SC3E (p4est3_set_connectivity (p3, p3->pvt->c3));
+  SC3E (p4est3_set_quadrant_vtable (p3, p3->pvt->qvt));
+  p3->pvt->c3 = p3->conn;
+  p3->pvt->qvt = p3->qvt;
+
+  /* assign virtual context */
   p3->slf = slf;
   return NULL;
 }
@@ -213,17 +226,18 @@ p4est3_setup (p4est3_t * p3)
 
   SC3A_IS (p4est3_is_new, p3);
 
+  /* Check conditions that arise due to omitting mandatory _set_ functions.
+     Note that p4est3_set_vtable sets connectivity and quadrant vtable. */
+  SC3E_DEMAND (p3->conn != NULL, "Connectivity must be set");
+  SC3E_DEMAND (p3->qvt == &p3->sqvt, "Quadrant virtual table must be set");
+
+  /* further pre-setup consistency checks */
+  SC3A_CHECK (p3->num_trees > 0);
+
   if (p3->pvt != NULL) {
     SC3E (p4est3_setup_vtable (p3));
   }
   else {
-    /* check conditions that arise due to omitting mandatory _set_ functions */
-    SC3E_DEMAND (p3->conn != NULL, "Connectivity must be set");
-    SC3E_DEMAND (p3->qvt == &p3->sqvt, "Quadrant virtual table must be set");
-
-    /* further pre-setup consistency checks */
-    SC3A_CHECK (p3->num_trees > 0);
-
     /* query input communicator and populate node and head communicators */
     SC3E (p4est3_internal_setup_comm (p3));
 
@@ -309,13 +323,17 @@ p4est3_destroy (p4est3_t ** pp3)
   /* This is a hard check for a reference count of exactly one. */
   SC3E_DEMIS (sc3_refcount_is_last, &p3->rc);
 
-  /* destruction callback if one was provided */
-  if (p3->pvt != NULL && p3->pvt->destroy != NULL) {
-    SC3E (p3->pvt->destroy (p3->slf));
-  }
+  if (p3->pvt != NULL) {
+    /* the connectivity has been set from the virtual table */
+    SC3E (p4est3_connectivity_unref (p3->conn));
 
-  /* free memory that has been populated during non-virtual setup */
-  if (p3->pvt == NULL) {
+    /* destruction callback if one was provided */
+    if (p3->pvt->destroy != NULL) {
+      SC3E (p3->pvt->destroy (p3->slf));
+    }
+  }
+  else {
+    /* free memory that has been populated during non-virtual setup */
     if (p3->setup) {
       int                 ti;
 

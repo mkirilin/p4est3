@@ -160,6 +160,12 @@ test_p4est_new (sc3_allocator_t * alloc,
       p4 = p4est_new (sc_MPI_COMM_WORLD, c4, 0, NULL, NULL);
       SC3E (p4est3_new_p4est (alloc, p4, 1, &p3));
 
+      /* do something with the forest */
+      for (j = 0; j < 2; ++j) {
+        SC3E (p4est3_access_connectivity (p3, &aconn));
+        SC3E (p4est3_restore_connectivity (p3, aconn));
+      }
+
       SC3E (p4est3_destroy (&p3));
     }
 
