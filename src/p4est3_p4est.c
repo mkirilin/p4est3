@@ -125,6 +125,7 @@ p4est3_new_p4est (sc3_allocator_t * alloc, p4est_t * p4,
   /* create forest and quadrant virtual tables on the stack */
   memset (pvt, 0, sizeof (*pvt));
   pvt->dim = P4EST_DIM;
+  pvt->mpicomm = p4->mpicomm;
   pvt->c3 = slf->c3;
   pvt->qvt = &sqvt;
   SC3E (p4est3_quadrant_vtable_p4est (pvt->qvt, 0));
