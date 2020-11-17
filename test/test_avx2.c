@@ -22,11 +22,11 @@
 */
 
 #ifndef P4_TO_P8
-#include <p4est3_quadrant_zyx.h>
-#include <p4est_p4est3.h>
+#include <p4est3_quadrant_yx.h>
+#include <p4est3_p4est.h>
 #else
-#include <p8est3_quadrant_zyx.h>
-#include <p8est_p4est3.h>
+#include <p4est3_quadrant_zyx.h>
+#include <p4est3_p8est.h>
 #endif
 
 #define N_QUADS_2_TEST 6000000
@@ -70,7 +70,7 @@ is_equal_child (p4est3_quadrant_vtable_t * qvt_avx,
                 sc3_array_t * q, int32_t n_quad)
 {
   int32_t             is_equal, i;
-  int32_t             l;
+  int                 xy[P4EST_DIM], l;
   void               *p;
   void               *v_p;
   p4est_quadrant_t   *q_row;
@@ -84,12 +84,11 @@ is_equal_child (p4est3_quadrant_vtable_t * qvt_avx,
   for (i = 0; i < n_quad; ++i) {
     SC3E (sc3_array_index (v, i, &v_p));
     SC3E (p4est3_quadrant_level (qvt_avx, v_p, &l));
-    SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, c));
+    SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, P4EST_DIM, xy));
     is_equal =
-      (int32_t) q_row[i].level == l && q_row[i].x == c[0] &&
-      q_row[i].y == c[1] &&
+      (int32_t) q_row[i].level == l && q_row[i].x == xy[0] && q_row[i].y == xy[1] &&
 #ifdef P4_TO_P8
-      q_row[i].z == c[2] &&
+      q_row[i].z == xy[2] &&
 #endif
       1;
     SC3E_DEMAND (is_equal, "Comparing of quadrant_child results");
@@ -103,7 +102,7 @@ is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx,
                  sc3_array_t * q, int n_quad)
 {
   int32_t             is_equal, i;
-  int32_t             l;
+  int                 xy[P4EST_DIM], l;
   void               *v_p;
   p4est_quadrant_t   *q_p;
   void               *in, *p;
@@ -122,11 +121,10 @@ is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx,
     SC3E (p4est3_quadrant_parent (qvt, in, q_p));
 
     SC3E (p4est3_quadrant_level (qvt_avx, v_p, &l));
-    SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, c));
-    is_equal =
-    (int32_t) q_p->level == l && q_p->x == c[0] && q_p->y == c[1] &&
+    SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, P4EST_DIM, xy));
+    is_equal = (int32_t) q_p->level == l && q_p->x == xy[0] && q_p->y == xy[1] &&
 #ifdef P4_TO_P8
-      q_p->z == c[2] &&
+      q_p->z == xy[2] &&
 #endif
       1;
     SC3E_DEMAND (is_equal, "Comparing of quadrant_parent results");
@@ -160,7 +158,7 @@ is_equal_successor (p4est3_quadrant_vtable_t * qvt_avx,
                     sc3_array_t * q, int n_quad)
 {
   int32_t             is_equal, i, j;
-  int32_t             l;
+  int32_t             xy[P4EST_DIM], l;
   void               *v_p;
   p4est_quadrant_t   *q_p;
   void               *in, *p;
@@ -180,11 +178,10 @@ is_equal_successor (p4est3_quadrant_vtable_t * qvt_avx,
       SC3E (p4est3_quadrant_successor (qvt, in, q_p));
 
       SC3E (p4est3_quadrant_level (qvt_avx, v_p, &l));
-      SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, c));
-      is_equal =
-        (int32_t) q_p->level == l && q_p->x == c[0] && q_p->y == c[1] &&
+      SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, P4EST_DIM, xy));
+      is_equal = (int32_t) q_p->level == l && q_p->x == xy[0] && q_p->y == xy[1] &&
 #ifdef P4_TO_P8
-        q_p->z == c[2] &&
+        q_p->z == xy[2] &&
 #endif
         1;
       if (!is_equal) {
@@ -218,7 +215,7 @@ main (int argc, char **argv)
   sc3_array_t        *qarr_avx, *qarr;
   void               *p;
 
-  e = p4est3_quadrant_zyx_vtable (qvt_avx);
+  e = p4est3_quadrant_yx_vtable (qvt_avx);
   if (e != NULL) {
     sc3_error_t        *e_;
     SC3E_SET (e_, sc3_error_get_kind (e, &kind));
@@ -228,9 +225,10 @@ main (int argc, char **argv)
       return 0;
     }
   }
-  p4est_quadrant_vtable (qvt, 0);
 
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
+
+  SC3E_NULL_SET (e, p4est3_quadrant_vtable_p4est (qvt, 0));
 
   SC3E_NULL_SET (e, p4est3_quadrant_array_new (sc3_allocator_nocount (),
                                                qvt_avx, n_quads, &qarr_avx));

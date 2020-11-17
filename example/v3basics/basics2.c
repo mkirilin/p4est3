@@ -22,10 +22,59 @@
 */
 
 #ifndef P4_TO_P8
-#include <p4est_p4est3.h>
+#include <p4est3_p4est.h>
 #else
-#include <p8est_p4est3.h>
+#include <p4est3_p8est.h>
 #endif
+
+typedef struct p4est3_connectivity_ntslf
+{
+  sc3_allocator_t    *alloc;
+
+  /* no need really to allocate this here since it is deep copied */
+  p4est3_connectivity_vtable_t scvt;
+}
+p4est3_connectivity_ntslf_t;
+
+static sc3_error_t *
+p4est3_connectivity_dstr (void *vslf)
+{
+  p4est3_connectivity_ntslf_t *slf = (p4est3_connectivity_ntslf_t *) vslf;
+  SC3A_CHECK (slf != NULL);
+
+  SC3E (sc3_allocator_free (slf->alloc, slf));
+  return NULL;
+}
+
+static sc3_error_t *
+basics_connectivity_new_virtual (sc3_allocator_t * alloc,
+                                 p4est3_topidx num_trees,
+                                 p4est3_connectivity_t ** pc)
+{
+  p4est3_connectivity_ntslf_t *slf;
+  p4est3_connectivity_t *c;
+
+  SC3E_RETVAL (pc, NULL);
+  SC3A_IS (sc3_allocator_is_valid, alloc);
+  SC3A_CHECK (num_trees > 0);
+
+  /* create virtual structure */
+  SC3E (sc3_allocator_calloc_one
+        (alloc, sizeof (p4est3_connectivity_ntslf_t), &slf));
+  slf->alloc = alloc;           /**< no need to ref alloc since conn_new does it */
+  slf->scvt.dim = P4EST_DIM;
+  slf->scvt.num_trees = num_trees;
+  slf->scvt.destroy = p4est3_connectivity_dstr;
+
+  /* create connectivity */
+  SC3E (p4est3_connectivity_new (alloc, &c));
+  SC3E (p4est3_connectivity_set_vtable (c, &slf->scvt, slf));
+  SC3E (p4est3_connectivity_setup (c));
+  SC3A_IS (p4est3_connectivity_is_setup, c);
+
+  *pc = c;
+  return NULL;
+}
 
 static sc3_error_t *
 make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
@@ -41,29 +90,37 @@ test_p4est_new (sc3_allocator_t * alloc,
                 sc3_MPI_Comm_t mpicomm, p4est3_quadrant_vtable_t * qvt,
                 p4est3_topidx num_trees, int level)
 {
-  int                 i;
+  int                 i, j;
   p4est_connectivity_t *c4;
   p4est3_connectivity_t *conn;
+  p4est3_connectivity_t *aconn;
   p4est3_t           *p3;
+  p4est_t            *p4;
 
   SC3A_IS (sc3_allocator_is_setup, alloc);
 
   for (i = 0; i < 4; ++i) {
-    /* create connectivity structure */
+    /* create p4est3_connectivity_t structure */
     fprintf (stderr, "Trying %d\n", i);
     switch (i) {
     case 0:
       /* default connectivity with one tree */
       SC3E (p4est3_connectivity_new (alloc, &conn));
+      SC3E (p4est3_connectivity_set_dim (conn, P4EST_DIM));
+      SC3E (p4est3_connectivity_set_num_trees (conn, num_trees));
       SC3E (p4est3_connectivity_setup (conn));
       break;
     case 1:
       /* virtual connectivity with one tree */
-      SC3E (p4est3_connectivity_new_num_trees (alloc, 1, &conn));
+      SC3E (basics_connectivity_new_virtual (alloc, num_trees, &conn));
       break;
     case 2:
-      /* at this stage this object is still dimension-independent */
+      /* use convenience constructors */
+#ifndef P4_TO_P8
+      SC3E (p4est3_connectivity_new_unitsquare (alloc, &conn));
+#else
       SC3E (p4est3_connectivity_new_unitcube (alloc, &conn));
+#endif
       break;
     case 3:
       /* wrapping a p4est connectivity */
@@ -78,16 +135,43 @@ test_p4est_new (sc3_allocator_t * alloc,
       SC3E_UNREACH ("Invalid example counter");
     }
 
-    /* create p4est object with connectivity */
+    /* create p4est3_t object with p4est3_connectivity_t */
     SC3E (p4est3_new (alloc, &p3));
     SC3E (p4est3_set_comm (p3, mpicomm, 1));
     SC3E (p4est3_set_connectivity (p3, conn));
-    SC3E (p4est3_set_vtable (p3, qvt));
+    SC3E (p4est3_set_quadrant_vtable (p3, qvt));
     SC3E (p4est3_set_level (p3, level));
     SC3E (p4est3_setup (p3));
 
+    /* do something with the forest */
+    for (j = 0; j < 4; ++j) {
+      SC3E (p4est3_access_connectivity (p3, &aconn));
+      SC3E (p4est3_restore_connectivity (p3, aconn));
+    }
+
+    /* this leaves the connectivity intact */
     SC3E (p4est3_destroy (&p3));
+
+    if (i == 3) {
+      SC3A_CHECK (c4 != NULL);
+
+      /* create p4est object from legacy p4est */
+      fprintf (stderr, "Variant %d\n", i);
+      p4 = p4est_new (sc_MPI_COMM_WORLD, c4, 0, NULL, NULL);
+      SC3E (p4est3_new_p4est (alloc, p4, 1, &p3));
+
+      /* do something with the forest */
+      for (j = 0; j < 2; ++j) {
+        SC3E (p4est3_access_connectivity (p3, &aconn));
+        SC3E (p4est3_restore_connectivity (p3, aconn));
+      }
+
+      SC3E (p4est3_destroy (&p3));
+    }
+
+    /* this deletes the standard connectivity in case 3 */
     SC3E (p4est3_connectivity_destroy (&conn));
+    c4 = NULL;
   }
   return NULL;
 }
@@ -100,75 +184,132 @@ free_allocator (sc3_allocator_t ** alloc)
   return NULL;
 }
 
-static void
-report_errors (sc3_allocator_t * mainalloc, sc3_error_t ** pe)
+typedef struct v3basics
 {
-  char                eflat[SC3_BUFSIZE];
-  char                reason[SC3_BUFSIZE];
-
-  if (pe != NULL && *pe != NULL) {
-    /* TODO print error messages in a nicer way */
-    sc3_error_destroy_noerr (pe, eflat);
-    fprintf (stderr, "Error: %s\n", eflat);
-  }
-
-  if (!sc3_allocator_is_free (mainalloc, reason)) {
-    fprintf (stderr, "Allocation error: %s\n", reason);
-  }
-
-#if 0
-  e = sc3_error_destroy (pe);
-
-  /* TODO synchronize e across MPI processes */
-
-  if (e != NULL) {
-    fprintf (stderr, "Errors remain\n");
-    sc3_error_destroy (&e);
-  }
-#endif
-}
-
-int
-main (int argc, char **argv)
-{
-  int                 level;
-  p4est3_topidx       num_trees;
-  sc3_allocator_t    *alloc, *mainalloc;
-  sc3_error_t        *e;
   sc3_MPI_Comm_t      mpicomm;
-  p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
+  int                 mpirank;
+  sc3_allocator_t    *alloc;
+  p4est3_quadrant_vtable_t sqvt_legacy, *qvt_legacy;
 
-  /* v3 standard procedure to isolate memory allocation contexts */
-  mainalloc = sc3_allocator_nothread ();
+}
+v3basics_t;
 
-  /* legacy wrapping for p4est quadrants */
-  p4est_quadrant_vtable (qvt, 0);
+static sc3_error_t *
+v3basics_prepare (v3basics_t * t)
+{
+  /* consistency checks */
+  SC3A_CHECK (t != NULL);
 
-  /* command line parameters */
-  num_trees = 2;
-  level = 3;
-
-  /* this is generally needed for MPI */
-  SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
+  /* initialize global data */
+  t->qvt_legacy = &t->sqvt_legacy;
+  t->mpicomm = SC3_MPI_COMM_WORLD;
+  SC3E (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
+  SC3E (sc3_MPI_Comm_set_errhandler (t->mpicomm, SC3_MPI_ERRORS_RETURN));
 
   /* we don't need init calls for v3.  Just to check legacy wrapping */
   /* must not use SC3_MPI_COMM_WORLD due to incompatible non-mpi wrapping */
   sc_init (sc_MPI_COMM_WORLD, 1, 1, NULL, SC_LP_DEFAULT);
   p4est_init (NULL, SC_LP_DEFAULT);
 
-  SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
+  /* legacy wrapping for p4est quadrants */
+  SC3E (p4est3_quadrant_vtable_p4est (t->qvt_legacy, 0));
 
-  mpicomm = SC3_MPI_COMM_WORLD;
-  SC3E_NULL_SET (e, test_p4est_new (alloc, mpicomm, qvt, num_trees, level));
+  /* perspectively make one allocator for each thread */
+  SC3E (make_allocator (sc3_allocator_nothread (), &t->alloc));
+  return NULL;
+}
 
-  SC3E_NULL_SET (e, free_allocator (&alloc));
+static sc3_error_t *
+v3basics_run (v3basics_t * t, p4est3_topidx num_trees, int level)
+{
+  SC3A_CHECK (t != NULL);
+  SC3A_CHECK (num_trees > 0);
+
+  SC3E (test_p4est_new
+        (t->alloc, t->mpicomm, t->qvt_legacy, num_trees, level));
+  return NULL;
+}
+
+static sc3_error_t *
+v3basics_cleanup (v3basics_t * t)
+{
+  SC3A_CHECK (t != NULL);
+
+  /* free resources allocated earlier */
+  SC3E (free_allocator (&t->alloc));
 
   /* again, just to check legacy wrapping */
-  SC3E_NULL_REQ (e, !sc_finalize_noabort ());
+  SC3E_DEMAND (sc_finalize_noabort () == 0, "Legacy sc_finalize failed");
+  return NULL;
+}
 
-  /* TODO: call finalize even with errors? */
-  SC3E_NULL_SET (e, sc3_MPI_Finalize ());
-  report_errors (mainalloc, &e);
+/* It is generally a nice idea to make the error status collective.
+   However, this will not work since MPI state prior to entering here
+   may be inconsistent between ranks due to rank-specific error history. */
+static int
+v3basics_error_check (v3basics_t * t, sc3_error_t ** e)
+{
+  int                 retval;
+  char                buffer[SC3_BUFSIZE];
 
+  retval = sc3_error_check (e, buffer, SC3_BUFSIZE);
+  if (retval) {
+    fprintf (stderr, "Internal error to program on rank %d:\n"
+             "%s\nThis rank %d will skip the rest.\n",
+             t->mpirank, buffer, t->mpirank);
+  }
+  return retval < 0;
+}
+
+static void
+v3basics_error_summary (v3basics_t * t, int arewedead)
+{
+  if (arewedead) {
+    fprintf (stderr, "Ended rank %d on error.\n", t->mpirank);
+    SC3X (sc3_MPI_Abort (t->mpicomm, SC3_MPI_ERR_OTHER));
+  }
+}
+
+int
+main (int argc, char **argv)
+{
+  int                 level;
+  int                 arewedead;
+  p4est3_topidx       num_trees;
+  sc3_error_t        *e;
+  v3basics_t          st, *t = &st;
+
+  /* Generally needed for MPI.  No room for continuing on error. */
+  SC3X (sc3_MPI_Init (&argc, &argv));
+
+  /* wanna-be command line parameters */
+  num_trees = 2;
+  level = 3;
+
+  /*** The way of using p4est3 in the following is one suggestion.
+       Application may use shortcuts and crash on error, but here
+       we try to report error conditions cleanly to calling code. ***/
+
+  /* setup data structures to use */
+  e = v3basics_prepare (t);
+  arewedead = v3basics_error_check (t, &e);
+
+  /* do something.  Supposing the use of p4est3 is part of a bigger program */
+  if (!arewedead) {
+    e = v3basics_run (t, num_trees, level);
+    arewedead = v3basics_error_check (t, &e);
+  }
+
+  /* we will not try to cleanup if we must assume fatal inconsistencies */
+  if (!arewedead) {
+    e = v3basics_cleanup (t);
+    arewedead = v3basics_error_check (t, &e);
+  }
+
+  /* print summary and abort if we have encountered a fatal inconsistency */
+  v3basics_error_summary (t, arewedead);
+
+  /* Generally needed for MPI.  No room for continuing on error. */
+  SC3X (sc3_MPI_Finalize ());
   return 0;
 }

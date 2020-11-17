@@ -29,9 +29,17 @@
  * \ingroup p4est
  */
 
-/** \defgroup p4est p4est
+/** \defgroup p4est p4est version up to 2
  *
- * The 2D version of the p4est library.
+ * The 2D version of the p4est library: standard interface and code.
+ * Development began in November 2007 and the code has been in production
+ * for a rough decade.  We will continue to maintain this code in the future.
+ *
+ * The branches master and develop preserve the conventions of about 2015.
+ * The branch prev3-develop has been stripped of unnecessary dependencies
+ * and is the version recommended to specify when developing applicatons,
+ * both evolving existing ones and starting new ones.
+ * prev3-develop is expected to be the most portable.
  */
 
 #ifndef P4EST_H
@@ -47,9 +55,11 @@
 SC_EXTERN_C_BEGIN;
 
 /** The finest level of the quadtree for representing nodes */
+#define P4EST_OLD_MAXLEVEL 30   /* in 2D, the maxlevel has always been 30 */
 #define P4EST_MAXLEVEL 30
 
 /** The finest level of the quadtree for representing quadrants */
+#define P4EST_OLD_QMAXLEVEL 29  /* in 2D, the qmaxlevel has always been 29 */
 #define P4EST_QMAXLEVEL 29
 
 /** The length of a side of the root quadrant */
@@ -250,7 +260,7 @@ void                p4est_qcoord_to_vertex (p4est_connectivity_t *
                                             p4est_qcoord_t x,
                                             p4est_qcoord_t y, double vxyz[3]);
 
-/** Create a new forest.
+/** Create a new forest with an initial coarse mesh.
  * The new forest consists of equi-partitioned root quadrants.
  * When there are more processors than trees, some processors are empty.
  *
@@ -386,6 +396,11 @@ void                p4est_partition (p4est_t * p4est,
  * \return  Returns the checksum on processor 0 only. 0 on other processors.
  */
 unsigned            p4est_checksum (p4est_t * p4est);
+
+/** Compute a partition-dependent checksum for a forest.
+ * \return  Returns the checksum on processor 0 only. 0 on other processors.
+ */
+unsigned            p4est_checksum_partition (p4est_t * p4est);
 
 /** Save the complete connectivity/p4est data to disk.
  *

@@ -24,9 +24,9 @@
 #ifndef P4EST3_INTERNAL_H
 #define P4EST3_INTERNAL_H
 
-#include <p4est3.h>
 #include <sc3_array.h>
 #include <sc3_refcount.h>
+#include <p4est3.h>
 
 typedef struct p4est3_tree
 {
@@ -45,9 +45,15 @@ struct p4est3
   sc3_array_t        *talloc;  /* TODO: one allocator per thread */
   int                 setup;
 
+  /* this forest may be wrapping a virtual implementation */
+  p4est3_vtable_t     spvt, *pvt;
+  void               *slf;
+
   sc3_MPI_Comm_t      mpicomm;
   int                 commdup;
   p4est3_connectivity_t *conn;
+
+  int                 accessed_conn;
 
   sc3_MPI_Comm_t      nodecomm, headcomm;
   sc3_MPI_Info_t      info_noncontig;

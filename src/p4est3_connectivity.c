@@ -35,8 +35,18 @@ struct p4est3_connectivity
   void               *slf;
 
   /* parameters fixed after setup call */
+  int                 dim;
   p4est3_topidx       num_trees;
 };
+
+int                 p4est3_connectivity_vtable_is_valid
+  (const p4est3_connectivity_vtable_t * cvt, char *reason)
+{
+  SC3E_TEST (cvt != NULL, reason);
+  SC3E_TEST (0 < cvt->dim && cvt->dim <= 3, reason);
+  SC3E_TEST (0 < cvt->num_trees, reason);
+  SC3E_YES (reason);
+}
 
 int
 p4est3_connectivity_is_valid (const p4est3_connectivity_t * c, char *reason)
@@ -45,11 +55,10 @@ p4est3_connectivity_is_valid (const p4est3_connectivity_t * c, char *reason)
   SC3E_IS (sc3_refcount_is_valid, &c->rc, reason);
   SC3E_IS (sc3_allocator_is_setup, c->alloc, reason);
   if (c->cvt != NULL) {
-    /* is there anything we should check? */
+    SC3E_IS (p4est3_connectivity_vtable_is_valid, c->cvt, reason);
   }
-  else {
-    SC3E_TEST (c->num_trees > 0, reason);
-  }
+  SC3E_TEST (0 < c->dim && c->dim <= 3, reason);
+  SC3E_TEST (0 < c->num_trees, reason);
   SC3E_YES (reason);
 }
 
@@ -81,6 +90,7 @@ p4est3_connectivity_new (sc3_allocator_t * alloc, p4est3_connectivity_t ** pc)
   SC3E (sc3_allocator_calloc_one (alloc, sizeof (p4est3_connectivity_t), &c));
   SC3E (sc3_refcount_init (&c->rc));
   c->alloc = alloc;
+  c->dim = 2;
   c->num_trees = 1;
   SC3A_IS (p4est3_connectivity_is_new, c);
 
@@ -93,11 +103,20 @@ p4est3_connectivity_set_vtable (p4est3_connectivity_t * c,
                                 p4est3_connectivity_vtable_t * cvt, void *slf)
 {
   SC3A_IS (p4est3_connectivity_is_new, c);
-  SC3A_CHECK (cvt != NULL);
+  SC3A_IS (p4est3_connectivity_vtable_is_valid, cvt);
 
-  /* make deep copy of virtual table */
+  /* make shallow copy of virtual table */
   *(c->cvt = &c->scvt) = *cvt;
   c->slf = slf;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_connectivity_set_dim (p4est3_connectivity_t * c, int dim)
+{
+  SC3A_IS (p4est3_connectivity_is_new, c);
+  SC3A_CHECK (0 < dim && dim <= 3);
+  c->dim = dim;
   return NULL;
 }
 
@@ -129,42 +148,51 @@ p4est3_connectivity_ref (p4est3_connectivity_t * c)
 }
 
 sc3_error_t        *
-p4est3_connectivity_unref (p4est3_connectivity_t ** pc)
+p4est3_connectivity_unref (p4est3_connectivity_t * c)
 {
   int                 waslast;
-  sc3_allocator_t    *alloc;
-  p4est3_connectivity_t *c;
 
-  SC3E_INOUTP (pc, c);
-  SC3A_IS (p4est3_connectivity_is_valid, c);
-
+  SC3A_IS (p4est3_connectivity_is_setup, c);
   SC3E (sc3_refcount_unref (&c->rc, &waslast));
-  if (waslast) {
-    *pc = NULL;
 
-    /* destruction callback if one was provided */
-    if (c->cvt != NULL && c->cvt->destroy != NULL) {
-      SC3E (c->cvt->destroy (c->slf));
-    }
-
-    /* remove allocation */
-    alloc = c->alloc;
-    SC3E (sc3_allocator_free (alloc, c));
-    SC3E (sc3_allocator_unref (&alloc));
-  }
+  /* This is a hard check that we do not unref below a count of one. */
+  SC3E_DEMAND (!waslast, "Connectivity unrefd below a count of one");
   return NULL;
 }
 
 sc3_error_t        *
 p4est3_connectivity_destroy (p4est3_connectivity_t ** pc)
 {
+  sc3_allocator_t    *alloc;
   p4est3_connectivity_t *c;
 
   SC3E_INULLP (pc, c);
-  SC3E_DEMIS (sc3_refcount_is_last, &c->rc);
-  SC3E (p4est3_connectivity_unref (&c));
+  SC3A_IS (p4est3_connectivity_is_valid, c);
 
-  SC3A_CHECK (c == NULL);
+  /* This is a hard check for a reference count of exactly one. */
+  SC3E_DEMIS (sc3_refcount_is_last, &c->rc);
+
+  /* destruction callback if one was provided */
+  if (c->cvt != NULL && c->cvt->destroy != NULL) {
+    SC3E (c->cvt->destroy (c->slf));
+  }
+
+  /* remove allocation */
+  alloc = c->alloc;
+  SC3E (sc3_allocator_free (alloc, c));
+  SC3E (sc3_allocator_unref (&alloc));
+
+  /* nothing is left */
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_connectivity_get_dim (const p4est3_connectivity_t * c, int *pdim)
+{
+  SC3A_IS (p4est3_connectivity_is_setup, c);
+  SC3A_CHECK (pdim != NULL);
+
+  *pdim = c->cvt != NULL ? c->cvt->dim : c->dim;
   return NULL;
 }
 
@@ -175,71 +203,18 @@ p4est3_connectivity_get_num_trees (const p4est3_connectivity_t * c,
   SC3A_IS (p4est3_connectivity_is_setup, c);
   SC3A_CHECK (pnum_trees != NULL);
 
-  if (c->cvt != NULL) {
-    SC3A_CHECK (c->cvt->get_num_trees != NULL);
-    SC3E (c->cvt->get_num_trees (c->slf, pnum_trees));
-  }
-  else {
-    *pnum_trees = c->num_trees;
-  }
-  return NULL;
-}
-
-/* TODO this is demo/convenience code; move away */
-
-typedef struct p4est3_connectivity_ntslf
-{
-  sc3_allocator_t    *alloc;
-  p4est3_topidx       num_trees;
-
-  /* no need really to allocate this here since it is deep copied */
-  p4est3_connectivity_vtable_t scvt;
-}
-p4est3_connectivity_ntslf_t;
-
-static sc3_error_t *
-p4est3_connectivity_gnt (void *vslf, p4est3_topidx * pnt)
-{
-  p4est3_connectivity_ntslf_t *slf = (p4est3_connectivity_ntslf_t *) vslf;
-  SC3A_CHECK (slf != NULL);
-  SC3A_CHECK (pnt != NULL);
-
-  *pnt = slf->num_trees;
-  return NULL;
-}
-
-static sc3_error_t *
-p4est3_connectivity_dstr (void *vslf)
-{
-  p4est3_connectivity_ntslf_t *slf = (p4est3_connectivity_ntslf_t *) vslf;
-  SC3A_CHECK (slf != NULL);
-
-  SC3E (sc3_allocator_free (slf->alloc, slf));
+  *pnum_trees = c->cvt != NULL ? c->cvt->num_trees : c->num_trees;
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_connectivity_new_num_trees (sc3_allocator_t * alloc,
-                                   p4est3_topidx num_trees,
-                                   p4est3_connectivity_t ** pc)
+p4est3_connectivity_new_unitsquare (sc3_allocator_t * alloc,
+                                    p4est3_connectivity_t ** pc)
 {
-  p4est3_connectivity_ntslf_t *slf;
   p4est3_connectivity_t *c;
 
   SC3E_RETVAL (pc, NULL);
-  SC3A_CHECK (num_trees > 0);
-
-  /* create virtual structure */
-  SC3E (sc3_allocator_calloc_one
-        (alloc, sizeof (p4est3_connectivity_ntslf_t), &slf));
-  slf->alloc = alloc;
-  slf->num_trees = num_trees;
-  slf->scvt.get_num_trees = p4est3_connectivity_gnt;
-  slf->scvt.destroy = p4est3_connectivity_dstr;
-
-  /* create connectivity */
   SC3E (p4est3_connectivity_new (alloc, &c));
-  SC3E (p4est3_connectivity_set_vtable (c, &slf->scvt, slf));
   SC3E (p4est3_connectivity_setup (c));
   SC3A_IS (p4est3_connectivity_is_setup, c);
 

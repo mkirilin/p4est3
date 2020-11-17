@@ -1,5 +1,5 @@
 /*
-  This file is part of p4est, version 3
+  This file is part of p4est, version 3.
   p4est is a C library to manage a collection (a forest) of multiple
   connected adaptive quadtrees or octrees in parallel.
 
@@ -21,11 +21,17 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P8EST_P4EST3_H
-#define P8EST_P4EST3_H
+/** \file p4est3_quadrant_yx.h
+ *
+ * 2D quadrant implementation using a 128 bit AVX accelerated data type.
+ *
+ * \ingroup p4est3
+ */
 
-#include <p8est.h>
-#include <p4est3.h>
+#ifndef P4EST_QUADRANT_YX_H
+#define P4EST_QUADRANT_YX_H
+
+#include <p4est3_quadrant_vtable.h>
 
 #ifdef __cplusplus
 extern              "C"
@@ -35,14 +41,15 @@ extern              "C"
 #endif
 #endif
 
-sc3_error_t        *p4est3_connectivity_new_p8est (sc3_allocator_t * alloc,
-                                                   p8est_connectivity_t * c4,
-                                                   int autodestroy,
-                                                   p4est3_connectivity_t **
-                                                   conn);
-
-void                p8est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt,
-                                           int id);
+/** Populate a 2D quadrant virtual table with an AVX implementation.
+ * We use the level and x, y coordinates inside a 4x32 bit hardware type.
+ * \param [out] qvt     Members populated with virtual functions.
+ * \return              NULL on success, error object otherwise.
+ *                      If AVX hardware support is not available,
+ *                      return an error of kind SC3_ERROR_RUNTIME.
+ */
+sc3_error_t        *p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t *
+                                               qvt);
 
 #ifdef __cplusplus
 #if 0
@@ -51,4 +58,4 @@ void                p8est_quadrant_vtable (p4est3_quadrant_vtable_t * qvt,
 }
 #endif
 
-#endif /* !P8EST_P4EST3_H */
+#endif /* !P4EST_QUADRANT_YX_H */

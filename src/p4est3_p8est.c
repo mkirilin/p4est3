@@ -1,5 +1,5 @@
 /*
-  This file is part of p4est, version 3.
+  This file is part of p4est, version 3
   p4est is a C library to manage a collection (a forest) of multiple
   connected adaptive quadtrees or octrees in parallel.
 
@@ -21,28 +21,6 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P8EST_QUADRANT_ZYX_H
-#define P8EST_QUADRANT_ZYX_H
-
-#include <p4est3_base.h>
-#include <p4est3_quadrant_vtable.h>
-
-#ifdef __cplusplus
-extern              "C"
-{
-#if 0
-}
-#endif
-#endif
-
-sc3_error_t        *p8est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t *
-                                                qvt);
-
-#ifdef __cplusplus
-#if 0
-{
-#endif
-}
-#endif
-
-#endif /* !P8EST_QUADRANT_ZYX_H */
+#include <p4est_to_p8est.h>
+#include <p4est3_to_p8est3.h>
+#include "p4est3_p4est.c"

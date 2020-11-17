@@ -40,5 +40,12 @@
 
 /* functions in p4est_quadrant_mort */
 #define p4est3_quadrant_mort_vtable         p8est3_quadrant_mort_vtable
+/* functions in p4est3_p4est */
+#define p4est3_new_p4est                    p4est3_new_p8est
+#define p4est3_connectivity_new_p4est       p4est3_connectivity_new_p8est
+#define p4est3_quadrant_vtable_p4est        p4est3_quadrant_vtable_p8est
+
+/* functions in p4est3_quadrant_yx */
+#define p4est3_quadrant_yx_vtable           p4est3_quadrant_zyx_vtable
 
 #endif /* !P4EST3_TO_P8EST3_H */

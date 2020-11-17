@@ -21,7 +21,11 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#if 0 /* 3D not ready yet */
+/* TODO: we do not need this file since p4est3.h is dimension independent.
+ *       Still, in the future we may use dimension-specific algorithms
+ *       for which this file may renamed as the beginning. */
+
+#if 0                           /* 3D not ready yet */
 #include <p4est3_to_p8est3.h>
 #include "p4est3.c"
 #endif /* 0 */

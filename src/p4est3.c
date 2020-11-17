@@ -25,8 +25,18 @@
 #include <sc3_omp.h>
 #include <sc3_refcount.h>
 
-/* TODO add context information to sc3_error
-        (i.e., which library is producing the error?) */
+int
+p4est3_vtable_is_valid (const p4est3_vtable_t * pvt, char *reason)
+{
+  SC3E_TEST (pvt != NULL, reason);
+  SC3E_TEST (0 < pvt->dim && pvt->dim <= 3, reason);
+
+  /* check object variables as well */
+  SC3E_IS (p4est3_connectivity_is_valid, pvt->c3, reason);
+  SC3E_IS (p4est3_quadrant_vtable_is_valid, pvt->qvt, reason);
+
+  SC3E_YES (reason);
+}
 
 int
 p4est3_is_valid (const p4est3_t * p3, char *reason)
@@ -35,23 +45,38 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
   SC3E_IS (sc3_refcount_is_valid, &p3->rc, reason);
   SC3E_IS (sc3_allocator_is_setup, p3->alloc, reason);
 
-  SC3E_TEST (p3->mpicomm != SC3_MPI_COMM_NULL, reason);
-  SC3E_TEST (p3->level >= 0, reason);
-  SC3E_TEST (p3->setup_mode < P4EST3_NEW_MODE_LAST, reason);
-
   if (!p3->setup) {
-    SC3E_TEST (p3->mpisize == 0 && p3->mpirank == 0, reason);
+    SC3E_TEST (p3->accessed_conn == 0, reason);
   }
   else {
-    SC3E_IS (p4est3_connectivity_is_setup, p3->conn, reason);
-    SC3E_TEST (p3->num_trees > 0, reason);
-    SC3E_TEST (p3->qvt == &p3->sqvt, reason);
+    SC3E_TEST (p3->accessed_conn >= 0, reason);
+  }
 
-    SC3E_TEST (p3->nodesizewin != SC3_MPI_WIN_NULL, reason);
-    SC3E_TEST (p3->headcomm != SC3_MPI_COMM_NULL || p3->noderank > 0, reason);
-    SC3E_TEST (p3->nodecomm != SC3_MPI_COMM_NULL, reason);
+  if (p3->pvt != NULL) {
+    SC3E_IS (p4est3_vtable_is_valid, p3->pvt, reason);
 
-    /* TODO thoroughly test all member variables */
+    /* TODO check whatever else happens with a forest virtual table */
+  }
+  else {
+    SC3E_TEST (p3->mpicomm != SC3_MPI_COMM_NULL, reason);
+    SC3E_TEST (p3->level >= 0, reason);
+    SC3E_TEST (p3->setup_mode < P4EST3_NEW_MODE_LAST, reason);
+
+    if (!p3->setup) {
+      SC3E_TEST (p3->mpisize == 0 && p3->mpirank == 0, reason);
+    }
+    else {
+      SC3E_IS (p4est3_connectivity_is_setup, p3->conn, reason);
+      SC3E_TEST (p3->num_trees > 0, reason);
+      SC3E_TEST (p3->qvt == &p3->sqvt, reason);
+
+      SC3E_TEST (p3->nodesizewin != SC3_MPI_WIN_NULL, reason);
+      SC3E_TEST (p3->headcomm != SC3_MPI_COMM_NULL
+                 || p3->noderank > 0, reason);
+      SC3E_TEST (p3->nodecomm != SC3_MPI_COMM_NULL, reason);
+
+      /* TODO thoroughly test all member variables */
+    }
   }
 
   SC3E_YES (reason);
@@ -97,6 +122,26 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
 }
 
 sc3_error_t        *
+p4est3_set_vtable (p4est3_t * p3, p4est3_vtable_t * pvt, void *slf)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  SC3A_IS (p4est3_vtable_is_valid, pvt);
+
+  /* make shallow copy of virtual table */
+  *(p3->pvt = &p3->spvt) = *pvt;
+
+  /* use objects passed in table now and overwrite them with our own */
+  SC3E (p4est3_set_connectivity (p3, p3->pvt->c3));
+  SC3E (p4est3_set_quadrant_vtable (p3, p3->pvt->qvt));
+  p3->pvt->c3 = p3->conn;
+  p3->pvt->qvt = p3->qvt;
+
+  /* assign virtual context */
+  p3->slf = slf;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_set_comm (p4est3_t * p3, sc3_MPI_Comm_t comm, int dup)
 {
   SC3A_IS (p4est3_is_new, p3);
@@ -126,7 +171,7 @@ p4est3_set_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
   SC3A_IS (p4est3_connectivity_is_setup, conn);
 
   if (p3->conn != NULL) {
-    SC3E (p4est3_connectivity_unref (&p3->conn));
+    SC3E (p4est3_connectivity_unref (p3->conn));
   }
   p3->conn = conn;
   SC3E (p4est3_connectivity_ref (p3->conn));
@@ -137,12 +182,12 @@ p4est3_set_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
 }
 
 sc3_error_t        *
-p4est3_set_vtable (p4est3_t * p3, p4est3_quadrant_vtable_t * qvt)
+p4est3_set_quadrant_vtable (p4est3_t * p3, p4est3_quadrant_vtable_t * qvt)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (qvt != NULL);
 
-  /* make deep copy of virtual table */
+  /* make shallow copy of virtual table */
   *(p3->qvt = &p3->sqvt) = *qvt;
   return NULL;
 }
@@ -154,6 +199,15 @@ p4est3_set_level (p4est3_t * p3, int level)
   SC3A_CHECK (level >= 0);
 
   p3->level = level;
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_setup_vtable (p4est3_t * p3)
+{
+  /* TODO: make MPI communicator wrappers of sc and sc3 compatible */
+  /* TODO: set as many p3 member variables as makes sense */
+
   return NULL;
 }
 
@@ -184,52 +238,58 @@ p4est3_setup (p4est3_t * p3)
 
   SC3A_IS (p4est3_is_new, p3);
 
-  /* check conditions that arise due to omitting mandatory _set_ functions */
+  /* Check conditions that arise due to omitting mandatory _set_ functions.
+     Note that p4est3_set_vtable sets connectivity and quadrant vtable. */
   SC3E_DEMAND (p3->conn != NULL, "Connectivity must be set");
   SC3E_DEMAND (p3->qvt == &p3->sqvt, "Quadrant virtual table must be set");
 
   /* further pre-setup consistency checks */
   SC3A_CHECK (p3->num_trees > 0);
 
-  /* query input communicator and populate node and head communicators */
-  SC3E (p4est3_internal_setup_comm (p3));
-
-  /* determine a quadrant's size in memory */
-  qsize = (int) p4est3_quadrant_size (p3->qvt);
-  SC3A_CHECK (qsize > 0);
-
-  /* determine principal and initial refinement level */
-  p3->qmaxlevel = p4est3_max_level (p3->qvt);
-  SC3A_CHECK (p3->qmaxlevel >= 0);
-  p3->level = SC3_MIN (p3->level, p3->qmaxlevel);
-
-  /* TODO make sure that the number of local quadrants stays bounded */
-
-  /* with number of children determine number of elements per tree */
-  p3->num_children = p4est3_num_children (p3->qvt);
-  SC3A_CHECK (p3->num_children > 0);
-  high_uniform = P4EST3_GLOIDX_MAX / p3->num_children;
-  for (num_uniform = 1, lev = 0;
-       num_uniform <= high_uniform && lev < p3->level; ++lev) {
-    /* we iterate so we do not roll over the gloidx limit */
-    num_uniform *= p3->num_children;
+  if (p3->pvt != NULL) {
+    SC3E (p4est3_setup_vtable (p3));
   }
-  p3->level = lev;
-  SC3A_CHECK (p4est3_glopow (p3->num_children, p3->level) == num_uniform);
+  else {
+    /* query input communicator and populate node and head communicators */
+    SC3E (p4est3_internal_setup_comm (p3));
 
-  /* allocate one temporary quadrant per thread */
-  p3->max_threads = sc3_omp_max_threads ();
-  SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),
-                              &p3->temp_quad));
-  for (ti = 0; ti < p3->max_threads; ++ti) {
-    SC3E (sc3_allocator_malloc (p3->alloc, qsize, &p3->temp_quad[ti]));
-  }
+    /* determine a quadrant's size in memory */
+    qsize = (int) p4est3_quadrant_size (p3->qvt);
+    SC3A_CHECK (qsize > 0);
 
-  /* compute partition cuts and create shared partition arrays */
-  SC3E (p4est3_internal_setup_cut (p3, num_uniform, qsize));
+    /* determine principal and initial refinement level */
+    p3->qmaxlevel = p4est3_quadrant_max_level (p3->qvt);
+    SC3A_CHECK (p3->qmaxlevel >= 0);
+    p3->level = SC3_MIN (p3->level, p3->qmaxlevel);
 
-  /* create tree and quadrant metadata */
-  SC3E (p4est3_internal_setup_tree (p3, num_uniform));
+    /* TODO make sure that the number of local quadrants stays bounded */
+
+    /* with number of children determine number of elements per tree */
+    /* TODO use uniform_level function and consider variable num_children */
+    p3->num_children = p4est3_quadrant_max_children (p3->qvt);
+    SC3A_CHECK (p3->num_children > 0);
+    high_uniform = P4EST3_GLOIDX_MAX / p3->num_children;
+    for (num_uniform = 1, lev = 0;
+         num_uniform <= high_uniform && lev < p3->level; ++lev) {
+      /* we iterate so we do not roll over the gloidx limit */
+      num_uniform *= p3->num_children;
+    }
+    p3->level = lev;
+    SC3A_CHECK (p4est3_glopow (p3->num_children, p3->level) == num_uniform);
+
+    /* allocate one temporary quadrant per thread */
+    p3->max_threads = sc3_omp_max_threads ();
+    SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),
+                                &p3->temp_quad));
+    for (ti = 0; ti < p3->max_threads; ++ti) {
+      SC3E (sc3_allocator_malloc (p3->alloc, qsize, &p3->temp_quad[ti]));
+    }
+
+    /* compute partition cuts and create shared partition arrays */
+    SC3E (p4est3_internal_setup_cut (p3, num_uniform, qsize));
+
+    /* create tree and quadrant metadata */
+    SC3E (p4est3_internal_setup_tree (p3, num_uniform));
 
   /* create quadrants by the previously specified method,
      default is morton, which is presumably slowest */
@@ -250,19 +310,42 @@ p4est3_ref (p4est3_t * p3)
 }
 
 sc3_error_t        *
-p4est3_unref (p4est3_t ** pp3)
+p4est3_unref (p4est3_t * p3)
 {
   int                 waslast;
+
+  SC3A_IS (p4est3_is_setup, p3);
+  SC3E (sc3_refcount_unref (&p3->rc, &waslast));
+
+  /* This is a hard check that we do not unref below a count of one. */
+  SC3E_DEMAND (!waslast, "Forest unrefd below a count of one");
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_destroy (p4est3_t ** pp3)
+{
   sc3_allocator_t    *alloc;
   p4est3_t           *p3;
 
-  SC3E_INOUTP (pp3, p3);
+  SC3E_INULLP (pp3, p3);
   SC3A_IS (p4est3_is_valid, p3);
-  SC3E (sc3_refcount_unref (&p3->rc, &waslast));
-  if (waslast) {
-    *pp3 = NULL;
+  SC3A_CHECK (p3->accessed_conn == 0);
 
-    alloc = p3->alloc;
+  /* This is a hard check for a reference count of exactly one. */
+  SC3E_DEMIS (sc3_refcount_is_last, &p3->rc);
+
+  if (p3->pvt != NULL) {
+    /* the connectivity has been set from the virtual table */
+    SC3E (p4est3_connectivity_unref (p3->conn));
+
+    /* destruction callback if one was provided */
+    if (p3->pvt->destroy != NULL) {
+      SC3E (p3->pvt->destroy (p3->slf));
+    }
+  }
+  else {
+    /* free memory that has been populated during non-virtual setup */
     if (p3->setup) {
       int                 ti;
 
@@ -290,27 +373,41 @@ p4est3_unref (p4est3_t ** pp3)
 
     /* release data that has been referenced before setup */
     if (p3->conn != NULL) {
-      SC3E (p4est3_connectivity_unref (&p3->conn));
+      SC3E (p4est3_connectivity_unref (p3->conn));
     }
     if (p3->commdup) {
       SC3E (sc3_MPI_Comm_free (&p3->mpicomm));
     }
-    SC3E (sc3_allocator_free (alloc, p3));
-    SC3E (sc3_allocator_unref (&alloc));
   }
+
+  /* remove allocation */
+  alloc = p3->alloc;
+  SC3E (sc3_allocator_free (alloc, p3));
+  SC3E (sc3_allocator_unref (&alloc));
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_destroy (p4est3_t ** pp3)
+p4est3_access_connectivity (p4est3_t * p3, p4est3_connectivity_t ** pconn)
 {
-  p4est3_t           *p3;
+  SC3E_RETVAL (pconn, NULL);
+  SC3A_IS (p4est3_is_setup, p3);
 
-  SC3E_INULLP (pp3, p3);
-  SC3E_DEMIS (sc3_refcount_is_last, &p3->rc);
-  SC3E (p4est3_unref (&p3));
+  SC3E (p4est3_connectivity_ref (p3->conn));
+  *pconn = p3->conn;
+  ++p3->accessed_conn;
+  return NULL;
+}
 
-  SC3A_CHECK (p3 == NULL);
+sc3_error_t        *
+p4est3_restore_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
+{
+  SC3A_IS (p4est3_is_setup, p3);
+  SC3A_CHECK (conn == p3->conn);
+  SC3A_CHECK (p3->accessed_conn > 0);
+
+  SC3E (p4est3_connectivity_unref (p3->conn));
+  --p3->accessed_conn;
   return NULL;
 }
 

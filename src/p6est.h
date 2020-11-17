@@ -27,14 +27,14 @@
 
 /** \file p6est.h
  *
- * A hybrid 2D+1D AMR extension.
+ * A hybrid 2D+1D AMR extension to the p4est library.
  *
  * \ingroup p6est
  */
 
 /** \defgroup p6est p6est
  *
- * A hybrid 2D+1D AMR extension.
+ * A hybrid 2D+1D AMR extension: standard interface and code.
  *
  * To include this component of the p4est library, configure p4est with the
  * --enable-p6est option given.  This module provides a specific kind of

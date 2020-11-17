@@ -21,10 +21,16 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+/** \file p4est3_quadrant_zyx.h
+ *
+ * 3D quadrant implementation using a 128 bit AVX accelerated data type.
+ *
+ * \ingroup p4est3
+ */
+
 #ifndef P4EST_QUADRANT_ZYX_H
 #define P4EST_QUADRANT_ZYX_H
 
-#include <p4est3_base.h>
 #include <p4est3_quadrant_vtable.h>
 
 #ifdef __cplusplus
@@ -35,7 +41,13 @@ extern              "C"
 #endif
 #endif
 
-/** TODO: document */
+/** Populate a 3D quadrant virtual table with an AVX implementation.
+ * We use the level and x, y, z coordinates inside a 4x32 bit hardware type.
+ * \param [out] qvt     Members populated with virtual functions.
+ * \return              NULL on success, error object otherwise.
+ *                      If AVX hardware support is not available,
+ *                      return an error of kind SC3_ERROR_RUNTIME.
+ */
 sc3_error_t        *p4est3_quadrant_zyx_vtable (p4est3_quadrant_vtable_t *
                                                 qvt);
 
