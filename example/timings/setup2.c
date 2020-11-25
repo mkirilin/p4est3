@@ -22,14 +22,14 @@
 */
 
 #ifndef P4_TO_P8
-#include <p4est3_quadrant_zyx.h>
+#include <p4est3_quadrant_yx.h>
 #include <p4est3_quadrant_mort.h>
-#include <p4est_p4est3.h>
+#include <p4est3_p4est.h>
 #include <p4est_extended.h>
 #else
-#include <p8est3_quadrant_zyx.h>
+#include <p4est3_quadrant_zyx.h>
 #include <p8est3_quadrant_mort.h>
-#include <p8est_p4est3.h>
+#include <p4est3_p8est.h>
 #include <p8est_extended.h>
 #endif
 
@@ -55,6 +55,7 @@ free_allocator (sc3_allocator_t ** alloc)
   return NULL;
 }
 
+#if 0
 static void
 report_errors (sc3_allocator_t * mainalloc, sc3_error_t ** pe)
 {
@@ -84,6 +85,7 @@ report_errors (sc3_allocator_t * mainalloc, sc3_error_t ** pe)
   }
 #endif
 }
+#endif
 
 void
 wrong_input (const char *name, int n)
@@ -160,10 +162,10 @@ check_quadrant_type (int argc, char **argv,
     return;
   }
   if (strcmp (argv[2], "STANDART") == 0) {
-    p4est_quadrant_vtable (qvt, 0);
+    p4est3_quadrant_vtable_p4est (qvt, 0);
   }
   else if (strcmp (argv[2], "AVX") == 0) {
-    p4est3_quadrant_zyx_vtable (qvt);
+    p4est3_quadrant_yx_vtable (qvt);
   }
   else if (strcmp (argv[2], "MORT_ORD") == 0) {
     p4est3_quadrant_mort_vtable (qvt);
@@ -232,7 +234,7 @@ main (int argc, char **argv)
 
   /* default parameters */
   p4est3_setup_mode_t mode = P4EST3_NEW_MORTON;
-  p4est_quadrant_vtable (qvt, 0);
+  p4est3_quadrant_vtable_p4est (qvt, 0);
   level = 1;
   num_trees = 2;
 
@@ -286,7 +288,7 @@ main (int argc, char **argv)
     SC3E_NULL_SET (e, p4est3_new (alloc, &p3));
     SC3E_NULL_SET (e, p4est3_set_comm (p3, mpicomm, 1));
     SC3E_NULL_SET (e, p4est3_set_connectivity (p3, conn));
-    SC3E_NULL_SET (e, p4est3_set_vtable (p3, qvt));
+    SC3E_NULL_SET (e, p4est3_set_quadrant_vtable (p3, qvt));
     SC3E_NULL_SET (e, p4est3_set_level (p3, level));
     SC3E_NULL_SET (e, p4est3_set_setup_mode (p3, mode));
 
@@ -322,7 +324,9 @@ main (int argc, char **argv)
 
   /* TODO: call finalize even with errors? */
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
+  SC3X(e);
+#if 0
   report_errors (mainalloc, &e);
-
+#endif
   return 0;
 }

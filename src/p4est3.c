@@ -290,7 +290,7 @@ p4est3_setup (p4est3_t * p3)
 
     /* create tree and quadrant metadata */
     SC3E (p4est3_internal_setup_tree (p3, num_uniform));
-
+  }
   /* create quadrants by the previously specified method,
      default is morton, which is presumably slowest */
   SC3E (p4est3_internal_setup_quadrants (p3));
@@ -424,7 +424,9 @@ p4est3_get_quadrants (const p4est3_t * p3, char **q)
 sc3_error_t        *
 p4est3_get_global_num_quads (const p4est3_t * p3, p4est3_gloidx * n)
 {
-  SC3E_RETOPT (n, 0L);
+  if (n != NULL) {
+    *n = 0L;
+  }
   SC3A_IS (p4est3_is_setup, p3);
 
   if (n != NULL) {
@@ -436,7 +438,9 @@ p4est3_get_global_num_quads (const p4est3_t * p3, p4est3_gloidx * n)
 sc3_error_t        *
 p4est3_get_local_num_quads (const p4est3_t * p3, p4est3_locidx * n)
 {
-  SC3E_RETOPT (n, 0L);
+  if (n != NULL) {
+    *n = 0L;
+  }
   SC3A_IS (p4est3_is_setup, p3);
 
   if (n != NULL) {
