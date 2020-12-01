@@ -24,10 +24,10 @@
 /** \file p4est3_internal.h
  *
  * Private declarations for use within the library.
- * It must never be included by public header files.
+ * This file must never be included by public header files.
  *
  * Me make no provisions on stability or backwards compatibility.
- * There is usually no reason to use them outside of the library.
+ * There is usually no reason to include this file outside of the library.
  *
  * \ingroup p4est3
  */
@@ -71,11 +71,10 @@ struct p4est3
   sc3_MPI_Comm_t      mpicomm;  /**< Valid MPI communicator. */
   int                 commdup;  /**< Boolean: communicator has been duped. */
   p4est3_connectivity_t *conn;  /**< Pointer to the relevant connectivity. */
+  p4est3_topidx       num_trees;        /**< Number of trees in \ref conn. */
   p4est3_quadrant_vtable_t sqvt;        /**< Memory pointed to by \ref qvt.
                                              Stores virtual quadrant methods. */
   p4est3_quadrant_vtable_t *qvt;        /**< Always points to \ref sqvt. */
-  p4est3_topidx       num_trees;        /**< Convenience variable to store
-                                             the number of trees in \c conn. */
   int                 level;    /**< Configuration variable for initiel level. */
 
   /* variables populated during \ref p4est3_setup */

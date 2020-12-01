@@ -36,6 +36,9 @@ p4est3_vtable_is_valid (const p4est3_vtable_t * pvt, char *reason)
   SC3E_IS (p4est3_connectivity_is_valid, pvt->c3, reason);
   SC3E_IS (p4est3_quadrant_vtable_is_valid, pvt->qvt, reason);
 
+  /* internal consistency */
+  /* TODO: verify dim of connectivity equals dim of vtable */
+
   SC3E_YES (reason);
 }
 
