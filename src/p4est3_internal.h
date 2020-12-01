@@ -75,7 +75,10 @@ struct p4est3
   p4est3_quadrant_vtable_t sqvt;        /**< Memory pointed to by \ref qvt.
                                              Stores virtual quadrant methods. */
   p4est3_quadrant_vtable_t *qvt;        /**< Always points to \ref sqvt. */
-  int                 level;    /**< Configuration variable for initiel level. */
+  int                 level;    /**< Configuration variable for initial level.
+                                     Depending on the available memory and
+                                     index space, may be reduced during
+                                     \ref p4est3_setup. */
 
   /* variables populated during p4est3_setup: communicator related */
   sc3_MPI_Comm_t      nodecomm;         /**< All ranks of shared memory node. */
@@ -93,12 +96,6 @@ struct p4est3
  *                                  * for each node and one beyond the
  *                                    number of ranks before it
  */
-
-  /* variables populated during p4est3_setup: partition related */
-  sc3_MPI_Win_t       gfposwin;
-  sc3_MPI_Win_t       gftreewin;
-  sc3_MPI_Win_t       goffsetwin;
-  sc3_MPI_Win_t       quadwin;
   int                 mpisize;          /**< Size of forest communicator. */
   int                 mpirank;          /**< Rank in forest communicator. */
   int                 nodesize;         /**< Size of node communicator. */
@@ -111,9 +108,14 @@ struct p4est3
   int                *node_offsets;     /**< For each node and one beyond, the
                                              number of ranks before it. */
 
-  int                 qmaxlevel;
-  int                 num_children;
+  /* variables populated during p4est3_setup: partition related */
+  sc3_MPI_Win_t       gfposwin;
+  sc3_MPI_Win_t       gftreewin;
+  sc3_MPI_Win_t       goffsetwin;
+  sc3_MPI_Win_t       quadwin;
   int                 qsize;            /**< Store byte size of one quadrant. */
+  int                 qmaxlevel;        /**< Maximum allowed refinement level. */
+  int                 num_children;     /**< Number of children for a quadrant. */
 
   int                 max_threads;      /**< Max threads from querying openmp. */
   char              **temp_quad;
