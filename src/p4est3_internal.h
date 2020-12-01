@@ -39,7 +39,7 @@
 #include <sc3_refcount.h>
 #include <p4est3.h>
 
-/** Data structure for a process-local tree and the quadrants it contains. */
+/** Internal data for a process-local tree and the quadrants it contains. */
 typedef struct p4est3_tree
 {
   p4est3_topidx       treeid;   /**< Tree number is zero based. */
@@ -77,22 +77,39 @@ struct p4est3
   p4est3_quadrant_vtable_t *qvt;        /**< Always points to \ref sqvt. */
   int                 level;    /**< Configuration variable for initiel level. */
 
-  /* variables populated during \ref p4est3_setup */
-  sc3_MPI_Comm_t      nodecomm;
-  sc3_MPI_Comm_t      headcomm;
-  sc3_MPI_Info_t      info_noncontig;
-  sc3_MPI_Win_t       nodesizewin;
-  sc3_MPI_Win_t       gfposwin, gftreewin, goffsetwin;
+  /* variables populated during p4est3_setup: communicator related */
+  sc3_MPI_Comm_t      nodecomm;         /**< All ranks of shared memory node. */
+  sc3_MPI_Comm_t      headcomm;         /**< Contains first rank of each node. */
+  sc3_MPI_Info_t      info_noncontig;   /**< Key "alloc_shared_noncontig" set. */
+  sc3_MPI_Win_t       nodesizewin;      /**< Shared memory segment allocated
+                                             on first rank of a node, available
+                                             to all ranks on that node.  Its
+                                             element count is (2 + 2 * \ref
+                                             num_nodes + 1) integers.
+                                             Its contents hold
+ *                                  * number of nodes for this run
+ *                                  * zero-based number of this node
+ *                                  * for each node number of ranks on it
+ *                                  * for each node and one beyond the
+ *                                    number of ranks before it
+ */
+
+  /* variables populated during p4est3_setup: partition related */
+  sc3_MPI_Win_t       gfposwin;
+  sc3_MPI_Win_t       gftreewin;
+  sc3_MPI_Win_t       goffsetwin;
   sc3_MPI_Win_t       quadwin;
   int                 mpisize;          /**< Size of forest communicator. */
   int                 mpirank;          /**< Rank in forest communicator. */
-  int                 nodesize;
-  int                 noderank;
-  int                 num_nodes;
-  int                 node_num;
-  int                 node_frank;
-  int                *node_sizes;
-  int                *node_offsets;
+  int                 nodesize;         /**< Size of node communicator. */
+  int                 noderank;         /**< Rank in node communicator. */
+  int                 num_nodes;        /**< Number of shared memory nodes. */
+  int                 node_num;         /**< Zero-based node number. */
+  int                 node_frank;       /**< Rank within forest communicator
+                                             of first rank on this node. */
+  int                *node_sizes;       /**< For each node, number of its ranks. */
+  int                *node_offsets;     /**< For each node and one beyond, the
+                                             number of ranks before it. */
 
   int                 qmaxlevel;
   int                 num_children;
