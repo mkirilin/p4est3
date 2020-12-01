@@ -56,6 +56,8 @@ p4est3_connectivity_is_valid (const p4est3_connectivity_t * c, char *reason)
   SC3E_IS (sc3_allocator_is_setup, c->alloc, reason);
   if (c->cvt != NULL) {
     SC3E_IS (p4est3_connectivity_vtable_is_valid, c->cvt, reason);
+    SC3E_TEST (c->cvt->dim == c->dim, reason);
+    SC3E_TEST (c->cvt->num_trees == c->num_trees, reason);
   }
   SC3E_TEST (0 < c->dim && c->dim <= 3, reason);
   SC3E_TEST (0 < c->num_trees, reason);
@@ -106,6 +108,8 @@ p4est3_connectivity_set_vtable (p4est3_connectivity_t * c,
   SC3A_IS (p4est3_connectivity_vtable_is_valid, cvt);
 
   /* make shallow copy of virtual table */
+  c->dim = cvt->dim;
+  c->num_trees = cvt->num_trees;
   *(c->cvt = &c->scvt) = *cvt;
   c->slf = slf;
   return NULL;
@@ -192,7 +196,7 @@ p4est3_connectivity_get_dim (const p4est3_connectivity_t * c, int *pdim)
   SC3A_IS (p4est3_connectivity_is_setup, c);
   SC3A_CHECK (pdim != NULL);
 
-  *pdim = c->cvt != NULL ? c->cvt->dim : c->dim;
+  *pdim = c->dim;
   return NULL;
 }
 
@@ -203,7 +207,7 @@ p4est3_connectivity_get_num_trees (const p4est3_connectivity_t * c,
   SC3A_IS (p4est3_connectivity_is_setup, c);
   SC3A_CHECK (pnum_trees != NULL);
 
-  *pnum_trees = c->cvt != NULL ? c->cvt->num_trees : c->num_trees;
+  *pnum_trees = c->num_trees;
   return NULL;
 }
 
