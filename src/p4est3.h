@@ -173,12 +173,21 @@ sc3_error_t        *p4est3_set_quadrant_vtable (p4est3_t * p3,
  */
 sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
 
+/** Enable/disable use of MPI shared memory
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] is_split     The value 1 indicating enabling,
+ *                          while 1 is for disabling of MPI shared memory.
+ *                          Defauld value is 1.
+*/
+sc3_error_t        *p4est3_set_is_split_comm (p4est3_t * p3, int is_split);
+
 /** Finalize construction of a forest.
  * Afterwards, no more \c p4est3_set_* functions may be called.
  * \param [in,out] p3      Forest under construction will be finalized.
  * \return                 NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_setup (p4est3_t * p3);
+
 
 /** Increase reference counter of a forest after setup.
  * \param [in,out] p3       Must be setup.  Increase its reference counter.

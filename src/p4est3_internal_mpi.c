@@ -46,9 +46,11 @@ p4est3_internal_setup_comm (p4est3_t * p3)
   SC3E (sc3_MPI_Comm_size (p3->nodecomm, &p3->nodesize));
   SC3E (sc3_MPI_Comm_rank (p3->nodecomm, &p3->noderank));
 
-  /* create communicator that contains the first rank on each node */
-  SC3E (sc3_MPI_Comm_split (p3->mpicomm, p3->noderank == 0 ? 0 :
-                            SC3_MPI_UNDEFINED, 0, &p3->headcomm));
+  if (p3->is_split_comm == 1) {
+    /* create communicator that contains the first rank on each node */
+    SC3E (sc3_MPI_Comm_split (p3->mpicomm, p3->noderank == 0 ? 0 :
+                              SC3_MPI_UNDEFINED, 0, &p3->headcomm));
+  }
   SC3A_CHECK ((p3->noderank != 0) == (p3->headcomm == SC3_MPI_COMM_NULL));
   if (p3->noderank == 0) {
     SC3E (sc3_MPI_Comm_size (p3->headcomm, &headsize));

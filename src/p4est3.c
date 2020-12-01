@@ -119,6 +119,7 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   p3->nodesizewin = SC3_MPI_WIN_NULL;
   p3->headcomm = SC3_MPI_COMM_NULL;
   p3->nodecomm = SC3_MPI_COMM_NULL;
+  p3->is_split_comm = 1;
   SC3A_IS (p4est3_is_new, p3);
 
   *pp3 = p3;
@@ -215,6 +216,16 @@ p4est3_setup_vtable (p4est3_t * p3)
   /* TODO: make MPI communicator wrappers of sc and sc3 compatible */
   /* TODO: set as many p3 member variables as makes sense */
 
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_set_is_split_comm (p4est3_t * p3, int is_split)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  SC3A_CHECK (is_split == 0 || is_split == 1);
+
+  p3->is_split_comm = is_split;
   return NULL;
 }
 
