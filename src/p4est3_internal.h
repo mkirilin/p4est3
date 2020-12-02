@@ -42,12 +42,16 @@
 /** Internal data for a process-local tree and the quadrants it contains. */
 typedef struct p4est3_tree
 {
-  p4est3_topidx       treeid;   /**< Tree number is zero based. */
-  p4est3_gloidx       first_tquad;
+  p4est3_topidx       treeid;   /**< Tree number between p4est3_t::fltree
+                                     and p4est3_t::lltree inclusive. */
+  p4est3_gloidx       first_tquad;      /**< First local quadrant in this tree
+                                             counted from the very first
+                                             (lower left) quadrant of this tree. */
   p4est3_gloidx       end_tquad;
   p4est3_locidx       quad_offset;      /**< Local quadrants before this tree. */
   p4est3_locidx       num_quads;        /**< Local quadrants within this tree. */
-  char               *tquads;   /**< Array of local tree quadrants. */
+  char               *tquads;   /**< Array of local quadrants in this tree.
+                                     Subarray of \ref p4est3_t::quads. */
 }
 p4est3_tree_t;
 
@@ -64,7 +68,7 @@ struct p4est3
 
   /* this forest may be wrapping a virtual implementation */
   p4est3_vtable_t     spvt;     /**< Memory pointed to by \ref pvt. */
-  p4est3_vtable_t     *pvt;     /**< If not NULL, forest virtual table. */
+  p4est3_vtable_t    *pvt;      /**< If not NULL, forest virtual table. */
   void               *slf;      /**< Context to use with virtual forest. */
 
   /* variables set before p4est3_setup */
@@ -128,15 +132,24 @@ struct p4est3
   char               *gfpos;            /**< Pointer to \ref gfposwin's memory. */
 
   /* variables populated during p4est3_setup: tree and quadrant storage */
-  sc3_MPI_Win_t       quadwin;
-  char              **nodequads;
-  char               *quads;
-
-  p4est3_topidx       fltree;   /**< Number of first local tree.
-                                     Relative to all trees in \ref conn. */
-  p4est3_topidx       lltree;   /**< Number of last local tree inclusive. */
-  p4est3_topidx       nltrees;  /**< Number of process-local trees. */
+  sc3_MPI_Win_t       quadwin;          /**< Shared memory stores the quadrants
+                                        for all ranks on this node in order.
+                                        Each node rank's local subwindow is
+                                        associated with its rank. */
+  char              **nodequads;        /**< Array of \ref nodesize holds pointers
+                                        to their respective first quadrants in
+                                        the storage of \ref quadwin. */
+  char               *quads;            /**< Pointer to first quadrant local
+                                        to his process equals \ref
+                                        nodequads[\ref noderank]. */
   sc3_array_t        *trees;    /**< Array of only the process-local trees. */
+  p4est3_topidx       fltree;   /**< Number of first local tree, or -1
+                                     if process holds no quadrants.
+                                     Relative to all trees in \ref conn. */
+  p4est3_topidx       lltree;   /**< Number of last local tree inclusive,
+                                     or -2 if process holds no quadrants. */
+  p4est3_topidx       nltrees;  /**< Number of trees with local quadrants. */
+
 };
 
 #ifdef __cplusplus
