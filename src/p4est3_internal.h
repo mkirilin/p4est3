@@ -47,7 +47,14 @@ typedef struct p4est3_tree
   p4est3_gloidx       first_tquad;      /**< First local quadrant in this tree
                                              counted from the very first
                                              (lower left) quadrant of this tree. */
-  p4est3_gloidx       end_tquad;
+  p4est3_gloidx       last_tquad;       /**< Last local quadrant in this tree
+                                             (inclusive), counted from first
+                                             (lower left) quadrant of this tree.
+                                             Greater equal \ref first_tquad. */
+  p4est3_gloidx       end_tquad;        /**< Last local quadrant in this tree
+                                             (exclusive), counted from first
+                                             (lower left) quadrant of this tree.
+                                             Equals \ref last_tquad + 1. */
   p4est3_locidx       quad_offset;      /**< Local quadrants before this tree. */
   p4est3_locidx       num_quads;        /**< Local quadrants within this tree. */
   char               *tquads;   /**< Array of local quadrants in this tree.
