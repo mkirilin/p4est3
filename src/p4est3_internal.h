@@ -67,7 +67,7 @@ struct p4est3
   p4est3_vtable_t     *pvt;     /**< If not NULL, forest virtual table. */
   void               *slf;      /**< Context to use with virtual forest. */
 
-  /* variables set before \ref p4est3_setup */
+  /* variables set before p4est3_setup */
   sc3_MPI_Comm_t      mpicomm;  /**< Valid MPI communicator. */
   int                 commdup;  /**< Boolean: communicator has been duped. */
   p4est3_connectivity_t *conn;  /**< Pointer to the relevant connectivity. */
@@ -109,22 +109,26 @@ struct p4est3
                                              number of ranks before it. */
 
   /* variables populated during p4est3_setup: partition related */
-  sc3_MPI_Win_t       gfposwin;
-  sc3_MPI_Win_t       gftreewin;
-  sc3_MPI_Win_t       goffsetwin;
-  sc3_MPI_Win_t       quadwin;
+  sc3_MPI_Win_t       gftreewin;        /**< Array of (\ref mpisize + 1) \ref
+                                             p4est3_topidx integers for the
+                                             global partition of trees. */
+  sc3_MPI_Win_t       gfposwin;         /**< Array of (\ref mpisize + 1) times \ref
+                                        qsize bytes for global first quadrant. */
+  sc3_MPI_Win_t       goffsetwin;       /**< Array of (\ref mpisize + 1) \ref
+                                        p4est3_gloidx for global quadrant offsets. */
   int                 qsize;            /**< Store byte size of one quadrant. */
   int                 qmaxlevel;        /**< Maximum allowed refinement level. */
   int                 num_children;     /**< Number of children for a quadrant. */
-
   int                 max_threads;      /**< Max threads from querying openmp. */
-  char              **temp_quad;
-
+  char              **temp_quad;        /**< Quadrant work space, one per thread. */
   p4est3_locidx       local_num_quads;  /**< Count process-local quadrants. */
   p4est3_gloidx       global_num_quads; /**< Count all quadrants globally. */
-  p4est3_gloidx      *goffset;
-  p4est3_topidx      *gftree;
-  char               *gfpos;
+  p4est3_gloidx      *goffset;          /**< Pointer to \ref goffsetwin's memory. */
+  p4est3_topidx      *gftree;           /**< Pointer to \ref gftreewin's memory. */
+  char               *gfpos;            /**< Pointer to \ref gfposwin's memory. */
+
+  /* variables populated during p4est3_setup: tree and quadrant storage */
+  sc3_MPI_Win_t       quadwin;
   char              **nodequads;
   char               *quads;
 
