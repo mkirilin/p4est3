@@ -283,7 +283,7 @@ main (int argc, char **argv)
   SC3X (sc3_MPI_Init (&argc, &argv));
 
   /* wanna-be command line parameters */
-  num_trees = 2;
+  num_trees = 5;
   level = 3;
 
   /*** The way of using p4est3 in the following is one suggestion.
