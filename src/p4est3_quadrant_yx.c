@@ -309,9 +309,9 @@ p4est3_quadrant_zyx_ancestor_id (const __m128i * q, int level, int *j)
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
   SC3A_CHECK (0 <= level && level <= P4EST_MAXLEVEL);
   SC3A_CHECK (_mm_extract_epi32 (*q, 0) >= level);
+  *j = 0;
 
   if (level == 0) {
-    *j = 0;
     return NULL;
   }
 
@@ -660,13 +660,15 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_num_uniform = p4est3_quadrant_zyx_num_uniform;
 
-  qvt->quadrant_is_valid = (p4est3_quadrant_is_t) NULL;
+  qvt->quadrant_is_valid =
+    (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_valid;
 
   qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_zyx_level;
 
   qvt->quadrant_child_id = (p4est3_quadrant_child_id_t) NULL;
 
-  qvt->quadrant_ancestor_id = (p4est3_quadrant_ancestor_id_t) NULL;
+  qvt->quadrant_ancestor_id =
+    (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_zyx_ancestor_id;
 
   qvt->quadrant_coordinates =
     (p4est3_quadrant_coordinates_t) p4est3_quadrant_zyx_coordinates;
