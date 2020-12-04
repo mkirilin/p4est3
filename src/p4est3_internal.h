@@ -21,6 +21,17 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+/** \file p4est3_internal.h
+ *
+ * Private declarations for use within the library.
+ * This file must never be included by public header files.
+ *
+ * Me make no provisions on stability or backwards compatibility.
+ * There is usually no reason to include this file outside of the library.
+ *
+ * \ingroup p4est3
+ */
+
 #ifndef P4EST3_INTERNAL_H
 #define P4EST3_INTERNAL_H
 
@@ -28,66 +39,126 @@
 #include <sc3_refcount.h>
 #include <p4est3.h>
 
+/** Internal data for a process-local tree and the quadrants it contains. */
 typedef struct p4est3_tree
 {
-  p4est3_topidx       treeid;
-  p4est3_gloidx       first_tquad, end_tquad;
-  p4est3_locidx       quad_offset;
-  p4est3_locidx       num_quads;
-  char               *tquads;
+  p4est3_topidx       treeid;   /**< Tree number between p4est3_t::fltree
+                                     and p4est3_t::lltree inclusive. */
+  p4est3_gloidx       first_tquad;      /**< First local quadrant in this tree
+                                             counted from the very first
+                                             (lower left) quadrant of this tree. */
+  p4est3_gloidx       last_tquad;       /**< Last local quadrant in this tree
+                                             (inclusive), counted from first
+                                             (lower left) quadrant of this tree.
+                                             Greater equal \ref first_tquad. */
+  p4est3_gloidx       end_tquad;        /**< Last local quadrant in this tree
+                                             (exclusive), counted from first
+                                             (lower left) quadrant of this tree.
+                                             Equals \ref last_tquad + 1. */
+  p4est3_locidx       quad_offset;      /**< Local quadrants before this tree. */
+  p4est3_locidx       num_quads;        /**< Local quadrants within this tree. */
+  char               *tquads;   /**< Array of local quadrants in this tree.
+                                     Subarray of \ref p4est3_t::quads. */
 }
 p4est3_tree_t;
 
+/** This internal structure holds the members of a forest object.
+ * Don't rely on its declaration in code outside the library. */
 struct p4est3
 {
-  sc3_refcount_t      rc;
-  sc3_allocator_t    *alloc;
-  sc3_array_t        *talloc;  /* TODO: one allocator per thread */
-  int                 setup;
+  /* variables of internal state used during the whole lifetime */
+  sc3_refcount_t      rc;       /**< Reference counter in use. */
+  sc3_array_t        *talloc;   /**< Allocator for recoursive mode */
+  sc3_allocator_t    *alloc;    /**< Memory allocator in use. */
+  int                 setup;    /**< Boolean: object is setup. */
+  int                 accessed_conn;    /**< Number of currently active
+                                             connectivity accesses. */
 
   /* this forest may be wrapping a virtual implementation */
-  p4est3_vtable_t     spvt, *pvt;
-  void               *slf;
+  p4est3_vtable_t     spvt;     /**< Memory pointed to by \ref pvt. */
+  p4est3_vtable_t    *pvt;      /**< If not NULL, forest virtual table. */
+  void               *slf;      /**< Context to use with virtual forest. */
 
-  sc3_MPI_Comm_t      mpicomm;
-  int                 commdup;
-  p4est3_connectivity_t *conn;
+  /* variables set before p4est3_setup */
+  sc3_MPI_Comm_t      mpicomm;  /**< Valid MPI communicator. */
+  int                 commdup;  /**< Boolean: communicator has been duped. */
+  p4est3_connectivity_t *conn;  /**< Pointer to the relevant connectivity. */
+  p4est3_topidx       num_trees;        /**< Number of trees in \ref conn. */
+  p4est3_quadrant_vtable_t sqvt;        /**< Memory pointed to by \ref qvt.
+                                             Stores virtual quadrant methods. */
+  p4est3_quadrant_vtable_t *qvt;        /**< Always points to \ref sqvt. */
+  int                 level;    /**< Configuration variable for initial level.
+                                     Depending on the available memory and
+                                     index space, may be reduced during
+                                     \ref p4est3_setup. */
 
-  int                 accessed_conn;
+  /* variables populated during p4est3_setup: communicator related */
+  sc3_MPI_Comm_t      nodecomm;         /**< All ranks of shared memory node. */
+  sc3_MPI_Comm_t      headcomm;         /**< Contains first rank of each node. */
+  sc3_MPI_Info_t      info_noncontig;   /**< Key "alloc_shared_noncontig" set. */
+  sc3_MPI_Win_t       nodesizewin;      /**< Shared memory segment allocated
+                                             on first rank of a node, available
+                                             to all ranks on that node.  Its
+                                             element count is (2 + 2 * \ref
+                                             num_nodes + 1) integers.
+                                             Its contents hold
+ *                                  * number of nodes for this run
+ *                                  * zero-based number of this node
+ *                                  * for each node number of ranks on it
+ *                                  * for each node and one beyond the
+ *                                    number of ranks before it
+ */
+  int                 mpisize;          /**< Size of forest communicator. */
+  int                 mpirank;          /**< Rank in forest communicator. */
+  int                 nodesize;         /**< Size of node communicator. */
+  int                 noderank;         /**< Rank in node communicator. */
+  int                 num_nodes;        /**< Number of shared memory nodes. */
+  int                 node_num;         /**< Zero-based node number. */
+  int                 node_frank;       /**< Rank within forest communicator
+                                             of first rank on this node. */
+  int                *node_sizes;       /**< For each node, number of its ranks. */
+  int                *node_offsets;     /**< For each node and one beyond, the
+                                             number of ranks before it. */
 
-  sc3_MPI_Comm_t      nodecomm, headcomm;
-  sc3_MPI_Info_t      info_noncontig;
-  sc3_MPI_Win_t       nodesizewin;
-  sc3_MPI_Win_t       gfposwin, gftreewin, goffsetwin;
-  sc3_MPI_Win_t       quadwin;
-  int                 mpisize, mpirank;
-  int                 nodesize, noderank;
-  int                 num_nodes;
-  int                 node_num;
-  int                 node_frank;
-  int                *node_sizes;
-  int                *node_offsets;
+  /* variables populated during p4est3_setup: partition related */
+  sc3_MPI_Win_t       gftreewin;        /**< Array of (\ref mpisize + 1) \ref
+                                             p4est3_topidx integers for the
+                                             global partition of trees. */
+  sc3_MPI_Win_t       gfposwin;         /**< Array of (\ref mpisize + 1) times \ref
+                                        qsize bytes for global first quadrant. */
+  sc3_MPI_Win_t       goffsetwin;       /**< Array of (\ref mpisize + 1) \ref
+                                        p4est3_gloidx for global quadrant offsets. */
+  int                 qsize;            /**< Store byte size of one quadrant. */
+  int                 qmaxlevel;        /**< Maximum allowed refinement level. */
+  int                 num_children;     /**< Number of children for a quadrant. */
+  int                 max_threads;      /**< Max threads from querying openmp. */
+  char              **temp_quad;        /**< Quadrant work space, one per thread. */
+  p4est3_locidx       local_num_quads;  /**< Count process-local quadrants. */
+  p4est3_gloidx       global_num_quads; /**< Count all quadrants globally. */
+  p4est3_gloidx      *goffset;          /**< Pointer to \ref goffsetwin's memory. */
+  p4est3_topidx      *gftree;           /**< Pointer to \ref gftreewin's memory. */
+  char               *gfpos;            /**< Pointer to \ref gfposwin's memory. */
+  p4est3_setup_mode_t setup_mode;       /**< Choose the method of quadrant creation*/
 
-  p4est3_quadrant_vtable_t sqvt, *qvt;
-  p4est3_topidx       num_trees;
-  int                 level;
-  int                 qmaxlevel;
-  int                 num_children;
-  int                 qsize;
-  p4est3_setup_mode_t setup_mode;
+  /* variables populated during p4est3_setup: tree and quadrant storage */
+  sc3_MPI_Win_t       quadwin;          /**< Shared memory stores the quadrants
+                                        for all ranks on this node in order.
+                                        Each node rank's local subwindow is
+                                        associated with its rank. */
+  char              **nodequads;        /**< Array of \ref nodesize holds pointers
+                                        to their respective first quadrants in
+                                        the storage of \ref quadwin. */
+  char               *quads;            /**< Pointer to first quadrant local
+                                        to his process equals \ref
+                                        nodequads[\ref noderank]. */
+  sc3_array_t        *trees;    /**< Array of only the process-local trees. */
+  p4est3_topidx       fltree;   /**< Number of first local tree, or -1
+                                     if process holds no quadrants.
+                                     Relative to all trees in \ref conn. */
+  p4est3_topidx       lltree;   /**< Number of last local tree inclusive,
+                                     or -2 if process holds no quadrants. */
+  p4est3_topidx       nltrees;  /**< Number of trees with local quadrants. */
 
-  int                 max_threads;
-  char              **temp_quad;
-
-  p4est3_locidx       local_num_quads;
-  p4est3_gloidx       global_num_quads;
-  p4est3_gloidx      *goffset;
-  p4est3_topidx      *gftree;
-  char               *gfpos;
-  char              **nodequads, *quads;
-
-  p4est3_topidx       fltree, lltree, nltrees;
-  sc3_array_t        *trees;
 };
 
 #ifdef __cplusplus
@@ -98,9 +169,20 @@ extern              "C"
 #endif
 #endif
 
+/** Index into array of local trees and return pointer to indexed tree.
+ * \param [in] p3   Required to be non-NULL.
+ *                  For speed, we do not check for validity each time.
+ * \param [in] tt   Must be the index of a local tree, thus between \ref
+ *                  p4est3_t::fltree and \ref p4est3_t::lltree inclusive.
+ * \param [in,out] tree     Non-NULL on input.  On output, value is
+ *                          populated with a pointer to local tree structure.
+ * \return                  NULL on success, error object otherwise.
+ */
 sc3_error_t        *p4est3_tree_index (p4est3_t * p3, p4est3_topidx tt,
                                        p4est3_tree_t ** tree);
 
+/** \cond P4EST_FALSE */
+/* these functions are not documented on purpose */
 sc3_error_t        *p4est3_internal_setup_comm (p4est3_t * p3);
 sc3_error_t        *p4est3_internal_setup_cut (p4est3_t * p3,
                                                p4est3_gloidx num_uniform,

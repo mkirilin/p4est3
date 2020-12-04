@@ -61,6 +61,7 @@ typedef sc3_error_t *(*p4est3_inout_t) (void *slf);
 typedef struct p4est3_vtable
 {
   int                 dim;      /**< Space dimension is 1, 2 or 3. */
+  sc3_MPI_Comm_t      mpicomm;  /**< Valid MPI communicator. */
   p4est3_connectivity_t *c3;    /**< This connectivity must match the virtual
                                      forest to create.  It must be setup. */
   p4est3_quadrant_vtable_t *qvt;        /**< Quadrant table must match forest.
@@ -135,6 +136,7 @@ sc3_error_t        *p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3);
  * \param [in,out] p3   Forest under construction.
  * \param [in] pvt      Valid forest virtual table.
  *                      We make a shallow copy, that is, copy all elements.
+ *                      We call \ref p4est3_set_comm with duping true.
  *                      We call \ref p4est3_set_connectivity and \ref
  *                      p4est3_set_quadrant_vtable with the table contents.
  *                      It is thus safe if \c *pvt lives on the stack.
@@ -145,6 +147,7 @@ sc3_error_t        *p4est3_set_vtable (p4est3_t * p3,
                                        p4est3_vtable_t * pvt, void *slf);
 
 /** Provide an MPI communicator to use.
+ * The default after \ref p4est3_new is \c SC3_MPI_COMM_WORLD.
  * \param [in,out] p3       The forest must not have been setup.
  * \param [in] comm         This communicator replaces any previous one.
  *                          If it is dupd, we also set it to return errors.
@@ -156,6 +159,7 @@ sc3_error_t        *p4est3_set_comm (p4est3_t * p3,
                                      sc3_MPI_Comm_t comm, int dup);
 
 /** Provide a connectivity to be used in creating the forest.
+ * TODO: set 2D unit square as default.
  * This function is mandatory to call at least once before \ref p4est3_setup.
  * \param [in,out] p3       Forest object under construction.
  * \param [in] conn         Connectivity structure must be setup.
@@ -165,6 +169,7 @@ sc3_error_t        *p4est3_set_connectivity (p4est3_t * p3,
                                              p4est3_connectivity_t * conn);
 
 /** Set a virtual quadrant implementation to use in the forest.
+ * TODO: set standard virtual table as default.
  * \param [in,out] p3       Forest under construction.
  * \param [in] qvt          Valid virtual quadrant table.
  *                          We make a shallow copy, that is, copy all elements.
@@ -176,6 +181,7 @@ sc3_error_t        *p4est3_set_quadrant_vtable (p4est3_t * p3,
                                                 qvt);
 
 /** Set minimum refinement level on creation of the forest.
+ * The default after \ref p4est3_new is 0.
  * \param [in,out] p3       Forest under construction.
  * \param [in] level        Range must match quadrant virtual table.
  * \return                  NULL on success, error object otherwise.

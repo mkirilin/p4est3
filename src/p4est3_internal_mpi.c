@@ -312,14 +312,14 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
       tree->end_tquad = end_quad - tt_offset;
     }
     else {
-      /* TODO: double check whether tt_offset is needed here or not. */
-      /* tree->end_tquad = tt_offset += num_uniform; */
-      /* Temporary solution */
-      tree->end_tquad = num_uniform;
-      tt_offset += num_uniform;
+      /* if it's not the last tree, we always end at top right corner */
+      tt_offset += tree->end_tquad = num_uniform;
     }
+    SC3A_CHECK (tree->end_tquad > 0);
+    tree->last_tquad = tree->end_tquad - 1;
     /* by construction each local tree contains at least one element */
     SC3A_CHECK (0 <= tree->first_tquad &&
+                tree->first_tquad <= tree->last_tquad &&
                 tree->first_tquad < tree->end_tquad);
     tree->num_quads = tree->end_tquad - tree->first_tquad;
     SC3A_CHECK (0 < tree->num_quads && tree->num_quads <= num_uniform);

@@ -30,10 +30,14 @@ p4est3_vtable_is_valid (const p4est3_vtable_t * pvt, char *reason)
 {
   SC3E_TEST (pvt != NULL, reason);
   SC3E_TEST (0 < pvt->dim && pvt->dim <= 3, reason);
+  SC3E_TEST (pvt->mpicomm != SC3_MPI_COMM_NULL, reason);
 
   /* check object variables as well */
   SC3E_IS (p4est3_connectivity_is_valid, pvt->c3, reason);
   SC3E_IS (p4est3_quadrant_vtable_is_valid, pvt->qvt, reason);
+
+  /* internal consistency */
+  /* TODO: verify dim of connectivity equals dim of vtable */
 
   SC3E_YES (reason);
 }
@@ -51,6 +55,8 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
   else {
     SC3E_TEST (p3->accessed_conn >= 0, reason);
   }
+
+  /* TODO check communicator and connectivity members */
 
   if (p3->pvt != NULL) {
     SC3E_IS (p4est3_vtable_is_valid, p3->pvt, reason);
@@ -129,6 +135,9 @@ p4est3_set_vtable (p4est3_t * p3, p4est3_vtable_t * pvt, void *slf)
 
   /* make shallow copy of virtual table */
   *(p3->pvt = &p3->spvt) = *pvt;
+
+  /* we make a dupliacte of the communicator */
+  SC3E (p4est3_set_comm (p3, p3->pvt->mpicomm, 1));
 
   /* use objects passed in table now and overwrite them with our own */
   SC3E (p4est3_set_connectivity (p3, p3->pvt->c3));
