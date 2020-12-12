@@ -41,8 +41,14 @@ p4est3_internal_setup_comm (p4est3_t * p3)
   SC3E (sc3_MPI_Comm_rank (p3->mpicomm, &p3->mpirank));
 
   /* create one communicator on each shared-memory node */
-  SC3E (sc3_MPI_Comm_split_type (p3->mpicomm, SC3_MPI_COMM_TYPE_SHARED,
-                                 0, SC3_MPI_INFO_NULL, &p3->nodecomm));
+  if (p3->is_split_comm == 1) {
+    SC3E (sc3_MPI_Comm_split_type (p3->mpicomm, SC3_MPI_COMM_TYPE_SHARED,
+                                   0, SC3_MPI_INFO_NULL, &p3->nodecomm));
+  }
+  else {
+    sc3_MPI_Comm_dup (p3->mpicomm, &p3->nodecomm);
+    //p3->nodecomm = p3->mpicomm;
+  }
   SC3E (sc3_MPI_Comm_size (p3->nodecomm, &p3->nodesize));
   SC3E (sc3_MPI_Comm_rank (p3->nodecomm, &p3->noderank));
 
