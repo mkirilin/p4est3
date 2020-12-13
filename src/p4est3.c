@@ -365,10 +365,12 @@ p4est3_destroy (p4est3_t ** pp3)
       SC3E (sc3_MPI_Win_free (&p3->quadwin));
       if (p3->noderank == 0) {
         if (p3->is_split_comm == 1) {
-          SC3E (sc3_MPI_Comm_free (&p3->headcomm));
+          SC3E (sc3_MPI_Comm_free (&p3->nodecomm));
         }
       }
-      SC3E (sc3_MPI_Comm_free (&p3->nodecomm));
+      if (p3->is_split_comm == 1) {
+        SC3E (sc3_MPI_Comm_free (&p3->headcomm));
+       }
       SC3E (sc3_MPI_Info_free (&p3->info_noncontig));
 
       /* deallocate internal storage */

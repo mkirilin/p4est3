@@ -46,8 +46,7 @@ p4est3_internal_setup_comm (p4est3_t * p3)
                                    0, SC3_MPI_INFO_NULL, &p3->nodecomm));
   }
   else {
-    sc3_MPI_Comm_dup (p3->mpicomm, &p3->nodecomm);
-    //p3->nodecomm = p3->mpicomm;
+    p3->nodecomm = SC3_MPI_COMM_SELF;
   }
   SC3E (sc3_MPI_Comm_size (p3->nodecomm, &p3->nodesize));
   SC3E (sc3_MPI_Comm_rank (p3->nodecomm, &p3->noderank));
@@ -58,7 +57,7 @@ p4est3_internal_setup_comm (p4est3_t * p3)
                               SC3_MPI_UNDEFINED, 0, &p3->headcomm));
   }
   else {
-    p3->headcomm = SC3_MPI_COMM_SELF;
+    p3->headcomm = p3->mpicomm;
   }
   SC3A_CHECK ((p3->noderank != 0) == (p3->headcomm == SC3_MPI_COMM_NULL));
   if (p3->noderank == 0) {
