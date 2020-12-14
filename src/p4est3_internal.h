@@ -119,6 +119,8 @@ struct p4est3
   int                *node_sizes;       /**< For each node, number of its ranks. */
   int                *node_offsets;     /**< For each node and one beyond, the
                                              number of ranks before it. */
+  int                 is_split_comm;    /**< MPI sharined memory enable/disable
+                                             indicator. */
 
   /* variables populated during p4est3_setup: partition related */
   sc3_MPI_Win_t       gftreewin;        /**< Array of (\ref mpisize + 1) \ref

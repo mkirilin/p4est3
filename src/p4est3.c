@@ -121,6 +121,7 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   p3->headcomm = SC3_MPI_COMM_NULL;
   p3->nodecomm = SC3_MPI_COMM_NULL;
   p3->setup_mode = P4EST3_NEW_MORTON;
+  p3->is_split_comm = 1;
   SC3A_IS (p4est3_is_new, p3);
 
   *pp3 = p3;
@@ -227,6 +228,16 @@ p4est3_set_setup_mode (p4est3_t * p3, p4est3_setup_mode_t mode)
   SC3A_CHECK (mode < P4EST3_NEW_MODE_LAST);
 
   p3->setup_mode = mode;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_set_is_split_comm (p4est3_t * p3, int is_split)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  SC3A_CHECK (is_split == 0 || is_split == 1);
+
+  p3->is_split_comm = is_split;
   return NULL;
 }
 
@@ -365,9 +376,13 @@ p4est3_destroy (p4est3_t ** pp3)
       SC3E (sc3_MPI_Win_free (&p3->goffsetwin));
       SC3E (sc3_MPI_Win_free (&p3->quadwin));
       if (p3->noderank == 0) {
-        SC3E (sc3_MPI_Comm_free (&p3->headcomm));
+        if (p3->is_split_comm == 1) {
+          SC3E (sc3_MPI_Comm_free (&p3->nodecomm));
+        }
       }
-      SC3E (sc3_MPI_Comm_free (&p3->nodecomm));
+      if (p3->is_split_comm == 1) {
+        SC3E (sc3_MPI_Comm_free (&p3->headcomm));
+       }
       SC3E (sc3_MPI_Info_free (&p3->info_noncontig));
 
       /* deallocate internal storage */
