@@ -291,6 +291,7 @@ main (int argc, char **argv)
     SC3E_NULL_SET (e, p4est3_set_quadrant_vtable (p3, qvt));
     SC3E_NULL_SET (e, p4est3_set_level (p3, level));
     SC3E_NULL_SET (e, p4est3_set_setup_mode (p3, mode));
+    SC3E_NULL_SET (e, p4est3_set_is_split_comm (p3, 0));
 
     sc_flops_snap (&fi, &snapshot);
     SC3E_NULL_SET (e, p4est3_setup (p3));
