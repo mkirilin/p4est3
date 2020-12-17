@@ -78,6 +78,13 @@ typedef sc3_error_t *(*p4est3_quadrant_in_i_out_t) (const void *q, int i,
 /** Prototype to set a quadrant based on a linear index. */
 typedef sc3_error_t *(*p4est3_quadrant_morton_t) (int l, p4est3_gloidx i,
                                                   void *r);
+/** Prototype to set a common nearest ancestor of two quadrants. */
+typedef sc3_error_t *(*p4est3_nearest_common_ancestor_t) (const void * q1,
+                                                          const void * q2,
+                                                          void *r);
+/** Prototype to set a linear index of a quadrant based on its morton index. */
+typedef sc3_error_t *(*p4est3_quadrant_linear_id_t) (const void *q, int l,
+                                                     p4est3_gloidx *i);
 
 /*** Specific prototypes for quadrant query functions ***/
 
@@ -95,6 +102,8 @@ typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_coordinates_t;
 typedef p4est3_quadrant_in_j_t p4est3_quadrant_num_children_t;
 /** Prototype to compare two quadrants by linear index. */
 typedef p4est3_quadrant_in2_j_t p4est3_quadrant_compare_t;
+/** Prototype to query the one quadrant is ancetor of another . */
+typedef p4est3_quadrant_in2_j_t p4est3_quadrant_is_ancestor_t
 
 /*** Specific prototypes for quadrant creation functions ***/
 
@@ -166,6 +175,11 @@ typedef struct p4est3_quadrant_vtable
   /** Generate last smallest descendant of a quadrant at \a max_level. */
   p4est3_quadrant_last_descendant_t quadrant_last_descendant;
   p4est3_quadrant_morton_t quadrant_morton;     /**< Generate by linear index. */
+  /**< Generate a common nearest ancestor of a quadrant. */
+  p4est3_nearest_common_ancestor_t nearest_common_ancestor;
+  p4est3_quadrant_linear_id_t quadrant_linear_id;   /**< Generate by morton index. */
+  /**< Query if a quadrant is a ancestor of another. */
+  p4est3_quadrant_is_ancestor_t quadrant_is_ancestor;
 }
 p4est3_quadrant_vtable_t;
 
@@ -406,6 +420,40 @@ sc3_error_t        *p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t
 sc3_error_t        *p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
                                             int l, p4est3_gloidx g, void *r);
 
+/** Generate a common nearest ancestor of two quadrants. 
+ * \param [in] qvt      Valid virtual quadrant table.
+ * \param [in] q1       Valid quadrant in this implementation.
+ * \param [in] q2       Valid quadrant in this implementation.
+ * \param [out] r       Quadrant, common nearest ancestor of q1 and q2.
+ * \return              NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t
+                                                    * qvt, const void *q1,
+                                                    const void *q2, void *r);
+
+/** Generate a linear index by quadrant on a given level.
+ * This function works up to level l=31 in 2D and l=21 in 3D.
+ * This function is reverse for p4est3_quadrant_morton.
+ * \param [in] qvt      Valid virtual quadrant table.
+ * \param [in] q        Valid quadrant in this implementation.
+ * \param [in] l        Valid level available with this prototype.
+ * \param [out] id      Linear index of given quadrant is placed here.
+ * \return              NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_quadrant_linear_id (p4est3_quadrant_vtable_t * qvt,
+                                               const void *q, int l,
+                                               p4est3_gloidx * id);
+
+/** Query if quadrant q1 is an ancestor of quadrant q2.
+ * \param [in] qvt      Valid virtual quadrant table.
+ * \param [in] q1       Valid quadrant in this implementation.
+ * \param [in] q2       Valid quadrant in this implementation.
+ * \param [out] j       True if q1 is ancestor of q2, false otherwise.
+ * \return              NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t
+                                                 * qvt, const void *q1,
+                                                 const void *q2, int *j);
 /************************ convenience functions **************************/
 
 /** Create an array of given length intended to store quadrants.
