@@ -309,9 +309,9 @@ p4est3_quadrant_zyx_ancestor_id (const __m128i * q, int level, int *j)
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
   SC3A_CHECK (0 <= level && level <= P4EST_MAXLEVEL);
   SC3A_CHECK (_mm_extract_epi32 (*q, 0) >= level);
+  *j = 0;
 
   if (level == 0) {
-    *j = 0;
     return NULL;
   }
 
