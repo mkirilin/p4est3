@@ -103,7 +103,7 @@ typedef p4est3_quadrant_in_j_t p4est3_quadrant_num_children_t;
 /** Prototype to compare two quadrants by linear index. */
 typedef p4est3_quadrant_in2_j_t p4est3_quadrant_compare_t;
 /** Prototype to query the one quadrant is ancetor of another . */
-typedef p4est3_quadrant_in2_j_t p4est3_quadrant_is_ancestor_t
+typedef p4est3_quadrant_in2_j_t p4est3_quadrant_is_ancestor_t;
 
 /*** Specific prototypes for quadrant creation functions ***/
 
