@@ -29,6 +29,10 @@
 #endif
 #define P4_TO_P8
 
+/* macros in p4est3_quadrant_mort */
+#define P4EST_MORT_MAXLEVEL                P8EST_MORT_MAXLEVEL
+#define P4EST_MORT_QMAXLEVEL               P8EST_MORT_QMAXLEVEL
+
 /* functions in p4est3_p4est */
 #define p4est3_new_p4est                    p4est3_new_p8est
 #define p4est3_connectivity_new_p4est       p4est3_connectivity_new_p8est
