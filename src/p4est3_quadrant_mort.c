@@ -194,38 +194,6 @@ p4est3_quadrant_mort_parent (const p4est3_quadrant_mort_t * q,
   return NULL;
 }
 
-static              int
-p4est3_quadrant_mort_is_node (const p4est3_quadrant_mort_t * q, int inside,
-                              char *reason)
-{
-  int32_t             x = p4est3_quadrant_mort_coord_noerr (q, 0, reason);
-  int32_t             y = p4est3_quadrant_mort_coord_noerr (q, 1, reason);
-  int32_t             res;
-#ifdef P4_TO_P8
-  int32_t             z = p4est3_quadrant_mort_coord_noerr (q, 2, reason);
-  SC3E_TEST (z != -1, reason);
-#endif
-  SC3E_TEST (x != -1 && y != -1, reason);
-
-  res = q->level == P4EST_MORT_MAXLEVEL &&
-    x >= 0 && x <= P4EST_ROOT_LEN - (inside ? 1 : 0) &&
-    y >= 0 && y <= P4EST_ROOT_LEN - (inside ? 1 : 0) &&
-#ifdef P4_TO_P8
-    z >= 0 && z <= P4EST_ROOT_LEN - (inside ? 1 : 0) &&
-#endif
-    (!(x & ((1 << (P4EST_MORT_MAXLEVEL - P4EST_MORT_QMAXLEVEL)) - 1))
-     || (inside && x == P4EST_ROOT_LEN - 1)) &&
-    (!(y & ((1 << (P4EST_MORT_MAXLEVEL - P4EST_MORT_QMAXLEVEL)) - 1))
-     || (inside && y == P4EST_ROOT_LEN - 1)) &&
-#ifdef P4_TO_P8
-    (!(z & ((1 << (P4EST_MORT_MAXLEVEL - P4EST_MORT_QMAXLEVEL)) - 1))
-     || (inside && z == P4EST_ROOT_LEN - 1)) &&
-#endif
-    1;
-  SC3E_TEST (res, reason);
-  SC3E_YES (reason);
-}
-
 static sc3_error_t *
 p4est3_quadrant_mort_copy (const p4est3_quadrant_mort_t * q,
                            p4est3_quadrant_mort_t * copy)
@@ -240,10 +208,8 @@ static sc3_error_t *
 p4est3_quadrant_mort_compare (const p4est3_quadrant_mort_t * q1,
                               const p4est3_quadrant_mort_t * q2, int32_t * j)
 {
-  SC3A_CHECK (p4est3_quadrant_mort_is_node (q1, 1, NULL) ||
-             p4est3_quadrant_mort_is_valid (q1, NULL));
-  SC3A_CHECK (p4est3_quadrant_mort_is_node (q2, 1, NULL) ||
-             p4est3_quadrant_mort_is_valid (q2, NULL));
+  SC3A_CHECK (p4est3_quadrant_mort_is_valid (q1, NULL));
+  SC3A_CHECK (p4est3_quadrant_mort_is_valid (q2, NULL));
 
   if (q1->coords == q2->coords) {
     *j = 0;
