@@ -38,7 +38,7 @@ extern              "C"
 #define P4EST3_QUADRANT_MORT_LEN(n, l) ((uint64_t) (n) << P4EST_DIM * (P4EST_MAXLEVEL - (l)))
 
 #define P4EST_MORT_MAXLEVEL 31
-#define P4EST_MORT_QMAXLEVEL 30
+#define P4EST_MORT_QMAXLEVEL 31
 
 typedef struct p4est3_quadrant_mort
 {
