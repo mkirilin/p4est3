@@ -35,7 +35,7 @@ extern              "C"
 #endif
 #endif
 
-#define P4EST3_QUADRANT_MORT_LEN(n, l) ((uint64_t) (n) << P4EST_DIM * (P4EST_MAXLEVEL - (l)))
+#define P8EST3_QUADRANT_MORT_LEN(n, l) ((uint64_t) (n) << P4EST_DIM * (P8EST3_MORT_MAXLEVEL - (l)))
 #define P8EST3_MORT_MAXLEVEL 21
 #define P8EST3_MORT_QMAXLEVEL 21
 
