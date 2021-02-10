@@ -33,6 +33,7 @@
 #define P4EST3_MORT_MAXLEVEL                P8EST3_MORT_MAXLEVEL
 #define P4EST3_MORT_QMAXLEVEL               P8EST3_MORT_QMAXLEVEL
 #define P4EST3_QUADRANT_MORT_LEN            P8EST3_QUADRANT_MORT_LEN
+#define P4EST3_ROOT_MORT_LEN                P8EST3_ROOT_MORT_LEN
 
 /* functions in p4est3_p4est */
 #define p4est3_new_p4est                    p4est3_new_p8est

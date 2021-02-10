@@ -70,10 +70,10 @@ p4est3_quadrant_mort_coords (const p4est3_quadrant_mort_t * q,
   }
 
   /**???*/
-  SC3A_CHECK (0 <= coords[0] && coords[0] < P4EST_ROOT_LEN);
-  SC3A_CHECK (0 <= coords[1] && coords[1] < P4EST_ROOT_LEN);
+  SC3A_CHECK (0 <= coords[0] && coords[0] < P4EST3_ROOT_MORT_LEN);
+  SC3A_CHECK (0 <= coords[1] && coords[1] < P4EST3_ROOT_MORT_LEN);
 #ifdef P4_TO_P8
-  SC3A_CHECK (0 <= coords[2] && coords[2] < P4EST_ROOT_LEN);
+  SC3A_CHECK (0 <= coords[2] && coords[2] < P4EST3_ROOT_MORT_LEN);
 #endif /* P4_TO_P8 */
   return NULL;
 }
@@ -99,7 +99,7 @@ p4est3_quadrant_mort_coord_noerr (const p4est3_quadrant_mort_t * q,
   }
 
   /**???*/
-  if (0 > coord || coord >= P4EST_ROOT_LEN) {
+  if (0 > coord || coord >= P4EST3_ROOT_MORT_LEN) {
     return -1;
   }
   return coord;
