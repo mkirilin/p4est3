@@ -31,8 +31,8 @@
 #define P4EST_BASE_H
 
 /* include config headers */
-#include <p4est3_config.h>
-#include <sc3_config.h>
+#include <p4est_config.h>
+#include <sc_config.h>
 #if \
   (defined (P4EST_ENABLE_MPI) && !defined (SC_ENABLE_MPI)) || \
   (!defined (P4EST_ENABLE_MPI) && defined (SC_ENABLE_MPI))
@@ -517,6 +517,28 @@ p4est_partition_cut_gloidx (p4est_gloidx_t global_num, int p, int num_procs)
 
   return result;
 }
+
+/** Return the full version of p4est.
+ *
+ * \return          Return the version of p4est using the format
+ *                  `VERSION_MAJOR.VERSION_MINOR.VERSION_POINT`,
+ *                  where `VERSION_POINT` can contain dots and
+ *                  characters, e.g. to indicate the additional
+ *                  number of commits and a git commit hash.
+ */
+const char         *p4est_version (void);
+
+/** Return the major version of p4est.
+ *
+ * \return          Return the major version of p4est.
+ */
+int                 p4est_version_major (void);
+
+/** Return the minor version of p4est.
+ *
+ * \return          Return the minor version of p4est.
+ */
+int                 p4est_version_minor (void);
 
 SC_EXTERN_C_END;
 
