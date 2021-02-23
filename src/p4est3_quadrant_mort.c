@@ -20,13 +20,14 @@
   along with p4est; if not, write to the Free Software Foundation, Inc.,
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
+
 #ifdef P4_TO_P8
 #include <p8est3_quadrant_mort.h>
 #else
 #include <p4est3_quadrant_mort.h>
 #endif
 
-static              int
+static int
 p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
                                      char *reason)
 {
@@ -35,7 +36,7 @@ p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
   SC3E_YES (reason);
 }
 
-static              int
+static int
 p4est3_quadrant_mort_is_valid (const p4est3_quadrant_mort_t * q, char *reason)
 {
   SC3E_TEST ((q->level >= 0 && q->level <= P4EST3_MORT_QMAXLEVEL) &&
@@ -62,10 +63,15 @@ p4est3_quadrant_mort_coords (const p4est3_quadrant_mort_t * q,
   for (i = 1; i < q->level + 2; ++i) {
     forward = P4EST_DIM * (P4EST3_MORT_MAXLEVEL - i);
     backward = forward - (P4EST3_MORT_MAXLEVEL - i);
-    coords[0] |= (p4est_qcoord_t) ((q->coords & (1ULL << forward)) >> backward);
-    coords[1] |= (p4est_qcoord_t) ((q->coords & (1ULL << (forward + 1))) >> (backward + 1));
+    coords[0] |=
+      (p4est_qcoord_t) ((q->coords & (1ULL << forward)) >> backward);
+    coords[1] |=
+      (p4est_qcoord_t) ((q->coords & (1ULL << (forward + 1))) >> (backward +
+                                                                  1));
 #ifdef P4_TO_P8
-    coords[2] |= (p4est_qcoord_t) ((q->coords & (1ULL << (forward + 2))) >> (backward + 2));
+    coords[2] |=
+      (p4est_qcoord_t) ((q->coords & (1ULL << (forward + 2))) >> (backward +
+                                                                  2));
 #endif /* P4_TO_P8 */
   }
 
@@ -77,6 +83,8 @@ p4est3_quadrant_mort_coords (const p4est3_quadrant_mort_t * q,
 #endif /* P4_TO_P8 */
   return NULL;
 }
+
+#if 0
 
 static              p4est_qcoord_t
 p4est3_quadrant_mort_coord_noerr (const p4est3_quadrant_mort_t * q,
@@ -98,12 +106,15 @@ p4est3_quadrant_mort_coord_noerr (const p4est3_quadrant_mort_t * q,
     coord |= (p4est_qcoord_t) ((q->coords & (1ULL << forward)) >> backward);
   }
 
+  /* Please explain the issue */
   /**???*/
   if (0 > coord || coord >= P4EST3_ROOT_MORT_LEN) {
     return -1;
   }
   return coord;
 }
+
+#endif
 
 static sc3_error_t *
 p4est3_quadrant_mort_level (const p4est3_quadrant_mort_t * q, int *l)
@@ -113,7 +124,7 @@ p4est3_quadrant_mort_level (const p4est3_quadrant_mort_t * q, int *l)
   return NULL;
 }
 
-static              int
+static int
 p4est3_quadrant_mort_is_parent (const p4est3_quadrant_mort_t * q,
                                 const p4est3_quadrant_mort_t * r,
                                 char *reason)
@@ -150,7 +161,8 @@ p4est3_quadrant_mort_is_ancestor (const p4est3_quadrant_mort_t * q,
   }
 
   exclor =
-    (q->coords ^ r->coords) >> (P4EST_DIM * (P4EST3_MORT_MAXLEVEL - q->level));
+    (q->coords ^ r->coords) >> (P4EST_DIM *
+                                (P4EST3_MORT_MAXLEVEL - q->level));
   *j = exclor == 0 ? 1 : 0;
   return NULL;
 }
