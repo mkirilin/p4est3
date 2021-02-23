@@ -324,24 +324,6 @@ p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_array_new (sc3_allocator_t * alloc,
-                           p4est3_quadrant_vtable_t * qvt,
-                           p4est3_locidx n, sc3_array_t ** arr)
-{
-  SC3E_RETVAL (arr, NULL);
-  SC3A_IS (sc3_allocator_is_setup, alloc);
-  SC3A_CHECK (qvt != NULL);
-  SC3A_CHECK (n >= 0);
-
-  SC3E (sc3_array_new (alloc, arr));
-  SC3E (sc3_array_set_elem_size (*arr, qvt->quadrant_size));
-  SC3E (sc3_array_set_elem_count (*arr, n));
-  SC3E (sc3_array_setup (*arr));
-
-  return NULL;
-}
-
-sc3_error_t        *
 p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t * qvt,
                                 const void *q1, const void *q2, void *r)
 {
@@ -365,5 +347,23 @@ p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t * qvt,
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_is_ancestor != NULL);
   SC3E (qvt->quadrant_is_ancestor (q1, q2, j));
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_quadrant_array_new (sc3_allocator_t * alloc,
+                           p4est3_quadrant_vtable_t * qvt,
+                           p4est3_locidx n, sc3_array_t ** arr)
+{
+  SC3E_RETVAL (arr, NULL);
+  SC3A_IS (sc3_allocator_is_setup, alloc);
+  SC3A_CHECK (qvt != NULL);
+  SC3A_CHECK (n >= 0);
+
+  SC3E (sc3_array_new (alloc, arr));
+  SC3E (sc3_array_set_elem_size (*arr, qvt->quadrant_size));
+  SC3E (sc3_array_set_elem_count (*arr, n));
+  SC3E (sc3_array_setup (*arr));
+
   return NULL;
 }

@@ -192,45 +192,6 @@ p4est3_quadrant_zyx_parent (const __m128i * q, __m128i * r)
   return NULL;
 }
 
-static int
-p4est3_quadrant_zyx_is_node (const __m128i * q, int inside, char *reason)
-{
-  SC3E_TEST (_mm_extract_epi32 (*q, 0) == P4EST_MAXLEVEL, reason);
-/* *INDENT-OFF* */
-  SC3E_TEST (_mm_test_all_zeros (_mm_set_epi32 ((P4EST_ROOT_LEN) << 1
-                                              , (P4EST_ROOT_LEN) << 1
-                                              , (P4EST_ROOT_LEN) << 1
-                                              , 0), *q) == 1, reason);
-  SC3E_TEST (_mm_test_all_zeros (_mm_set_epi32 (P4EST_MAXLEVEL
-                                              , P4EST_MAXLEVEL
-                                              , P4EST_MAXLEVEL
-                                              , 0), *q) == 1, reason);
-  SC3E_TEST (
-    (inside ? 1 : _mm_test_all_zeros (_mm_set_epi32 ((P4EST_MAXLEVEL) - 1
-                                                  , (P4EST_MAXLEVEL) - 1
-                                                  , (P4EST_MAXLEVEL) - 1
-                                                  , 0), *q)) == 1, reason);
-  __m128i isNodeCell =
-    _mm_or_si128 (
-      _mm_andnot_si128 (*q
-      , _mm_set1_epi32 ((1 << (P4EST_MAXLEVEL - P4EST_QMAXLEVEL)) - 1))
-
-      , _mm_and_si128 (
-            _mm_set_epi32 (inside, inside, inside, 0xFFFFFFFF)
-          , _mm_cmpeq_epi32 (*q, _mm_set_epi32 (P4EST_ROOT_LEN - 1
-                                              , P4EST_ROOT_LEN - 1
-                                              , P4EST_ROOT_LEN - 1
-                                              , _mm_extract_epi32 (*q, 0)))
-        )
-    );
-  SC3E_TEST (_mm_test_all_zeros (
-                _mm_cmpeq_epi32 (isNodeCell, _mm_setzero_si128 ())
-              , _mm_set1_epi32 (0xFFFFFFFF)) == 1
-          , reason);
-/* *INDENT-ON* */
-  SC3E_YES (reason);
-}
-
 static sc3_error_t *
 p4est3_quadrant_zyx_copy (const __m128i * q, __m128i * copy)
 {
@@ -247,10 +208,8 @@ p4est3_quadrant_zyx_compare (const __m128i * q1, const __m128i * q2, int *j)
 
 /* *INDENT-OFF* */
   { /* Waiting for the corresponding SC3A_.. macro */
-    SC3A_CHECK (p4est3_quadrant_zyx_is_node (q1, 1, NULL) ||
-                  p4est3_quadrant_zyx_is_valid (q1, NULL));
-    SC3A_CHECK (p4est3_quadrant_zyx_is_node (q2, 1, NULL) ||
-                  p4est3_quadrant_zyx_is_valid (q2, NULL));
+    SC3A_CHECK (p4est3_quadrant_zyx_is_valid (q1, NULL));
+    SC3A_CHECK (p4est3_quadrant_zyx_is_valid (q2, NULL));
   }
   __m128i            exclor_coords = _mm_xor_si128 (*q1, *q2);
   __m128i            exclor =
@@ -323,6 +282,15 @@ p4est3_quadrant_zyx_ancestor_id (const __m128i * q, int level, int *j)
   *j |= _mm_extract_epi32 (t, 1) ? 0x04 : 0;
 #endif
 
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_quadrant_zyx_child_id (const __m128i * q, int *j)
+{
+  int                 level =
+  _mm_extract_epi32 (*q, 0);
+  SC3E (p4est3_quadrant_zyx_ancestor_id (q, level, j));
   return NULL;
 }
 
@@ -665,7 +633,7 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_zyx_level;
 
-  qvt->quadrant_child_id = (p4est3_quadrant_child_id_t) NULL;
+  qvt->quadrant_child_id = (p4est3_quadrant_child_id_t) p4est3_quadrant_zyx_child_id;
 
   qvt->quadrant_ancestor_id =
     (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_zyx_ancestor_id;
@@ -702,7 +670,7 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_morton =
     (p4est3_quadrant_morton_t) p4est3_quadrant_zyx_morton;
-#if 0
+
   qvt->nearest_common_ancestor =
     (p4est3_nearest_common_ancestor_t) p4est3_zyx_nearest_common_ancestor;
 
@@ -711,7 +679,7 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_is_ancestor =
     (p4est3_quadrant_is_ancestor_t) p4est3_quadrant_zyx_is_ancestor;
-#endif
+
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt);
   return NULL;
 #else

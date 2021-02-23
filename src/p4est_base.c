@@ -121,4 +121,24 @@ P4EST_LOG_IMP (ESSENTIAL, ESSENTIAL)
 P4EST_LOG_IMP (LERROR, ERROR)
 /* *INDENT-ON* */
 
+const char         *
+p4est_version (void)
+{
+  return P4EST_VERSION;
+}
+
+int
+p4est_version_major (void)
+{
+  /* In rare cases SC_VERSION_MINOR may be a non-numerical string */
+  return sc_atoi (SC_TOSTRING (P4EST_VERSION_MAJOR));
+}
+
+int
+p4est_version_minor (void)
+{
+  /* In rare cases SC_VERSION_MAJOR may be a non-numerical string */
+  return sc_atoi (SC_TOSTRING (P4EST_VERSION_MINOR));
+}
+
 #endif

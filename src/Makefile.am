@@ -3,7 +3,7 @@
 # Makefile.am in src
 # included non-recursively from toplevel directory
 
-libp4est_generated_headers = src/p4est3_config.h
+libp4est_generated_headers = src/p4est_config.h
 libp4est_installed_headers = src/p4est_base.h src/p4est3_base.h \
         src/p4est3_connectivity.h \
         src/p4est3_quadrant_vtable.h src/p4est3.h \

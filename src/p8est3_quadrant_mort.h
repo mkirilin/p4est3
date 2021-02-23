@@ -35,7 +35,12 @@ extern              "C"
 #endif
 #endif
 
-#define P8EST3_QUADRANT_MORT_LEN(n, l) ((uint64_t) (n) << P4EST_DIM * (P4EST_MAXLEVEL - (l)))
+#define P8EST3_MORT_MAXLEVEL 21
+#define P8EST3_MORT_QMAXLEVEL 21
+
+#define P8EST3_QUADRANT_MORT_LEN(n, l) \
+        ((uint64_t) (n) << P8EST_DIM * (P8EST3_MORT_MAXLEVEL - (l)))
+#define P8EST3_ROOT_MORT_LEN ((p4est_qcoord_t) 1 << P8EST3_MORT_QMAXLEVEL)
 
 typedef struct p8est3_quadrant_mort
 {

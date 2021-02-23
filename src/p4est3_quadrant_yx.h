@@ -41,6 +41,9 @@ extern              "C"
 #endif
 #endif
 
+#define P4EST3_YX_MAXLEVEL 31
+#define P4EST3_YX_QMAXLEVEL 31
+
 /** Populate a 2D quadrant virtual table with an AVX implementation.
  * We use the level and x, y coordinates inside a 4x32 bit hardware type.
  * \param [out] qvt     Members populated with virtual functions.

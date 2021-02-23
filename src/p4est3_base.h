@@ -62,7 +62,7 @@
 
 #include <sc3_alloc.h>
 #include <sc3_error.h>
-#include <p4est3_config.h>
+#include <p4est_config.h>
 
 /** Integer type for topology counts, such as the number of trees. */
 typedef int         p4est3_topidx;
