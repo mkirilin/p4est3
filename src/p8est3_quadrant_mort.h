@@ -21,16 +21,10 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-/** \file p4est3_quadrant_yx.h
- *
- * 2D quadrant implementation using a 128 bit AVX accelerated data type.
- *
- * \ingroup p4est3
- */
+#ifndef P8EST3_QUADRANT_MORT_H
+#define P8EST3_QUADRANT_MORT_H
 
-#ifndef P4EST_QUADRANT_YX_H
-#define P4EST_QUADRANT_YX_H
-
+#include <p8est.h>
 #include <p4est3_quadrant_vtable.h>
 
 #ifdef __cplusplus
@@ -41,18 +35,26 @@ extern              "C"
 #endif
 #endif
 
-#define P4EST3_YX_MAXLEVEL 31
-#define P4EST3_YX_QMAXLEVEL 31
+#define P8EST3_MORT_MAXLEVEL 21
+#define P8EST3_MORT_QMAXLEVEL 21
 
-/** Populate a 2D quadrant virtual table with an AVX implementation.
- * We use the level and x, y coordinates inside a 4x32 bit hardware type.
- * \param [out] qvt     Members populated with virtual functions.
- * \return              NULL on success, error object otherwise.
- *                      If AVX hardware support is not available,
- *                      return an error of kind SC3_ERROR_RUNTIME.
- */
-sc3_error_t        *p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t *
-                                               qvt);
+#define P8EST3_QUADRANT_MORT_LEN(n, l) \
+        ((uint64_t) (n) << P8EST_DIM * (P8EST3_MORT_MAXLEVEL - (l)))
+#define P8EST3_ROOT_MORT_LEN ((p4est_qcoord_t) 1 << P8EST3_MORT_QMAXLEVEL)
+
+typedef struct p8est3_quadrant_mort
+{
+  /*@{ */
+  uint64_t            coords;  /**< coordinates */
+  /*@} */
+  int8_t              level,    /**< level of refinement */
+                      pad8;     /**< padding */
+  int16_t             pad16;    /**< padding */
+}
+p8est3_quadrant_mort_t;
+
+void                p8est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t
+                                                 * qvt);
 
 #ifdef __cplusplus
 #if 0
@@ -61,4 +63,4 @@ sc3_error_t        *p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t *
 }
 #endif
 
-#endif /* !P4EST_QUADRANT_YX_H */
+#endif /* !P8EST3_QUADRANT_MORT_H */

@@ -324,6 +324,33 @@ p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
+p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t * qvt,
+                                const void *q1, const void *q2, void *r)
+{
+  SC3A_CHECK (qvt != NULL && qvt->nearest_common_ancestor != NULL);
+  SC3E (qvt->nearest_common_ancestor (q1, q2, r));
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_quadrant_linear_id (p4est3_quadrant_vtable_t * qvt,
+                           const void *q, int l, p4est3_gloidx * id)
+{
+  SC3A_CHECK (qvt != NULL && qvt->quadrant_linear_id != NULL);
+  SC3E (qvt->quadrant_linear_id (q, l, id));
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t * qvt,
+                             const void *q1, const void *q2, int *j)
+{
+  SC3A_CHECK (qvt != NULL && qvt->quadrant_is_ancestor != NULL);
+  SC3E (qvt->quadrant_is_ancestor (q1, q2, j));
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_quadrant_array_new (sc3_allocator_t * alloc,
                            p4est3_quadrant_vtable_t * qvt,
                            p4est3_locidx n, sc3_array_t ** arr)
