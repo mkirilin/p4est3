@@ -122,6 +122,8 @@ p4est3_quadrant_mort_level (const p4est3_quadrant_mort_t * q, int *l)
   return NULL;
 }
 
+#ifdef P4EST_ENABLE_DEBUG
+
 static              int
 p4est3_quadrant_mort_is_parent (const p4est3_quadrant_mort_t * q,
                                 const p4est3_quadrant_mort_t * r,
@@ -142,6 +144,8 @@ p4est3_quadrant_mort_is_parent (const p4est3_quadrant_mort_t * q,
              reason);
   SC3E_YES (reason);
 }
+
+#endif
 
 static sc3_error_t *
 p4est3_quadrant_mort_is_ancestor (const p4est3_quadrant_mort_t * q,
