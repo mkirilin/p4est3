@@ -34,22 +34,16 @@
 #define MAX_TEST_LEVEL 5
 #define MAX_TEST_TREES 5
 
-#define test_setup(m, s, r, rc, rr, q) do {                                 \
+#define test_setup(m, s, rc, q) do {                                        \
   /*P4EST3_NEW_MORTON*/                                                     \
   SC3E_NULL_SET (e, make_new_p4est3 (&m, alloc, conn, mpicomm, q,           \
                                      level, P4EST3_NEW_MORTON));            \
   /*P4EST3_NEW_SUCCESSOR*/                                                  \
   SC3E_NULL_SET (e, make_new_p4est3 (&s, alloc, conn, mpicomm, q,           \
                                      level, P4EST3_NEW_SUCCESSOR));         \
-  /*P4EST3_NEW_RECURSIVE*/                                                  \
-  /*SC3E_NULL_SET (e, make_new_p4est3 (&r, alloc, conn, mpicomm, q,           \
-                                     level, P4EST3_NEW_RECURSIVE));   */      \
   /*P4EST3_NEW_RECURSIVE_CHILD*/                                            \
   SC3E_NULL_SET (e, make_new_p4est3 (&rc, alloc, conn, mpicomm, q,          \
                                      level, P4EST3_NEW_RECURSIVE_CHILD));   \
-  /*P4EST3_NEW_RECURSIVE_REGION*/                                           \
-  /*SC3E_NULL_SET (e, make_new_p4est3 (&rr, alloc, conn, mpicomm, q,          \
-                                     level, P4EST3_NEW_RECURSIVE_REGION)); */ \
   } while (0)
 
 static sc3_error_t *
@@ -173,9 +167,9 @@ main (int argc, char **argv)
   p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
   p4est3_quadrant_vtable_t vtavx, *qvtavx = &vtavx;
   p4est3_quadrant_vtable_t vtmort, *qvtmort = &vtmort;
-  p4est3_t           *p3m, *p3s, *p3r, *p3rc, *p3rr;
-  p4est3_t           *p3m_avx, *p3s_avx, *p3r_avx, *p3rc_avx, *p3rr_avx;
-  p4est3_t           *p3m_mort, *p3s_mort, *p3r_mort, *p3rc_mort, *p3rr_mort;
+  p4est3_t           *p3m, *p3s, *p3rc;
+  p4est3_t           *p3m_avx, *p3s_avx, *p3rc_avx;
+  p4est3_t           *p3m_mort, *p3s_mort, *p3rc_mort;
   p4est3_connectivity_t *conn;
 
   /* v3 standard procedure to isolate memory allocation contexts */
@@ -216,10 +210,9 @@ main (int argc, char **argv)
       SC3E_NULL_SET (e, p4est3_connectivity_set_num_trees (conn, num_trees));
       SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));
 
-      test_setup (p3m, p3s, p3r, p3rc, p3rr, qvt);
-      test_setup (p3m_avx, p3s_avx, p3r_avx, p3rc_avx, p3rr_avx, qvtavx);
-      test_setup (p3m_mort, p3s_mort, p3r_mort, p3rc_mort, p3rr_mort,
-                  qvtmort);
+      test_setup (p3m, p3s, p3rc, qvt);
+      test_setup (p3m_avx, p3s_avx, p3rc_avx, qvtavx);
+      test_setup (p3m_mort, p3s_mort, p3rc_mort, qvtmort);
 
       SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3m_avx, qvt, qvtavx));
       SC3E_NULL_SET (e,
@@ -231,9 +224,7 @@ main (int argc, char **argv)
 #endif /* P4EST_ENABLE_DEBUG */
 
       SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3s, qvt, qvt));
-      //SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3r, qvt, qvt));
       SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3rc, qvt, qvt));
-      //SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3rr, qvt, qvt));
 #ifdef P4EST_ENABLE_DEBUG
       if (mpirank == 0 && e == NULL) {
         printf ("Old-quadrants are equal for every setup option\n");
@@ -242,12 +233,8 @@ main (int argc, char **argv)
 
       SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_avx, p3s_avx, qvtavx,
                                                   qvtavx));
-      /*SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_avx, p3r_avx, qvtavx,
-                                                  qvtavx));*/
       SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_avx, p3rc_avx, qvtavx,
                                                   qvtavx));
-      /*SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_avx, p3rr_avx, qvtavx,
-                                                  qvtavx));*/
 #ifdef P4EST_ENABLE_DEBUG
       if (mpirank == 0 && e == NULL) {
         printf ("AVX-quadrants are equal for every setup option\n");
@@ -256,12 +243,8 @@ main (int argc, char **argv)
 
       SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_mort, p3s_mort, qvtmort,
                                                   qvtmort));
-      /*SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_mort, p3r_mort, qvtmort,
-                                                  qvtmort));*/
       SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_mort, p3rc_mort,
                                                   qvtmort, qvtmort));
-      /*SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_mort, p3rr_mort,
-                                                  qvtmort, qvtmort));*/
 #ifdef P4EST_ENABLE_DEBUG
       if (mpirank == 0 && e == NULL) {
         printf ("Mort-quadrants are equal for every setup option\n");
@@ -270,21 +253,15 @@ main (int argc, char **argv)
 
       SC3E_NULL_SET (e, p4est3_destroy (&p3m));
       SC3E_NULL_SET (e, p4est3_destroy (&p3s));
-      //SC3E_NULL_SET (e, p4est3_destroy (&p3r));
       SC3E_NULL_SET (e, p4est3_destroy (&p3rc));
-      //SC3E_NULL_SET (e, p4est3_destroy (&p3rr));
 
       SC3E_NULL_SET (e, p4est3_destroy (&p3m_avx));
       SC3E_NULL_SET (e, p4est3_destroy (&p3s_avx));
-      //SC3E_NULL_SET (e, p4est3_destroy (&p3r_avx));
       SC3E_NULL_SET (e, p4est3_destroy (&p3rc_avx));
-      //SC3E_NULL_SET (e, p4est3_destroy (&p3rr_avx));
 
       SC3E_NULL_SET (e, p4est3_destroy (&p3m_mort));
       SC3E_NULL_SET (e, p4est3_destroy (&p3s_mort));
-      //SC3E_NULL_SET (e, p4est3_destroy (&p3r_mort));
       SC3E_NULL_SET (e, p4est3_destroy (&p3rc_mort));
-      //SC3E_NULL_SET (e, p4est3_destroy (&p3rr_mort));
 
       SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn));
     }
