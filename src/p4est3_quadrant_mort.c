@@ -404,7 +404,7 @@ p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->dim = P4EST_DIM;
 
-  qvt->max_level = P4EST3_MORT_QMAXLEVEL;
+  qvt->max_level = P4EST3_MORT_MAXLEVEL;
 
   qvt->max_children = P4EST_CHILDREN;
 
