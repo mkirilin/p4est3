@@ -105,8 +105,8 @@ compare_p4est3_quadrants (const p4est3_t * lhs, const p4est3_t * rhs,
   for (i = 0; i < lln; ++i, lchar_q += lq_size, rchar_q += rq_size) {
     SC3E (p4est3_quadrant_level (lqvt, lchar_q, &ll));
     SC3E (p4est3_quadrant_level (rqvt, rchar_q, &rl));
-    SC3E (p4est3_quadrant_coordinates (lqvt, lchar_q, P4EST_DIM, lc));
-    SC3E (p4est3_quadrant_coordinates (rqvt, rchar_q, P4EST_DIM, rc));
+    SC3E (p4est3_quadrant_coordinates_norm (lqvt, lchar_q, P4EST_DIM, lc));
+    SC3E (p4est3_quadrant_coordinates_norm (rqvt, rchar_q, P4EST_DIM, rc));
     is_eq = (int) (ll == rl && lc[0] == rc[0] && lc[1] == rc[1] &&
 #ifdef P4_TO_P8
                    lc[2] == rc[2] &&
