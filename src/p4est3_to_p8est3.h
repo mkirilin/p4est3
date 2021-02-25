@@ -30,8 +30,8 @@
 #define P4_TO_P8
 
 /* macros in p4est3_quadrant_yx */
-#define P4EST3_YX_MAXLEVEL                   P8EST3_ZYX_MAXLEVEL
-#define P4EST3_YX_QMAXLEVEL                  P8EST3_ZYX_QMAXLEVEL
+#define P4EST3_YX_MAXLEVEL                   P4EST3_ZYX_MAXLEVEL
+#define P4EST3_YX_QMAXLEVEL                  P4EST3_ZYX_QMAXLEVEL
 
 /* macros in p4est3_quadrant_mort */
 #define P4EST3_MORT_MAXLEVEL                P8EST3_MORT_MAXLEVEL
