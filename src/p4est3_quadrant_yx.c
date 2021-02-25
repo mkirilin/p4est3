@@ -81,6 +81,8 @@ p4est3_quadrant_zyx_is_valid (const __m128i * q, char *reason)
   SC3E_YES (reason);
 }
 
+#ifdef P4EST_ENABLE_DEBUG
+
 static int
 p4est3_quadrant_zyx_is_parent (const __m128i * q, const __m128i * r,
                                char *reason)
@@ -109,6 +111,8 @@ p4est3_quadrant_zyx_is_parent (const __m128i * q, const __m128i * r,
   SC3E_TEST (_mm_testc_si128 (rhs, lhs) == 1, reason);
   SC3E_YES (reason);
 }
+
+#endif
 
 static sc3_error_t *
 p4est3_quadrant_zyx_is_ancestor (const __m128i * q, const __m128i * r, int *j)
