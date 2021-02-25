@@ -41,8 +41,8 @@ extern              "C"
 #endif
 #endif
 
-#define P4EST3_ZYX_MAXLEVEL 21
-#define P4EST3_ZYX_QMAXLEVEL 21
+#define P4EST3_ZYX_MAXLEVEL 30
+#define P4EST3_ZYX_QMAXLEVEL 30
 
 /** Populate a 3D quadrant virtual table with an AVX implementation.
  * We use the level and x, y, z coordinates inside a 4x32 bit hardware type.
