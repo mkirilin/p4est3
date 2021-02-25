@@ -40,6 +40,7 @@ p4est3_quadrant_vtable_is_valid (p4est3_quadrant_vtable_t * qvt, char *reason)
   SC3E_TEST (qvt->quadrant_child_id != NULL, reason);
   SC3E_TEST (qvt->quadrant_ancestor_id != NULL, reason);
   SC3E_TEST (qvt->quadrant_coordinates != NULL, reason);
+  SC3E_TEST (qvt->quadrant_coordinates_norm != NULL, reason);
   SC3E_TEST (qvt->quadrant_compare != NULL, reason);
   SC3E_TEST (qvt->quadrant_root != NULL, reason);
   SC3E_TEST (qvt->quadrant_copy != NULL, reason);
@@ -172,6 +173,15 @@ p4est3_quadrant_coordinates (p4est3_quadrant_vtable_t * qvt,
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_coordinates != NULL);
   SC3E (qvt->quadrant_coordinates (q, n, j));
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_quadrant_coordinates_norm (p4est3_quadrant_vtable_t * qvt,
+                                  const void *q, int n, int *j)
+{
+  SC3A_CHECK (qvt != NULL && qvt->quadrant_coordinates_norm != NULL);
+  SC3E (qvt->quadrant_coordinates_norm (q, n, j));
   return NULL;
 }
 

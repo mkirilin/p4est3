@@ -313,6 +313,31 @@ p4est3_quadrant_zyx_coordinates (const __m128i * q, int n, int *j)
 }
 
 static sc3_error_t *
+p4est3_quadrant_zyx_coordinates_norm (const __m128i * q, int n, int *j)
+{
+  int                 l_diff;
+  __m128i             r;
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  SC3A_CHECK (n == P4EST_DIM);
+
+  l_diff = P4EST_MAXLEVEL - P4EST3_YX_MAXLEVEL;
+  if (l_diff > 0) {
+    r = _mm_slli_epi32 (*q, l_diff);
+  }
+  else
+  {
+    r = _mm_srai_epi32 (*q, -l_diff);
+  }
+
+  j[0] = _mm_extract_epi32 (r, 3);
+  j[1] = _mm_extract_epi32 (r, 2);
+#ifdef P4_TO_P8
+  j[2] = _mm_extract_epi32 (r, 1);
+#endif
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_quadrant_zyx_level (const __m128i * q, int *l)
 {
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
@@ -644,6 +669,9 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_coordinates =
     (p4est3_quadrant_coordinates_t) p4est3_quadrant_zyx_coordinates;
+
+  qvt->quadrant_coordinates_norm =
+    (p4est3_quadrant_coordinates_t) p4est3_quadrant_zyx_coordinates_norm;
 
   qvt->quadrant_compare =
     (p4est3_quadrant_compare_t) p4est3_quadrant_zyx_compare;

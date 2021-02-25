@@ -82,6 +82,31 @@ p4est3_quadrant_mort_coords (const p4est3_quadrant_mort_t * q,
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_quadrant_mort_coords_norm (const p4est3_quadrant_mort_t * q,
+                                  int n, p4est_qcoord_t * coords)
+{
+  int                 l_diff;
+  SC3E (p4est3_quadrant_mort_coords (q, n, coords));
+
+  l_diff = P4EST_MAXLEVEL - P4EST3_MORT_MAXLEVEL;
+  if (l_diff > 0) {
+    coords[0] <<= l_diff;
+    coords[1] <<= l_diff;
+#ifdef P4_TO_P8
+    coords[2] <<= l_diff;
+#endif
+  }
+  else {
+    coords[0] >>= -l_diff;
+    coords[1] >>= -l_diff;
+#ifdef P4_TO_P8
+    coords[2] >>= -l_diff;
+#endif
+  }
+  return NULL;
+}
+
 #if 0
 
 static              p4est_qcoord_t
@@ -422,6 +447,9 @@ p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_coordinates =
     (p4est3_quadrant_coordinates_t) p4est3_quadrant_mort_coords;
+
+  qvt->quadrant_coordinates_norm =
+    (p4est3_quadrant_coordinates_t) p4est3_quadrant_mort_coords_norm;
 
   qvt->quadrant_compare =
     (p4est3_quadrant_compare_t) p4est3_quadrant_mort_compare;

@@ -212,6 +212,13 @@ p4est_quadrant_vtable_coordinates (const void *q, int n, int *j)
 }
 
 static sc3_error_t *
+p4est_quadrant_vtable_coordinates_norm (const void *q, int n, int *j)
+{
+  SC3E (p4est_quadrant_vtable_coordinates (q, n, j));
+  return NULL;
+}
+
+static sc3_error_t *
 p4est_quadrant_vtable_compare (const void *q1, const void *q2, int *j)
 {
   SC3A_CHECK (j != NULL);
@@ -346,6 +353,7 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->quadrant_child_id = p4est_quadrant_vtable_child_id;
   qvt->quadrant_ancestor_id = p4est_quadrant_vtable_ancestor_id;
   qvt->quadrant_coordinates = p4est_quadrant_vtable_coordinates;
+  qvt->quadrant_coordinates_norm = p4est_quadrant_vtable_coordinates_norm;
   /* quadrant_num_children is not necessary */
   qvt->quadrant_compare = p4est_quadrant_vtable_compare;
   qvt->quadrant_root = p4est_quadrant_vtable_root;
