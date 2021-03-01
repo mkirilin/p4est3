@@ -73,11 +73,14 @@ p4est3_quadrant_mort_coords (const p4est3_quadrant_mort_t * q,
 #endif /* P4_TO_P8 */
   }
 
-  /**???*/
-  SC3A_CHECK (0 <= coords[0] && coords[0] < P4EST3_ROOT_MORT_LEN);
-  SC3A_CHECK (0 <= coords[1] && coords[1] < P4EST3_ROOT_MORT_LEN);
+  /**Check if coordinates belong to a root.
+   * Use (coords[0] & P4EST3_ROOT_MORT_LEN) == 0 instead of comparison due to
+   * the lack of bits in signed int.
+  */
+  SC3A_CHECK (0 <= coords[0] && (coords[0] & P4EST3_ROOT_MORT_LEN) == 0);
+  SC3A_CHECK (0 <= coords[1] && (coords[1] & P4EST3_ROOT_MORT_LEN) == 0);
 #ifdef P4_TO_P8
-  SC3A_CHECK (0 <= coords[2] && coords[2] < P4EST3_ROOT_MORT_LEN);
+  SC3A_CHECK (0 <= coords[2] && (coords[2] & P4EST3_ROOT_MORT_LEN) == 0);
 #endif /* P4_TO_P8 */
   return NULL;
 }
