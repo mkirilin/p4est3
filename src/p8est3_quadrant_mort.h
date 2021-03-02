@@ -47,9 +47,7 @@ typedef struct p8est3_quadrant_mort
   /*@{ */
   uint64_t            coords;  /**< coordinates */
   /*@} */
-  int8_t              level,    /**< level of refinement */
-                      pad8;     /**< padding */
-  int16_t             pad16;    /**< padding */
+  int8_t              level;    /**< level of refinement */
 }
 p8est3_quadrant_mort_t;
 
