@@ -34,24 +34,47 @@
 #define MAX_TEST_LEVEL 5
 #define MAX_TEST_TREES 5
 
-#define test_setup(m, s, rc, q) do {                                        \
-  /*P4EST3_NEW_MORTON*/                                                     \
-  SC3E_NULL_SET (e, make_new_p4est3 (&m, alloc, conn, mpicomm, q,           \
-                                     level, P4EST3_NEW_MORTON));            \
-  /*P4EST3_NEW_SUCCESSOR*/                                                  \
-  SC3E_NULL_SET (e, make_new_p4est3 (&s, alloc, conn, mpicomm, q,           \
-                                     level, P4EST3_NEW_SUCCESSOR));         \
-  /*P4EST3_NEW_RECURSIVE_CHILD*/                                            \
-  SC3E_NULL_SET (e, make_new_p4est3 (&rc, alloc, conn, mpicomm, q,          \
-                                     level, P4EST3_NEW_RECURSIVE_CHILD));   \
-  } while (0)
+typedef struct setup
+{
+  sc3_allocator_t    *alloc;
+  sc3_allocator_t    *mainalloc;
+  p4est3_connectivity_t *conn;
+  sc3_MPI_Comm_t      mpicomm;
+  int                 mpirank;
+  int                 level;
+  p4est3_topidx       num_trees;
+}
+setup_t;
 
 static sc3_error_t *
-make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
+set_vtables (p4est3_quadrant_vtable_t * q, p4est3_quadrant_vtable_t * qmort,
+             p4est3_quadrant_vtable_t * qavx, sc3_error_t ** e)
 {
-  SC3A_IS (sc3_allocator_is_setup, oa);
-  SC3E (sc3_allocator_new (oa, alloc));
-  SC3E (sc3_allocator_setup (*alloc));
+  SC3X (p4est3_quadrant_vtable_p4est (q, 0));
+  SC3X (p4est3_quadrant_mort_vtable (qmort));
+  /* the AVX virtual table can only be set with hardware support */
+  SC3F (p4est3_quadrant_yx_vtable (qavx), *e);
+
+  return NULL;
+}
+
+static sc3_error_t *
+make_allocator (setup_t *t)
+{
+  SC3A_IS (sc3_allocator_is_setup, t->mainalloc);
+  SC3E (sc3_allocator_new (t->mainalloc, &t->alloc));
+  SC3E (sc3_allocator_setup (t->alloc));
+
+  return NULL;
+}
+
+static sc3_error_t *
+make_connectivity (setup_t * t)
+{
+  SC3E (p4est3_connectivity_new (t->alloc, &t->conn));
+  SC3E (p4est3_connectivity_set_num_trees (t->conn, t->num_trees));
+  SC3E (p4est3_connectivity_setup (t->conn));
+
   return NULL;
 }
 
@@ -71,6 +94,20 @@ make_new_p4est3 (p4est3_t ** p3, sc3_allocator_t * alloc,
   SC3E (p4est3_set_level (*p3, level));
   SC3E (p4est3_set_setup_mode (*p3, mode));
   SC3E (p4est3_setup (*p3));
+
+  return NULL;
+}
+
+static sc3_error_t *
+setup_forests (setup_t * t, p4est3_quadrant_vtable_t * q,
+               p4est3_t ** m, p4est3_t ** s, p4est3_t ** rc)
+{
+  SC3E (make_new_p4est3 (m, t->alloc, t->conn, t->mpicomm, q, t->level,
+        P4EST3_NEW_MORTON));
+  SC3E (make_new_p4est3 (s, t->alloc, t->conn, t->mpicomm, q, t->level,
+      P4EST3_NEW_SUCCESSOR));
+  SC3E (make_new_p4est3 (rc, t->alloc, t->conn, t->mpicomm, q, t->level,
+      P4EST3_NEW_RECURSIVE_CHILD));
 
   return NULL;
 }
@@ -119,163 +156,115 @@ compare_p4est3_quadrants (const p4est3_t * lhs, const p4est3_t * rhs,
 }
 
 static sc3_error_t *
+perform_test_old (setup_t * t,
+                  p4est3_t ** m, p4est3_t ** s, p4est3_t ** rc,
+                  p4est3_quadrant_vtable_t * qref,
+                  p4est3_quadrant_vtable_t * q)
+{
+  SC3E (setup_forests (t, q, m, s, rc));
+  SC3E (compare_p4est3_quadrants (*m, *s, q, q));
+  SC3E (compare_p4est3_quadrants (*m, *rc, q, q));
+
+  /*do not destroy m fprest, due to it is referenced for others*/
+  SC3E (p4est3_destroy (s));
+  SC3E (p4est3_destroy (rc));
+
+  return NULL;
+}
+
+static sc3_error_t *
+perform_test (setup_t * t,
+              p4est3_t * ref, p4est3_t ** m, p4est3_t ** s, p4est3_t ** rc,
+              p4est3_quadrant_vtable_t * qref, p4est3_quadrant_vtable_t * q)
+{
+  SC3E (setup_forests (t, q, m, s, rc));
+  SC3E (compare_p4est3_quadrants (ref, *m, qref, q));
+  SC3E (compare_p4est3_quadrants (*m, *s, q, q));
+  SC3E (compare_p4est3_quadrants (*m, *rc, q, q));
+
+  SC3E (p4est3_destroy (m));
+  SC3E (p4est3_destroy (s));
+  SC3E (p4est3_destroy (rc));
+
+  return NULL;
+}
+
+static sc3_error_t *
 free_allocator (sc3_allocator_t ** alloc)
 {
   SC3A_IS (sc3_allocator_is_setup, *alloc);
   SC3E (sc3_allocator_destroy (alloc));
   return NULL;
 }
-#if 0
-static void
-report_errors (sc3_allocator_t * mainalloc, sc3_error_t ** pe)
-{
-  char                eflat[SC3_BUFSIZE];
-  char                reason[SC3_BUFSIZE];
 
-  if (pe != NULL && *pe != NULL) {
-    /* TODO print error messages in a nicer way */
-    sc3_error_destroy_noerr (pe, eflat);
-    fprintf (stderr, "Error: %s\n", eflat);
-    SC_CHECK_ABORT (0, "Setup's tests failed\n");
-  }
-
-  if (!sc3_allocator_is_free (mainalloc, reason)) {
-    fprintf (stderr, "Allocation error: %s\n", reason);
-    SC_CHECK_ABORT (0, "Allocation's tests failed\n");
-  }
-
-#if 0
-  e = sc3_error_destroy (pe);
-
-  /* TODO synchronize e across MPI processes */
-
-  if (e != NULL) {
-    fprintf (stderr, "Errors remain\n");
-    sc3_error_destroy (&e);
-  }
-#endif
-}
-#endif
 int
 main (int argc, char **argv)
 {
-  int                 level, mpirank;
-  p4est3_topidx       num_trees;
-  sc3_allocator_t    *alloc, *mainalloc;
-  sc3_error_t        *e;
-  sc3_MPI_Comm_t      mpicomm;
+  setup_t             st, *t = &st;
+  sc3_error_t        *e_avx;
   p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
   p4est3_quadrant_vtable_t vtavx, *qvtavx = &vtavx;
   p4est3_quadrant_vtable_t vtmort, *qvtmort = &vtmort;
   p4est3_t           *p3m, *p3s, *p3rc;
   p4est3_t           *p3m_avx, *p3s_avx, *p3rc_avx;
   p4est3_t           *p3m_mort, *p3s_mort, *p3rc_mort;
-  p4est3_connectivity_t *conn;
 
   /* v3 standard procedure to isolate memory allocation contexts */
-  mainalloc = sc3_allocator_nothread ();
+  t->mainalloc = sc3_allocator_nothread ();
 
   /* this is generally needed for MPI */
-  SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
+  SC3X (sc3_MPI_Init (&argc, &argv));
+  t->mpicomm = SC3_MPI_COMM_WORLD;
+  SC3X (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
 
-  /* legacy wrapping for p4est quadrants */
-  p4est3_quadrant_vtable_p4est (qvt, 0);
-  p4est3_quadrant_yx_vtable (qvtavx);
-  p4est3_quadrant_mort_vtable (qvtmort);
+  SC3X (set_vtables (qvt, qvtmort, qvtavx, &e_avx));
 
-  /* we don't need init calls for v3.  Just to check legacy wrapping */
-  /* must not use SC3_MPI_COMM_WORLD due to incompatible non-mpi wrapping */
-  mpicomm = SC3_MPI_COMM_WORLD;
-  sc_init (mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
-  p4est_init (NULL, SC_LP_DEFAULT);
-  SC3E_SET (e, sc3_MPI_Comm_rank (mpicomm, &mpirank));
-  SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
-  for (level = 1; level < MAX_TEST_LEVEL; ++level) {
-    for (num_trees = 1; num_trees < MAX_TEST_TREES; ++num_trees) {
+  SC3X (make_allocator (t));
+  for (t->level = 1; t->level < MAX_TEST_LEVEL; ++(t->level)) {
+    for (t->num_trees = 1; t->num_trees < MAX_TEST_TREES; ++(t->num_trees)) {
 
 #ifdef P4EST_ENABLE_DEBUG
-      if (e == NULL) {
-        if (mpirank == 0) {
-          printf ("l = %d, t = %d\n", level, num_trees);
-        }
-      }
-      else {
-        break;
+      if (t->mpirank == 0) {
+        printf ("l = %d, t = %d\n", t->level, t->num_trees);
       }
 #endif /* P4EST_ENABLE_DEBUG */
+      SC3X (sc3_MPI_Barrier (t->mpicomm));
+      SC3X (make_connectivity (t));
 
-      SC3E_NULL_SET (e, sc3_MPI_Barrier (mpicomm));
-
-      SC3E_NULL_SET (e, p4est3_connectivity_new (alloc, &conn));
-      SC3E_NULL_SET (e, p4est3_connectivity_set_num_trees (conn, num_trees));
-      SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));
-
-      test_setup (p3m, p3s, p3rc, qvt);
-      test_setup (p3m_avx, p3s_avx, p3rc_avx, qvtavx);
-      test_setup (p3m_mort, p3s_mort, p3rc_mort, qvtmort);
-
-      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3m_avx, qvt, qvtavx));
-      SC3E_NULL_SET (e,
-                     compare_p4est3_quadrants (p3m, p3m_mort, qvt, qvtmort));
+      SC3X (perform_test_old (t, &p3m, &p3s, &p3rc, qvt, qvt));
 #ifdef P4EST_ENABLE_DEBUG
-      if (mpirank == 0 && e == NULL) {
-        printf ("Morton settings up are equal for every qvt\n");
-      }
-#endif /* P4EST_ENABLE_DEBUG */
-
-      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3s, qvt, qvt));
-      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m, p3rc, qvt, qvt));
-#ifdef P4EST_ENABLE_DEBUG
-      if (mpirank == 0 && e == NULL) {
+      if (t->mpirank == 0) {
         printf ("Old-quadrants are equal for every setup option\n");
       }
 #endif /* P4EST_ENABLE_DEBUG */
 
-      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_avx, p3s_avx, qvtavx,
-                                                  qvtavx));
-      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_avx, p3rc_avx, qvtavx,
-                                                  qvtavx));
+      SC3X (perform_test (t, p3m, &p3m_mort, &p3s_mort, &p3rc_mort, qvt,
+                          qvtmort));
 #ifdef P4EST_ENABLE_DEBUG
-      if (mpirank == 0 && e == NULL) {
-        printf ("AVX-quadrants are equal for every setup option\n");
-      }
-#endif /* P4EST_ENABLE_DEBUG */
-
-      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_mort, p3s_mort, qvtmort,
-                                                  qvtmort));
-      SC3E_NULL_SET (e, compare_p4est3_quadrants (p3m_mort, p3rc_mort,
-                                                  qvtmort, qvtmort));
-#ifdef P4EST_ENABLE_DEBUG
-      if (mpirank == 0 && e == NULL) {
+      if (t->mpirank == 0) {
         printf ("Mort-quadrants are equal for every setup option\n");
       }
 #endif /* P4EST_ENABLE_DEBUG */
 
-      SC3E_NULL_SET (e, p4est3_destroy (&p3m));
-      SC3E_NULL_SET (e, p4est3_destroy (&p3s));
-      SC3E_NULL_SET (e, p4est3_destroy (&p3rc));
+      if (!sc3_error_is2_kind (e_avx, SC3_ERROR_RUNTIME, NULL)) {
+        SC3X (perform_test (t, p3m, &p3m_avx, &p3s_avx, &p3rc_avx, qvt, qvtavx));
+#ifdef P4EST_ENABLE_DEBUG
+        if (t->mpirank == 0) {
+          printf ("AVX-quadrants are equal for every setup option\n");
+        }
+#endif /* P4EST_ENABLE_DEBUG */
+      }
 
-      SC3E_NULL_SET (e, p4est3_destroy (&p3m_avx));
-      SC3E_NULL_SET (e, p4est3_destroy (&p3s_avx));
-      SC3E_NULL_SET (e, p4est3_destroy (&p3rc_avx));
-
-      SC3E_NULL_SET (e, p4est3_destroy (&p3m_mort));
-      SC3E_NULL_SET (e, p4est3_destroy (&p3s_mort));
-      SC3E_NULL_SET (e, p4est3_destroy (&p3rc_mort));
-
-      SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn));
+      /*destroy forest, that was referenced for others*/
+      SC3X (p4est3_destroy (&p3m));
+      SC3X (p4est3_connectivity_destroy (&t->conn));
     }
   }
-  SC3E_NULL_SET (e, free_allocator (&alloc));
+  if (e_avx != NULL) {
+    SC3X (sc3_error_unref (&e_avx));
+  }
+  SC3X (free_allocator (&t->alloc));
 
-  /* again, just to check legacy wrapping */
-  SC3E_NULL_REQ (e, !sc_finalize_noabort ());
-
-  /* TODO: call finalize even with errors? */
-  SC3E_NULL_SET (e, sc3_MPI_Finalize ());
-  SC3X (e);
-#if 0
-  report_errors (mainalloc, &e);
-#endif
+  SC3X (sc3_MPI_Finalize ());
   return 0;
 }
