@@ -25,6 +25,15 @@
 #include <p4est3_quadrant_mort.h>
 #endif
 
+static              p4est3_gloidx
+p4est3_quadrant_mort_num_uniform (int level)
+{
+  if (level < 0) {
+    return -1;
+  }
+  return p4est3_glopow (P4EST_CHILDREN, level);
+}
+
 static              int
 p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
                                      char *reason)
@@ -288,6 +297,13 @@ p4est3_quadrant_mort_ancestor_id (const p4est3_quadrant_mort_t * q,
 }
 
 static sc3_error_t *
+p4est3_quadrant_mort_child_id (const p4est3_quadrant_mort_t * q, int *j)
+{
+  SC3E (p4est3_quadrant_mort_ancestor_id (q, q->level, j));
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_quadrant_mort_ancestor (const p4est3_quadrant_mort_t * q,
                                int32_t level, p4est3_quadrant_mort_t * r)
 {
@@ -422,28 +438,26 @@ p4est3_quadrant_mort_root (p4est3_quadrant_mort_t * r)
   return NULL;
 }
 
-void
+sc3_error_t        *
 p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t * qvt)
 {
-  if (qvt == NULL) {
-    return;
-  }
+  SC3A_CHECK (qvt != NULL);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
 
   qvt->dim = P4EST_DIM;
-
   qvt->max_level = P4EST3_MORT_MAXLEVEL;
-
   qvt->max_children = P4EST_CHILDREN;
-
   qvt->quadrant_size = sizeof (p4est3_quadrant_mort_t);
+
+  qvt->quadrant_num_uniform = p4est3_quadrant_mort_num_uniform;
 
   qvt->quadrant_is_valid =
     (p4est3_quadrant_is_t) p4est3_quadrant_mort_is_valid;
 
   qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_mort_level;
 
-  qvt->quadrant_child_id = (p4est3_quadrant_child_id_t) NULL;
+  qvt->quadrant_child_id =
+    (p4est3_quadrant_child_id_t) p4est3_quadrant_mort_child_id;
 
   qvt->quadrant_ancestor_id =
     (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_mort_ancestor_id;
@@ -492,4 +506,8 @@ p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_is_ancestor =
     (p4est3_quadrant_is_ancestor_t) p4est3_quadrant_mort_is_ancestor;
+
+  /* verify correctness */
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt);
+  return NULL;
 }

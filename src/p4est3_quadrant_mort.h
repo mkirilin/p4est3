@@ -51,7 +51,7 @@ typedef struct p4est3_quadrant_mort
 }
 p4est3_quadrant_mort_t;
 
-void                p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t
+sc3_error_t        *p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t
                                                  * qvt);
 
 #ifdef __cplusplus
