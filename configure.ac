@@ -46,7 +46,6 @@ m4_ifdef([AM_PROG_AR],[AM_PROG_AR])
 dnl SC_PROG_LINT
 dnl SC_C_VERSION
 LT_INIT
-P4EST_CHECK_AVX2([P4EST])
 
 echo "o---------------------------------------"
 echo "| Checking libraries"
