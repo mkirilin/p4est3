@@ -1,6 +1,6 @@
 
 dnl P4EST_CPU_SUPPORTS_AVX2(ACTION-IF-FOUND, ACTION-IF-NOT-FOUND)
-dnl This macro performs a compile and link test for the avx2 instruction set.
+dnl This macro performs a compile and link test for the AVX2 instruction set.
 dnl
 AC_DEFUN([P4EST_CPU_SUPPORTS_AVX2], [
    dnl AC_REQUIRE([AC_PROG_CC])
@@ -39,15 +39,15 @@ dnl The argument PREFIX should be set to P4EST for configuring p4est.
 dnl If p4est is part of a bigger program, use any application prefix.
 dnl
 AC_DEFUN([P4EST_CHECK_AVX2], [
-  AC_MSG_CHECKING([for avx2])
+  AC_MSG_CHECKING([for AVX2])
   AC_ARG_ENABLE([avx2], [AS_HELP_STRING([--disable-avx2],
-                         [disable avx2 instruction test and feature])],
+                         [disable AVX2 instruction test and feature])],
                 , [enableval=yes])
   if test "x$enableval" != xno ; then
     P4EST_CPU_SUPPORTS_AVX2([enableval=yes], [enableval=no])
   fi
   if test "x$enableval" != xno ; then
-    AC_DEFINE([ENABLE_AVX2], 1, [Define to 1 if avx2 instructions are active])
+    AC_DEFINE([ENABLE_AVX2], 1, [Define to 1 if AVX2 instructions are active])
   fi
   AM_CONDITIONAL([$1_ENABLE_AVX2], [test "x$enableval" != xno])
   $1_ENABLE_AVX2="$enableval"
