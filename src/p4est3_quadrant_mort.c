@@ -58,9 +58,11 @@ p4est3_quadrant_mort_coords (const p4est3_quadrant_mort_t * q,
                              int n, p4est_qcoord_t * coords)
 {
   int                 i, forward, backward;
+  int                 d = P4EST3_REF_MAXLEVEL - P4EST3_MORT_MAXLEVEL;
 
   SC3A_IS (p4est3_quadrant_mort_is_valid, q);
   SC3A_CHECK (n == P4EST_DIM);
+  SC3A_CHECK (d >= 0);
 
   coords[0] = 0;
   coords[1] = 0;
@@ -91,31 +93,11 @@ p4est3_quadrant_mort_coords (const p4est3_quadrant_mort_t * q,
 #ifdef P4_TO_P8
   SC3A_CHECK (0 <= coords[2] && (coords[2] & P4EST3_ROOT_MORT_LEN) == 0);
 #endif /* P4_TO_P8 */
-  return NULL;
-}
-
-static sc3_error_t *
-p4est3_quadrant_mort_coords_norm (const p4est3_quadrant_mort_t * q,
-                                  int n, p4est_qcoord_t * coords)
-{
-  int                 l_diff;
-  SC3E (p4est3_quadrant_mort_coords (q, n, coords));
-
-  l_diff = P4EST_MAXLEVEL - P4EST3_MORT_MAXLEVEL;
-  if (l_diff > 0) {
-    coords[0] <<= l_diff;
-    coords[1] <<= l_diff;
+  coords[0] <<= d;
+  coords[1] <<= d;
 #ifdef P4_TO_P8
-    coords[2] <<= l_diff;
+  coords[2] <<= d;
 #endif
-  }
-  else {
-    coords[0] >>= -l_diff;
-    coords[1] >>= -l_diff;
-#ifdef P4_TO_P8
-    coords[2] >>= -l_diff;
-#endif
-  }
   return NULL;
 }
 
@@ -463,10 +445,7 @@ p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t * qvt)
     (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_mort_ancestor_id;
 
   qvt->quadrant_coordinates =
-    (p4est3_quadrant_coordinates_t) p4est3_quadrant_mort_coords;
-
-  qvt->quadrant_coordinates_norm =
-    (p4est3_quadrant_coordinates_t) p4est3_quadrant_mort_coords_norm;
+    (p4est3_quadrant_in_i_out_t) p4est3_quadrant_mort_coords;
 
   qvt->quadrant_compare =
     (p4est3_quadrant_compare_t) p4est3_quadrant_mort_compare;

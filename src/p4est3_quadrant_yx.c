@@ -301,34 +301,13 @@ p4est3_quadrant_zyx_child_id (const __m128i * q, int *j)
 static sc3_error_t *
 p4est3_quadrant_zyx_coordinates (const __m128i * q, int n, int *j)
 {
-  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
-  SC3A_CHECK (n == P4EST_DIM);
-
-  j[0] = _mm_extract_epi32 (*q, 3);
-  j[1] = _mm_extract_epi32 (*q, 2);
-#ifdef P4_TO_P8
-  j[2] = _mm_extract_epi32 (*q, 1);
-#endif
-  return NULL;
-}
-
-static sc3_error_t *
-p4est3_quadrant_zyx_coordinates_norm (const __m128i * q, int n, int *j)
-{
-  int                 l_diff;
   __m128i             r;
+  int                 d = P4EST3_REF_MAXLEVEL - P4EST3_YX_MAXLEVEL;
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
   SC3A_CHECK (n == P4EST_DIM);
+  SC3A_CHECK (d >= 0);
 
-  l_diff = P4EST_MAXLEVEL - P4EST3_YX_MAXLEVEL;
-  if (l_diff > 0) {
-    r = _mm_slli_epi32 (*q, l_diff);
-  }
-  else
-  {
-    r = _mm_srai_epi32 (*q, -l_diff);
-  }
-
+  r = _mm_slli_epi32 (*q, d);
   j[0] = _mm_extract_epi32 (r, 3);
   j[1] = _mm_extract_epi32 (r, 2);
 #ifdef P4_TO_P8
@@ -668,10 +647,7 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
     (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_zyx_ancestor_id;
 
   qvt->quadrant_coordinates =
-    (p4est3_quadrant_coordinates_t) p4est3_quadrant_zyx_coordinates;
-
-  qvt->quadrant_coordinates_norm =
-    (p4est3_quadrant_coordinates_t) p4est3_quadrant_zyx_coordinates_norm;
+    (p4est3_quadrant_in_i_out_t) p4est3_quadrant_zyx_coordinates;
 
   qvt->quadrant_compare =
     (p4est3_quadrant_compare_t) p4est3_quadrant_zyx_compare;
