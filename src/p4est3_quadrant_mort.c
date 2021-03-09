@@ -23,9 +23,26 @@
 
 #ifndef P4_TO_P8
 #include <p4est3_quadrant_mort.h>
+#define P4EST3_MORT_MAXLEVEL 31
+#define P4EST3_MORT_QMAXLEVEL 31
 #else
 #include <p8est3_quadrant_mort.h>
+#define P4EST3_MORT_MAXLEVEL 21
+#define P4EST3_MORT_QMAXLEVEL 21
 #endif
+
+#define P4EST3_QUADRANT_MORT_LEN(n, l) \
+        ((uint64_t) (n) << P4EST_DIM * (P4EST3_MORT_MAXLEVEL - (l)))
+#define P4EST3_ROOT_MORT_LEN ((p4est_qcoord_t) 1 << P4EST3_MORT_MAXLEVEL)
+
+typedef struct p4est3_quadrant_mort
+{
+  /*@{ */
+  uint64_t            coords;  /**< coordinates */
+  /*@} */
+  int8_t              level;    /**< level of refinement */
+}
+p4est3_quadrant_mort_t;
 
 static              p4est3_gloidx
 p4est3_quadrant_mort_num_uniform (int level)

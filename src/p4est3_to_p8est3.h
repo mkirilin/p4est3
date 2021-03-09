@@ -33,15 +33,6 @@
 #define P4EST3_YX_MAXLEVEL                   P4EST3_ZYX_MAXLEVEL
 #define P4EST3_YX_QMAXLEVEL                  P4EST3_ZYX_QMAXLEVEL
 
-/* macros in p4est3_quadrant_mort */
-#define P4EST3_MORT_MAXLEVEL                P8EST3_MORT_MAXLEVEL
-#define P4EST3_MORT_QMAXLEVEL               P8EST3_MORT_QMAXLEVEL
-#define P4EST3_QUADRANT_MORT_LEN            P8EST3_QUADRANT_MORT_LEN
-#define P4EST3_ROOT_MORT_LEN                P8EST3_ROOT_MORT_LEN
-
-/* structures in p4est3_quadrant_mort */
-#define p4est3_quadrant_mort_t              p8est3_quadrant_mort_t
-
 /* functions in p4est3_p4est */
 #define p4est3_new_p4est                    p4est3_new_p8est
 #define p4est3_connectivity_new_p4est       p4est3_connectivity_new_p8est
