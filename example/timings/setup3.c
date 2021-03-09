@@ -21,27 +21,6 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P4EST3_TO_P8EST3_H
-#define P4EST3_TO_P8EST3_H
-
-#ifdef P4EST3_H
-#error "The include files p4est3.h and p4est3_to_p8est3.h cannot be combined"
-#endif
-#define P4_TO_P8
-
-/* macros in p4est3_quadrant_yx */
-#define P4EST3_YX_MAXLEVEL                   P4EST3_ZYX_MAXLEVEL
-#define P4EST3_YX_QMAXLEVEL                  P4EST3_ZYX_QMAXLEVEL
-
-/* functions in p4est3_p4est */
-#define p4est3_new_p4est                    p4est3_new_p8est
-#define p4est3_connectivity_new_p4est       p4est3_connectivity_new_p8est
-#define p4est3_quadrant_vtable_p4est        p4est3_quadrant_vtable_p8est
-
-/* functions in p4est3_quadrant_yx */
-#define p4est3_quadrant_yx_vtable           p4est3_quadrant_zyx_vtable
-
-/* functions in p4est3_quadrant_mort */
-#define p4est3_quadrant_mort_vtable         p8est3_quadrant_mort_vtable
-
-#endif /* !P4EST3_TO_P8EST3_H */
+#include <p4est_to_p8est.h>
+#include <p4est3_to_p8est3.h>
+#include "setup2.c"

@@ -72,6 +72,21 @@ typedef struct p4est3_vtable
 }
 p4est3_vtable_t;
 
+/* Use to choose a way of filling a tree with quadrants.*/
+typedef enum p4est3_setup_mode
+{
+  P4EST3_NEW_MORTON,    /**< Set every quadrant by its Morton index */
+  P4EST3_NEW_SUCCESSOR, /**< Set every quadrant by the previous one */
+  P4EST3_NEW_RECURSIVE, /**< Recursive calling the child function */
+  P4EST3_NEW_RECURSIVE_CHILD,
+  P4EST3_NEW_RECURSIVE_REGION,
+  P4EST3_NEW_MODE_LAST  /**< Unused bounding value */
+}
+p4est3_setup_mode_t;
+
+/* p4est construction parameters: connectivity, uniform level, etc. */
+/* While we're not ready defining the connectivity, use abstract trees. */
+
 /** Check whether a forest virtual table is valid, thus ready to use.
  * \param [in] pvt      Any pointer.  NULL is considered not valid.
  * \param [out] reason  May be NULL.  Otherwise, will be filled with the
@@ -173,12 +188,30 @@ sc3_error_t        *p4est3_set_quadrant_vtable (p4est3_t * p3,
  */
 sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
 
+/* TODO: document default value for all _set_ */
+/** Set a way that creates quadrants in a tree in a setup p4est3 phase.
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] mode         See \ref p4est3_setup_mode_t type for
+ *                          available options. Default value is
+ *                          P4EST3_NEW_MORTON.
+ */
+sc3_error_t        *p4est3_set_setup_mode (p4est3_t * p3,
+                                           p4est3_setup_mode_t mode);
+/** Enable/disable use of MPI shared memory
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] is_split     The value 1 indicating enabling,
+ *                          while 1 is for disabling of MPI shared memory.
+ *                          Defauld value is 1.
+*/
+sc3_error_t        *p4est3_set_is_split_comm (p4est3_t * p3, int is_split);
+
 /** Finalize construction of a forest.
  * Afterwards, no more \c p4est3_set_* functions may be called.
  * \param [in,out] p3      Forest under construction will be finalized.
  * \return                 NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_setup (p4est3_t * p3);
+
 
 /** Increase reference counter of a forest after setup.
  * \param [in,out] p3       Must be setup.  Increase its reference counter.
@@ -229,6 +262,14 @@ sc3_error_t        *p4est3_restore_connectivity (p4est3_t * p3,
                                                  conn);
 
 /*----------------------- accessing quadrants ------------------------*/
+
+/* TODO: think about this interface */
+sc3_error_t        *p4est3_get_quadrants (const p4est3_t * p3, char **q);
+
+sc3_error_t        *p4est3_get_global_num_quads (const p4est3_t * p3,
+                                                 p4est3_gloidx * n);
+sc3_error_t        *p4est3_get_local_num_quads (const p4est3_t * p3,
+                                                p4est3_locidx * n);
 
 #if 0
 

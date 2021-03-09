@@ -66,6 +66,7 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
   else {
     SC3E_TEST (p3->mpicomm != SC3_MPI_COMM_NULL, reason);
     SC3E_TEST (p3->level >= 0, reason);
+    SC3E_TEST (p3->setup_mode < P4EST3_NEW_MODE_LAST, reason);
 
     if (!p3->setup) {
       SC3E_TEST (p3->mpisize == 0 && p3->mpirank == 0, reason);
@@ -119,6 +120,8 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   p3->nodesizewin = SC3_MPI_WIN_NULL;
   p3->headcomm = SC3_MPI_COMM_NULL;
   p3->nodecomm = SC3_MPI_COMM_NULL;
+  p3->setup_mode = P4EST3_NEW_MORTON;
+  p3->is_split_comm = 1;
   SC3A_IS (p4est3_is_new, p3);
 
   *pp3 = p3;
@@ -219,6 +222,26 @@ p4est3_setup_vtable (p4est3_t * p3)
 }
 
 sc3_error_t        *
+p4est3_set_setup_mode (p4est3_t * p3, p4est3_setup_mode_t mode)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  SC3A_CHECK (mode < P4EST3_NEW_MODE_LAST);
+
+  p3->setup_mode = mode;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_set_is_split_comm (p4est3_t * p3, int is_split)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  SC3A_CHECK (is_split == 0 || is_split == 1);
+
+  p3->is_split_comm = is_split;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_setup (p4est3_t * p3)
 {
   int                 lev;
@@ -288,8 +311,9 @@ p4est3_setup (p4est3_t * p3)
     /* create tree and quadrant metadata */
     SC3E (p4est3_internal_setup_tree (p3, num_uniform));
 
-    /* create quadrants by the morton method, which is presumably slowest */
-    SC3E (p4est3_internal_setup_morton (p3));
+    /* create quadrants by the previously specified method,
+     default is morton, which is presumably slowest */
+    SC3E (p4est3_internal_setup_quadrants (p3));
   }
 
   /* we are done creating a valid forest */
@@ -353,9 +377,13 @@ p4est3_destroy (p4est3_t ** pp3)
       SC3E (sc3_MPI_Win_free (&p3->goffsetwin));
       SC3E (sc3_MPI_Win_free (&p3->quadwin));
       if (p3->noderank == 0) {
-        SC3E (sc3_MPI_Comm_free (&p3->headcomm));
+        if (p3->is_split_comm == 1) {
+          SC3E (sc3_MPI_Comm_free (&p3->nodecomm));
+        }
       }
-      SC3E (sc3_MPI_Comm_free (&p3->nodecomm));
+      if (p3->is_split_comm == 1) {
+        SC3E (sc3_MPI_Comm_free (&p3->headcomm));
+       }
       SC3E (sc3_MPI_Info_free (&p3->info_noncontig));
 
       /* deallocate internal storage */
@@ -405,5 +433,43 @@ p4est3_restore_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
 
   SC3E (p4est3_connectivity_unref (p3->conn));
   --p3->accessed_conn;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_get_quadrants (const p4est3_t * p3, char **q)
+{
+  SC3A_IS (p4est3_is_setup, p3);
+
+  *q = p3->quads;
+
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_get_global_num_quads (const p4est3_t * p3, p4est3_gloidx * n)
+{
+  if (n != NULL) {
+    *n = 0L;
+  }
+  SC3A_IS (p4est3_is_setup, p3);
+
+  if (n != NULL) {
+    *n = p3->global_num_quads;
+  }
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_get_local_num_quads (const p4est3_t * p3, p4est3_locidx * n)
+{
+  if (n != NULL) {
+    *n = 0L;
+  }
+  SC3A_IS (p4est3_is_setup, p3);
+
+  if (n != NULL) {
+    *n = p3->local_num_quads;
+  }
   return NULL;
 }

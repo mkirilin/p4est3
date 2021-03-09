@@ -198,15 +198,18 @@ p4est_quadrant_vtable_ancestor_id (const void *q, int i, int *j)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_coordinates (const void *q, int n, int *j)
+p4est_quadrant_vtable_coordinates (const void *q, int n, void *j)
 {
   const p4est_quadrant_t *quad = (const p4est_quadrant_t *) q;
+  p4est_qcoord_t     *coords = (p4est_qcoord_t *) j;
+  int                 d = P4EST3_REF_MAXLEVEL - P4EST_MAXLEVEL;
   SC3A_CHECK (n == P4EST_DIM);
-  SC3A_CHECK (j != NULL);
-  j[0] = (int) quad->x;
-  j[1] = (int) quad->y;
+  SC3A_CHECK (coords != NULL);
+  SC3A_CHECK (d >= 0);
+  coords[0] = quad->x << d;
+  coords[1] = quad->y << d;
 #ifdef P4_TO_P8
-  j[2] = (int) quad->z;
+  coords[2] = quad->z << d;
 #endif
   return NULL;
 }

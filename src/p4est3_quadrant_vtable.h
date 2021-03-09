@@ -42,6 +42,12 @@
 #include <sc3_array.h>
 #include <p4est3_base.h>
 
+/** Normalize coordinates of a quadrant to maxlevel of P4EST3_REF_MAXLEVEL.
+ * This is done to make the coordinates of various virtual quadrant
+ * implementations comparable with each other.
+ */
+#define P4EST3_REF_MAXLEVEL 32
+
 #ifdef __cplusplus
 extern              "C"
 {
@@ -72,7 +78,7 @@ typedef sc3_error_t *(*p4est3_quadrant_in2_j_t) (const void * q1,
 typedef sc3_error_t *(*p4est3_quadrant_out_t) (void *r);
 /** Generic prototype to take a quadrant and output another. */
 typedef sc3_error_t *(*p4est3_quadrant_in_out_t) (const void *q, void *r);
-/** Generic prototype to take a quadrant and int and output another int. */
+/** Generic prototype to take a quadrant and int and output another value. */
 typedef sc3_error_t *(*p4est3_quadrant_in_i_out_t) (const void *q, int i,
                                                     void *r);
 /** Prototype to set a quadrant based on a linear index. */
@@ -96,13 +102,11 @@ typedef p4est3_quadrant_in_j_t p4est3_quadrant_level_t;
 typedef p4est3_quadrant_in_j_t p4est3_quadrant_child_id_t;
 /** Prototype to query the ancestor id of a quadrant. */
 typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_ancestor_id_t;
-/** Prototype to query the coordinates of a quadrant. */
-typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_coordinates_t;
 /** Prototype to query the number of children of a quadrant. */
 typedef p4est3_quadrant_in_j_t p4est3_quadrant_num_children_t;
 /** Prototype to compare two quadrants by linear index. */
 typedef p4est3_quadrant_in2_j_t p4est3_quadrant_compare_t;
-/** Prototype to query the one quadrant is ancetor of another . */
+/** Prototype to query the one quadrant is ancetor of another. */
 typedef p4est3_quadrant_in2_j_t p4est3_quadrant_is_ancestor_t;
 
 /*** Specific prototypes for quadrant creation functions ***/
@@ -155,7 +159,7 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_level_t quadrant_level;               /**< Query the level. */
   p4est3_quadrant_child_id_t quadrant_child_id;         /**< Query child id. */
   p4est3_quadrant_ancestor_id_t quadrant_ancestor_id;   /**< Query ancestor id. */
-  p4est3_quadrant_coordinates_t quadrant_coordinates;   /**< Query coordinates. */
+  p4est3_quadrant_in_i_out_t quadrant_coordinates;      /**< Query coordinates. */
   /** Number of distinct children a quadrant can have.
    * This pointer may be NULL, in which case we return \ref max_children. */
   p4est3_quadrant_num_children_t quadrant_num_children;
@@ -285,7 +289,8 @@ sc3_error_t        *p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t *
                                                  qvt, const void *q, int l,
                                                  int *j);
 
-/** Query the integer coordinates of a quadrant with respect to the unit tree.
+/** Query the integer coordinates of a quadrant with respect to the unit tree
+ * with a maximum level equal to P4EST_MAXLEVEL.
  * \param [in] qvt      Valid virtual quadrant table.
  * \param [in] q        Valid quadrant in this implementation.
  * \param [in] n        Number of coordinates must match the dimension of \a qvt.
@@ -295,7 +300,7 @@ sc3_error_t        *p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t *
  */
 sc3_error_t        *p4est3_quadrant_coordinates (p4est3_quadrant_vtable_t *
                                                  qvt, const void *q, int n,
-                                                 int *j);
+                                                 void *j);
 
 /** Query the number of distinct children a quadrant can have.
  * \param [in] qvt      Valid virtual quadrant table.
@@ -418,7 +423,18 @@ sc3_error_t        *p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
-                                            int l, p4est3_gloidx g, void *r);
+                                            int l, p4est3_gloidx id, void *r);
+sc3_error_t        *p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t
+                                                    * qvt, const void *q1,
+                                                    const void *q2, void *r);
+
+sc3_error_t        *p4est3_quadrant_linear_id (p4est3_quadrant_vtable_t * qvt,
+                                               const void *q, int l,
+                                               p4est3_gloidx * id);
+
+sc3_error_t        *p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t
+                                                 * qvt, const void *q1,
+                                                 const void *q2, int *j);
 
 /** Generate a common nearest ancestor of two quadrants. 
  * \param [in] qvt      Valid virtual quadrant table.

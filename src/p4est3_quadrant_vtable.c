@@ -168,7 +168,7 @@ p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t * qvt,
 
 sc3_error_t        *
 p4est3_quadrant_coordinates (p4est3_quadrant_vtable_t * qvt,
-                             const void *q, int n, int *j)
+                             const void *q, int n, void *j)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_coordinates != NULL);
   SC3E (qvt->quadrant_coordinates (q, n, j));

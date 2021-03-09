@@ -24,6 +24,10 @@
 #include <p4est3_internal.h>
 #include <sc3_omp.h>
 
+#ifndef P4EST_ENABLE_OPENMP
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#endif
+
 sc3_error_t        *
 p4est3_internal_setup_comm (p4est3_t * p3)
 {
@@ -41,14 +45,24 @@ p4est3_internal_setup_comm (p4est3_t * p3)
   SC3E (sc3_MPI_Comm_rank (p3->mpicomm, &p3->mpirank));
 
   /* create one communicator on each shared-memory node */
-  SC3E (sc3_MPI_Comm_split_type (p3->mpicomm, SC3_MPI_COMM_TYPE_SHARED,
-                                 0, SC3_MPI_INFO_NULL, &p3->nodecomm));
+  if (p3->is_split_comm == 1) {
+    SC3E (sc3_MPI_Comm_split_type (p3->mpicomm, SC3_MPI_COMM_TYPE_SHARED,
+                                   0, SC3_MPI_INFO_NULL, &p3->nodecomm));
+  }
+  else {
+    p3->nodecomm = SC3_MPI_COMM_SELF;
+  }
   SC3E (sc3_MPI_Comm_size (p3->nodecomm, &p3->nodesize));
   SC3E (sc3_MPI_Comm_rank (p3->nodecomm, &p3->noderank));
 
-  /* create communicator that contains the first rank on each node */
-  SC3E (sc3_MPI_Comm_split (p3->mpicomm, p3->noderank == 0 ? 0 :
-                            SC3_MPI_UNDEFINED, 0, &p3->headcomm));
+  if (p3->is_split_comm == 1) {
+    /* create communicator that contains the first rank on each node */
+    SC3E (sc3_MPI_Comm_split (p3->mpicomm, p3->noderank == 0 ? 0 :
+                              SC3_MPI_UNDEFINED, 0, &p3->headcomm));
+  }
+  else {
+    p3->headcomm = p3->mpicomm;
+  }
   SC3A_CHECK ((p3->noderank != 0) == (p3->headcomm == SC3_MPI_COMM_NULL));
   if (p3->noderank == 0) {
     SC3E (sc3_MPI_Comm_size (p3->headcomm, &headsize));
@@ -278,7 +292,7 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   /* create shared quadrant storage */
   SC3E (sc3_allocator_malloc (p3->alloc, p3->nodesize * sizeof (char *),
                               &p3->nodequads));
-  quadbytes = p3->local_num_quads * p3->qsize;
+  quadbytes = (sc3_MPI_Aint_t) p3->local_num_quads * p3->qsize;
   SC3E (sc3_MPI_Win_allocate_shared
         (quadbytes, p3->qsize,
          p3->info_noncontig, p3->nodecomm, &quadmem, &p3->quadwin));
@@ -331,6 +345,279 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_lowest_children (p4est3_t * p3, const void *q,
+                        sc3_array_t * levelq, char **threadq)
+{
+  int                 i;
+  void               *child;
+  int                 level;
+  SC3E (p4est3_quadrant_level (p3->qvt, q, &level));
+
+  if (level < p3->level - 1) {
+    SC3E (sc3_array_index (levelq, level + 1, &child));
+    for (i = 0; i < p3->num_children; ++i) {
+      SC3E (p4est3_quadrant_child (p3->qvt, q, i, child));
+      SC3E (p4est3_lowest_children (p3, child, levelq, threadq));
+    }
+  }
+  else if (level == p3->level - 1) {
+    for (i = 0; i < p3->num_children; ++i, *threadq += p3->qsize) {
+      SC3E (p4est3_quadrant_child (p3->qvt, q, i, *threadq));
+      SC3A_IS (p3->qvt->quadrant_is_valid, *threadq);
+    }
+  }
+  else {
+    SC3E (p4est3_quadrant_copy (p3->qvt, q, *threadq));
+    *threadq += p3->qsize;
+  }
+
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_recursive_partition (p4est3_t * p3, int level,
+                            p4est3_locidx rf,
+                            p4est3_locidx rl,
+                            p4est3_locidx mf,
+                            p4est3_locidx ml,
+                            sc3_array_t * levelq, char **threadq)
+{
+  int                 i;
+  p4est3_locidx       n_lowerq;
+  void               *q;
+
+  if (rf >= mf && rl <= ml) {
+    SC3E (sc3_array_index (levelq, level, &q));
+    SC3E (p4est3_quadrant_morton (p3->qvt, level,
+                                  rf >> (p3->qvt->dim * (p3->level - level)),
+                                  q));
+    SC3E (p4est3_lowest_children (p3, q, levelq, threadq));
+  }
+  else if (rf > ml || rl < mf) {
+    return NULL;
+  }
+  else {
+    n_lowerq = (rl - rf + 1) / p3->num_children;
+    rl = rf + n_lowerq - 1;
+    for (i = 0; i < p3->num_children; ++i, rf += n_lowerq, rl += n_lowerq) {
+      SC3E (p4est3_recursive_partition (p3, level + 1, rf, rl, mf, ml,
+                                        levelq, threadq));
+    }
+  }
+
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_recursive_partition_child (p4est3_t * p3, int level,
+                                  p4est3_locidx rf,
+                                  p4est3_locidx rl,
+                                  p4est3_locidx mf,
+                                  p4est3_locidx ml,
+                                  sc3_array_t * levelq, char **threadq)
+{
+  int                 i;
+  p4est3_locidx       n_lowerq;
+  void               *q, *r;
+
+  if (rf >= mf && rl <= ml) {
+    SC3E (sc3_array_index (levelq, level, &q));
+    SC3E (p4est3_lowest_children (p3, q, levelq, threadq));
+  }
+  else if (rf > ml || rl < mf) {
+    return NULL;
+  }
+  else {
+    n_lowerq = (rl - rf + 1) / p3->num_children;
+    rl = rf + n_lowerq - 1;
+    for (i = 0; i < p3->num_children; ++i, rf += n_lowerq, rl += n_lowerq) {
+      SC3A_CHECK (level < p3->level);
+      SC3E (sc3_array_index (levelq, level, &q));
+      SC3E (sc3_array_index (levelq, level + 1, &r));
+      SC3E (p4est3_quadrant_child (p3->qvt, q, i, r));
+      SC3E (p4est3_recursive_partition_child (p3, level + 1, rf, rl, mf, ml,
+                                              levelq, threadq));
+    }
+  }
+
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_region (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
+{
+  int                 la, lb, lc;
+  int                 i, j, j1, j2, ecount;
+  p4est3_gloidx       aid, bid, cid;
+  void               *c, *q;
+  sc3_array_t        *testq, *buff;
+  sc3_allocator_t    *alloc;
+
+  p4est3_quadrant_level (p3->qvt, a, &la);
+  p4est3_quadrant_level (p3->qvt, b, &lb);
+  SC3A_CHECK (la == lb);
+
+  SC3E (p4est3_quadrant_linear_id (p3->qvt, a, p3->level, &aid));
+  SC3E (p4est3_quadrant_linear_id (p3->qvt, b, p3->level, &bid));
+
+  SC3E (sc3_array_index
+        (p3->talloc, sc3_omp_thread_num (), (void **) &(alloc)));
+  SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &testq));
+  SC3E (sc3_array_set_elem_size (testq, p3->qsize));
+  SC3E (sc3_array_set_resizable (testq, 1));
+  SC3E (sc3_array_setup (testq));
+
+  SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &buff));
+  SC3E (sc3_array_set_elem_size (buff, p3->qsize));
+  SC3E (sc3_array_set_elem_count (buff, 2));
+  SC3E (sc3_array_setup (buff));
+
+  SC3E (p4est3_quadrant_compare (p3->qvt, a, b, &j1));
+  SC3A_CHECK (j1 < 0);
+  SC3E (sc3_array_push (testq, &c));
+  SC3E (p4est3_nearest_common_ancestor (p3->qvt, a, b, c));
+  for (i = 0; i < p3->num_children; ++i) {
+    SC3E (sc3_array_push (testq, &q));
+    SC3E (p4est3_quadrant_child (p3->qvt, c, i, q));
+  }
+  SC3E (sc3_array_get_elem_count (testq, &ecount));
+  SC3A_CHECK (ecount == p3->num_children + 1);
+  for (i = 1; i < ecount; ++i) {
+    SC3E (sc3_array_index (testq, i, &c));
+    SC3E (p4est3_quadrant_linear_id (p3->qvt, c, p3->level, &cid));
+    SC3E (p4est3_quadrant_level (p3->qvt, c, &lc));
+    SC3E (p4est3_quadrant_is_ancestor (p3->qvt, c, b, &j2));
+    if ((aid < cid || (aid == cid && la <= lc))
+        && (cid < bid || (cid == bid && lc < lb))
+        && !j2) {
+      SC3E (sc3_array_push (region, &q));
+      SC3E (p4est3_quadrant_copy (p3->qvt, c, q));
+    }
+    else {
+      SC3E (p4est3_quadrant_is_ancestor (p3->qvt, c, a, &j1));
+      if (j1 || j2) {
+        for (j = 0; j < p3->num_children; ++j) {
+          SC3E (sc3_array_push (testq, &q));
+          SC3E (p4est3_quadrant_child (p3->qvt, c, j, q));
+        }
+        ecount += p3->num_children;
+      }
+    }
+  }
+
+  SC3E (sc3_array_destroy (&testq));
+  SC3E (sc3_array_destroy (&buff));
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_region_end (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
+{
+  int                 la, lc;
+  int                 i, j, j1, ecount;
+  p4est3_gloidx       aid, cid;
+  void               *c, *q;
+  sc3_array_t        *testq, *buff;
+  sc3_allocator_t    *alloc;
+
+  p4est3_quadrant_level (p3->qvt, a, &la);
+
+  SC3E (p4est3_quadrant_linear_id (p3->qvt, a, p3->level, &aid));
+
+  SC3E (sc3_array_index
+        (p3->talloc, sc3_omp_thread_num (), (void **) &(alloc)));
+  SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &testq));
+  SC3E (sc3_array_set_elem_size (testq, p3->qsize));
+  SC3E (sc3_array_set_resizable (testq, 1));
+  SC3E (sc3_array_setup (testq));
+
+  SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &buff));
+  SC3E (sc3_array_set_elem_size (buff, p3->qsize));
+  SC3E (sc3_array_set_elem_count (buff, 2));
+  SC3E (sc3_array_setup (buff));
+
+  SC3E (sc3_array_push(testq, &c));
+  SC3E (p4est3_nearest_common_ancestor (p3->qvt, a, b, c));
+
+  SC3E (sc3_array_get_elem_count (testq, &ecount));
+  SC3A_CHECK (ecount == 1);
+  for (i = 0; i < ecount; ++i) {
+    SC3E (sc3_array_index (testq, i, &c));
+    SC3E (p4est3_quadrant_linear_id (p3->qvt, c, p3->level, &cid));
+    SC3E (p4est3_quadrant_level (p3->qvt, c, &lc));
+    if (aid < cid || (aid == cid && la <= lc)) {
+      SC3E (sc3_array_push (region, &q));
+      SC3E (p4est3_quadrant_copy (p3->qvt, c, q));
+    }
+    else {
+      SC3E (p4est3_quadrant_is_ancestor (p3->qvt, c, a, &j1));
+      if (j1) {
+        for (j = 0; j < p3->num_children; ++j) {
+          SC3E (sc3_array_push (testq, &q));
+          SC3E (p4est3_quadrant_child (p3->qvt, c, j, q));
+        }
+        ecount += p3->num_children;
+      }
+    }
+  }
+
+  SC3E (sc3_array_destroy (&testq));
+  SC3E (sc3_array_destroy (&buff));
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_recursive_partition_region (p4est3_t * p3, int is_region_end,
+                                   p4est3_locidx mf, p4est3_locidx ml,
+                                   sc3_array_t * levelq, char **threadq)
+{
+  sc3_allocator_t    *alloc;
+  sc3_array_t        *region;
+  void               *a, *b;
+  char               *threadq_ptr;
+  int                 rcount, i;
+  p4est3_gloidx       id;
+
+  SC3E (sc3_array_index (levelq, 0, &a));
+  SC3E (sc3_array_index (levelq, 1, &b));
+  SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, mf, a));
+
+  if (mf == ml) {
+    SC3E (p4est3_quadrant_copy (p3->qvt, a, *threadq));
+    *threadq += p3->qsize;
+    return NULL;
+  }
+
+  SC3E (sc3_array_index
+        (p3->talloc, sc3_omp_thread_num (), (void **) &(alloc)));
+  SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &region));
+  SC3E (sc3_array_set_elem_size (region, p3->qsize));
+  SC3E (sc3_array_set_resizable (region, 1));
+  SC3E (sc3_array_setup (region));
+
+  if (is_region_end) {
+    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, ml, b));
+    SC3E (p4est3_region_end (p3, a, b, region));
+  }
+  else {
+    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, ml + 1, b));
+    SC3E (p4est3_region (p3, a, b, region));
+  }
+
+  SC3E (sc3_array_get_elem_count (region, &rcount));
+  for (i = 0; i < rcount; ++i) {
+    SC3E (sc3_array_index (region, i, &a));
+    SC3E (p4est3_quadrant_linear_id (p3->qvt, a, p3->level, &id));
+    threadq_ptr = *threadq + p3->qsize * (id - mf);
+    SC3E (p4est3_lowest_children (p3, a, levelq, &threadq_ptr));
+  }
+  *threadq += p3->qsize * (ml - mf + 1);
+
+  SC3E (sc3_array_destroy (&region));
+  return NULL;
+}
+
 /** Binary search a local quad number in the local trees */
 static sc3_error_t *
 p4est3_local_quad_tree (p4est3_t * p3,
@@ -369,10 +656,113 @@ p4est3_local_quad_tree (p4est3_t * p3,
   }
 }
 
+/* TODO: char * is a good convention for type? */
+static sc3_error_t *
+p4est3_internal_populate_morton (p4est3_locidx tmine, p4est3_t * p3,
+                                 p4est3_locidx * tq, p4est3_gloidx * gq,
+                                 char **charq)
+{
+  for (; *tq < tmine; ++(*tq), ++(*gq), *charq += p3->qsize) {
+    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, *gq, *charq));
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_internal_populate_successor (p4est3_locidx tmine, p4est3_t * p3,
+                                    p4est3_locidx * tq, p4est3_gloidx * gq,
+                                    char **charq)
+{
+  if (*tq < tmine) {
+    char               *cq_prev = *charq;
+    SC3E (p4est3_quadrant_morton (p3->qvt, p3->level, *gq, *charq));
+    ++(*tq);
+    ++(*gq);
+    *charq += p3->qsize;
+    for (; *tq < tmine;
+         ++(*tq), ++(*gq), cq_prev = *charq, *charq += p3->qsize) {
+      SC3E (p4est3_quadrant_successor (p3->qvt, cq_prev, *charq));
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
+                                    p4est3_locidx * tq, p4est3_gloidx * gq,
+                                    char **charq)
+{
+  if (*tq < tmine) {
+    sc3_array_t        *levelq;
+    sc3_allocator_t    *alloc;
+    const p4est3_locidx rl = (1 << (p3->qvt->dim * p3->level)) - 1;
+    const p4est3_locidx ml = *gq + (tmine - *tq) - 1;
+
+    /* TODO: use per-thread allocotor here */
+    SC3E (sc3_array_index
+          (p3->talloc, sc3_omp_thread_num (), (void **) &(alloc)));
+    SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &levelq));
+    SC3E (sc3_array_set_elem_size (levelq, p3->qsize));
+    SC3E (sc3_array_set_elem_alloc (levelq, p3->level + 1));
+    SC3E (sc3_array_set_elem_count (levelq, p3->level + 1));
+    SC3E (sc3_array_set_initzero (levelq, 1));
+    SC3E (sc3_array_setup (levelq));
+    switch (p3->setup_mode) {
+    case P4EST3_NEW_RECURSIVE:
+      SC3E (p4est3_recursive_partition
+            (p3, 0, 0, rl, *gq, ml, levelq, charq));
+      break;
+    case P4EST3_NEW_RECURSIVE_CHILD:
+      SC3E (p4est3_recursive_partition_child
+            (p3, 0, 0, rl, *gq, ml, levelq, charq));
+      break;
+    case P4EST3_NEW_RECURSIVE_REGION:
+      SC3E (p4est3_recursive_partition_region
+            (p3, ml == rl ? 1 : 0, *gq, ml, levelq, charq));
+      break;
+    default:
+      SC3E_UNREACH ("wrong setup mode");
+    }
+    SC3E (sc3_array_destroy (&levelq));
+    *tq = tmine;
+    *gq = ml;
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_internal_populate (p4est3_locidx tmine, p4est3_t * p3,
+                          p4est3_locidx * tq, p4est3_gloidx * gq,
+                          char **charq)
+{
+  switch (p3->setup_mode) {
+  case P4EST3_NEW_MORTON:
+    SC3E (p4est3_internal_populate_morton (tmine, p3, tq, gq, charq));
+    break;
+  case P4EST3_NEW_SUCCESSOR:
+    SC3E (p4est3_internal_populate_successor (tmine, p3, tq, gq, charq));
+    break;
+  case P4EST3_NEW_RECURSIVE:
+    SC3E (p4est3_internal_populate_recursive (tmine, p3, tq, gq, charq));
+    break;
+  case P4EST3_NEW_RECURSIVE_CHILD:
+    SC3E (p4est3_internal_populate_recursive (tmine, p3, tq, gq, charq));
+    break;
+  case P4EST3_NEW_RECURSIVE_REGION:
+    SC3E (p4est3_internal_populate_recursive (tmine, p3, tq, gq, charq));
+    break;
+  default:
+    SC3E_UNREACH ("wrong setup mode");
+  }
+  return NULL;
+}
+
 sc3_error_t        *
-p4est3_internal_setup_morton (p4est3_t * p3)
+p4est3_internal_setup_quadrants (p4est3_t * p3)
 {
   sc3_omp_esync_t     esync, *s = &esync;
+  int                 tcount;
+  sc3_allocator_t    *malloc;
 
   /* this is a special-purpose function to simplify p4est3_setup */
   SC3A_CHECK (p3 != NULL && p3->quads != NULL);
@@ -392,28 +782,58 @@ p4est3_internal_setup_morton (p4est3_t * p3)
     p4est3_locidx       first_quad_num, end_quad_num, tmine, tq;
     p4est3_gloidx       gq;
     p4est3_tree_t      *tree;
+    sc3_allocator_t    *alloc;
+
+    /* TODO: if recursive mode is selected, create one allocator per thread
+       derived from p3->alloc.
+       Please see sc/example/v3basics/basics.c
+       Would it make sense to allocate the per-thread allocators
+       persistent through the lifetime of the p4est3 object.
+     */
 
     /* find tree sub-range for each thread separately */
     first_quad_num = p4est3_loccut (p3->local_num_quads, tnum, tid);
     end_quad_num = p4est3_loccut (p3->local_num_quads, tnum, tid + 1);
     SC3E_SET (e, p4est3_local_quad_tree (p3, first_quad_num, &tree));
+
+    if (p3->setup_mode == P4EST3_NEW_RECURSIVE
+        || p3->setup_mode == P4EST3_NEW_RECURSIVE_CHILD
+        || p3->setup_mode == P4EST3_NEW_RECURSIVE_REGION) {
+      if (tid == 0) {
+        SC3E_NULL_SET (e, sc3_array_new (p3->alloc, &p3->talloc));
+        SC3E_NULL_SET (e,
+                       sc3_array_set_elem_size (p3->talloc,
+                                                sizeof (sc3_allocator_t *)));
+        SC3E_NULL_SET (e, sc3_array_set_elem_count (p3->talloc, tnum));
+        SC3E_NULL_SET (e, sc3_array_setup (p3->talloc));
+      }
+#pragma omp barrier
+      SC3E_NULL_SET (e,
+                     sc3_array_index (p3->talloc, tid, (void **) &(alloc)));
+#pragma omp critical
+      {
+        SC3E_NULL_SET (e,
+                       sc3_allocator_new (p3->alloc,
+                                          (sc3_allocator_t **) alloc));
+        SC3E_NULL_SET (e, sc3_allocator_setup (*(sc3_allocator_t **) alloc));
+        sc3_omp_esync_in_critical (s, &e);
+      }
+    }
     if (e == NULL) {
       tq = first_quad_num;
       gq = tree->first_tquad + (first_quad_num - tree->quad_offset);
-      charq = p3->quads + first_quad_num * p3->qsize;
+      charq = p3->quads + (p4est3_gloidx) first_quad_num * p3->qsize;
 
       /* loop over subset of local trees */
       for (;;) {
         SC3E_NULL_REQ (e, tree->quad_offset <= tq);
         SC3E_NULL_REQ (e, tq < tree->quad_offset + tree->num_quads);
-        tmine = SC3_MIN (end_quad_num, tree->quad_offset + tree->num_quads);
+        tmine = SC3_MIN (end_quad_num, (p4est3_gloidx) tree->quad_offset + tree->num_quads);
 
-        /* loop over quadrants in local tree */
-        for (; tq < tmine; ++tq, ++gq, charq += p3->qsize) {
-          SC3E_NULL_SET
-            (e, p4est3_quadrant_morton (p3->qvt, p3->level, gq, charq));
-          SC3E_NULL_BREAK (e);
-        }
+        /* loop over quadrants in local tree with creating of quadrants
+           by selected method */
+        SC3E_SET (e, p4est3_internal_populate (tmine, p3, &tq, &gq, &charq));
+
         SC3E_NULL_REQ (e, tq <= end_quad_num);
         if (tq == end_quad_num) {
           break;
@@ -428,6 +848,16 @@ p4est3_internal_setup_morton (p4est3_t * p3)
     sc3_omp_esync (s, &e);
   }
   SC3E (sc3_omp_esync_summary (s));
+  if (p3->setup_mode == P4EST3_NEW_RECURSIVE
+      || p3->setup_mode == P4EST3_NEW_RECURSIVE_CHILD
+      || p3->setup_mode == P4EST3_NEW_RECURSIVE_REGION) {
+    SC3E (sc3_array_get_elem_count (p3->talloc, &tcount));
+    for (int i = 0; i < tcount; ++i) {
+      SC3E (sc3_array_index (p3->talloc, i, (void **) &(malloc)));
+      SC3E (sc3_allocator_destroy ((sc3_allocator_t **) malloc));
+    }
+    SC3E (sc3_array_destroy (&p3->talloc));
+  }
   SC3E (sc3_MPI_Win_unlock (p3->noderank, p3->quadwin));
   SC3E (sc3_MPI_Barrier (p3->nodecomm));
   return NULL;

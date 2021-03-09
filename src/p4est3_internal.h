@@ -68,6 +68,7 @@ struct p4est3
 {
   /* variables of internal state used during the whole lifetime */
   sc3_refcount_t      rc;       /**< Reference counter in use. */
+  sc3_array_t        *talloc;   /**< Allocator for recoursive mode */
   sc3_allocator_t    *alloc;    /**< Memory allocator in use. */
   int                 setup;    /**< Boolean: object is setup. */
   int                 accessed_conn;    /**< Number of currently active
@@ -118,6 +119,8 @@ struct p4est3
   int                *node_sizes;       /**< For each node, number of its ranks. */
   int                *node_offsets;     /**< For each node and one beyond, the
                                              number of ranks before it. */
+  int                 is_split_comm;    /**< MPI sharined memory enable/disable
+                                             indicator. */
 
   /* variables populated during p4est3_setup: partition related */
   sc3_MPI_Win_t       gftreewin;        /**< Array of (\ref mpisize + 1) \ref
@@ -137,6 +140,7 @@ struct p4est3
   p4est3_gloidx      *goffset;          /**< Pointer to \ref goffsetwin's memory. */
   p4est3_topidx      *gftree;           /**< Pointer to \ref gftreewin's memory. */
   char               *gfpos;            /**< Pointer to \ref gfposwin's memory. */
+  p4est3_setup_mode_t setup_mode;       /**< Choose the method of quadrant creation*/
 
   /* variables populated during p4est3_setup: tree and quadrant storage */
   sc3_MPI_Win_t       quadwin;          /**< Shared memory stores the quadrants
@@ -187,8 +191,7 @@ sc3_error_t        *p4est3_internal_setup_cut (p4est3_t * p3,
                                                int qsize);
 sc3_error_t        *p4est3_internal_setup_tree (p4est3_t * p3,
                                                 p4est3_gloidx num_uniform);
-sc3_error_t        *p4est3_internal_setup_morton (p4est3_t * p3);
-/** \endcond */
+sc3_error_t        *p4est3_internal_setup_quadrants (p4est3_t * p3);
 
 #ifdef __cplusplus
 #if 0
