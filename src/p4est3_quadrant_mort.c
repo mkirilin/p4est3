@@ -23,6 +23,8 @@
 
 #ifndef P4_TO_P8
 #include <p4est3_quadrant_mort.h>
+#else
+#include <p8est3_quadrant_mort.h>
 #endif
 
 static              p4est3_gloidx
