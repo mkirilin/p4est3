@@ -23,12 +23,12 @@
 
 #ifndef P4_TO_P8
 #include <p4est3_quadrant_yx.h>
-#include <p4est3_quadrant_mort.h>
+#include <p4est3_quadrant_mort2d.h>
 #include <p4est3_p4est.h>
 #include <p4est_extended.h>
 #else
 #include <p4est3_quadrant_zyx.h>
-#include <p8est3_quadrant_mort.h>
+#include <p4est3_quadrant_mort3d.h>
 #include <p4est3_p8est.h>
 #include <p8est_extended.h>
 #endif
@@ -168,7 +168,7 @@ check_quadrant_type (int argc, char **argv,
     p4est3_quadrant_yx_vtable (qvt);
   }
   else if (strcmp (argv[2], "MORT_ORD") == 0) {
-    p4est3_quadrant_mort_vtable (qvt);
+    p4est3_quadrant_mort2d_vtable (qvt);
   }
   else {
     if (mpirank == 0) {

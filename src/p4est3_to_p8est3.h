@@ -38,6 +38,6 @@
 #define p4est3_quadrant_yx_vtable           p4est3_quadrant_zyx_vtable
 
 /* functions in p4est3_quadrant_mort */
-#define p4est3_quadrant_mort_vtable         p8est3_quadrant_mort_vtable
+#define p4est3_quadrant_mort2d_vtable       p4est3_quadrant_mort3d_vtable
 
 #endif /* !P4EST3_TO_P8EST3_H */

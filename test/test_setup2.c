@@ -23,11 +23,11 @@
 
 #ifndef P4_TO_P8
 #include <p4est3_quadrant_yx.h>
-#include <p4est3_quadrant_mort.h>
+#include <p4est3_quadrant_mort2d.h>
 #include <p4est3_p4est.h>
 #else
 #include <p4est3_quadrant_zyx.h>
-#include <p8est3_quadrant_mort.h>
+#include <p4est3_quadrant_mort3d.h>
 #include <p4est3_p8est.h>
 #endif
 
@@ -51,7 +51,7 @@ set_vtables (p4est3_quadrant_vtable_t * q, p4est3_quadrant_vtable_t * qmort,
              p4est3_quadrant_vtable_t * qavx, sc3_error_t ** e)
 {
   SC3X (p4est3_quadrant_vtable_p4est (q, 0));
-  SC3X (p4est3_quadrant_mort_vtable (qmort));
+  SC3X (p4est3_quadrant_mort2d_vtable (qmort));
   /* the AVX virtual table can only be set with hardware support */
   SC3F (p4est3_quadrant_yx_vtable (qavx), *e);
 

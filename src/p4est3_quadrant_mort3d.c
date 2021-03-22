@@ -21,28 +21,6 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P4EST3_QUADRANT_MORT_H
-#define P4EST3_QUADRANT_MORT_H
-
-#include <p4est.h>
-#include <p4est3_quadrant_vtable.h>
-
-#ifdef __cplusplus
-extern              "C"
-{
-#if 0
-}
-#endif
-#endif
-
-sc3_error_t        *p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t
-                                                 * qvt);
-
-#ifdef __cplusplus
-#if 0
-{
-#endif
-}
-#endif
-
-#endif /* !P4EST3_QUADRANT_MORT_H */
+#include <p4est_to_p8est.h>
+#include <p4est3_to_p8est3.h>
+#include "p4est3_quadrant_mort2d.c"

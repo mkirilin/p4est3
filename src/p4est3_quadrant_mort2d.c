@@ -22,11 +22,11 @@
 */
 
 #ifndef P4_TO_P8
-#include <p4est3_quadrant_mort.h>
+#include <p4est3_quadrant_mort2d.h>
 #define P4EST3_MORT_MAXLEVEL 31
 #define P4EST3_MORT_QMAXLEVEL 31
 #else
-#include <p8est3_quadrant_mort.h>
+#include <p4est3_quadrant_mort3d.h>
 #define P4EST3_MORT_MAXLEVEL 21
 #define P4EST3_MORT_QMAXLEVEL 21
 #endif
@@ -440,7 +440,7 @@ p4est3_quadrant_mort_root (p4est3_quadrant_mort_t * r)
 }
 
 sc3_error_t        *
-p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t * qvt)
+p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
 {
   SC3A_CHECK (qvt != NULL);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
