@@ -296,8 +296,7 @@ p4est3_quadrant_zyx_ancestor_id (const __m128i * q, int level, int *j)
 static sc3_error_t *
 p4est3_quadrant_zyx_child_id (const __m128i * q, int *j)
 {
-  int                 level =
-  _mm_extract_epi32 (*q, 0);
+  int                 level = _mm_extract_epi32 (*q, 0);
   SC3E (p4est3_quadrant_zyx_ancestor_id (q, level, j));
   return NULL;
 }
@@ -375,7 +374,8 @@ p4est3_quadrant_zyx_first_descendant (const __m128i * q, int level,
                                       __m128i * fd)
 {
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
-  SC3A_CHECK (_mm_extract_epi32 (*q, 0) <= level && level <= P4EST3_YX_MAXLEVEL);
+  SC3A_CHECK (_mm_extract_epi32 (*q, 0) <= level &&
+              level <= P4EST3_YX_MAXLEVEL);
 
   *fd = _mm_insert_epi32 (*q, level, 0);
   return NULL;
@@ -388,7 +388,8 @@ p4est3_quadrant_zyx_last_descendant (const __m128i * q, int level,
   p4est_qcoord_t      shift;
 
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
-  SC3A_CHECK (_mm_extract_epi32 (*q, 0) <= level && level <= P4EST3_YX_QMAXLEVEL);
+  SC3A_CHECK (_mm_extract_epi32 (*q, 0) <= level &&
+              level <= P4EST3_YX_QMAXLEVEL);
 
   shift = P4EST_QUADRANT_LEN (_mm_extract_epi32 (*q, 0))
     - P4EST_QUADRANT_LEN (level);
@@ -645,7 +646,8 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_zyx_level;
 
-  qvt->quadrant_child_id = (p4est3_quadrant_child_id_t) p4est3_quadrant_zyx_child_id;
+  qvt->quadrant_child_id =
+    (p4est3_quadrant_child_id_t) p4est3_quadrant_zyx_child_id;
 
   qvt->quadrant_ancestor_id =
     (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_zyx_ancestor_id;
