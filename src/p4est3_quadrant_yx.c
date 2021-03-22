@@ -29,6 +29,10 @@
 #include <p4est3_quadrant_zyx.h>
 #endif /* !P4_TO_P8 */
 
+/* These have the same values for the 2D and 3D implementations */
+#define P4EST3_YX_MAXLEVEL 30
+#define P4EST3_YX_QMAXLEVEL 30
+
 #ifdef P4EST_ENABLE_AVX2
 
 #include <immintrin.h>
