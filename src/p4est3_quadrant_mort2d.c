@@ -53,7 +53,7 @@ p4est3_quadrant_mort_num_uniform (int level)
   return p4est3_glopow (P4EST_CHILDREN, level);
 }
 
-static              int
+static int
 p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
                                      char *reason)
 {
@@ -62,7 +62,7 @@ p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
   SC3E_YES (reason);
 }
 
-static              int
+static int
 p4est3_quadrant_mort_is_valid (const p4est3_quadrant_mort_t * q, char *reason)
 {
   SC3E_TEST ((q->level >= 0 && q->level <= P4EST3_MORT_QMAXLEVEL) &&
@@ -162,7 +162,7 @@ p4est3_quadrant_mort_level (const p4est3_quadrant_mort_t * q, int *l)
 
 #ifdef P4EST_ENABLE_DEBUG
 
-static              int
+static int
 p4est3_quadrant_mort_is_parent (const p4est3_quadrant_mort_t * q,
                                 const p4est3_quadrant_mort_t * r,
                                 char *reason)
