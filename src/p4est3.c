@@ -37,6 +37,8 @@ p4est3_vtable_is_valid (const p4est3_vtable_t * pvt, char *reason)
   SC3E_IS (p4est3_quadrant_vtable_is_valid, pvt->qvt, reason);
 
   /* internal consistency */
+  SC3E_TEST (pvt->get_local_num_trees != NULL, reason);
+
   /* TODO: verify dim of connectivity equals dim of vtable */
 
   SC3E_YES (reason);
@@ -437,11 +439,24 @@ p4est3_restore_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
 }
 
 sc3_error_t        *
-p4est3_get_local_num_trees (p4est3_t * p3,
+p4est3_get_local_num_trees (const p4est3_t * p3,
                             p4est3_topidx * first_local_tree,
                             p4est3_topidx * last_local_tree)
 {
-  return NULL;
+  SC3A_IS (p4est3_is_setup, p3);
+  SC3A_CHECK (first_local_tree != NULL);
+  SC3A_CHECK (last_local_tree != NULL);
+
+  if (p3->pvt != NULL) {
+    SC3A_CHECK (p3->pvt->get_local_num_trees != NULL);
+    return p3->pvt->get_local_num_trees (p3->slf,
+                                         first_local_tree, last_local_tree);
+  }
+  else {
+    *first_local_tree = p3->fltree;
+    *last_local_tree = p3->lltree;
+    return NULL;
+  }
 }
 
 sc3_error_t        *

@@ -94,6 +94,7 @@ test_p4est_new (sc3_allocator_t * alloc,
   p4est_connectivity_t *c4;
   p4est3_connectivity_t *conn;
   p4est3_connectivity_t *aconn;
+  p4est3_topidx       flt, llt;
   p4est3_t           *p3;
   p4est_t            *p4;
 
@@ -147,6 +148,7 @@ test_p4est_new (sc3_allocator_t * alloc,
     for (j = 0; j < 4; ++j) {
       SC3E (p4est3_access_connectivity (p3, &aconn));
       SC3E (p4est3_restore_connectivity (p3, aconn));
+      SC3E (p4est3_get_local_num_trees (p3, &flt, &llt));
     }
 
     /* this leaves the connectivity intact */

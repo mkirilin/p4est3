@@ -49,6 +49,14 @@ extern              "C"
 /** General virtual function taking one in-out argument. */
 typedef sc3_error_t *(*p4est3_inout_t) (void *slf);
 
+/** General virtual function with one topidx out argument. */
+typedef sc3_error_t *(*p4est3_out1t_t) (void *slf, p4est3_topidx * t1);
+
+/** General virtual function with two topidx out argument. */
+typedef sc3_error_t *(*p4est3_out2t_t) (const void *slf,
+                                        p4est3_topidx * t1,
+                                        p4est3_topidx * t2);
+
 /** One way to create a forest is to provide a virtual table with state.
  * The members of this table must be set before passing it to \ref
  * p4est3_set_vtable, where we make a shallow copy.
@@ -66,6 +74,9 @@ typedef struct p4est3_vtable
                                      forest to create.  It must be setup. */
   p4est3_quadrant_vtable_t *qvt;        /**< Quadrant table must match forest.
                                              We make a shallow copy. */
+
+  /** Query functions */
+  p4est3_out2t_t      get_local_num_trees;      /**< Number of local trees. */
 
   /** This function may be NULL, e.g.\ when no state requires destruction */
   p4est3_inout_t      destroy;
@@ -260,8 +271,15 @@ sc3_error_t        *p4est3_restore_connectivity (p4est3_t * p3,
                                                  p4est3_connectivity_t *
                                                  conn);
 
-/** Document */
-sc3_error_t        *p4est3_get_local_num_trees (p4est3_t * p3,
+/** Query the range of processor-local trees of this forest.
+ * \param [in] p3                   Initialized, valid forest.
+ * \param [out] first_local_tree    The first local tree, or -1 if empty.
+ *                          Pointer to this output variable must not be NULL.
+ * \param [out] last_local_tree     The last local tree (inclusive), or -2.
+ *                          Pointer to this output variable must not be NULL.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_local_num_trees (const p4est3_t * p3,
                                                 p4est3_topidx *
                                                 first_local_tree,
                                                 p4est3_topidx *

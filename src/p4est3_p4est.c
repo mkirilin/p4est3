@@ -86,13 +86,25 @@ typedef struct p4est3_p4est_self
 p4est3_p4est_self_t;
 
 static sc3_error_t *
+p4est3_p4est_get_local_num_trees (const void *pslf,
+                                  p4est3_topidx * t1, p4est3_topidx * t2)
+{
+  p4est3_p4est_self_t *slf = (p4est3_p4est_self_t *) pslf;
+
+  SC3A_CHECK (slf != NULL && slf->p4 != NULL);
+
+  *t1 = slf->p4->first_local_tree;
+  *t2 = slf->p4->last_local_tree;
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_p4est_destroy (void *pslf)
 {
   p4est3_p4est_self_t *slf = (p4est3_p4est_self_t *) pslf;
 
   /* leave p4->connectivity alone */
-  SC3A_CHECK (slf != NULL);
-  SC3A_CHECK (slf->p4 != NULL);
+  SC3A_CHECK (slf != NULL && slf->p4 != NULL);
   if (slf->autodestroy) {
     p4est_destroy (slf->p4);
   }
@@ -129,6 +141,7 @@ p4est3_new_p4est (sc3_allocator_t * alloc, p4est_t * p4,
   pvt->c3 = slf->c3;
   pvt->qvt = &sqvt;
   SC3E (p4est3_quadrant_vtable_p4est (pvt->qvt, 0));
+  pvt->get_local_num_trees = p4est3_p4est_get_local_num_trees;
   pvt->destroy = p4est3_p4est_destroy;
 
   /* create forest */
