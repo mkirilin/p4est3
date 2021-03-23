@@ -212,7 +212,6 @@ sc3_error_t        *p4est3_set_is_split_comm (p4est3_t * p3, int is_split);
  */
 sc3_error_t        *p4est3_setup (p4est3_t * p3);
 
-
 /** Increase reference counter of a forest after setup.
  * \param [in,out] p3       Must be setup.  Increase its reference counter.
  * \return                  NULL on success, error object otherwise.
@@ -260,6 +259,13 @@ sc3_error_t        *p4est3_access_connectivity (p4est3_t * p3,
 sc3_error_t        *p4est3_restore_connectivity (p4est3_t * p3,
                                                  p4est3_connectivity_t *
                                                  conn);
+
+/** Document */
+sc3_error_t        *p4est3_get_local_num_trees (p4est3_t * p3,
+                                                p4est3_topidx *
+                                                first_local_tree,
+                                                p4est3_topidx *
+                                                last_local_tree);
 
 /*----------------------- accessing quadrants ------------------------*/
 

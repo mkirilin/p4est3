@@ -383,7 +383,7 @@ p4est3_destroy (p4est3_t ** pp3)
       }
       if (p3->is_split_comm == 1) {
         SC3E (sc3_MPI_Comm_free (&p3->headcomm));
-       }
+      }
       SC3E (sc3_MPI_Info_free (&p3->info_noncontig));
 
       /* deallocate internal storage */
@@ -433,6 +433,14 @@ p4est3_restore_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
 
   SC3E (p4est3_connectivity_unref (p3->conn));
   --p3->accessed_conn;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_get_local_num_trees (p4est3_t * p3,
+                            p4est3_topidx * first_local_tree,
+                            p4est3_topidx * last_local_tree)
+{
   return NULL;
 }
 
