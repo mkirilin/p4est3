@@ -491,7 +491,8 @@ sc3_error_t        *p4est3_quadrant_array_new (sc3_allocator_t * alloc,
  * ancestor's children at level \b level + 1.
  * \param [in] array     The sorted array of quadrants of level > \b level.
  * \param [in] level     The level at which there is a common ancestor.
- * \param [in,out] indices     The indices of the first quadrant in each of
+ * \param [in,out] indices     Array of length max_children + 1 and type int.
+ *                             The indices of the first quadrant in each of
  *                             the ancestors's children, plus an additional
  *                             index on the end.  The quadrants of \b array
  *                             that are descendants of child i have indices
