@@ -7,12 +7,12 @@ libp4est_generated_headers = config/p4est_config.h
 libp4est_installed_headers = src/p4est_base.h src/p4est3_base.h \
         src/p4est3_connectivity.h \
         src/p4est3_quadrant_vtable.h src/p4est3.h \
-        src/p4est3_internal.h
+        src/p4est3_internal.h src/p4est3_iterate.h
 libp4est_internal_headers =
 libp4est_compiled_sources = src/p4est_base.c \
         src/p4est3_connectivity.c \
         src/p4est3_quadrant_vtable.c src/p4est3.c \
-        src/p4est3_internal_mpi.c
+        src/p4est3_internal_mpi.c src/p4est3_iterate.c
 
 if P4EST_ENABLE_BUILD_2D
 libp4est_installed_headers += \
