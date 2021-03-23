@@ -4,7 +4,8 @@ target_sources(p4est PRIVATE
         p4est_nodes.c p4est_vtk.c p4est_points.c p4est_geometry.c p4est_iterate.c
         p4est_lnodes.c p4est_mesh.c p4est_balance.c p4est_io.c
         p4est_connrefine.c p4est_wrap.c p4est_plex.c p4est_empty.c
-        p4est3_connectivity.c p4est3_internal_mpi.c p4est3_quadrant_vtable.c
+        p4est3.c p4est3_connectivity.c p4est3_quadrant_vtable.c
+        p4est3_internal_mpi.c 
         p4est3_p4est.c p4est3_quadrant_yx.c p4est3_quadrant_mort2d.c)
 if(P4EST_HAVE_WINSOCK2_H)
   target_link_libraries(p4est PRIVATE ${WINSOCK_LIBRARIES})
