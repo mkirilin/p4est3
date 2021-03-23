@@ -166,6 +166,7 @@ test_p4est_new (sc3_allocator_t * alloc,
       for (j = 0; j < 2; ++j) {
         SC3E (p4est3_access_connectivity (p3, &aconn));
         SC3E (p4est3_restore_connectivity (p3, aconn));
+        SC3E (p4est3_get_local_num_trees (p3, &flt, &llt));
       }
 
       SC3E (p4est3_destroy (&p3));

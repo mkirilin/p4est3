@@ -76,22 +76,36 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
   return NULL;
 }
 
+static const char *P4EST3_P4EST_SELF_MAGIC = "p4est3_p4est_self_magic";
+
 typedef struct p4est3_p4est_self
 {
-  int                 autodestroy;
+  const char         *magic;
   sc3_allocator_t    *alloc;
   p4est3_connectivity_t *c3;
   p4est_t            *p4;
+  int                 autodestroy;
 }
 p4est3_p4est_self_t;
+
+static int
+p4est3_p4est_self_is_valid (const p4est3_p4est_self_t * pslf, char *reason)
+{
+  SC3E_TEST (pslf != NULL, reason);
+  SC3E_TEST (pslf->magic == P4EST3_P4EST_SELF_MAGIC, reason);
+  SC3E_TEST (!strcmp (pslf->magic, P4EST3_P4EST_SELF_MAGIC), reason);
+  SC3E_IS (sc3_allocator_is_setup, pslf->alloc, reason);
+  SC3E_TEST (pslf->c3 != NULL, reason);
+  SC3E_TEST (pslf->p4 != NULL, reason);
+  SC3E_YES (reason);
+}
 
 static sc3_error_t *
 p4est3_p4est_get_local_num_trees (const void *pslf,
                                   p4est3_topidx * t1, p4est3_topidx * t2)
 {
   p4est3_p4est_self_t *slf = (p4est3_p4est_self_t *) pslf;
-
-  SC3A_CHECK (slf != NULL && slf->p4 != NULL);
+  SC3A_IS (p4est3_p4est_self_is_valid, slf);
 
   *t1 = slf->p4->first_local_tree;
   *t2 = slf->p4->last_local_tree;
@@ -102,9 +116,9 @@ static sc3_error_t *
 p4est3_p4est_destroy (void *pslf)
 {
   p4est3_p4est_self_t *slf = (p4est3_p4est_self_t *) pslf;
+  SC3A_IS (p4est3_p4est_self_is_valid, slf);
 
   /* leave p4->connectivity alone */
-  SC3A_CHECK (slf != NULL && slf->p4 != NULL);
   if (slf->autodestroy) {
     p4est_destroy (slf->p4);
   }
@@ -130,6 +144,7 @@ p4est3_new_p4est (sc3_allocator_t * alloc, p4est_t * p4,
   /* wrap connectivity into a p4est3_connectivity_t object and build context */
   SC3E (sc3_allocator_malloc (alloc, sizeof (p4est3_p4est_self_t), &slf));
   SC3E (p4est3_connectivity_new_p4est (alloc, p4->connectivity, 0, &slf->c3));
+  slf->magic = P4EST3_P4EST_SELF_MAGIC;
   slf->autodestroy = autodestroy;
   slf->alloc = alloc;
   slf->p4 = p4;
