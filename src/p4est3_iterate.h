@@ -40,6 +40,18 @@ extern              "C"
 #endif
 #endif
 
+typedef struct p4est3_iterate_volume_info
+{
+  p4est3_t           *p3;
+  void               *user_data;
+  void               *quadrant;
+  p4est3_topidx       ntree;
+}
+p4est3_iterate_volume_info_t;
+
+typedef sc3_error_t *(*p4est3_iterate_volume_t) (p4est3_iterate_volume_info_t
+                                                 * vi);
+
 typedef struct p4est3_iterate_face_side
 {
   p4est3_topidx       ntree;
@@ -67,7 +79,8 @@ typedef sc3_error_t *(*p4est3_iterate_face_t) (p4est3_iterate_face_info_t *
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_iterate (p4est3_t * p3,
-                                    p4est3_iterate_face_t * face_callback,
+                                    p4est3_iterate_volume_t * cvolume,
+                                    p4est3_iterate_face_t * cface,
                                     void *user_data);
 
 #ifdef __cplusplus
