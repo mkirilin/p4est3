@@ -88,6 +88,8 @@ typedef struct p4est3_p4est_self
 }
 p4est3_p4est_self_t;
 
+#ifdef P4EST_ENABLE_DEBUG
+
 static int
 p4est3_p4est_self_is_valid (const p4est3_p4est_self_t * pslf, char *reason)
 {
@@ -99,6 +101,8 @@ p4est3_p4est_self_is_valid (const p4est3_p4est_self_t * pslf, char *reason)
   SC3E_TEST (pslf->p4 != NULL, reason);
   SC3E_YES (reason);
 }
+
+#endif
 
 static sc3_error_t *
 p4est3_p4est_get_local_num_trees (const void *pslf,
