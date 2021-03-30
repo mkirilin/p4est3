@@ -334,6 +334,8 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   SC3A_CHECK (id >= 0);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
 
+#if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
+ || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
   /* populate scalar members */
   qvt->id = id;
   qvt->dim = P4EST_DIM;
@@ -368,4 +370,9 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   /* verify correctness */
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt);
   return NULL;
+#else
+  return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
+                             " of virtual table is denied since"
+                             " this dimension is disabled or not supported");
+#endif /* !(P4EST_DIM == ? && defined(P4EST_ENABLE_BUILD_?D)) */
 }

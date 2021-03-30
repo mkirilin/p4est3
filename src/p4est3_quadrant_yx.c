@@ -633,6 +633,9 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
   SC3A_CHECK (qvt != NULL);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
 
+#if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
+ || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
+
 #ifdef P4EST_ENABLE_AVX2
   qvt->dim = P4EST_DIM;
   qvt->max_level = P4EST3_YX_MAXLEVEL;
@@ -701,4 +704,9 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
                              " of AVX2-based virtual table is denied since AVX2"
                              " is disabled or not found working");
 #endif /* !P4EST_ENABLE_AVX2 */
+
+  return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
+                             " of AVX-based virtual table is denied since"
+                             " this dimension is disabled or not supported");
+#endif /* !(P4EST_DIM == ? && defined(P4EST_ENABLE_BUILD_?D)) */
 }
