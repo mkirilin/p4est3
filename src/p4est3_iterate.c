@@ -39,6 +39,15 @@ p4est3_iterate_face (p4est3_t * p3,
   return NULL;
 }
 
+sc3_error_t        *
+p4est3_iterate_codim (p4est3_t * p3, int codims,
+                      p4est3_iterate_volume_t * cvolume,
+                      p4est3_iterate_face_t * cface,
+                      p4est3_iterate_codim_t * ccodim, void *user_data)
+{
+  return NULL;
+}
+
 #ifdef __cplusplus
 #if 0
 {

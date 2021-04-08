@@ -52,7 +52,7 @@ typedef struct p4est3_iterate_volume_info
 p4est3_iterate_volume_info_t;
 
 /** Callback function invoked for every local quadrant during iteration.
-    Guaranteed to be called in ascending tree and quadrant order. */
+    Guaranteed to be called in ascending tree and then quadrant order. */
 typedef sc3_error_t *(*p4est3_iterate_volume_t) (p4est3_iterate_volume_info_t
                                                  * vi);
 
@@ -61,8 +61,8 @@ typedef struct p4est3_iterate_face_side
 {
   p4est3_topidx       ntree;            /**< Number of tree of quadrant */
   p4est3_locidx       nquad;            /**< Local index of quadrant */
-  int                 nface;            /**< Number of quadrant's face */
-  int                 is_ghost;         /**< This side is a ghost quadrant */
+  int                 nface;            /**< Number of face at connection */
+  int                 is_ghost;         /**< Is this side a ghost quadrant */
   void               *quadrant;         /**< Pointer to quadrant itself */
 }
 p4est3_iterate_face_side_t;
@@ -72,53 +72,72 @@ typedef struct p4est3_iterate_face_info
 {
   p4est3_t           *p3;               /**< Pointer to the forest */
   void               *user_data;        /**< Passed into \a p4est_iterate_* */
-  int                 orientation;      /**< orientation of the sides to each
-                                            other, as in the definition of
-                                            p4est_connectivity_t */
+  int                 orientation;      /**< Orientation of the sides relative
+                                            to each other, as in the definition
+                                            of p4est_connectivity_t */
   int                 tree_boundary;    /**< Boolean */
   sc3_array_t        *sides;            /**< Array of 1 or 2 elements of type
                                     p4est3_iterate_face_side_t.  At a domain
-                                    boundary, it's 1, otherwise 2.  In the
+                                    boundary, it's 1, otherwise it's 2.  In the
                                     latter case ordered ascending by quadrant. */
 }
 p4est3_iterate_face_info_t;
 
 /** Callback function invoked for every face connection during iteration.
-    Guaranteed to be called in ascending tree, quadrant and face order
-    with respect to the lower of the two connecting faces.
-    For hanging face connections, it is called once for each small face. */
+ * Guaranteed to be called in ascending tree, quadrant and face order
+ * as seen from the lower-ordered of the two connecting quadrants.
+ * For hanging face connections, it is called separately for each small face
+ * repeating the large face.
+ */
 typedef sc3_error_t *(*p4est3_iterate_face_t) (p4est3_iterate_face_info_t *
                                                fi);
 
+/** Context representing each one of edge-/corner-connecting quadrants. */
 typedef struct p4est3_iterate_codim_side
 {
   p4est3_topidx       ntree;            /**< Number of tree of quadrant */
   p4est3_locidx       nquad;            /**< Local index of quadrant */
   int                 nbound;           /**< Number of quadrant's connecting
                                              boundary entity */
-  int                 is_ghost;         /**< This side is a ghost quadrant */
+  int                 orientation;      /**< Relative orientation around the
+                                            connecting entity for non-corners
+                                            (3D edges), as in the definition
+                                            of p4est_connectivity_t.
+                                            It's 0 for corners */
+  int                 is_ghost;         /**< Is this side a ghost quadrant */
   void               *quadrant;         /**< Pointer to quadrant itself */
 }
 p4est3_iterate_codim_side_t;
 
+/** Pass context information about higher codimension connection to iteration. */
 typedef struct p4est3_iterate_codim_info
 {
   p4est3_t           *p3;               /**< Pointer to the forest */
   void               *user_data;        /**< Passed into \a p4est_iterate_* */
   int                 codimension;      /**< Codimension of connection */
-  int                 orientation;      /**< orientation of the sides to each
-                                            other, as in the definition of
-                                            p4est_connectivity_t */
   int                 tree_boundary;    /**< Boolean */
   sc3_array_t        *sides;            /**< One entry per neighbor across
                                              codimension boundary entity. */
 }
 p4est3_iterate_codim_info_t;
 
+/** Callback function invoked for every edge and corner connection.
+ * Guaranteed to be called in ascending tree, quadrant and edge/corner order
+ * as seen from the lower-ordered of the connecting quadrants.
+ * For hanging face connections, it is called separately for each small
+ * boundary entity (only relevant for edges), repeating the quadrants
+ * that are larger neighbors around a parent of the boundary entity.
+ */
 typedef sc3_error_t *(*p4est3_iterate_codim_t) (p4est3_iterate_codim_info_t *
                                                 fi);
 
 /** Iterate through the forest for volumes and face connections.
+ * \param [in] p3       Forest passed for reference.
+ * \param [in] cvolume  Volume callback called for every local quadrant.
+ *                      Ignored if NULL.
+ * \param [in] cface    Callback for every face connection involving
+ *                      local quadrants.  Ignored if NULL.
+ * \param [in,out] user_data        Passed through to the callbacks.
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_iterate_face (p4est3_t * p3,
@@ -127,13 +146,24 @@ sc3_error_t        *p4est3_iterate_face (p4est3_t * p3,
                                          void *user_data);
 
 /** Iterate through the forest for connections of any codimension.
- * \param [in] codims   Binary or of bit 0 (volume), 1 (face),
- *                      2 (2D: corner, 3D: edge), 3 (3D: corner).
+ * \param [in] p3       Forest passed for reference.
+ * \param [in] codims   Binary OR of bit 0 (volume), 1 (face),
+ *                      2 (2D: corner; 3D: edge), 3 (3D: corner).
+ * \param [in] cvolume  Volume callback called for every local quadrant
+ *                      when volumes enabled in \a codims.  Ignored if NULL.
+ * \param [in] cface    Callback for every face connection involving
+ *                      local quadrants when faces enabled in \a codims.
+ *                      Ignored if NULL.
+ * \param [in] ccodim   Callback for every non-face connection involving
+ *                      local quadrants when enabled by \a codims.
+ *                      Ignored if NULL.
+ * \param [in,out] user_data        Passed through to the callbacks.
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_iterate_codim (p4est3_t * p3, int codims,
                                           p4est3_iterate_volume_t * cvolume,
-                                          p4est3_iterate_codim_t * codim,
+                                          p4est3_iterate_face_t * cface,
+                                          p4est3_iterate_codim_t * ccodim,
                                           void *user_data);
 
 #ifdef __cplusplus
