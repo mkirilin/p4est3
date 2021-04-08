@@ -36,6 +36,7 @@ p4est3_iterate_face (p4est3_t * p3,
                      p4est3_iterate_volume_t * cvolume,
                      p4est3_iterate_face_t * cface, void *user_data)
 {
+  SC3E (p4est3_iterate_codim (p3, 0x03, cvolume, cface, NULL, user_data));
   return NULL;
 }
 
