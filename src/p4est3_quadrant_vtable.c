@@ -389,7 +389,7 @@ p4est3_quadrant_array_split (p4est3_quadrant_vtable_t * qvt,
   SC3E (sc3_array_get_elem_count (array, &count));
   SC3E (sc3_array_index (array, 0, &q1));
   SC3E (p4est3_quadrant_level (qvt, q1, &l));
-  SC3A_CHECK (l > level)
+  SC3A_CHECK (l > level);
   SC3E (sc3_array_index (array, count - 1, &q2));
   SC3E (p4est3_quadrant_level (qvt, q2, &l));
   SC3A_CHECK (l > level);
@@ -399,8 +399,7 @@ p4est3_quadrant_array_split (p4est3_quadrant_vtable_t * qvt,
 #endif
 
   level++;
-  SC3A_CHECK (qvt->quadrant_ancestor_id != NULL);
   SC3E (sc3_array_split (array, indices, qvt->max_children,
-                         qvt->quadrant_ancestor_id, &level));
+                         type_fn, &level));
   return NULL;
 }
