@@ -40,6 +40,16 @@ extern              "C"
 #endif
 #endif
 
+typedef enum p4est3_iterate_point_type
+{
+  P4EST3_ITERATE_VOLUME = 0x00,
+  P4EST3_ITERATE_FACE = 0x01,
+  P4EST3_ITERATE_EDGE = 0x02,
+  P4EST3_ITERATE_CORNER = 0x04,
+  P4EST3_ITERATE_LAST = 0x08
+}
+p4est3_iterate_point_t;
+
 /** Pass context information about a local element to the quadrant iteration. */
 typedef struct p4est3_iterate_volume_info
 {
@@ -148,7 +158,7 @@ sc3_error_t        *p4est3_iterate_face (p4est3_t * p3,
 /** Iterate through the forest for connections of any codimension.
  * \param [in] p3       Forest passed for reference.
  * \param [in] codims   Binary OR of bit 0 (volume), 1 (face),
- *                      2 (2D: corner; 3D: edge), 3 (3D: corner).
+ *                      2 (2D: corner; 3D: edge), 4 (3D: corner).
  * \param [in] cvolume  Volume callback called for every local quadrant
  *                      when volumes enabled in \a codims.  Ignored if NULL.
  * \param [in] cface    Callback for every face connection involving
