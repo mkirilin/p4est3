@@ -151,8 +151,8 @@ typedef sc3_error_t *(*p4est3_iterate_codim_t) (p4est3_iterate_codim_info_t *
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_iterate_face (p4est3_t * p3,
-                                         p4est3_iterate_volume_t * cvolume,
-                                         p4est3_iterate_face_t * cface,
+                                         p4est3_iterate_volume_t cvolume,
+                                         p4est3_iterate_face_t cface,
                                          void *user_data);
 
 /** Iterate through the forest for connections of any codimension.
@@ -171,9 +171,9 @@ sc3_error_t        *p4est3_iterate_face (p4est3_t * p3,
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_iterate_codim (p4est3_t * p3, int codims,
-                                          p4est3_iterate_volume_t * cvolume,
-                                          p4est3_iterate_face_t * cface,
-                                          p4est3_iterate_codim_t * ccodim,
+                                          p4est3_iterate_volume_t cvolume,
+                                          p4est3_iterate_face_t cface,
+                                          p4est3_iterate_codim_t ccodim,
                                           void *user_data);
 
 #ifdef __cplusplus

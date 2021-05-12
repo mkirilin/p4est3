@@ -504,7 +504,6 @@ sc3_error_t        *p4est3_quadrant_array_new (sc3_allocator_t * alloc,
 sc3_error_t        *p4est3_quadrant_array_split (p4est3_quadrant_vtable_t *
                                                  qvt, sc3_array_t * array,
                                                  int level,
-                                                 sc3_array_type_t type_fn,
                                                  sc3_array_t * indices);
 
 #ifdef __cplusplus

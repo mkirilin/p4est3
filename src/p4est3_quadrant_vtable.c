@@ -371,7 +371,6 @@ p4est3_quadrant_array_new (sc3_allocator_t * alloc,
 sc3_error_t        *
 p4est3_quadrant_array_split (p4est3_quadrant_vtable_t * qvt,
                              sc3_array_t * array, int level,
-                             sc3_array_type_t type_fn,
                              sc3_array_t * indices)
 {
 #ifdef P4EST_ENABLE_DEBUG
@@ -400,6 +399,6 @@ p4est3_quadrant_array_split (p4est3_quadrant_vtable_t * qvt,
 
   level++;
   SC3E (sc3_array_split (array, indices, qvt->max_children,
-                         type_fn, &level));
+                         qvt->quadrant_is_ancestor, &level));
   return NULL;
 }
