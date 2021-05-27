@@ -34,38 +34,55 @@ extern              "C"
 
 typedef struct p4est3_search_area
 {
+  /* general section */
   p4est3_locidx      *begin;
   p4est3_locidx      *end;
-  int                *level2nchildren;  /* Array specifing the number n
-                                           of children processed on
-                                           the particular level; n can't be
-                                           greater than p3->qvt->max_children */
-  int                 Level;
   int                 start_level;
   p4est3_tree_t      *tree;
-  sc3_array_t        *idx_vol_stack;
-  sc3_array_t        *idx_face_stack;
   sc3_array_t        *view;             /* array ptr to pass tree's quads
                                            into array_split */
   sc3_array_t        *split_offsets;    /* temp array of size max_children + 1
                                            for split_array output */
+
+  /* volume section */
+  int                 Level;
+  int                *level2nchildren;  /* Array specifing the number n
+                                           of children processed on
+                                           the particular level; n can't be
+                                           greater than p3->qvt->max_children */
+  sc3_array_t        *idx_vol_stack;
   p4est3_iterate_volume_info_t *vinfo;
+
+  /* face section */
+  int                *Level_sides; /* array of 2, storing the level of
+                                      current size */
+  int                *is_refine;   /* array of 2, storing the information
+                                      about neccesity of refenement. Must
+                                      be initiated by 0 */
+  p4est3_locidx     **begin_face;
+  p4est3_locidx     **end_face;
+  sc3_array_t        *inner_quadrants; /* array of max_children, storing
+                                          result split_array in face_init */
+  sc3_array_t        **idx_face_stack;
+
   p4est3_iterate_face_info_t *finfo;
 }
 p4est3_search_area_t;
 
 static inline sc3_error_t *
-p4est3_reverse_copy (const int n, sc3_array_t *src, sc3_array_t *dst,
-                     p4est3_locidx *stack_it)
+p4est3_reverse_copy (const int n, int offset, int gap, sc3_array_t *src,
+                     sc3_array_t *dst, p4est3_locidx **ptr_stack_it)
 {
   int i;
-  p4est3_locidx      *offsets_it;
+  p4est3_locidx      *offsets_it, *stack_it;
 
+  SC3E_RETVAL (ptr_stack_it, NULL);
   SC3E (sc3_array_index (src, n, &offsets_it));
-  for (i = 0; i <= n; ++i, --offsets_it) {
+  for (i = offset; i <= n; i += 1 + gap, --offsets_it) {
     SC3E (sc3_array_push (dst, &stack_it));
     *(++stack_it) = *offsets_it;
   }
+  *ptr_stack_it = stack_it;
   return NULL;
 }
 
@@ -102,27 +119,95 @@ p4est3_internal_iterate_volume_simple (p4est3_t * p3,
   return NULL;
 }
 
-/* Warning! A single direction (vertical) and side (left)! */
-/* rearrange some data in the search ares so as to process faces */
 static sc3_error_t *
-p4est3_internal_iterate_face_init (p4est3_t * p3,
-                                   p4est3_iterate_face_t cface,
-                                   p4est3_iterate_codim_t ccodim,
-                                   p4est3_search_area_t * search_area)
+p4est3_internal_iterate_face_rec (p4est3_t * p3, p4est3_iterate_face_t cface,
+                                  p4est3_iterate_codim_t ccodim,
+                                  p4est3_search_area_t * search_area)
 {
-  const int           max_children = p3->qvt->max_children;
-  int                 i, level;
-  int                *Level = &search_area->Level;
-  void               *quad;
-
-  p4est3_locidx      *begin_face, *end_face;
-  p4est3_locidx      *stack_it;
-
+  int                 i, side, level;
+  int                *is_refine = search_area->is_refine;
+  int                *Level = search_area->Level_sides;
+  int                 max_children = p3->qvt->max_children;
+  void               *first_quad;
+  p4est3_locidx     **begin_face = search_area->begin_face,
+                    **end_face = search_area->end_face;
+  p4est3_locidx      *stack_it, *offset_it;
   sc3_array_t        *sides = search_area->finfo->sides;
   sc3_array_t        *view = search_area->view;
   sc3_array_t        *split_offsets = search_area->split_offsets;
+  sc3_array_t       **idx_face_stack = search_area->idx_face_stack;
   p4est3_tree_t      *tree = search_area->tree;
   p4est3_iterate_face_side_t *fside;
+
+  for (side = 0; side < 2; ++side) {
+    if (is_refine[side]) {
+      SC3E (sc3_array_new_data (p3->alloc, &view, tree->tquads,
+                                p3->qvt->quadrant_size, *(begin_face[side]),
+                                *(end_face[side]) - *(begin_face[side])));
+      SC3E (p4est3_quadrant_array_split (p3->qvt, view, Level[side], split_offsets));
+      SC3E (sc3_array_index (split_offsets, 1, &offset_it));
+      first_quad = (void *) (tree->tquads + p3->qvt->quadrant_size * (*offset_it));
+      SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
+      if (level == Level[side]) {
+        is_refine[side] = 0;
+        SC3E (sc3_array_index (sides, side, &fside));
+        fside->nquad = *offset_it;
+        fside->quadrant = first_quad;
+      }
+    }
+    if (!is_refine[0] && !is_refine[1]) {
+      if (cface != NULL) {
+        SC3E (cface (search_area->finfo));
+      }
+      return NULL;
+    }
+    if (is_refine[side]) {
+      Level[side]++;
+      SC3E (p4est3_reverse_copy (max_children, 1, 0, split_offsets,
+                                 idx_face_stack[side], &stack_it));
+      SC3A_CHECK (*stack_it == *(begin_face[side]) + 1);
+      for (i = 0; i < max_children / 2; ++i, --stack_it) {
+        begin_face[side] = stack_it;
+        end_face[side] = --stack_it;
+        if (*(begin_face[side]) == *(end_face[side]) - 1) {
+          is_refine[side] = 0;
+        }
+        SC3E (p4est3_internal_iterate_face_rec (p3, cface, ccodim,
+                                                search_area));
+      }
+      Level[side]--;
+      SC3E (sc3_array_pop (idx_face_stack[side]));
+      SC3E (sc3_array_pop (idx_face_stack[side]));
+    }
+  }
+  return NULL;
+}
+
+/* Warning! A single direction (vertical) and side (left)! */
+/* rearrange some data in the search ares so as to process faces */
+static sc3_error_t *
+p4est3_internal_iterate_face (p4est3_t * p3, p4est3_iterate_face_t cface,
+                              p4est3_iterate_codim_t ccodim,
+                              p4est3_search_area_t * search_area)
+{
+  const int           max_children = p3->qvt->max_children;
+  int                 i, side, level;
+  int                *Level = &search_area->Level;
+  int                *Level_sides = search_area->Level_sides;
+  int                *is_refine = search_area->is_refine;
+  void               *quad;
+
+  p4est3_locidx      *begin_face, *end_face;
+  p4est3_locidx      *idx_it;
+
+  sc3_array_t        *sides = search_area->finfo->sides;
+  sc3_array_t        *view = search_area->view;
+  sc3_array_t        *inner_quadrants = search_area->inner_quadrants;
+  p4est3_tree_t      *tree = search_area->tree;
+  p4est3_iterate_face_side_t *fside;
+
+  Level_sides[0] = Level_sides[1] = *Level;
+  is_refine[0] = is_refine[1] = 1;
 
   end_face = search_area->end - 2;
   begin_face = search_area->begin - 2;
@@ -130,104 +215,50 @@ p4est3_internal_iterate_face_init (p4est3_t * p3,
   if (*(begin_face) == *(end_face) - 1) {
     return NULL;
   }
-  SC3E (sc3_array_new_data (tree->tquads, p3->qvt->quadrant_size,
-                            begin_face, end_face - begin_face,
-                            &search_area->view));
-  SC3E (p4est3_quadrant_array_split (p3->qvt, view, *Level, split_offsets));
-  SC3E (p4est3_reverse_copy (max_children, split_offsets,
-                             search_area->idx_face_stack, stack_it));
-  SC3A_CHECK (*stack_it == *begin_face);
+
+  /* some preliminary definitions */
+  search_area->finfo->orientation = 0 /*???*/;
+  search_area->finfo->tree_boundary = 0;
+  for (side = 0; side < 2; ++side){
+    SC3E (sc3_array_index (sides, side, &fside));
+    fside->is_ghost = 0;
+    fside->ntree = search_area->vinfo->ntree;
+    /*ToDo: add #faces at the connection tracker*/
+    //fside->nface = 2; /*???*/ 
+  }
+  
+  SC3E (sc3_array_new_data (p3->alloc, &search_area->view, tree->tquads,
+                            p3->qvt->quadrant_size,
+                            *begin_face, *end_face - *begin_face));
+  SC3E (p4est3_quadrant_array_split (p3->qvt, view, *Level, inner_quadrants));
+  SC3E (sc3_array_index (inner_quadrants, 0, &idx_it));
 
   /* try to procces quads of current level */
-  /* a loop over one-side-one-dir quads */
-  for (i = 0; i < max_children; i += 2, stack_it -= 2) {
-    quad = (void *) (tree->tquads + p3->qvt->quadrant_size * (*stack_it));
-    SC3E (p4est3_quadrant_level (p3->qvt, quad, &level));
-    if (level == *Level) {
-      if (cface != NULL) {
-        search_area->finfo->tree_boundary = 0;
-        search_area->finfo->orientation = 0 /*???*/;
-        SC3E (sc3_array_index (sides, 0, &fside));
-        fside->is_ghost = 0;
-        fside->nface = 2; /*???*/
-        fside->nquad = *stack_it + i;
-        fside->ntre = search_area->vinfo->ntree;
+  /* a loop over one-dir quads */
+  for (i = 0; i < max_children / 2; ++i, idx_it += 2) {
+    for (side = 0; side < 2; ++side) {
+      quad =
+      (void *) (tree->tquads + p3->qvt->quadrant_size * (idx_it[side]));
+      SC3E (p4est3_quadrant_level (p3->qvt, quad, &level));
+      if (level == Level_sides[side]) {
+        is_refine[side] = 0;
+        SC3E (sc3_array_index (sides, side, &fside));
+        fside->nquad = idx_it[side];
         fside->quadrant = quad;
+      }
+    }
+    if (!is_refine[0] && !is_refine[1]) {
+      if (cface != NULL) {
         SC3E (cface (search_area->finfo));
       }
     }
-    else {
-      (*Level)++;
-      search_area->begin = stack_it;
-      search_area->end =  stack_it - 1;
+    /* at least one side needs to be refined */
+    for (side = 0; side < 2; ++side) {
+      search_area->begin_face[side] = idx_it + 2 * side;
+      search_area->end_face[side] =  idx_it + 1 + 2 * side;
       SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
     }
-    SC3E (sc3_array_pop (search_area->idx_face_stack));
-    SC3E (sc3_array_pop (search_area->idx_face_stack));
   }
-}
-
-static sc3_error_t *
-p4est3_internal_iterate_face (p4est3_t * p3,
-                              p4est3_iterate_face_t cface,
-                              p4est3_iterate_codim_t ccodim,
-                              p4est3_search_area_t * search_area)
-{
-  int                 i, level;
-  int                 is_refine_right = 1, is_refine_left = 1;
-  int                *Level = &search_area->Level;
-  int                 max_children = p3->qvt->max_children;
-  void               *first_quad;
-  p4est3_locidx      *begin_face = search_area->begin,
-                     *end_face = search_area->end;
-  p4est3_locidx      *stack_it, *offset_it;
-  sc3_array_t        *sides = search_area->finfo->sides;
-  sc3_array_t        *view = search_area->view;
-  sc3_array_t        *split_offsets = search_area->split_offsets;
-  sc3_array_t        *idx_face_stack = search_area->idx_face_stack;
-  p4est3_tree_t      *tree = search_area->tree;
-  p4est3_iterate_face_side_t *fside;
-
-  SC3E (sc3_array_new_data (p3->alloc, &view, search_area->tree->tquads,
-                            p3->qvt->quadrant_size, begin_face,
-                            end_face - begin_face));
-  SC3E (p4est3_quadrant_array_split (p3->qvt, view, *Level, split_offsets));
-  SC3E (sc3_array_index (split_offsets, 1, &offset_it));
-
-  first_quad = (void *) (tree->tquads + p3->qvt->quadrant_size * (*offset_it));
-  SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
-  if (level == *Level) {
-    is_refine_left = 0;
-    if (cface != NULL) {
-      search_area->finfo->tree_boundary = 0;
-      search_area->finfo->orientation = 0 /*???*/;
-      SC3E (sc3_array_index (sides, 0, &fside));
-      fside->is_ghost = 0;
-      fside->nface = 2; /*???*/
-      fside->nquad = *offset_it;
-      fside->ntree = search_area->vinfo->ntree;
-      fside->quadrant = first_quad;
-      SC3E (cface (search_area->finfo));
-    }
-  }
-  else {
-    (*Level)++;
-    SC3E (p4est3_reverse_copy (max_children, split_offsets,
-                               search_area->idx_face_stack, stack_it));
-    SC3A_CHECK (*stack_it == *begin_face);
-    for (i = 0, --stack_it; i < max_children / 2; ++i, --stack_it) {
-      search_area->begin = stack_it;
-      search_area->end = --stack_it;
-      if (*(search_area->begin) == *(search_area->end) - 1) {
-        continue;
-      }
-      SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
-    }
-    (*Level)--;
-    SC3E (sc3_array_pop (idx_face_stack));
-    SC3E (sc3_array_pop (idx_face_stack));
-  }
-  SC3E (sc3_array_pop (idx_face_stack));
   return NULL;
 }
 
@@ -270,8 +301,8 @@ p4est3_internal_iterate_volume (p4est3_t * p3,
   }
 
   if (is_refine) {
-    SC3E (sc3_array_new_data (tree->tquads, p3->qvt->quadrant_size, begin,
-                              end - begin, &view));
+    SC3E (sc3_array_new_data (p3->alloc, &view, tree->tquads,
+                              p3->qvt->quadrant_size, begin, end - begin));
     SC3E (p4est3_quadrant_array_split (p3->qvt, view, *Level, split_offsets));
     l2nch[++(*Level)] = 0;
   }
@@ -284,8 +315,8 @@ p4est3_internal_iterate_volume (p4est3_t * p3,
     l2nch[--(*Level)]++;
   }
   else {
-    SC3E (p4est3_reverse_copy (max_children, split_offsets, idx_vol_stack,
-                               stack_it));
+    SC3E (p4est3_reverse_copy (max_children, 0, 0, split_offsets, idx_vol_stack,
+                               &stack_it));
     for (i = 0; i < max_children; ++i) {
       search_area->begin = stack_it;
       search_area->end = --stack_it;
