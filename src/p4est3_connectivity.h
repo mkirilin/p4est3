@@ -66,6 +66,7 @@ typedef sc3_error_t *(*p4est3_connectivity_inout_t) (void *slf);
 typedef struct p4est3_connectivity_vtable
 {
   int                 dim;      /**< Space dimension is 1, 2 or 3. */
+  int                 enable_faces; /**< Inter-tree face connections. */
   p4est3_topidx       num_trees;    /**< Number of trees is positive. */
 
   /** This function may be NULL, e.g.\ when no state requires destruction */
@@ -138,15 +139,24 @@ sc3_error_t        *p4est3_connectivity_set_vtable
 
 /** Set the spatial dimension of this connectivity.
  * \param [in,out] c        Connectivity under construction.
- * \param [in] dim          Dimension from 1 to 3.
+ * \param [in] dim          Dimension from 1 to 3.  Default is 2.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_set_dim
   (p4est3_connectivity_t * c, int dim);
 
+/** Set whether to enable face connections between trees.
+ * \param [in,out] c        Connectivity under construction.
+ *                          On setup, initialize all tree faces as boundary.
+ * \param [in] enable_faces Boolean; default true.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_set_enable_faces
+  (p4est3_connectivity_t * c, int enable_faces);
+
 /** Set the number of trees that constitute this connectivity.
  * \param [in,out] c        Connectivity under construction.
- * \param [in] num_trees    Positive number of trees.
+ * \param [in] num_trees    Positive number of trees.  Default is 1.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_set_num_trees

@@ -57,6 +57,7 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
   /* create virtual structure */
   memset (cvt, 0, sizeof (*cvt));
   cvt->dim = P4EST_DIM;
+  cvt->enable_faces = 1;
   cvt->num_trees = c4->num_trees;
   if (autodestroy) {
     cvt->destroy = p4est3_connectivity_p4est_destroy;
