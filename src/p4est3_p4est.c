@@ -41,6 +41,36 @@ p4est3_connectivity_p4est_destroy (void *cslf)
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_connectivity_p4est_get_face (void *cslf, p4est3_topidx * which_tree,
+                                    int *nface, int *orient)
+{
+  p4est_connectivity_t *c4 = (p4est_connectivity_t *) cslf;
+  p4est3_topidx       tt;
+  int                 nf;
+
+  /* formally check parameters */
+  SC3A_CHECK (c4 != NULL);
+  SC3A_CHECK (which_tree != NULL);
+  SC3A_CHECK (nface != NULL);
+  SC3A_CHECK (orient != NULL);
+
+  /* check input values */
+  SC3A_CHECK (0 <= *which_tree && *which_tree < c4->num_trees);
+  SC3A_CHECK (0 <= *nface && *nface < P4EST_FACES);
+  SC3A_CHECK (0 == *orient);
+
+  /* set output values */
+  tt = *which_tree;
+  *which_tree = c4->tree_to_tree[P4EST_FACES * tt + *nface];
+  nf = c4->tree_to_face[P4EST_FACES * tt + *nface];
+  *nface = nf % P4EST_FACES;
+  *orient = nf / P4EST_FACES;
+
+  /* done! */
+  return NULL;
+}
+
 sc3_error_t        *
 p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
                                p4est_connectivity_t * c4, int autodestroy,
@@ -62,6 +92,7 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
   if (autodestroy) {
     cvt->destroy = p4est3_connectivity_p4est_destroy;
   }
+  cvt->get_face = p4est3_connectivity_p4est_get_face;
 
   /* create connectivity */
   SC3E (p4est3_connectivity_new (alloc, &c));

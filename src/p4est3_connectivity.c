@@ -22,6 +22,7 @@
 */
 
 #include <p4est3_connectivity.h>
+#include <sc3_array.h>
 #include <sc3_refcount.h>
 
 struct p4est3_connectivity
@@ -36,8 +37,12 @@ struct p4est3_connectivity
 
   /* parameters fixed after setup call */
   int                 dim;
+  int                 num_faces;
+  int                 num_orient;
   int                 enable_faces;
   p4est3_topidx       num_trees;
+  sc3_array_t        *tree_to_face;
+  sc3_array_t        *tree_to_tree;
 };
 
 int                 p4est3_connectivity_vtable_is_valid
@@ -46,6 +51,7 @@ int                 p4est3_connectivity_vtable_is_valid
   SC3E_TEST (cvt != NULL, reason);
   SC3E_TEST (0 < cvt->dim && cvt->dim <= 3, reason);
   SC3E_TEST (0 < cvt->num_trees, reason);
+  SC3E_TEST (!cvt->enable_faces || cvt->get_face != NULL, reason);
   SC3E_YES (reason);
 }
 
@@ -132,6 +138,8 @@ sc3_error_t        *
 p4est3_connectivity_set_enable_faces (p4est3_connectivity_t * c,
                                       int enable_faces)
 {
+  SC3A_CHECK (c->enable_faces);
+
   SC3A_IS (p4est3_connectivity_is_new, c);
   c->enable_faces = enable_faces;
   return NULL;
@@ -147,10 +155,21 @@ p4est3_connectivity_set_num_trees (p4est3_connectivity_t * c,
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_connectivity_enable_faces (p4est3_connectivity_t * c)
+{
+  c->num_faces = 2 * c->dim;
+  c->num_orient = 2 * (c->dim - 1);
+  return NULL;
+}
+
 sc3_error_t        *
 p4est3_connectivity_setup (p4est3_connectivity_t * c)
 {
   SC3A_IS (p4est3_connectivity_is_new, c);
+  if (c->cvt != NULL && c->enable_faces) {
+    SC3E (p4est3_connectivity_enable_faces (c));
+  }
   c->setup = 1;
   SC3A_IS (p4est3_connectivity_is_setup, c);
   return NULL;
@@ -221,6 +240,34 @@ p4est3_connectivity_get_num_trees (const p4est3_connectivity_t * c,
   SC3A_CHECK (pnum_trees != NULL);
 
   *pnum_trees = c->num_trees;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_connectivity_get_face (const p4est3_connectivity_t * c,
+                              p4est3_topidx * which_tree, int *nface,
+                              int *orient)
+{
+  /* formally check arguments */
+  SC3A_IS (p4est3_connectivity_is_setup, c);
+  SC3A_CHECK (which_tree != NULL);
+  SC3A_CHECK (nface != NULL);
+  SC3E_RETVAL (orient, 0);
+
+  /* verify input values */
+  SC3A_CHECK (0 <= *which_tree && *which_tree < c->num_trees);
+  SC3A_CHECK (0 <= *nface && *nface < c->num_faces);
+
+  if (c->enable_faces) {
+    if (c->cvt == NULL) {
+
+    }
+    else {
+      SC3A_CHECK (c->cvt->get_face != NULL);
+      SC3E (c->cvt->get_face (c->slf, which_tree, nface, orient));
+    }
+  }
+
   return NULL;
 }
 
