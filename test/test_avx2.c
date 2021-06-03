@@ -68,7 +68,7 @@ testavx2_prepare (timeavx2_t * t, int *retval)
     /* AVX is not supported by hardware */
     if (t->mpirank == 0) {
       char                buffer[SC3_BUFSIZE];
-      SC3E (sc3_error_get_text (e, -1, 1, buffer, SC3_BUFSIZE));
+      SC3E (sc3_error_copy_text (e, -1, 1, buffer, SC3_BUFSIZE));
       fprintf (stderr, "%s\nWill not proceed\n", buffer);
     }
     SC3E (sc3_error_unref (&e));
