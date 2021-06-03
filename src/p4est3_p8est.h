@@ -53,17 +53,17 @@ extern              "C"
 
 /** Create a setup connectivity object from a \ref p8est_connectivity_t.
  * \param [in,out] alloc    This allocator must be setup and is refd.
+ * \param [out] conn        Setup connectivity object ready for use.
  * \param [in] c4           Valid 3D connectivity object must remain alive.
  * \param [in] autodestroy  If set to true, call \ref p8est_connectivity_destroy
  *                          when the connectivity constructed here expires.
- * \param [out] conn        Setup connectivity object ready for use.
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_new_p8est (sc3_allocator_t * alloc,
-                                                   p8est_connectivity_t * c4,
-                                                   int autodestroy,
                                                    p4est3_connectivity_t **
-                                                   conn);
+                                                   conn,
+                                                   p8est_connectivity_t * c4,
+                                                   int autodestroy);
 
 /** Create a setup connectivity from \ref p8est_connectivity_new_brick.
  * \param [in,out] alloc    This allocator must be setup and is refd.
@@ -82,16 +82,16 @@ sc3_error_t        *p4est3_connectivity_new_p8est_brick
 
 /** Create a setup forest object from a \ref p8est_t.
  * \param [in,out] alloc    This allocator must be setup and is refd.
+ * \param [out] forest      Setup forest object ready for use.
  * \param [in] p8           Valid 3D p8est object must remain alive.
  * \param [in] autodestroy  If set to true, call \ref p8est_destroy when the
  *                          forest constructed expires.  This does *not* touch
  *                          the p8est_connectivity_t pointer stored inside.
- * \param [out] pp3         Setup forest object ready for use.
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_new_p8est (sc3_allocator_t * alloc,
-                                      p8est_t * p8, int autodestroy,
-                                      p4est3_t ** pp3);
+                                      p4est3_t ** forest,
+                                      p8est_t * p8, int autodestroy);
 
 /** Populate a quadrant virtual table to use standard 3D p8est quadrants.
  * \param [out] qvt     Pointer to a virtual table that will be populated.

@@ -48,8 +48,8 @@ p4est3_connectivity_dstr (void *vslf)
 
 static sc3_error_t *
 basics_connectivity_new_virtual (sc3_allocator_t * alloc,
-                                 p4est3_topidx num_trees,
-                                 p4est3_connectivity_t ** pc)
+                                 p4est3_connectivity_t ** pc,
+                                 p4est3_topidx num_trees)
 {
   p4est3_connectivity_ntslf_t *slf;
   p4est3_connectivity_t *c;
@@ -112,7 +112,7 @@ test_p4est_new (sc3_allocator_t * alloc,
       break;
     case 1:
       /* virtual connectivity with one tree */
-      SC3E (basics_connectivity_new_virtual (alloc, num_trees, &conn));
+      SC3E (basics_connectivity_new_virtual (alloc, &conn, num_trees));
       break;
     case 2:
       /* use convenience constructors */
@@ -129,7 +129,7 @@ test_p4est_new (sc3_allocator_t * alloc,
 #else
       c4 = p8est_connectivity_new_unitcube ();
 #endif
-      SC3E (p4est3_connectivity_new_p4est (alloc, c4, 1, &conn));
+      SC3E (p4est3_connectivity_new_p4est (alloc, &conn, c4, 1));
       break;
     case 4:
       /* wrapping a p4est brick connectivity */
@@ -167,7 +167,7 @@ test_p4est_new (sc3_allocator_t * alloc,
       /* create p4est object from legacy p4est */
       fprintf (stderr, "Variant %d\n", i);
       p4 = p4est_new (sc_MPI_COMM_WORLD, c4, 0, NULL, NULL);
-      SC3E (p4est3_new_p4est (alloc, p4, 1, &p3));
+      SC3E (p4est3_new_p4est (alloc, &p3, p4, 1));
 
       /* do something with the forest */
       for (j = 0; j < 2; ++j) {

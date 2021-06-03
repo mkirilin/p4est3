@@ -73,8 +73,8 @@ p4est3_connectivity_p4est_get_face (void *cslf, p4est3_topidx * which_tree,
 
 sc3_error_t        *
 p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
-                               p4est_connectivity_t * c4, int autodestroy,
-                               p4est3_connectivity_t ** pc)
+                               p4est3_connectivity_t ** pc,
+                               p4est_connectivity_t * c4, int autodestroy)
 {
   p4est3_connectivity_t *c;
   p4est3_connectivity_vtable_t scvt, *cvt = &scvt;
@@ -142,7 +142,7 @@ p4est3_connectivity_new_p4est_brick (sc3_allocator_t * alloc,
     );
 
   /* wrap brick into p4est3 connectivity */
-  SC3E (p4est3_connectivity_new_p4est (alloc, c4, 1, pc));
+  SC3E (p4est3_connectivity_new_p4est (alloc, pc, c4, 1));
   return NULL;
 }
 
@@ -172,8 +172,8 @@ p4est3_p4est_destroy (void *pslf)
 }
 
 sc3_error_t        *
-p4est3_new_p4est (sc3_allocator_t * alloc, p4est_t * p4,
-                  int autodestroy, p4est3_t ** pp3)
+p4est3_new_p4est (sc3_allocator_t * alloc, p4est3_t ** pp3,
+                  p4est_t * p4, int autodestroy)
 {
   p4est3_p4est_self_t *slf;
   p4est3_t           *p3;
@@ -187,7 +187,7 @@ p4est3_new_p4est (sc3_allocator_t * alloc, p4est_t * p4,
 
   /* wrap connectivity into a p4est3_connectivity_t object and build context */
   SC3E (sc3_allocator_malloc (alloc, sizeof (p4est3_p4est_self_t), &slf));
-  SC3E (p4est3_connectivity_new_p4est (alloc, p4->connectivity, 0, &slf->c3));
+  SC3E (p4est3_connectivity_new_p4est (alloc, &slf->c3, p4->connectivity, 0));
   slf->autodestroy = autodestroy;
   slf->alloc = alloc;
   slf->p4 = p4;
