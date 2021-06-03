@@ -191,8 +191,7 @@ is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx,
     SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, P4EST_DIM, xy_avx));
     SC3E (p4est3_quadrant_coordinates (qvt, q_p, P4EST_DIM, xy));
     is_equal =
-      (int32_t) q_p->level == l && xy[0] == xy_avx[0] &&
-      xy[1] == xy_avx[1] &&
+      (int32_t) q_p->level == l && xy[0] == xy_avx[0] && xy[1] == xy_avx[1] &&
 #ifdef P4_TO_P8
       xy[2] == xy_avx[2] &&
 #endif
@@ -271,15 +270,14 @@ testavx2_compare (timeavx2_t * t)
   SC3A_CHECK (t != NULL);
   SC3A_CHECK (t->n_quads > 0);
 
-  SC3X (
-    is_equal_child (t->qvt_avx, t->qvt, t->qarr_avx, t->qarr, t->n_quads));
-  SC3X (
-    is_equal_parent (t->qvt_avx, t->qvt, t->qarr_avx, t->qarr, t->n_quads));
-  SC3X (
-    is_equal_compare (t->qvt_avx, t->qvt, t->qarr_avx, t->qarr, t->n_quads));
-  SC3X (
-    is_equal_successor (t->qvt_avx, t->qvt, t->qarr_avx, t->qarr,
-                        t->n_quads));
+  SC3X (is_equal_child
+        (t->qvt_avx, t->qvt, t->qarr_avx, t->qarr, t->n_quads));
+  SC3X (is_equal_parent
+        (t->qvt_avx, t->qvt, t->qarr_avx, t->qarr, t->n_quads));
+  SC3X (is_equal_compare
+        (t->qvt_avx, t->qvt, t->qarr_avx, t->qarr, t->n_quads));
+  SC3X (is_equal_successor
+        (t->qvt_avx, t->qvt, t->qarr_avx, t->qarr, t->n_quads));
   return NULL;
 }
 
