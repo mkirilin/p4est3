@@ -21,10 +21,10 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P4EST3_QUADRANT_MORT_H
-#define P4EST3_QUADRANT_MORT_H
+#ifndef P4EST3_QUADRANT_MORT3D_H
+#define P4EST3_QUADRANT_MORT3D_H
 
-#include <p4est.h>
+#include <p8est.h>
 #include <p4est3_quadrant_vtable.h>
 
 #ifdef __cplusplus
@@ -35,8 +35,8 @@ extern              "C"
 #endif
 #endif
 
-sc3_error_t        *p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t
-                                                 * qvt);
+sc3_error_t        *p4est3_quadrant_mort3d_vtable (p4est3_quadrant_vtable_t
+                                                   * qvt);
 
 #ifdef __cplusplus
 #if 0
@@ -45,4 +45,4 @@ sc3_error_t        *p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t
 }
 #endif
 
-#endif /* !P4EST3_QUADRANT_MORT_H */
+#endif /* !P4EST3_QUADRANT_MORT3D_H */

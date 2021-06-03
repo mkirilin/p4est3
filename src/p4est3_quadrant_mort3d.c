@@ -1,5 +1,5 @@
 /*
-  This file is part of p4est, version 3
+  This file is part of p4est, version 3.
   p4est is a C library to manage a collection (a forest) of multiple
   connected adaptive quadtrees or octrees in parallel.
 
@@ -21,11 +21,6 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-/* TODO: we do not need this file since p4est3.h is dimension independent.
- *       Still, in the future we may use dimension-specific algorithms
- *       for which this file may renamed as the beginning. */
-
-#if 0                           /* 3D not ready yet */
+#include <p4est_to_p8est.h>
 #include <p4est3_to_p8est3.h>
-#include "p4est3.c"
-#endif /* 0 */
+#include "p4est3_quadrant_mort2d.c"
