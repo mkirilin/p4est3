@@ -35,6 +35,14 @@
  * p4est3_connectivity_new_unitsquare (2D) and \ref
  * p4est3_connectivity_new_unitcube (3D).
  *
+ * The connectivity object is designed as a shell for a virtual implementation.
+ * (The builtin construction is limited to setting the dimension and
+ * a number of non-connected trees (all faces are boundary faces)).
+ * This connectivity becomes more practically useful when setting the virtual
+ * table to wrap an arbitrary externally maintained connectivity.
+ * We provide wrappers for classic p4est and p8est connectivities
+ * in the files \ref p4est3_p4est.h and \ref p4est3_p8est.h.
+ *
  * \ingroup p4est3
  */
 
@@ -73,12 +81,12 @@ typedef             sc3_error_t
 typedef struct p4est3_connectivity_vtable
 {
   int                 dim;      /**< Space dimension is 1, 2 or 3. */
-  int                 enable_faces; /**< Inter-tree face connections. */
   p4est3_topidx       num_trees;    /**< Number of trees is positive. */
 
   /** This function may be NULL, e.g.\ when no state requires destruction */
   p4est3_connectivity_inout_t destroy;
-  p4est3_connectivity_get_face_t get_face;      /**< Query face connection */
+  /** Query face connection; if NULL report physical boundary always */
+  p4est3_connectivity_get_face_t get_face;
 }
 p4est3_connectivity_vtable_t;
 
@@ -152,15 +160,6 @@ sc3_error_t        *p4est3_connectivity_set_vtable
  */
 sc3_error_t        *p4est3_connectivity_set_dim
   (p4est3_connectivity_t * c, int dim);
-
-/** Set whether to enable face connections between trees.
- * \param [in,out] c        Connectivity under construction.
- *                          On setup, initialize all tree faces as boundary.
- * \param [in] enable_faces Boolean; default true.
- * \return                  NULL on success, error object otherwise.
- */
-sc3_error_t        *p4est3_connectivity_set_enable_faces
-  (p4est3_connectivity_t * c, int enable_faces);
 
 /** Set the number of trees that constitute this connectivity.
  * \param [in,out] c        Connectivity under construction.
