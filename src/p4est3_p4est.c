@@ -107,6 +107,45 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
   return NULL;
 }
 
+sc3_error_t        *
+p4est3_connectivity_new_p4est_brick (sc3_allocator_t * alloc,
+                                     p4est3_connectivity_t ** pc,
+                                     int ki, int li,
+#ifdef P4_TO_P8
+                                     int mi,
+#endif
+                                     int periodic_k, int periodic_l
+#ifdef P4_TO_P8
+                                     , int periodic_m
+#endif
+  )
+{
+  p4est_connectivity_t *c4;
+
+  /* verify arguments */
+  SC3E_RETVAL (pc, NULL);
+  SC3A_IS (sc3_allocator_is_valid, alloc);
+  SC3A_CHECK (ki > 0 && li > 0);
+#ifdef P4_TO_P8
+  SC3A_CHECK (mi > 0);
+#endif
+
+  /* create brick connectivity */
+  c4 = p4est_connectivity_new_brick (ki, li,
+#ifdef P4_TO_P8
+                                     mi,
+#endif
+                                     periodic_k, periodic_l
+#ifdef P4_TO_P8
+                                     , periodic_m
+#endif
+    );
+
+  /* wrap brick into p4est3 connectivity */
+  SC3E (p4est3_connectivity_new_p4est (alloc, c4, 1, pc));
+  return NULL;
+}
+
 typedef struct p4est3_p4est_self
 {
   int                 autodestroy;

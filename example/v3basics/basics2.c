@@ -99,7 +99,7 @@ test_p4est_new (sc3_allocator_t * alloc,
 
   SC3A_IS (sc3_allocator_is_setup, alloc);
 
-  for (i = 0; i < 4; ++i) {
+  for (i = 0; i < 5; ++i) {
     /* create p4est3_connectivity_t structure */
     fprintf (stderr, "Trying %d\n", i);
     switch (i) {
@@ -130,6 +130,15 @@ test_p4est_new (sc3_allocator_t * alloc,
       c4 = p8est_connectivity_new_unitcube ();
 #endif
       SC3E (p4est3_connectivity_new_p4est (alloc, c4, 1, &conn));
+      break;
+    case 4:
+      /* wrapping a p4est brick connectivity */
+#ifndef P4_TO_P8
+      SC3E (p4est3_connectivity_new_p4est_brick (alloc, &conn, 2, 3, 0, 0));
+#else
+      SC3E (p4est3_connectivity_new_p8est_brick
+            (alloc, &conn, 2, 3, 4, 0, 0, 0));
+#endif
       break;
     default:
       SC3E_UNREACH ("Invalid example counter");

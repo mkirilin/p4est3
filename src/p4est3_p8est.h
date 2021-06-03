@@ -65,6 +65,21 @@ sc3_error_t        *p4est3_connectivity_new_p8est (sc3_allocator_t * alloc,
                                                    p4est3_connectivity_t **
                                                    conn);
 
+/** Create a setup connectivity from \ref p8est_connectivity_new_brick.
+ * \param [in,out] alloc    This allocator must be setup and is refd.
+ * \param [out] conn        Setup connectivity object ready for use.
+ * \param [in] ki           Number of trees in x direction.
+ * \param [in] li           Number of trees in y direction.
+ * \param [in] mi           Number of trees in z direction.
+ * \param [in] periodic_k   Boolean: periodicity in x direction.
+ * \param [in] periodic_l   Boolean: periodicity in y direction.
+ * \param [in] periodic_m   Boolean: periodicity in z direction.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_new_p8est_brick
+  (sc3_allocator_t * alloc, p4est3_connectivity_t ** conn,
+   int ki, int li, int mi, int periodic_k, int periodic_l, int periodic_m);
+
 /** Create a setup forest object from a \ref p8est_t.
  * \param [in,out] alloc    This allocator must be setup and is refd.
  * \param [in] p8           Valid 3D p8est object must remain alive.
