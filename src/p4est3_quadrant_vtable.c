@@ -399,6 +399,6 @@ p4est3_quadrant_array_split (p4est3_quadrant_vtable_t * qvt,
 
   level++;
   SC3E (sc3_array_split (array, indices, qvt->max_children,
-                         qvt->quadrant_is_ancestor, &level));
+                         qvt->quadrant_ancestor_id, &level));
   return NULL;
 }
