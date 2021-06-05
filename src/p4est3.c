@@ -28,17 +28,21 @@
 int
 p4est3_vtable_is_valid (const p4est3_vtable_t * pvt, char *reason)
 {
+  int                 cdim;
+
   SC3E_TEST (pvt != NULL, reason);
   SC3E_TEST (0 < pvt->dim && pvt->dim <= 3, reason);
   SC3E_TEST (pvt->mpicomm != SC3_MPI_COMM_NULL, reason);
 
-  /* check object variables as well */
+  /* check connectivity and retrieve dimension */
   SC3E_IS (p4est3_connectivity_is_valid, pvt->c3, reason);
+  SC3E_DO (p4est3_connectivity_get_dim (pvt->c3, &cdim), reason);
+
+  /* check quadrant table and compare dimension */
   SC3E_IS (p4est3_quadrant_vtable_is_valid, pvt->qvt, reason);
+  SC3E_TEST (cdim == pvt->qvt->dim, reason);
 
-  /* internal consistency */
-  /* TODO: verify dim of connectivity equals dim of vtable */
-
+  /* successfully done */
   SC3E_YES (reason);
 }
 
@@ -225,7 +229,7 @@ sc3_error_t        *
 p4est3_set_setup_mode (p4est3_t * p3, p4est3_setup_mode_t mode)
 {
   SC3A_IS (p4est3_is_new, p3);
-  SC3A_CHECK (mode < P4EST3_NEW_MODE_LAST);
+  SC3A_CHECK (0 <= mode && mode < P4EST3_NEW_MODE_LAST);
 
   p3->setup_mode = mode;
   return NULL;
@@ -244,6 +248,7 @@ p4est3_set_is_split_comm (p4est3_t * p3, int is_split)
 sc3_error_t        *
 p4est3_setup (p4est3_t * p3)
 {
+  int                 cdim;
   int                 lev;
   int                 qsize;
   int                 ti;
@@ -262,6 +267,9 @@ p4est3_setup (p4est3_t * p3)
      Note that p4est3_set_vtable sets connectivity and quadrant vtable. */
   SC3E_DEMAND (p3->conn != NULL, "Connectivity must be set");
   SC3E_DEMAND (p3->qvt == &p3->sqvt, "Quadrant virtual table must be set");
+  SC3E (p4est3_connectivity_get_dim (p3->conn, &cdim));
+  SC3E_DEMAND (cdim == p3->qvt->dim,
+               "Dimensions of connectivity and quadrant vtable must match");
 
   /* further pre-setup consistency checks */
   SC3A_CHECK (p3->num_trees > 0);
@@ -311,8 +319,7 @@ p4est3_setup (p4est3_t * p3)
     /* create tree and quadrant metadata */
     SC3E (p4est3_internal_setup_tree (p3, num_uniform));
 
-    /* create quadrants by the previously specified method,
-     default is morton, which is presumably slowest */
+    /* create quadrants by the previously specified method */
     SC3E (p4est3_internal_setup_quadrants (p3));
   }
 
@@ -383,7 +390,7 @@ p4est3_destroy (p4est3_t ** pp3)
       }
       if (p3->is_split_comm == 1) {
         SC3E (sc3_MPI_Comm_free (&p3->headcomm));
-       }
+      }
       SC3E (sc3_MPI_Info_free (&p3->info_noncontig));
 
       /* deallocate internal storage */

@@ -253,6 +253,7 @@ p4est3_connectivity_new_unitsquare (sc3_allocator_t * alloc,
 
   SC3E_RETVAL (pc, NULL);
   SC3E (p4est3_connectivity_new (alloc, &c));
+  SC3E (p4est3_connectivity_set_dim (c, 2));
   SC3E (p4est3_connectivity_setup (c));
   SC3A_IS (p4est3_connectivity_is_setup, c);
 
@@ -268,6 +269,7 @@ p4est3_connectivity_new_unitcube (sc3_allocator_t * alloc,
 
   SC3E_RETVAL (pc, NULL);
   SC3E (p4est3_connectivity_new (alloc, &c));
+  SC3E (p4est3_connectivity_set_dim (c, 3));
   SC3E (p4est3_connectivity_setup (c));
   SC3A_IS (p4est3_connectivity_is_setup, c);
 

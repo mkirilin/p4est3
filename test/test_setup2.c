@@ -72,6 +72,7 @@ static sc3_error_t *
 make_connectivity (setup_t * t)
 {
   SC3E (p4est3_connectivity_new (t->alloc, &t->conn));
+  SC3E (p4est3_connectivity_set_dim (t->conn, P4EST_DIM));
   SC3E (p4est3_connectivity_set_num_trees (t->conn, t->num_trees));
   SC3E (p4est3_connectivity_setup (t->conn));
 
