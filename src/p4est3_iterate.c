@@ -79,6 +79,21 @@ typedef struct p4est3_search_area
 p4est3_search_area_t;
 
 static sc3_error_t *
+p4est3_array_is_sorted (const void * q1, const void * q2, void * qvt, int *j)
+{
+  p4est3_quadrant_vtable_t *qvtable;
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt);
+
+  qvtable = (p4est3_quadrant_vtable_t *) qvt;
+  SC3A_IS (qvtable->quadrant_is_valid, q1);
+  SC3A_IS (qvtable->quadrant_is_valid, q2);
+  SC3A_CHECK (j != NULL);
+
+  SC3E (qvtable->quadrant_compare (q1, q2, j));
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_array_split_ancestor_id (sc3_array_t * a, int index, void *data,
                                 int *type)
 {
@@ -107,7 +122,7 @@ p4est3_quadrant_array_split (p4est3_quadrant_vtable_t * qvt,
   SC3A_IS (sc3_array_is_setup, indices);
   SC3A_CHECK (qvt != NULL);
   SC3A_CHECK (0 <= level && level < qvt->max_level);
-  SC3A_IS2 (sc3_array_is_sorted, array, qvt->quadrant_compare);
+  SC3A_IS3 (sc3_array_is_sorted, array, qvt, p4est3_array_is_sorted);
 
 #ifdef P4EST_ENABLE_DEBUG
   SC3E (sc3_array_get_elem_count (array, &count));
@@ -130,7 +145,7 @@ p4est3_quadrant_array_split (p4est3_quadrant_vtable_t * qvt,
   return NULL;
 }
 
-static inline const int *
+static inline int *
 p4est3_direction_order (const int side, const int dir,
                         const int dim, int *dir_ord)
 {                               /*TODO: optimize */
@@ -251,9 +266,9 @@ p4est3_internal_iterate_face_rec (p4est3_t * p3, p4est3_iterate_face_t cface,
       SC3E (p4est3_quadrant_array_split
             (p3->qvt, view, Level[side], split_offsets));
       Level[side]++;
-      dir_ord_it = p4est3_direction_order (side, earch_area->dir,
+      dir_ord_it = p4est3_direction_order (side, search_area->dir,
                                            p3->qvt->dim, dir_ord_arr);
-      SC3E (p4est3_reverse_copy_face (max_children, dir_ord_arr,
+      SC3E (p4est3_reverse_copy_face (max_children, dir_ord_it,
                                       split_offsets, idx_face_stack[side],
                                       &stack_it));
       SC3A_CHECK (*stack_it == *(begin_face[side]) + 1);
