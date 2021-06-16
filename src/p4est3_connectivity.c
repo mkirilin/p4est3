@@ -22,6 +22,7 @@
 */
 
 #include <p4est3_connectivity.h>
+#include <sc3_array.h>
 #include <sc3_refcount.h>
 
 struct p4est3_connectivity
@@ -36,6 +37,8 @@ struct p4est3_connectivity
 
   /* parameters fixed after setup call */
   int                 dim;
+  int                 num_faces;
+  int                 num_orient;
   p4est3_topidx       num_trees;
 };
 
@@ -61,6 +64,10 @@ p4est3_connectivity_is_valid (const p4est3_connectivity_t * c, char *reason)
   }
   SC3E_TEST (0 < c->dim && c->dim <= 3, reason);
   SC3E_TEST (0 < c->num_trees, reason);
+  if (c->setup) {
+    SC3E_TEST (c->num_faces == 2 * c->dim, reason);
+    SC3E_TEST (c->num_orient == 2 * (c->dim - 1), reason);
+  }
   SC3E_YES (reason);
 }
 
@@ -138,6 +145,10 @@ sc3_error_t        *
 p4est3_connectivity_setup (p4est3_connectivity_t * c)
 {
   SC3A_IS (p4est3_connectivity_is_new, c);
+
+  c->num_faces = 2 * c->dim;
+  c->num_orient = 2 * (c->dim - 1);
+
   c->setup = 1;
   SC3A_IS (p4est3_connectivity_is_setup, c);
   return NULL;
@@ -212,6 +223,29 @@ p4est3_connectivity_get_num_trees (const p4est3_connectivity_t * c,
 }
 
 sc3_error_t        *
+p4est3_connectivity_get_face (const p4est3_connectivity_t * c,
+                              p4est3_topidx * which_tree, int *nface,
+                              int *orient)
+{
+  /* formally check arguments */
+  SC3A_IS (p4est3_connectivity_is_setup, c);
+  SC3A_CHECK (which_tree != NULL);
+  SC3A_CHECK (nface != NULL);
+  SC3E_RETVAL (orient, 0);
+
+  /* verify input values */
+  SC3A_CHECK (0 <= *which_tree && *which_tree < c->num_trees);
+  SC3A_CHECK (0 <= *nface && *nface < c->num_faces);
+
+  /* return physical boundary unless specified otherwise */
+  if (c->cvt != NULL && c->cvt->get_face != NULL) {
+    SC3E (c->cvt->get_face (c->slf, which_tree, nface, orient));
+  }
+
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_connectivity_new_unitsquare (sc3_allocator_t * alloc,
                                     p4est3_connectivity_t ** pc)
 {
@@ -219,6 +253,7 @@ p4est3_connectivity_new_unitsquare (sc3_allocator_t * alloc,
 
   SC3E_RETVAL (pc, NULL);
   SC3E (p4est3_connectivity_new (alloc, &c));
+  SC3E (p4est3_connectivity_set_dim (c, 2));
   SC3E (p4est3_connectivity_setup (c));
   SC3A_IS (p4est3_connectivity_is_setup, c);
 
@@ -234,6 +269,7 @@ p4est3_connectivity_new_unitcube (sc3_allocator_t * alloc,
 
   SC3E_RETVAL (pc, NULL);
   SC3E (p4est3_connectivity_new (alloc, &c));
+  SC3E (p4est3_connectivity_set_dim (c, 3));
   SC3E (p4est3_connectivity_setup (c));
   SC3A_IS (p4est3_connectivity_is_setup, c);
 

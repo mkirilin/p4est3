@@ -22,11 +22,11 @@
 */
 
 #ifndef P4_TO_P8
-#include <p4est3_quadrant_mort.h>
+#include <p4est3_quadrant_mort2d.h>
 #define P4EST3_MORT_MAXLEVEL 31
 #define P4EST3_MORT_QMAXLEVEL 31
 #else
-#include <p8est3_quadrant_mort.h>
+#include <p4est3_quadrant_mort3d.h>
 #define P4EST3_MORT_MAXLEVEL 21
 #define P4EST3_MORT_QMAXLEVEL 21
 #endif
@@ -53,7 +53,7 @@ p4est3_quadrant_mort_num_uniform (int level)
   return p4est3_glopow (P4EST_CHILDREN, level);
 }
 
-static              int
+static int
 p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
                                      char *reason)
 {
@@ -62,7 +62,7 @@ p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
   SC3E_YES (reason);
 }
 
-static              int
+static int
 p4est3_quadrant_mort_is_valid (const p4est3_quadrant_mort_t * q, char *reason)
 {
   SC3E_TEST ((q->level >= 0 && q->level <= P4EST3_MORT_QMAXLEVEL) &&
@@ -162,7 +162,7 @@ p4est3_quadrant_mort_level (const p4est3_quadrant_mort_t * q, int *l)
 
 #ifdef P4EST_ENABLE_DEBUG
 
-static              int
+static int
 p4est3_quadrant_mort_is_parent (const p4est3_quadrant_mort_t * q,
                                 const p4est3_quadrant_mort_t * r,
                                 char *reason)
@@ -440,11 +440,13 @@ p4est3_quadrant_mort_root (p4est3_quadrant_mort_t * r)
 }
 
 sc3_error_t        *
-p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t * qvt)
+p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
 {
   SC3A_CHECK (qvt != NULL);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
 
+#if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
+ || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
   qvt->dim = P4EST_DIM;
   qvt->max_level = P4EST3_MORT_MAXLEVEL;
   qvt->max_children = P4EST_CHILDREN;
@@ -508,4 +510,9 @@ p4est3_quadrant_mort_vtable (p4est3_quadrant_vtable_t * qvt)
   /* verify correctness */
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt);
   return NULL;
+#else
+  return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
+                             " of Morton-based virtual table is denied since"
+                             " this dimension is disabled or not supported");
+#endif /* !(P4EST_DIM == ? && defined(P4EST_ENABLE_BUILD_?D)) */
 }

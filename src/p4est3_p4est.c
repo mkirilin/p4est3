@@ -41,10 +41,40 @@ p4est3_connectivity_p4est_destroy (void *cslf)
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_connectivity_p4est_get_face (void *cslf, p4est3_topidx * which_tree,
+                                    int *nface, int *orient)
+{
+  p4est_connectivity_t *c4 = (p4est_connectivity_t *) cslf;
+  p4est3_topidx       tt;
+  int                 nf;
+
+  /* formally check parameters */
+  SC3A_CHECK (c4 != NULL);
+  SC3A_CHECK (which_tree != NULL);
+  SC3A_CHECK (nface != NULL);
+  SC3A_CHECK (orient != NULL);
+
+  /* check input values */
+  SC3A_CHECK (0 <= *which_tree && *which_tree < c4->num_trees);
+  SC3A_CHECK (0 <= *nface && *nface < P4EST_FACES);
+  SC3A_CHECK (0 == *orient);
+
+  /* set output values */
+  tt = *which_tree;
+  *which_tree = c4->tree_to_tree[P4EST_FACES * tt + *nface];
+  nf = c4->tree_to_face[P4EST_FACES * tt + *nface];
+  *nface = nf % P4EST_FACES;
+  *orient = nf / P4EST_FACES;
+
+  /* done! */
+  return NULL;
+}
+
 sc3_error_t        *
 p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
-                               p4est_connectivity_t * c4, int autodestroy,
-                               p4est3_connectivity_t ** pc)
+                               p4est3_connectivity_t ** pc,
+                               p4est_connectivity_t * c4, int autodestroy)
 {
   p4est3_connectivity_t *c;
   p4est3_connectivity_vtable_t scvt, *cvt = &scvt;
@@ -61,6 +91,7 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
   if (autodestroy) {
     cvt->destroy = p4est3_connectivity_p4est_destroy;
   }
+  cvt->get_face = p4est3_connectivity_p4est_get_face;
 
   /* create connectivity */
   SC3E (p4est3_connectivity_new (alloc, &c));
@@ -77,6 +108,45 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
 }
 
 static const char *P4EST3_P4EST_SELF_MAGIC = "p4est3_p4est_self_magic";
+
+sc3_error_t        *
+p4est3_connectivity_new_p4est_brick (sc3_allocator_t * alloc,
+                                     p4est3_connectivity_t ** pc,
+                                     int ki, int li,
+#ifdef P4_TO_P8
+                                     int mi,
+#endif
+                                     int periodic_k, int periodic_l
+#ifdef P4_TO_P8
+                                     , int periodic_m
+#endif
+  )
+{
+  p4est_connectivity_t *c4;
+
+  /* verify arguments */
+  SC3E_RETVAL (pc, NULL);
+  SC3A_IS (sc3_allocator_is_valid, alloc);
+  SC3A_CHECK (ki > 0 && li > 0);
+#ifdef P4_TO_P8
+  SC3A_CHECK (mi > 0);
+#endif
+
+  /* create brick connectivity */
+  c4 = p4est_connectivity_new_brick (ki, li,
+#ifdef P4_TO_P8
+                                     mi,
+#endif
+                                     periodic_k, periodic_l
+#ifdef P4_TO_P8
+                                     , periodic_m
+#endif
+    );
+
+  /* wrap brick into p4est3 connectivity */
+  SC3E (p4est3_connectivity_new_p4est (alloc, pc, c4, 1));
+  return NULL;
+}
 
 typedef struct p4est3_p4est_self
 {
@@ -132,8 +202,8 @@ p4est3_p4est_destroy (void *pslf)
 }
 
 sc3_error_t        *
-p4est3_new_p4est (sc3_allocator_t * alloc, p4est_t * p4,
-                  int autodestroy, p4est3_t ** pp3)
+p4est3_new_p4est (sc3_allocator_t * alloc, p4est3_t ** pp3,
+                  p4est_t * p4, int autodestroy)
 {
   p4est3_p4est_self_t *slf;
   p4est3_t           *p3;
@@ -147,8 +217,8 @@ p4est3_new_p4est (sc3_allocator_t * alloc, p4est_t * p4,
 
   /* wrap connectivity into a p4est3_connectivity_t object and build context */
   SC3E (sc3_allocator_malloc (alloc, sizeof (p4est3_p4est_self_t), &slf));
-  SC3E (p4est3_connectivity_new_p4est (alloc, p4->connectivity, 0, &slf->c3));
   slf->magic = P4EST3_P4EST_SELF_MAGIC;
+  SC3E (p4est3_connectivity_new_p4est (alloc, &slf->c3, p4->connectivity, 0));
   slf->autodestroy = autodestroy;
   slf->alloc = alloc;
   slf->p4 = p4;
@@ -366,6 +436,8 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   SC3A_CHECK (id >= 0);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
 
+#if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
+ || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
   /* populate scalar members */
   qvt->id = id;
   qvt->dim = P4EST_DIM;
@@ -400,4 +472,9 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   /* verify correctness */
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt);
   return NULL;
+#else
+  return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
+                             " of virtual table is denied since"
+                             " this dimension is disabled or not supported");
+#endif /* !(P4EST_DIM == ? && defined(P4EST_ENABLE_BUILD_?D)) */
 }

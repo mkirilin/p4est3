@@ -35,6 +35,14 @@
  * p4est3_connectivity_new_unitsquare (2D) and \ref
  * p4est3_connectivity_new_unitcube (3D).
  *
+ * The connectivity object is designed as a shell for a virtual implementation.
+ * (The builtin construction is limited to setting the dimension and
+ * a number of non-connected trees (all faces are boundary faces)).
+ * This connectivity becomes more practically useful when setting the virtual
+ * table to wrap an arbitrary externally maintained connectivity.
+ * We provide wrappers for classic p4est and p8est connectivities
+ * in the files \ref p4est3_p4est.h and \ref p4est3_p8est.h.
+ *
  * \ingroup p4est3
  */
 
@@ -54,6 +62,13 @@ extern              "C"
 /** General virtual function taking one in-out argument. */
 typedef sc3_error_t *(*p4est3_connectivity_inout_t) (void *slf);
 
+/** In/out: tree number, face number; out: orientation (input 0).
+ * Only for a tree connection the output arguments need to be updated.
+ */
+typedef             sc3_error_t
+  * (*p4est3_connectivity_get_face_t) (void *slf, p4est3_topidx * which_tree,
+                                       int *nface, int *orient);
+
 /** One way to create a connectivity is to provide a virtual table with state.
  * The members of this table must be set before passing it to \ref
  * p4est3_connectivity_set_vtable, where we make a shallow copy.
@@ -70,6 +85,8 @@ typedef struct p4est3_connectivity_vtable
 
   /** This function may be NULL, e.g.\ when no state requires destruction */
   p4est3_connectivity_inout_t destroy;
+  /** Query face connection; if NULL report physical boundary always */
+  p4est3_connectivity_get_face_t get_face;
 }
 p4est3_connectivity_vtable_t;
 
@@ -138,7 +155,7 @@ sc3_error_t        *p4est3_connectivity_set_vtable
 
 /** Set the spatial dimension of this connectivity.
  * \param [in,out] c        Connectivity under construction.
- * \param [in] dim          Dimension from 1 to 3.
+ * \param [in] dim          Dimension from 1 to 3.  Default is 2.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_set_dim
@@ -146,7 +163,7 @@ sc3_error_t        *p4est3_connectivity_set_dim
 
 /** Set the number of trees that constitute this connectivity.
  * \param [in,out] c        Connectivity under construction.
- * \param [in] num_trees    Positive number of trees.
+ * \param [in] num_trees    Positive number of trees.  Default is 1.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_set_num_trees
@@ -199,6 +216,22 @@ sc3_error_t        *p4est3_connectivity_get_dim
  */
 sc3_error_t        *p4est3_connectivity_get_num_trees
   (const p4est3_connectivity_t * c, p4est3_topidx * pnum_trees);
+
+/** Query a tree connection across a face.
+ * For a physical boundary face we return same tree and same face.
+ * \param [in] c            Connectivity must be setup.
+ *                          If the connectivity is not face-enabled,
+ *                          we always return a physical boundary.
+ * \param [in,out] which_tree   On input, valid tree number.
+ *                              On output, connecting tree's number.
+ * \param [in,out] nface        On input, valid face number.
+ *                              On output, connecting face's number.
+ * \param [out] orient          On output, orientation of connection.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_get_face
+  (const p4est3_connectivity_t * c,
+   p4est3_topidx * which_tree, int *nface, int *orient);
 
 /** Create a connectivity readily setup to represent the 2D unit square.
  * \param [in,out] alloc   Allocator must be setup.  It is referenced

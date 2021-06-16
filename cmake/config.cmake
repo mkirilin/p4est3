@@ -46,8 +46,8 @@ set(P4EST_LDFLAGS \"${MPI_C_LINK_FLAGS}\")
 set(P4EST_LIBS \"${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${ZLIB_LIBRARIES} m\")
 
 set(P4EST_ENABLE_BUILD_2D true CACHE BOOL "p4est is always used")
-set(P4EST_ENABLE_BUILD_3D ${enable_p6est})
-set(P4EST_ENABLE_BUILD_P6EST ${enable_p8est})
+set(P4EST_ENABLE_BUILD_3D ${enable_p8est})
+set(P4EST_ENABLE_BUILD_P6EST ${enable_p6est})
 
 set(P4EST_ENABLE_MEMALIGN 1)
 
@@ -99,6 +99,10 @@ endif()
 if(ZLIB_FOUND)
   set(CMAKE_REQUIRED_LIBRARIES ZLIB::ZLIB)
   check_symbol_exists(adler32_combine zlib.h P4EST_HAVE_ZLIB)
+endif()
+
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+  set(P4EST_ENABLE_DEBUG 1)
 endif()
 
 configure_file(${CMAKE_CURRENT_LIST_DIR}/p4est_config.h.in ${PROJECT_BINARY_DIR}/include/p4est_config.h)

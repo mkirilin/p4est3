@@ -48,8 +48,8 @@ p4est3_connectivity_dstr (void *vslf)
 
 static sc3_error_t *
 basics_connectivity_new_virtual (sc3_allocator_t * alloc,
-                                 p4est3_topidx num_trees,
-                                 p4est3_connectivity_t ** pc)
+                                 p4est3_connectivity_t ** pc,
+                                 p4est3_topidx num_trees)
 {
   p4est3_connectivity_ntslf_t *slf;
   p4est3_connectivity_t *c;
@@ -100,7 +100,7 @@ test_p4est_new (sc3_allocator_t * alloc,
 
   SC3A_IS (sc3_allocator_is_setup, alloc);
 
-  for (i = 0; i < 4; ++i) {
+  for (i = 0; i < 5; ++i) {
     /* create p4est3_connectivity_t structure */
     fprintf (stderr, "Trying %d\n", i);
     switch (i) {
@@ -113,7 +113,7 @@ test_p4est_new (sc3_allocator_t * alloc,
       break;
     case 1:
       /* virtual connectivity with one tree */
-      SC3E (basics_connectivity_new_virtual (alloc, num_trees, &conn));
+      SC3E (basics_connectivity_new_virtual (alloc, &conn, num_trees));
       break;
     case 2:
       /* use convenience constructors */
@@ -130,7 +130,16 @@ test_p4est_new (sc3_allocator_t * alloc,
 #else
       c4 = p8est_connectivity_new_unitcube ();
 #endif
-      SC3E (p4est3_connectivity_new_p4est (alloc, c4, 1, &conn));
+      SC3E (p4est3_connectivity_new_p4est (alloc, &conn, c4, 1));
+      break;
+    case 4:
+      /* wrapping a p4est brick connectivity */
+#ifndef P4_TO_P8
+      SC3E (p4est3_connectivity_new_p4est_brick (alloc, &conn, 2, 3, 0, 0));
+#else
+      SC3E (p4est3_connectivity_new_p8est_brick
+            (alloc, &conn, 2, 3, 4, 0, 0, 0));
+#endif
       break;
     default:
       SC3E_UNREACH ("Invalid example counter");
@@ -160,7 +169,7 @@ test_p4est_new (sc3_allocator_t * alloc,
       /* create p4est object from legacy p4est */
       fprintf (stderr, "Variant %d\n", i);
       p4 = p4est_new (sc_MPI_COMM_WORLD, c4, 0, NULL, NULL);
-      SC3E (p4est3_new_p4est (alloc, p4, 1, &p3));
+      SC3E (p4est3_new_p4est (alloc, &p3, p4, 1));
 
       /* do something with the forest */
       for (j = 0; j < 2; ++j) {

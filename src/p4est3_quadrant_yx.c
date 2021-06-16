@@ -29,6 +29,10 @@
 #include <p4est3_quadrant_zyx.h>
 #endif /* !P4_TO_P8 */
 
+/* These have the same values for the 2D and 3D implementations */
+#define P4EST3_YX_MAXLEVEL 30
+#define P4EST3_YX_QMAXLEVEL 30
+
 #ifdef P4EST_ENABLE_AVX2
 
 #include <immintrin.h>
@@ -292,8 +296,7 @@ p4est3_quadrant_zyx_ancestor_id (const __m128i * q, int level, int *j)
 static sc3_error_t *
 p4est3_quadrant_zyx_child_id (const __m128i * q, int *j)
 {
-  int                 level =
-  _mm_extract_epi32 (*q, 0);
+  int                 level = _mm_extract_epi32 (*q, 0);
   SC3E (p4est3_quadrant_zyx_ancestor_id (q, level, j));
   return NULL;
 }
@@ -371,7 +374,8 @@ p4est3_quadrant_zyx_first_descendant (const __m128i * q, int level,
                                       __m128i * fd)
 {
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
-  SC3A_CHECK (_mm_extract_epi32 (*q, 0) <= level && level <= P4EST3_YX_MAXLEVEL);
+  SC3A_CHECK (_mm_extract_epi32 (*q, 0) <= level &&
+              level <= P4EST3_YX_MAXLEVEL);
 
   *fd = _mm_insert_epi32 (*q, level, 0);
   return NULL;
@@ -384,7 +388,8 @@ p4est3_quadrant_zyx_last_descendant (const __m128i * q, int level,
   p4est_qcoord_t      shift;
 
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
-  SC3A_CHECK (_mm_extract_epi32 (*q, 0) <= level && level <= P4EST3_YX_QMAXLEVEL);
+  SC3A_CHECK (_mm_extract_epi32 (*q, 0) <= level &&
+              level <= P4EST3_YX_QMAXLEVEL);
 
   shift = P4EST_QUADRANT_LEN (_mm_extract_epi32 (*q, 0))
     - P4EST_QUADRANT_LEN (level);
@@ -628,6 +633,9 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
   SC3A_CHECK (qvt != NULL);
   memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
 
+#if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
+ || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
+
 #ifdef P4EST_ENABLE_AVX2
   qvt->dim = P4EST_DIM;
   qvt->max_level = P4EST3_YX_MAXLEVEL;
@@ -641,7 +649,8 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_zyx_level;
 
-  qvt->quadrant_child_id = (p4est3_quadrant_child_id_t) p4est3_quadrant_zyx_child_id;
+  qvt->quadrant_child_id =
+    (p4est3_quadrant_child_id_t) p4est3_quadrant_zyx_child_id;
 
   qvt->quadrant_ancestor_id =
     (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_zyx_ancestor_id;
@@ -695,4 +704,9 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
                              " of AVX2-based virtual table is denied since AVX2"
                              " is disabled or not found working");
 #endif /* !P4EST_ENABLE_AVX2 */
+
+  return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
+                             " of AVX-based virtual table is denied since"
+                             " this dimension is disabled or not supported");
+#endif /* !(P4EST_DIM == ? && defined(P4EST_ENABLE_BUILD_?D)) */
 }
