@@ -233,6 +233,19 @@ sc3_error_t        *p4est3_connectivity_get_face
   (const p4est3_connectivity_t * c,
    p4est3_topidx * which_tree, int *nface, int *orient);
 
+/** Query child id that touches a face at i-th z-position
+ * \param [in] c            Connectivity must be setup.
+ * \param [in] nface        Valid face number.
+ * \param [in, out] i       On input, valid index number of a quadrant touches
+ *                          nface face. 3D: 0..3, 2D: 0..1.
+ *                          On output, child id of the quadrant touches nface
+ *                          face. 3D: 0..7, 2D: 0..3.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_get_face_child_id
+  (const p4est3_connectivity_t * c,
+   const int *nface, int *i);
+
 /** Create a connectivity readily setup to represent the 2D unit square.
  * \param [in,out] alloc   Allocator must be setup.  It is referenced
  *                         and kept around while connectivity is live.
