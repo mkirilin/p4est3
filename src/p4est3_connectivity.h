@@ -243,8 +243,7 @@ sc3_error_t        *p4est3_connectivity_get_face
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_get_face_child_id
-  (const p4est3_connectivity_t * c,
-   const int *nface, int *i);
+  (const p4est3_connectivity_t * c, int nface, int *i);
 
 /** Create a connectivity readily setup to represent the 2D unit square.
  * \param [in,out] alloc   Allocator must be setup.  It is referenced

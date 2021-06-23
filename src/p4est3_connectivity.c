@@ -281,7 +281,7 @@ p4est3_connectivity_get_face (const p4est3_connectivity_t * c,
 
 sc3_error_t        *
 p4est3_connectivity_get_face_child_id (const p4est3_connectivity_t * c,
-                                       const int *nface, int *i)
+                                       int nface, int *i)
 {
   SC3A_IS (p4est3_connectivity_is_setup, c);
   SC3A_CHECK (nface != NULL);
