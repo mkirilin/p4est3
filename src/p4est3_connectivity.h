@@ -233,17 +233,31 @@ sc3_error_t        *p4est3_connectivity_get_face
   (const p4est3_connectivity_t * c,
    p4est3_topidx * which_tree, int *nface, int *orient);
 
-/** Query child id that touches a face at i-th z-position
+/** Query child id that touches a face \a nface at a face corner \a i.
  * \param [in] c            Connectivity must be setup.
  * \param [in] nface        Valid face number.
- * \param [in, out] i       On input, valid index number of a quadrant touches
- *                          nface face. 3D: 0..3, 2D: 0..1.
- *                          On output, child id of the quadrant touches nface
- *                          face. 3D: 0..7, 2D: 0..3.
+ * \param [in, out] i       On input, valid face corner number of the
+ *                          face \a nface. 3D: 0..3, 2D: 0..1.
+ *                          On output, child id of the quadrant touches both 
+ *                          nface \a face and face corner \a i.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_get_face_child_id
   (const p4est3_connectivity_t * c, int nface, int *i);
+
+/** Transform a face corner across one of the adjacent faces into a neighbor tree.
+ * This version expects the neighbor face and orientation separately.
+ * \param [in] c            Connectivity must be setup.
+ * \param [in,out] fc       On input, a face corner number in 0..3.
+ *                          On output, the face corner number relative
+ *                          to the neighbor's face.
+ * \param [in] f     A face that the face corner \a fc is relative to.
+ * \param [in] nf    A neighbor face that is on the other side of \f.
+ * \param [in] o     The orientation between tree boundary faces \a f and \nf.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_face_neighbor_face_corner
+  (const p4est3_connectivity_t * c, int *fc, int f, int nf, int o);
 
 /** Create a connectivity readily setup to represent the 2D unit square.
  * \param [in,out] alloc   Allocator must be setup.  It is referenced
