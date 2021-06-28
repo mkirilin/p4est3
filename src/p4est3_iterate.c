@@ -441,7 +441,7 @@ p4est3_iterate_face_frame (p4est3_t * p3,
     if (!is_refine[side]) {
       continue;
     }
-    for (i = 0; i < max_children + 1; ++i) {
+    for (i = 0; i < max_children / 2; ++i) {
       SC3E (sc3_array_pop (idx_f_stack[side]));
     }
   }
@@ -477,10 +477,11 @@ p4est3_iterate_face_frame_init (p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_iterate_face_init (p4est3_t * p3,
-                          p4est3_iterate_face_t cface,
-                          p4est3_iterate_codim_t ccodim,
-                          p4est3_search_area_t * search_area)
+p4est3_iterate_face_inner_init (p4est3_t * p3,
+                                p4est3_iterate_face_t cface,
+                                p4est3_iterate_codim_t ccodim,
+                                p4est3_search_area_t * search_area,
+                                p4est3_locidx * stack_it)
 {
   p4est3_locidx *idx;
   int *Level_sides = search_area->Level_sides;
@@ -561,13 +562,12 @@ p4est3_internal_iterate_volume (p4est3_t * p3,
     return NULL;
   }
   if (l2nch[*Level] == max_children) {
-    SC3E (p4est3_iterate_face_frame_init (p3, cface, ccodim, search_area));
+    SC3E (p4est3_iterate_face_inner_init (p3, cface, ccodim, search_area,
+                                          stack_it));
     SC3E (p4est3_iterate_face_frame (p3, cface, ccodim, search_area));
     l2nch[--(*Level)]++;
   }
   else {
-    SC3E (p4est3_reverse_copy_vol (max_children, split_offsets,
-                                   idx_vol_stack, &stack_it));
     for (i = 0; i < max_children; ++i) {
       search_area->begin = stack_it;
       search_area->end = ++stack_it;
