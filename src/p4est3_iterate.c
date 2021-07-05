@@ -53,7 +53,7 @@ typedef struct p4est3_search_area
 
   /* volume section */
   p4est3_tree_t      *tree;
-  p4est3_locidx      *begin;
+  p4est3_locidx      *begin;  /*or p4est3_gloidx??*/
   p4est3_locidx      *end;
   int                 Level;
   int                *level2nchildren;  /* Array specifing the number n
@@ -148,9 +148,10 @@ p4est3_set_face_dual (p4est3_t * p3, p4est3_search_area_t * sa)
 }
 
 static sc3_error_t *
-p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
+p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
+                       void *user_data)
 {
-  int i;
+  int side;
   /*set general section of sa*/
   sa->max_children = p3->qvt->max_children;
   sa->nfaces = 2 * p3->qvt->dim;
@@ -165,12 +166,15 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
   sa->Level = 0;
   SC3E (sc3_allocator_calloc (p3->alloc, p3->qvt->max_level, sizeof (int),
                               &sa->level2nchildren));
-  SC3E (p4est3_array_new (p3->alloc, sizeof (int),
-                          p3->qvt->max_level * (sa->max_children + 1), 0,
+  memset (sa->level2nchildren, 0, sizeof (int) * p3->qvt->max_level);
+  SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_locidx),
+                          p3->qvt->max_level * (sa->max_children + 1), 2,
                           &sa->idx_vol_stack));
   SC3E (sc3_allocator_calloc_one (p3->alloc,
                                   sizeof (p4est3_iterate_volume_info_t),
                                   &sa->vinfo));
+  sa->vinfo->p3 = p3;
+  sa->vinfo->user_data = user_data;
 
   /*set face section of sa*/
   SC3E (sc3_allocator_calloc_one (p3->alloc,
@@ -178,15 +182,17 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
                                   &sa->finfo));
   SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_iterate_face_side_t), 2,
                           2, &sa->finfo->sides));
-  for (i = 0; i < 2; ++i) {
-    sa->tree_face[i] = NULL;
-    sa->begin_face[i] = NULL;
-    sa->end_face[i] = NULL;
-    sa->Level_face[i] = 0;
-    sa->is_refine[i] = 1;
-    SC3E (p4est3_array_new (p3->alloc, sizeof (int),
+  sa->finfo->p3 = p3;
+  sa->finfo->user_data = user_data;
+  for (side = 0; side < 2; ++side) {
+    sa->tree_face[side] = NULL;
+    sa->begin_face[side] = NULL;
+    sa->end_face[side] = NULL;
+    sa->Level_face[side] = 0;
+    sa->is_refine[side] = 1;
+    SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_locidx),
                             p3->qvt->max_level * (sa->max_children + 1), 0,
-                            &sa->idx_face_stack[i]));
+                            &sa->idx_face_stack[side]));
   }
 
   /*temporarily set view on level2children and idx_vol_stack array to be able
@@ -426,6 +432,10 @@ p4est3_internal_iterate_face (p4est3_t * p3,
                                                      fside->face[side], &idx));*/
       b_f[side] = stack_iter + idx;
       e_f[side] = stack_iter + idx + 1;
+      SC3A_CHECK (*(b_f[side]) < *(e_f[side]));
+      /*if (*(b_f[side]) == *(e_f[side]) - 1) {
+        continue;
+      }*/
       SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
       Level[side]--;
     }
@@ -500,11 +510,43 @@ p4est3_iterate_face_inner (p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_internal_iterate_volume (p4est3_t * p3,
-                                p4est3_iterate_volume_t cvolume,
-                                p4est3_iterate_face_t cface,
-                                p4est3_iterate_codim_t ccodim,
-                                p4est3_search_area_t * search_area)
+p4est3_iterate_volume_init (p4est3_t * p3,
+                            p4est3_search_area_t * sa,
+                            p4est3_topidx tree)
+{
+  p4est3_iterate_face_side_t *fside;
+
+  SC3E (p4est3_tree_index (p3, tree, &sa->tree));
+  sa->vinfo->ntree = tree;
+  sa->finfo->orientation = 0;
+  sa->finfo->tree_boundary = 0;
+
+#ifdef P4EST_ENABLE_DEBUG
+  int ecount;
+  SC3E (sc3_array_get_elem_count (sa->idx_vol_stack, &ecount));
+  SC3A_CHECK (ecount == 2);
+#endif
+
+  SC3E (sc3_array_index (sa->idx_vol_stack, 0, &sa->begin));
+  *(sa->begin) = 0;
+  sa->end = sa->begin + 1;
+  *(sa->end) = sa->tree->num_quads;
+
+  SC3E (sc3_array_index (sa->finfo->sides, 0, &fside));
+  for (int side = 0; side < 2; ++side) {
+    fside[side].ntree = tree;
+    fside[side].is_ghost = 0;
+  }
+
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_iterate_volume (p4est3_t * p3,
+                       p4est3_iterate_volume_t cvolume,
+                       p4est3_iterate_face_t cface,
+                       p4est3_iterate_codim_t ccodim,
+                       p4est3_search_area_t * search_area)
 {
   int                 i;
   int                 is_refine = 1;
@@ -517,8 +559,8 @@ p4est3_internal_iterate_volume (p4est3_t * p3,
   int                *l2nch = search_area->level2nchildren;
   int                *Level = &search_area->Level;
   int                 icount;
-  const int           begin = *(search_area->begin);
-  const int           end = *(search_area->end);
+  const p4est3_locidx begin = *(search_area->begin);
+  const p4est3_locidx end = *(search_area->end);
   p4est3_tree_t      *tree = search_area->tree;
   sc3_array_t        *view_q = search_area->view_quads;
   sc3_array_t        *view_i = search_area->view_indices;
@@ -565,8 +607,7 @@ p4est3_internal_iterate_volume (p4est3_t * p3,
         l2nch[*Level]++;
         continue;
       }
-      SC3E (p4est3_internal_iterate_volume (p3, cvolume, cface, ccodim,
-                                            search_area));
+      SC3E (p4est3_iterate_volume (p3, cvolume, cface, ccodim, search_area));
     }
     for (i = 0; i < nsplit_id; ++i) {
       SC3E (sc3_array_pop (idx_vol_stack));
@@ -584,7 +625,7 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
   p4est3_search_area_t ssa, *search_area = &ssa;
   p4est3_topidx       tree, tree_neighbor;
   p4est3_iterate_face_side_t *fside;
-  int                 i, face, orient, side;
+  int                 i, face, orient;
 
   /* This iteration is w/o ghost layer and for volumes only */
   if (codims < 0 || codims >= P4EST3_ITERATE_LAST) {
@@ -600,30 +641,16 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
     return NULL;
   }
 
-  /*preparing some data before iteratino*/
-  SC3E (p4est3_set_outer_data (p3, search_area));
-  search_area->vinfo->p3 = p3;
-  search_area->vinfo->user_data = user_data;
-  search_area->finfo->p3 = p3;
-  search_area->finfo->user_data = user_data;
+  SC3E (p4est3_set_outer_data (p3, search_area, user_data));
   SC3E (sc3_array_index (search_area->finfo->sides, 0, &fside));
   for (tree = p3->fltree; tree <= p3->lltree; ++tree) {
-    /*preparing some data before iteratino*/
-    SC3E (p4est3_tree_index (p3, tree, &search_area->tree));
-    search_area->tree_face[0] = search_area->tree;
-    search_area->vinfo->ntree = tree;
-    search_area->finfo->orientation = 0;
-    search_area->finfo->tree_boundary = 0;
-    for (side = 0; side < 2; ++side) {
-      fside[side].ntree = tree;
-      fside[side].is_ghost = 0;
-    }
 
-    SC3E (p4est3_internal_iterate_volume (p3, cvolume, cface, ccodim,
-                                          search_area));
+    SC3E (p4est3_iterate_volume_init (p3, search_area, tree));
+    SC3E (p4est3_iterate_volume (p3, cvolume, cface, ccodim, search_area));
 
     /* frame faces part */
     search_area->finfo->tree_boundary = 1;
+    search_area->tree_face[0] = search_area->tree;
     for (i = 0; i < search_area->nfaces; ++i) {
       face = i;
       tree_neighbor = tree;
