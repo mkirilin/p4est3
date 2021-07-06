@@ -64,6 +64,7 @@ typedef struct p4est3_search_area
   p4est3_iterate_volume_info_t *vinfo;
 
   /* face section */
+  int                 nsides;
   p4est3_tree_t      *tree_face[2];
   p4est3_locidx      *begin_face[2];
   p4est3_locidx      *end_face[2];
@@ -177,6 +178,7 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
   sa->vinfo->user_data = user_data;
 
   /*set face section of sa */
+  sa->nsides = 2;
   SC3E (sc3_allocator_calloc_one (p3->alloc,
                                   sizeof (p4est3_iterate_face_info_t),
                                   &sa->finfo));
@@ -338,27 +340,50 @@ p4est3_iterate_volume_simple (p4est3_t * p3,
 
 static sc3_error_t *
 p4est3_iterate_face_bound_init (p4est3_t * p3,
-                                p4est3_iterate_face_t cface,
-                                p4est3_iterate_codim_t ccodim,
-                                p4est3_search_area_t * search_area)
+                                p4est3_search_area_t * search_area,
+                                p4est3_topidx tree,
+                                int face,
+                                p4est3_iterate_face_side_t * fside,
+                                int *is_lower)
 {
+  int                 orient;
   int                *Level_face = search_area->Level_face;
   int                *is_refine = search_area->is_refine;
-
+  p4est3_topidx       tree_neighbor = tree;
   sc3_array_t       **idx_f_stack = search_area->idx_face_stack;
   p4est3_locidx     **b_f = search_area->begin_face,
     **e_f = search_area->end_face;
   int                 side;
 
-  Level_face[0] = Level_face[1] = 0;
-  is_refine[0] = is_refine[1] = 1;
+  fside[0].ntree = tree;
+  fside[0].nface = face;
+  SC3E (p4est3_connectivity_get_face
+        (p3->conn, &tree_neighbor, &face, &orient));
+  if (tree_neighbor < tree) {
+    *is_lower = 1;
+    return NULL;
+  }
+  search_area->finfo->orientation = orient;
 
-  for (side = 0; side < 2; ++side) {
+  if (tree_neighbor == tree) {
+    /* physical boundary */
+    search_area->nsides = 1;
+  }
+  else {
+    search_area->nsides = 2;
+    fside[1].ntree = tree_neighbor;
+    SC3E (p4est3_tree_index (p3, tree_neighbor, &search_area->tree_face[1]));
+    fside[1].nface = face;
+  }
+  for (side = 0; side < search_area->nsides; ++side) {
+    Level_face[side] = 0;
+    is_refine[side] = 1;
     SC3E (sc3_array_index (idx_f_stack[side], 0, &b_f[side]));
     *(b_f[side]) = 0;
     SC3E (sc3_array_index (idx_f_stack[side], 1, &e_f[side]));
     *(e_f[side]) = search_area->tree_face[side]->num_quads;
   }
+  *is_lower = 0;
   return NULL;
 }
 
@@ -387,7 +412,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
 
   /* first check if the whole quadrant passes */
   SC3E (sc3_array_index (search_area->finfo->sides, 0, &fside));
-  for (side = 0; side < 2; ++side) {
+  for (side = 0; side < search_area->nsides; ++side) {
     if (!is_refine[side]) {
       continue;
     }
@@ -408,7 +433,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     return NULL;
   }
   for (i = 0; i < half_ch; ++i) {
-    for (side = 0; side < 2; ++side) {
+    for (side = 0; side < search_area->nsides; ++side) {
       if (!is_refine[side]) {
         continue;
       }
@@ -440,7 +465,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       Level[side]--;
     }
   }
-  for (side = 0; side < 2; ++side) {
+  for (side = 0; side < search_area->nsides; ++side) {
     if (!is_refine[side]) {
       continue;
     }
@@ -465,6 +490,7 @@ p4est3_iterate_face_inner_init (p4est3_t * p3,
   p4est3_locidx     **b_f = search_area->begin_face,
     **e_f = search_area->end_face;
 
+  search_area->nsides = 2;
   Level_face[0] = Level_face[1] = search_area->Level;
   is_refine[0] = is_refine[1] = 1;
 
@@ -615,9 +641,9 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
                       p4est3_iterate_codim_t ccodim, void *user_data)
 {
   p4est3_search_area_t ssa, *search_area = &ssa;
-  p4est3_topidx       tree, tree_neighbor;
+  p4est3_topidx       tree;
   p4est3_iterate_face_side_t *fside;
-  int                 i, face, orient;
+  int                 face, is_lower;
 
   /* This iteration is w/o ghost layer and for volumes only */
   if (codims < 0 || codims >= P4EST3_ITERATE_LAST) {
@@ -643,28 +669,17 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
     /* frame faces part */
     search_area->finfo->tree_boundary = 1;
     search_area->tree_face[0] = search_area->tree;
-    for (i = 0; i < search_area->nfaces; ++i) {
-      face = i;
-      tree_neighbor = tree;
-      fside[0].nface = face;
-      SC3E (p4est3_connectivity_get_face (p3->conn, &tree_neighbor, &face,
-                                          &orient));
-      SC3E (p4est3_tree_index (p3, tree_neighbor,
-                               &search_area->tree_face[1]));
-      fside[1].nface = face;
-      search_area->finfo->orientation = orient;
-      if (tree_neighbor < tree) {
+    for (face = 0; face < search_area->nfaces; ++face) {
+      SC3E (p4est3_iterate_face_bound_init
+            (p3, search_area, tree, face, fside, &is_lower));
+      if (is_lower) {
+        /* we iterate over such trees that tree_neighbor < tree */
+        SC3E (sc3_array_pop (search_area->finfo->sides));
         continue;
       }
-      else if (tree_neighbor == tree) {
-        /* physical boundary */
-      }
-      else {
-        fside[0].ntree = tree;
-        fside[1].ntree = tree_neighbor;
-        SC3E (p4est3_iterate_face_bound_init
-              (p3, cface, ccodim, search_area));
-        SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
+      SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
+      if (is_lower) {
+        SC3E (sc3_array_push (search_area->finfo->sides, NULL));
       }
     }
   }
