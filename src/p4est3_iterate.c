@@ -578,7 +578,11 @@ p4est3_iterate_volume (p4est3_t * p3,
       SC3E (cvolume (vinfo));
     }
     l2nch[*Level]++;
-    /*no return here because we want to iter_face a bit later */
+    return NULL;
+  }
+
+  if (l2nch[search_area->start_level] > 0) {
+    return NULL;
   }
 
   if (is_refine) {
@@ -589,26 +593,20 @@ p4est3_iterate_volume (p4est3_t * p3,
     SC3E (sc3_array_renew_view (&view_i, idx_vol_stack, icount, nsplit_id));
     SC3E (p4est3_quadrant_array_split (p3->qvt, view_q, *Level, view_i));
     l2nch[++(*Level)] = 0;
-  }
 
-  if (l2nch[search_area->start_level] > 0) {
-    return NULL;
-  }
-  if (l2nch[*Level] == max_children) {
-    SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, search_area,
-                                     stack_it));
-    l2nch[--(*Level)]++;
-  }
-  else {
     for (i = 0; i < max_children; ++i) {
-      search_area->begin = stack_it;
-      search_area->end = ++stack_it;
+      search_area->begin = stack_it + i;
+      search_area->end = stack_it + i + 1;
       if (*(search_area->begin) == *(search_area->end) - 1) {
         l2nch[*Level]++;
         continue;
       }
       SC3E (p4est3_iterate_volume (p3, cvolume, cface, ccodim, search_area));
     }
+    SC3A_CHECK (l2nch[*Level] == max_children);
+    SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, search_area,
+                                     stack_it));
+    l2nch[--(*Level)]++;
     for (i = 0; i < nsplit_id; ++i) {
       SC3E (sc3_array_pop (idx_vol_stack));
     }
