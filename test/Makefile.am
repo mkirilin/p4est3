@@ -25,7 +25,8 @@ p4est_test_programs += \
         test/p4est_test_nodes \
         test/p4est3_test_setup \
         test/p4est_test_avx \
-        test/p4est_test_version
+        test/p4est_test_version \
+        test/p4est3_test_p3_iterate
 if P4EST_WITH_METIS
 p4est_test_programs += \
         test/p4est_test_reorder
@@ -106,6 +107,7 @@ test_p4est_test_nodes_SOURCES = test/test_nodes2.c
 test_p4est3_test_setup_SOURCES = test/test_setup2.c
 test_p4est_test_avx_SOURCES = test/test_avx2.c
 test_p4est_test_version_SOURCES = test/test_version.c
+test_p4est3_test_p3_iterate_SOURCES = test/test_p3_iterate2.c
 if P4EST_WITH_METIS
 test_p4est_test_reorder_SOURCES = test/test_reorder2.c
 endif
@@ -199,6 +201,7 @@ LINT_CSOURCES += \
         $(test_p4est3_test_setup_SOURCES) \
         $(test_p4est_test_avx_SOURCES) \
         $(test_p4est_test_version_SOURCES) \
+        $(test_p4est3_test_p3_iterate_SOURCES) \
         $(test_p8est_test_quadrants_SOURCES) \
         $(test_p8est_test_balance_SOURCES) \
         $(test_p8est_test_partition_SOURCES) \
