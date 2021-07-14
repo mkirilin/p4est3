@@ -47,7 +47,6 @@ typedef struct p4est3_search_area
   int                 start_level;
   sc3_array_t        *view_quads;       /* array ptr to pass tree's quads
                                            into array_split */
-  sc3_array_t        *view_indices;
   int                *children_face_neighbors;
   int                *face_dual;
 
@@ -243,8 +242,6 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
   SC3E (sc3_array_new_data (p3->alloc, &sa->view_quads, sa->level2nchildren,
                             sizeof (int), 0, 0));
   SC3E (sc3_array_index (sa->idx_vol_stack, 0, &arr));
-  SC3E (sc3_array_new_view (p3->alloc, &sa->view_indices, arr, 0, 0));
-
   return NULL;
 }
 
@@ -274,7 +271,6 @@ p4est3_destroy_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
   SC3E (sc3_array_destroy (&sa->idx_face_stack[0]));
   SC3E (sc3_array_destroy (&sa->idx_face_stack[1]));
   SC3E (sc3_array_destroy (&sa->view_quads));
-  SC3E (sc3_array_destroy (&sa->view_indices));
   SC3E (sc3_array_destroy (&sa->finfo->sides));
   SC3E (sc3_allocator_free (p3->alloc, sa->vinfo));
   SC3E (sc3_allocator_free (p3->alloc, sa->finfo));
@@ -453,7 +449,6 @@ p4est3_internal_iterate_face (p4est3_t * p3,
                               p4est3_search_area_t * search_area)
 {
   const int           max_children = p3->qvt->max_children;
-  const int           nsplit_id = max_children + 1;     /*#indices for split_array output */
   const int           half_ch = max_children / 2;
   p4est3_tree_t     **trees = search_area->tree_face;
   p4est3_locidx     **b_f = search_area->begin_face;
@@ -461,7 +456,6 @@ p4est3_internal_iterate_face (p4est3_t * p3,
   sc3_array_t        *stack_it;
   p4est3_locidx      *arr_it;
   sc3_array_t        *view_q = search_area->view_quads;
-  sc3_array_t        *view_i = search_area->view_indices;
   sc3_array_t       **idx_face_stack = search_area->idx_face_stack;
   p4est3_iterate_face_side_t *fside;
   int                *is_refine = search_area->is_refine;
@@ -500,11 +494,10 @@ p4est3_internal_iterate_face (p4est3_t * p3,
 #ifdef P4EST_ENABLE_DEBUG
     SC3E (p4est3_array_set_zero (stack_it));
 #endif
-    SC3E (sc3_array_renew_view (&view_i, stack_it, 0, nsplit_id));
     SC3E (sc3_array_renew_data (&view_q, trees[side]->tquads,
                                 p3->qvt->quadrant_size, *(b_f[side]),
                                 *(e_f[side]) - *(b_f[side])));
-    SC3E (p4est3_quadrant_array_split (p3->qvt, view_q, Level[side], view_i));
+    SC3E (p4est3_quadrant_array_split (p3->qvt, view_q, Level[side], stack_it));
     Level[side]++;
     for (i = 0; i < half_ch; ++i) {
       idx = i;
@@ -644,14 +637,12 @@ p4est3_iterate_volume (p4est3_t * p3,
   p4est3_locidx      *arr_it;
 
   const int           max_children = p3->qvt->max_children;
-  const int           nsplit_id = max_children + 1;     /*#indices for split_array output */
   int                *l2nch = search_area->level2nchildren;
   int                *Level = &search_area->Level;
   const p4est3_locidx begin = *(search_area->begin);
   const p4est3_locidx end = *(search_area->end);
   p4est3_tree_t      *tree = search_area->tree;
   sc3_array_t        *view_q = search_area->view_quads;
-  sc3_array_t        *view_i = search_area->view_indices;
   sc3_array_t        *idx_vol_stack = search_area->idx_vol_stack;
   p4est3_iterate_volume_info_t *vinfo = search_area->vinfo;
 
@@ -676,10 +667,9 @@ p4est3_iterate_volume (p4est3_t * p3,
 #ifdef P4EST_ENABLE_DEBUG
   SC3E (p4est3_array_set_zero (stack_it));
 #endif
-  SC3E (sc3_array_renew_view (&view_i, stack_it, 0, nsplit_id));
   SC3E (sc3_array_renew_data (&view_q, tree->tquads,
                               p3->qvt->quadrant_size, begin, end - begin));
-  SC3E (p4est3_quadrant_array_split (p3->qvt, view_q, *Level, view_i));
+  SC3E (p4est3_quadrant_array_split (p3->qvt, view_q, *Level, stack_it));
   l2nch[++(*Level)] = 0;
 
   SC3E (sc3_array_index (stack_it, 0, &arr_it));
