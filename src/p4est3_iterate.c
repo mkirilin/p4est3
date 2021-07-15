@@ -500,7 +500,16 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     SC3E (sc3_array_renew_data (&view_q, trees[side]->tquads,
                                 p3->qvt->quadrant_size, *(b_f[side]),
                                 *(e_f[side]) - *(b_f[side])));
-    SC3E (p4est3_quadrant_array_split (p3->qvt, view_q, Level[side], stack_it));
+    SC3E (p4est3_quadrant_array_split
+          (p3->qvt, view_q, Level[side], stack_it));
+
+     /* since array_split doesn't count shift from the beinning of quadrants
+    in a tree, we shift result indices at the loop below*/
+    for (i = 0; i < max_children + 1; ++i) {
+      SC3E (sc3_array_index (*(sc3_array_t **) stack_it, i, &arr_it));
+      *arr_it += *(b_f[side]);
+    }
+    SC3E (sc3_array_index (*(sc3_array_t **) stack_it, 0, &arr_it));
     Level[side]++;
     for (i = 0; i < half_ch; ++i) {
       idx = i;
@@ -511,7 +520,6 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       }
       /*SC3E (p4est3_connectivity_get_face_child_id (p3->conn,
          fside->face[side], &idx)); */
-      SC3E (sc3_array_index (stack_it, 0, &arr_it));
       b_f[side] = arr_it + idx;
       e_f[side] = arr_it + idx + 1;
       SC3A_CHECK (*(b_f[side]) < *(e_f[side]));
@@ -676,6 +684,12 @@ p4est3_iterate_volume (p4est3_t * p3,
                                      *(sc3_array_t **) stack_it));
   l2nch[++(*Level)] = 0;
 
+  /* since array_split doesn't count shift from the beinning of quadrants
+     in a tree, we shift result indices at the loop below*/
+  for (i = 0; i < max_children + 1; ++i) {
+    SC3E (sc3_array_index (*(sc3_array_t **) stack_it, i, &arr_it));
+    *arr_it += begin;
+  }
   SC3E (sc3_array_index (*(sc3_array_t **) stack_it, 0, &arr_it));
   for (i = 0; i < max_children; ++i) {
     search_area->begin = arr_it + i;
