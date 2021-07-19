@@ -682,6 +682,15 @@ p4est3_iterate_volume (p4est3_t * p3,
                               p3->qvt->quadrant_size, begin, end - begin));
   SC3E (p4est3_quadrant_array_split (p3->qvt, view_q, *Level,
                                      *(sc3_array_t **) stack_it));
+
+  /*for debug purposes only*/
+  int d_ecount, d_i;
+  p4est3_locidx *d_idx;
+  SC3E (sc3_array_get_elem_count (*(sc3_array_t **) stack_it, &d_ecount));
+  for (d_i = 0; d_i < d_ecount; ++d_i) {
+    SC3E (sc3_array_index (*(sc3_array_t **) stack_it, d_i, &d_idx));
+  }
+  /*for debug purposes only*/
   l2nch[++(*Level)] = 0;
 
   /* since array_split doesn't count shift from the beinning of quadrants
