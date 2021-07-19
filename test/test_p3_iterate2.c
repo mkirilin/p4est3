@@ -22,11 +22,14 @@
 */
 
 #include <p4est3_iterate.h>
+#include <p4est3_internal.h>
 #ifndef P4_TO_P8
 #include <p4est3_p4est.h>
 #else
 #include <p4est3_p8est.h>
 #endif
+
+/*#define ENABLE_FACE_ITERATOR*/
 
 /* *INDENT-OFF* */
 const int           face_inner_nb_2d[4][4] =
@@ -47,6 +50,35 @@ const int           face_inner_nface_2d[4][4] =
 const int           face_outer_nface_2d[8] =
 { 0, 0, 1, 1, 2, 2, 3, 3 };
  /* *INDENT-ON* */
+
+sc3_error_t        *
+p4est3_connectivity_new_p4est_twotrees (sc3_allocator_t * alloc,
+                                        p4est3_connectivity_t ** pc,
+                                        int l_face, int r_face,
+                                        int orientation)
+{
+  p4est_connectivity_t *c4;
+
+  /* verify arguments */
+  SC3E_RETVAL (pc, NULL);
+  SC3A_IS (sc3_allocator_is_valid, alloc);
+#ifdef P4_TO_P8
+  SC3A_CHECK (0 <= l_face && l_face < 6);
+  SC3A_CHECK (0 <= r_face && r_face < 6);
+  SC3A_CHECK (0 <= orientation && orientation < 4);
+#else
+  SC3A_CHECK (0 <= l_face && l_face < 4);
+  SC3A_CHECK (0 <= r_face && r_face < 4);
+  SC3A_CHECK (0 <= orientation && orientation < 2);
+#endif
+
+  /* create two trees connectivity */
+  c4 = p4est_connectivity_new_twotrees (l_face, r_face, orientation);
+
+  /* wrap two trees into p4est3 connectivity */
+  SC3E (p4est3_connectivity_new_p4est (alloc, pc, c4, 1));
+  return NULL;
+}
 
 typedef struct setup
 {
@@ -79,12 +111,14 @@ make_allocator (setup_t *t)
 }
 
 static sc3_error_t *
-make_connectivity (setup_t * t, int dim)
+make_connectivity (setup_t * t, int dim, int l_face, int r_face, int ori)
 {
-  SC3E (p4est3_connectivity_new (t->alloc, &t->conn));
-  SC3E (p4est3_connectivity_set_dim (t->conn, dim));
-  SC3E (p4est3_connectivity_set_num_trees (t->conn, t->num_trees));
-  SC3E (p4est3_connectivity_setup (t->conn));
+  //SC3E (p4est3_connectivity_new (t->alloc, &t->conn));
+  //SC3E (p4est3_connectivity_set_dim (t->conn, dim));
+  //SC3E (p4est3_connectivity_set_num_trees (t->conn, t->num_trees));
+  //SC3E (p4est3_connectivity_setup (t->conn));
+  SC3E (p4est3_connectivity_new_p4est_twotrees
+        (t->alloc, &t->conn, l_face, r_face, ori));
 
   return NULL;
 }
@@ -163,21 +197,51 @@ array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 }
 
 static sc3_error_t *
+make_ref_array_volume (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
+                       sc3_array_t ** vpredef)
+{
+  const int nquad = (1 << (qvt->dim * t->level)) * t->num_trees;
+#ifdef ENABLE_FACE_ITERATOR
+  const int nface = qvt->dim * (nquad + (1 << t->level));
+#endif
+  p4est3_iterate_volume_info_t *vit;
+  p4est3_tree_t *tree;
+  int i, ntree;
+  char *qit;
+
+  SC3E (array_new(t->alloc, sizeof (p4est3_iterate_volume_info_t), nquad,
+        nquad, vpredef));
+
+  SC3E (sc3_array_index (*vpredef, 0, &vit));
+  for (ntree = 0; ntree < t->num_trees; ++ntree) {
+    SC3E (p4est3_tree_index (p3, ntree, &tree));
+    qit = tree->tquads;
+    for (i = 0; i < tree->num_quads; ++i, ++vit, qit += qvt->quadrant_size) {
+      vit->ntree = ntree;
+      vit->nquad = i;
+      vit->quadrant = (void *) qit;
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
 make_result_arrays (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
                     sc3_array_t ** voutput, sc3_array_t ** vpredef,
                     sc3_array_t ** foutput, sc3_array_t ** fpredef)
 {
-  const int nquad = (1 << (qvt->dim * t->level));
+  const int nquad = (1 << (qvt->dim * t->level)) * t->num_trees;
+#ifdef ENABLE_FACE_ITERATOR
   const int nface = qvt->dim * (nquad + (1 << t->level));
   p4est3_iterate_face_info_t *fit;
-  p4est3_iterate_volume_info_t *vit;
   p4est3_iterate_face_side_t *sit;
   int i, side;
   char *qit;
+#endif
   SC3E (array_new (t->alloc, sizeof (p4est3_iterate_volume_info_t), nquad,
-        nquad, voutput));
-  SC3E (array_new (t->alloc, sizeof (p4est3_iterate_volume_info_t), nquad,
-        nquad, vpredef));
+        0, voutput));
+  SC3E (make_ref_array_volume (t, p3, qvt, vpredef));
+#ifdef ENABLE_FACE_ITERATOR
   SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_info_t), nface,
         nface, foutput));
   SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_info_t), nface,
@@ -191,15 +255,7 @@ make_result_arrays (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
     SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_side_t), 0, 0,
                      &fit->sides));
   }
-
-  /* now we'll fill in the reference arrays */
-  SC3E (sc3_array_index (*vpredef, 0, &vit));
-  SC3E (p4est3_get_quadrants (p3, &qit));
-  for (i = 0; i < nquad; ++i, ++vit, qit += qvt->quadrant_size) {
-    vit->ntree = 0;
-    vit->nquad = i;
-    vit->quadrant = (void *) qit;
-  }
+  SC3E (sc3_array_resize (*foutput, 0));
 
   SC3E (p4est3_get_quadrants (p3, &qit));
   SC3E (sc3_array_index (*fpredef, 0, &fit));
@@ -236,6 +292,7 @@ make_result_arrays (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
   else {
     SC3E_UNREACH ("invalid dimension");
   }
+#endif
   return NULL;
 }
 
@@ -255,21 +312,37 @@ compare_results (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
                  sc3_array_t * foutput, sc3_array_t * fpredef)
 {
   const int nquad = (1 << (qvt->dim * t->level));
-  const int nface = qvt->dim * (nquad + (1 << t->level));
   p4est3_iterate_volume_info_t *vit_out, *vit_pre;
+#ifdef ENABLE_FACE_ITERATOR
+  const int nface = qvt->dim * (nquad + (1 << t->level));
   p4est3_iterate_face_info_t *fit_out, *fit_pre;
   p4est3_iterate_face_side_t *sit_out, *sit_pre;
-  int i, side, nsides_out, nsides_pre;
+  int side, nsides_out, nsides_pre;
+#endif
+  int i;
+  int out_coord[2], pre_coord[2];
+  int out_l, pre_l;
 
   SC3E (sc3_array_index (voutput, 0, &vit_out));
   SC3E (sc3_array_index (vpredef, 0, &vit_pre));
   for (i = 0; i < nquad; ++i, ++vit_out, ++vit_pre) {
     SC3E_DEMAND (vit_out->ntree == vit_pre->ntree, "Volume's ntree differs");
     SC3E_DEMAND (vit_out->nquad == vit_pre->nquad, "Volume's nquad differs");
+
+    /* degub purposes only */
+    SC3E (p4est3_quadrant_coordinates
+          (qvt, vit_out->quadrant, qvt->dim, out_coord));
+    SC3E (p4est3_quadrant_coordinates
+          (qvt, vit_pre->quadrant, qvt->dim, pre_coord));
+    SC3E (p4est3_quadrant_level (qvt, vit_out->quadrant, &out_l));
+    SC3E (p4est3_quadrant_level (qvt, vit_pre->quadrant, &pre_l));
+    /* degub purposes only */
+
     SC3E_DEMAND (vit_out->quadrant == vit_pre->quadrant,
                  "Volumes poiner to various quadrants");
   }
 
+#ifdef ENABLE_FACE_ITERATOR
   SC3E (sc3_array_index (foutput, 0, &fit_out));
   SC3E (sc3_array_index (fpredef, 0, &fit_pre));
   for (i = 0; i < nface; ++i, ++fit_out, ++fit_pre) {
@@ -292,6 +365,7 @@ compare_results (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
                  "Faces poiner to various quadrants");
     }
   }
+#endif
   return NULL;
 }
 
@@ -299,18 +373,24 @@ static sc3_error_t *
 free_arrays (sc3_array_t *voutput, sc3_array_t *vpredef, sc3_array_t *foutput,
              sc3_array_t *fpredef)
 {
+#ifdef ENABLE_FACE_ITERATOR
   p4est3_iterate_face_info_t *fit_out, *fit_pre;
   int nfaces_out, nfaces_pre;
   int i;
+#endif
   SC3A_IS (sc3_array_is_setup, voutput);
   SC3A_IS (sc3_array_is_setup, vpredef);
+#ifdef ENABLE_FACE_ITERATOR
   SC3A_IS (sc3_array_is_setup, foutput);
   SC3A_IS (sc3_array_is_setup, fpredef);
+#endif
 
   SC3E (sc3_array_destroy (&voutput));
   SC3E (sc3_array_destroy (&vpredef));
-  SC3E (sc3_array_get_elem_count (voutput, &nfaces_out));
-  SC3E (sc3_array_get_elem_count (vpredef, &nfaces_pre));
+
+#ifdef ENABLE_FACE_ITERATOR
+  SC3E (sc3_array_get_elem_count (foutput, &nfaces_out));
+  SC3E (sc3_array_get_elem_count (fpredef, &nfaces_pre));
   SC3E_DEMAND (nfaces_pre == nfaces_out, "#Sides mismatches");
   SC3E (sc3_array_index (foutput, 0, &fit_out));
   SC3E (sc3_array_index (fpredef, 0, &fit_pre));
@@ -320,6 +400,7 @@ free_arrays (sc3_array_t *voutput, sc3_array_t *vpredef, sc3_array_t *foutput,
   }
   SC3E (sc3_array_destroy (&foutput));
   SC3E (sc3_array_destroy (&fpredef));
+#endif
   return NULL;
 }
 
@@ -339,6 +420,8 @@ main (int argc, char **argv)
   p4est3_t           *p3;
   sc3_array_t        *vpredef, *fpredef;
   callback_data_t     sud, *user_data = &sud;
+  int                 l_face, r_face, ori;
+  int                 nfaces, nori;
 
   /* v3 standard procedure to isolate memory allocation contexts */
   t->mainalloc = sc3_allocator_nothread ();
@@ -347,28 +430,36 @@ main (int argc, char **argv)
   SC3X (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
   SC3X (make_allocator (t));
   SC3X (p4est3_quadrant_vtable_p4est (qvt, 0));
+  nfaces = 2 * qvt->dim;
+  nori = 1 << (qvt->dim - 1);
 
-  t->level = 1;
-  t->num_trees = 1;
+  t->level = 5;
+  t->num_trees = 2;
 
 #ifdef P4EST_ENABLE_DEBUG
   printf ("l = %d, t = %d\n", t->level, t->num_trees);
 #endif /* P4EST_ENABLE_DEBUG */
-  SC3X (make_connectivity (t, qvt->dim));
-  SC3X (make_new_p4est3 (&p3, t->alloc, t->conn, qvt, t->level));
 
-  SC3X (make_result_arrays
-        (t, p3, qvt, &user_data->volumes, &vpredef, &user_data->faces,
-         &fpredef));
-  SC3X (perform_test (t, p3, qvt, user_data));
-  SC3X (compare_results
-        (t, p3, qvt, user_data->volumes, vpredef, user_data->faces, fpredef));
+  for (ori = 0; ori < nori; ++ori) {
+    for (l_face = 0; l_face < nfaces; ++l_face) {
+      for (r_face = 0; r_face < nfaces; ++r_face) {
+        SC3X (make_connectivity (t, qvt->dim, l_face, r_face, ori));
+        SC3X (make_new_p4est3 (&p3, t->alloc, t->conn, qvt, t->level));
 
-  /*destroy forest, that was referenced for others*/
-  SC3X (p4est3_destroy (&p3));
-  SC3X (p4est3_connectivity_destroy (&t->conn));
-  SC3X (free_arrays (user_data->volumes, vpredef, user_data->faces, fpredef));
+        SC3X (make_result_arrays
+              (t, p3, qvt, &user_data->volumes, &vpredef, &user_data->faces,
+              &fpredef));
+        SC3X (perform_test (t, p3, qvt, user_data));
+        SC3X (compare_results
+              (t, p3, qvt, user_data->volumes, vpredef, user_data->faces, fpredef));
 
+        /*destroy forest, that was referenced for others*/
+        SC3X (p4est3_destroy (&p3));
+        SC3X (p4est3_connectivity_destroy (&t->conn));
+        SC3X (free_arrays (user_data->volumes, vpredef, user_data->faces, fpredef));
+      }
+    }
+  }
   SC3X (free_allocator (&t->alloc));
   SC3X (sc3_MPI_Finalize ());
   return 0;
