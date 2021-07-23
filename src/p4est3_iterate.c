@@ -122,9 +122,9 @@ p4est3_set_children_face_neighbors (p4est3_t * p3, p4est3_search_area_t * sa)
   if (p3->qvt->dim == 2) {
     /* *INDENT-OFF* */
     cfn[0] = -1; cfn[1] = 1; cfn[2] = -1; cfn[3] = 2;
-    cfn[4] = -1; cfn[5] = 1; cfn[6] = -1; cfn[7] = 2;
-    cfn[8] = -1; cfn[9] = 1; cfn[10] = -1; cfn[11] = 2;
-    cfn[12] = -1; cfn[13] = 1; cfn[14] = -1; cfn[15] = 2;
+    cfn[4] = 1; cfn[5] = -1; cfn[6] = -1; cfn[7] = 3;
+    cfn[8] = -1; cfn[9] = 3; cfn[10] = 0; cfn[11] = -1;
+    cfn[12] = 2; cfn[13] = -1; cfn[14] = 1; cfn[15] = -1;
     /* *INDENT-ON* */
   }
   else if (p3->qvt->dim == 3) {
