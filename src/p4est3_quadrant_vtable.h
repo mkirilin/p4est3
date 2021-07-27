@@ -129,6 +129,8 @@ typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_child_t;
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_first_descendant_t;
 /** Prototype to construct the last descendant at maximum level of a quadrant. */
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_last_descendant_t;
+/** Prototype to construct the face neighbor of a quadrant. */
+typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_face_neighbor_t;
 
 /* *INDENT-ON* */
 
@@ -170,6 +172,7 @@ typedef struct p4est3_quadrant_vtable
    * This pointer may be NULL, in which case we memcpy (3) the quadrant. */
   p4est3_quadrant_copy_t quadrant_copy;
   p4est3_quadrant_parent_t quadrant_parent;     /**< Generate parent. */
+  p4est3_quadrant_face_neighbor_t quadrant_face_neighbor; /**< Generate face neighbor */
   p4est3_quadrant_predecessor_t quadrant_predecessor;   /**< Generate predecessor. */
   p4est3_quadrant_successor_t quadrant_successor;       /**< Generate successor. */
   p4est3_quadrant_child_t quadrant_child;       /**< Generate a child by number. */
@@ -350,6 +353,16 @@ sc3_error_t        *p4est3_quadrant_copy (p4est3_quadrant_vtable_t * qvt,
  */
 sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
                                             const void *q, void *r);
+
+/** Generate the face neighbor quadrant 
+ * \param [in] qvt      Valid virtual quadrant table.
+ * \param [in] q        Valid quadrant in this implementation.
+ * \param [in] i        The face across which to generate the neighbor.
+ * \param [out] r       The neighbor quadrant is placed here.
+ */
+sc3_error_t        *p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t *
+                                                   qvt, const void *q, int i,
+                                                   void *r);
 
 /** Generate the predecessor quadrant.
  * \param [in] qvt      Valid virtual quadrant table.

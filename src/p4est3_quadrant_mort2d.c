@@ -247,6 +247,40 @@ p4est3_quadrant_mort_parent (const p4est3_quadrant_mort_t * q,
 }
 
 static sc3_error_t *
+p4est3_quadrant_mort_face_neighbor (const p4est3_quadrant_mort_t * q,
+                                    int i, p4est3_quadrant_mort_t * r)
+{
+  SC3A_IS (p4est3_quadrant_mort_is_valid, q);
+  r->coords = q->coords;
+  r->level = q->level;
+  const int32_t       shift_sign = i & 0x01 ? 1 : -1;
+  uint64_t            mask = P4EST3_QUADRANT_MORT_LEN (0x01, r->level);
+  int                 j;
+
+  mask <<= i / 2;
+  if (shift_sign == 1) {
+    for (j = P4EST3_MORT_MAXLEVEL - r->level; j < P4EST3_MORT_MAXLEVEL; ++j) {
+      r->coords ^= mask;
+      if (r->coords & mask) {
+        break;
+      }
+      mask <<= P4EST_DIM;
+    }
+  }
+  else {
+    for (j = P4EST3_MORT_MAXLEVEL - r->level; j < P4EST3_MORT_MAXLEVEL; ++j) {
+      r->coords ^= mask;
+      if (!(r->coords & mask)) {
+        break;
+      }
+      mask <<= P4EST_DIM;
+    }
+  }
+  SC3A_IS (p4est3_quadrant_mort_is_valid, r);
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_quadrant_mort_copy (const p4est3_quadrant_mort_t * q,
                            p4est3_quadrant_mort_t * copy)
 {
@@ -477,6 +511,9 @@ p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_parent =
     (p4est3_quadrant_parent_t) p4est3_quadrant_mort_parent;
+
+  qvt->quadrant_face_neighbor =
+    (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_mort_face_neighbor;
 
   qvt->quadrant_predecessor =
     (p4est3_quadrant_predecessor_t) p4est3_quadrant_mort_predecessor;
