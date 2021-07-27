@@ -226,73 +226,168 @@ make_ref_array_volume (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
 }
 
 static sc3_error_t *
+iterate_unimesh_simple_children (setup_t *t, p4est3_t *p3,
+                                 p4est3_quadrant_vtable_t *qvt,
+                                 p4est3_gloidx first_qid, p4est3_tree_t *tree,
+                                 sc3_array_t *fpredef)
+{
+  int i, nfaces;
+  p4est3_iterate_face_info_t *finfo;
+  p4est3_iterate_face_side_t *sinfo;
+
+  if (qvt->dim == 2) {
+    nfaces = 2 * qvt->dim;
+    int nface_predef[4][2] = {{1, 0}, {3, 2}, {3, 2}, {1, 0}};
+    int nquad_predef[4][2] = {{0L, 1L}, {0L, 2L}, {1L, 3L}, {2L, 3L}};
+
+    for (i = 0; i < nfaces; ++i) {
+      SC3E (sc3_array_push (fpredef, &finfo));
+      SC3E (array_new
+            (t->alloc, sizeof (p4est3_iterate_face_side_t), 2, 0, &finfo->sides));
+      finfo->orientation = 0;
+      finfo->tree_boundary = 0;
+      SC3E (sc3_array_push (finfo->sides, &sinfo));
+      sinfo->ntree = tree->treeid;
+      sinfo->is_ghost = 0;
+
+      sinfo->nface = nface_predef[i][0];
+      sinfo->nquad = first_qid + nquad_predef[i][0];
+      sinfo->quadrant =
+        (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
+
+      SC3E (sc3_array_push (finfo->sides, &sinfo));
+      sinfo->ntree = tree->treeid;
+      sinfo->is_ghost = 0;
+
+      sinfo->nface = nface_predef[i][1];
+      sinfo->nquad = first_qid + nquad_predef[i][1];
+      sinfo->quadrant =
+        (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
+    }
+  }
+  else {
+    SC3E_UNREACH ("wrong dimension");
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+iterate_unimesh_inner_face_compl (setup_t *t, p4est3_quadrant_vtable_t *qvt,
+                                  p4est3_gloidx nquads_compl, int level,
+                                  void *q, void *r, p4est3_tree_t *tree,
+                                  sc3_array_t *fpredef)
+{
+  p4est3_iterate_face_info_t *finfo;
+  p4est3_iterate_face_side_t *sinfo;
+  p4est3_gloidx nquads_per_level = 1L << (qvt->dim * level);
+  p4est3_gloidx start_id = nquads_compl - (1L << (qvt->dim * level));
+  p4est3_gloidx bound_id;
+  int i, face;
+
+  if (qvt->dim == 2) {
+    int nface_predef[4][2] = {{1, 0}, {3, 2}, {3, 2}, {1, 0}};
+    int bound_dir[4] = {0, 1, 1, 0};
+    bound_id =
+      start_id + nquads_per_level / (p4est3_gloidx) qvt->max_children;
+    int bound_coords[2];
+    int coords[2];
+    SC3E (p4est3_quadrant_morton (qvt, qvt->max_level, bound_id - 1, q));
+    SC3E (p4est3_quadrant_coordinates (qvt, q, qvt->dim, bound_coords));
+    for (face = 0; face < 4; ++face) {
+      SC3E (p4est3_quadrant_morton (qvt, qvt->max_level, start_id, r));
+      for (i = 0; i < nquads_per_level; ++i) {
+        SC3E (p4est3_quadrant_coordinates (qvt, r, qvt->dim, coords));
+        if (coords[bound_dir[face]] != bound_coords[bound_dir[face]]) {
+          SC3E (p4est3_quadrant_successor (qvt, r, r));
+          continue;
+        }
+        SC3E (sc3_array_push (fpredef, &finfo));
+        SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_side_t), 2, 0,
+                        &finfo->sides));
+        finfo->orientation = 0;
+        finfo->tree_boundary = 0;
+        SC3E (sc3_array_push (finfo->sides, &sinfo));
+        sinfo->ntree = tree->treeid;
+        sinfo->is_ghost = 0;
+
+        sinfo->nface = nface_predef[face][0];
+        sinfo->nquad = start_id + i;
+        sinfo->quadrant =
+          (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
+
+        SC3E (sc3_array_push (finfo->sides, &sinfo));
+        sinfo->ntree = tree->treeid;
+        sinfo->is_ghost = 0;
+
+        sinfo->nface = nface_predef[face][1];
+        //SC3E (p4est3_quadrant_face_neighbor (qvt, r, nface_predef[face][0], q));
+        SC3E (p4est3_quadrant_linear_id
+              (qvt, q, qvt->max_level, &sinfo->nquad));
+        sinfo->quadrant =
+          (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
+        SC3E (p4est3_quadrant_successor (qvt, r, r));
+      }
+    }
+  }
+  else {
+    SC3E_UNREACH ("wrong dimension");
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+iterate_unimesh_inner_face (setup_t *t, p4est3_t *p3,
+                            p4est3_quadrant_vtable_t * qvt,
+                            sc3_array_t * fpredef)
+{
+  int level = qvt->max_level - 1;
+  p4est3_gloidx nquads_compl = 0;
+  p4est3_topidx ntree;
+  p4est3_tree_t *tree;
+  int *level2nchildren; /*how many processed quads of level level*/
+  void *q, *r;
+  SC3E (sc3_allocator_calloc
+        (t->alloc, level, sizeof (int), &level2nchildren));
+  SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &q));
+  SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &r));
+  memset (level2nchildren, 0, level * sizeof (int));
+
+  for (ntree = 0; ntree < t->num_trees; ++ntree) {
+    SC3E (p4est3_tree_index (p3, ntree, &tree));
+    while (level > 0)
+    {
+      SC3A_CHECK (level2nchildren[level] <= qvt->max_children);
+      if (level2nchildren[level] == qvt->max_children) {
+        level2nchildren[level] = 0;
+        SC3E (iterate_unimesh_inner_face_compl
+              (t, qvt, nquads_compl, level, q, r, tree, fpredef));
+        level2nchildren[--level]++;
+        continue;
+      }
+      SC3E (iterate_unimesh_simple_children
+            (t, p3, qvt, nquads_compl, tree, fpredef));
+      nquads_compl += qvt->max_children;
+      level2nchildren[level]++;
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
 make_result_arrays (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
                     sc3_array_t ** voutput, sc3_array_t ** vpredef,
                     sc3_array_t ** foutput, sc3_array_t ** fpredef)
 {
   const int nquad = (1 << (qvt->dim * t->level)) * t->num_trees;
-#ifdef ENABLE_FACE_ITERATOR
-  const int nface = qvt->dim * (nquad + (1 << t->level));
-  p4est3_iterate_face_info_t *fit;
-  p4est3_iterate_face_side_t *sit;
-  int i, side;
-  char *qit;
-#endif
+
   SC3E (array_new (t->alloc, sizeof (p4est3_iterate_volume_info_t), nquad,
         0, voutput));
   SC3E (make_ref_array_volume (t, p3, qvt, vpredef));
-#ifdef ENABLE_FACE_ITERATOR
-  SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_info_t), nface,
-        nface, foutput));
-  SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_info_t), nface,
-        nface, fpredef));
 
-  /* allocate memory for sides arrays at faces */
-  /* side arrays for foutput have size 0, since we will extend them at
-     corresponding callback */
-  SC3E (sc3_array_index (*foutput, 0, &fit));
-  for (i = 0; i < nface; ++i) {
-    SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_side_t), 0, 0,
-                     &fit->sides));
-  }
-  SC3E (sc3_array_resize (*foutput, 0));
+  SC3E (array_new
+        (t->alloc, sizeof (p4est3_iterate_face_info_t), 0, 0, fpredef));
+  SC3E (iterate_unimesh_inner_face (t, p3, qvt, *fpredef));
 
-  SC3E (p4est3_get_quadrants (p3, &qit));
-  SC3E (sc3_array_index (*fpredef, 0, &fit));
-  if (qvt->dim == 2) {
-    /* fill in inner faces */
-    for (i = 0; i < 4; ++i) {
-      fit->tree_boundary = 0;
-      fit->orientation = 0;
-      SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_side_t), 2, 2,
-                      &fit->sides));
-      SC3E (sc3_array_index (fit->sides, 0, &sit));
-      for (side = 0; side < 2; ++side, ++sit) {
-        sit->is_ghost = 0;
-        sit->ntree = 0;
-        sit->nface = face_inner_nface_2d[i][side];
-        sit->nquad = face_inner_nb_2d[i][side];
-        sit->quadrant = (void *) (qit + sit->nquad);
-      }
-    }
-      /* fill in outer faces */
-    for (i = 0; i < 8; ++i) {
-      fit->tree_boundary = 1;
-      fit->orientation = 0;
-      SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_side_t), 1, 1,
-                      &fit->sides));
-      SC3E (sc3_array_index (fit->sides, 0, &sit));
-      sit->is_ghost = 0;
-      sit->ntree = 0;
-      sit->nface = face_outer_nface_2d[i];
-      sit->nquad = face_outer_nb_2d[i];
-      sit->quadrant = qit + sit->nquad;
-    }
-  }
-  else {
-    SC3E_UNREACH ("invalid dimension");
-  }
-#endif
   return NULL;
 }
 
@@ -373,33 +468,36 @@ static sc3_error_t *
 free_arrays (sc3_array_t *voutput, sc3_array_t *vpredef, sc3_array_t *foutput,
              sc3_array_t *fpredef)
 {
+  p4est3_iterate_face_info_t *fit_pre;
+  int i, nfaces_pre;
 #ifdef ENABLE_FACE_ITERATOR
-  p4est3_iterate_face_info_t *fit_out, *fit_pre;
-  int nfaces_out, nfaces_pre;
-  int i;
+  p4est3_iterate_face_info_t *fit_out;
+  int nfaces_out;
 #endif
   SC3A_IS (sc3_array_is_setup, voutput);
   SC3A_IS (sc3_array_is_setup, vpredef);
+  SC3A_IS (sc3_array_is_setup, fpredef);
 #ifdef ENABLE_FACE_ITERATOR
   SC3A_IS (sc3_array_is_setup, foutput);
-  SC3A_IS (sc3_array_is_setup, fpredef);
 #endif
 
   SC3E (sc3_array_destroy (&voutput));
   SC3E (sc3_array_destroy (&vpredef));
 
+  SC3E (sc3_array_get_elem_count (fpredef, &nfaces_pre));
+  SC3E (sc3_array_index (fpredef, 0, &fit_pre));
+  for (i = 0; i < nfaces_pre; ++i, ++fit_pre) {
+    SC3E (sc3_array_destroy (&fit_pre->sides));
+  }
+  SC3E (sc3_array_destroy (&fpredef));
 #ifdef ENABLE_FACE_ITERATOR
   SC3E (sc3_array_get_elem_count (foutput, &nfaces_out));
-  SC3E (sc3_array_get_elem_count (fpredef, &nfaces_pre));
   SC3E_DEMAND (nfaces_pre == nfaces_out, "#Sides mismatches");
   SC3E (sc3_array_index (foutput, 0, &fit_out));
-  SC3E (sc3_array_index (fpredef, 0, &fit_pre));
   for (i = 0; i < nfaces_out; ++i, ++fit_out, ++fit_pre) {
-    SC3E (sc3_array_destroy (&fit_out->sides));
     SC3E (sc3_array_destroy (&fit_pre->sides));
   }
   SC3E (sc3_array_destroy (&foutput));
-  SC3E (sc3_array_destroy (&fpredef));
 #endif
   return NULL;
 }
