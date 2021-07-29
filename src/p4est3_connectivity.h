@@ -233,13 +233,13 @@ sc3_error_t        *p4est3_connectivity_get_face
   (const p4est3_connectivity_t * c,
    p4est3_topidx * which_tree, int *nface, int *orient);
 
-/** Query child id that touches a face \a nface at a face corner \a i.
+/** Query index of a child that touches a face at some its corner.
  * \param [in] c            Connectivity must be setup.
  * \param [in] nface        Valid face number.
- * \param [in, out] i       On input, valid face corner number of the
- *                          face \a nface. 3D: 0..3, 2D: 0..1.
- *                          On output, child id of the quadrant touches both 
- *                          nface \a face and face corner \a i.
+ * \param [in, out] i       On input, a face corner number for the
+ *                          face \a nface in 0..3.
+ *                          On output, index of the child touches both
+ *                          the face \a nface and the \a i-th face corner.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_get_face_child_id
