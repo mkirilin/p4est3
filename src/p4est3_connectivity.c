@@ -75,7 +75,7 @@ p4est3_connectivity_set_face_child_id (const p4est3_connectivity_t * c)
   int                *fc = c->face_corner;
   SC3A_IS (p4est3_connectivity_is_new, c);
   if (c->dim == 2) {
-    SC3E (sc3_allocator_calloc (c->alloc, 8, sizeof (int), fc));
+    SC3E (sc3_allocator_calloc (c->alloc, 8, sizeof (int), &fc));
     /* *INDENT-OFF* */
     fc[0] = 0; fc[1] = 2;
     fc[2] = 1; fc[3] = 3;
@@ -84,7 +84,7 @@ p4est3_connectivity_set_face_child_id (const p4est3_connectivity_t * c)
     /* *INDENT-ON* */
   }
   else if (c->dim == 3) {
-    SC3E (sc3_allocator_calloc (c->alloc, 24, sizeof (int), fc));
+    SC3E (sc3_allocator_calloc (c->alloc, 24, sizeof (int), &fc));
     /* *INDENT-OFF* */
     fc[0] = 0; fc[1] = 2; fc[2] = 4; fc[3] = 6;
     fc[4] = 1; fc[5] = 3; fc[6] = 5; fc[7] = 7;
