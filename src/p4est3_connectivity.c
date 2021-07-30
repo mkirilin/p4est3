@@ -46,6 +46,18 @@ static const int    face_permutations[8][4] =
  { 2, 3, 0, 1 },
  { 3, 1, 2, 0 },
  { 3, 2, 1, 0 }};
+static const int    face_corners_2d[4][2] =
+{{ 0, 2 },
+ { 1, 3 },
+ { 0, 1 },
+ { 2, 3 }};
+static const int    face_corners_3d[6][4] =
+{{ 0, 2, 4, 6 },
+ { 1, 3, 5, 7 },
+ { 0, 1, 4, 5 },
+ { 2, 3, 6, 7 },
+ { 0, 1, 2, 3 },
+ { 4, 5, 6, 7 }};
 /* *INDENT-ON* */
 
 struct p4est3_connectivity
@@ -64,41 +76,7 @@ struct p4est3_connectivity
   int                 num_orient;
   p4est3_topidx       num_trees;
   int                 half_children;
-
-  int                *face_corner;  /**< Corresdondance between face and
-                                         quadrant's corners adjacent to it */
 };
-
-static sc3_error_t *
-p4est3_connectivity_set_face_child_id (const p4est3_connectivity_t * c)
-{
-  int                *fc = c->face_corner;
-  SC3A_IS (p4est3_connectivity_is_new, c);
-  if (c->dim == 2) {
-    SC3E (sc3_allocator_calloc (c->alloc, 8, sizeof (int), &fc));
-    /* *INDENT-OFF* */
-    fc[0] = 0; fc[1] = 2;
-    fc[2] = 1; fc[3] = 3;
-    fc[4] = 0; fc[5] = 1;
-    fc[6] = 2; fc[7] = 3;
-    /* *INDENT-ON* */
-  }
-  else if (c->dim == 3) {
-    SC3E (sc3_allocator_calloc (c->alloc, 24, sizeof (int), &fc));
-    /* *INDENT-OFF* */
-    fc[0] = 0; fc[1] = 2; fc[2] = 4; fc[3] = 6;
-    fc[4] = 1; fc[5] = 3; fc[6] = 5; fc[7] = 7;
-    fc[8] = 0; fc[9] = 1; fc[10] = 4; fc[11] = 5;
-    fc[12] = 2; fc[13] = 3; fc[14] = 6; fc[15] = 7;
-    fc[16] = 0; fc[17] = 1; fc[18] = 2; fc[19] = 3;
-    fc[20] = 4; fc[21] = 5; fc[22] = 6; fc[23] = 7;
-    /* *INDENT-ON* */
-  }
-  else {
-    SC3E_UNREACH ("wrong dimension");
-  }
-  return NULL;
-}
 
 int                 p4est3_connectivity_vtable_is_valid
   (const p4est3_connectivity_vtable_t * cvt, char *reason)
@@ -209,8 +187,6 @@ p4est3_connectivity_setup (p4est3_connectivity_t * c)
   c->num_orient = 2 * (c->dim - 1);
   c->half_children = 1 << (c->dim - 1);
 
-  SC3E (p4est3_connectivity_set_face_child_id (c));
-
   c->setup = 1;
   SC3A_IS (p4est3_connectivity_is_setup, c);
   return NULL;
@@ -317,7 +293,13 @@ p4est3_connectivity_get_face_child_id (const p4est3_connectivity_t * c,
   SC3A_CHECK (0 <= nface && nface < c->num_faces);
   SC3A_CHECK (0 <= *i && *i < c->num_orient);
 
-  *i = c->face_corner[nface * c->num_orient + *i];
+  if (c->dim == 2) {
+    *i = face_corners_2d[nface][*i];
+  }
+  else {
+    *i = face_corners_3d[nface][*i];
+  }
+
   SC3A_CHECK (0 <= *i && *i < (1 << c->dim));
   return NULL;
 }
