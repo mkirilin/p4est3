@@ -104,6 +104,8 @@ typedef p4est3_quadrant_in_j_t p4est3_quadrant_child_id_t;
 typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_ancestor_id_t;
 /** Prototype to query the number of children of a quadrant. */
 typedef p4est3_quadrant_in_j_t p4est3_quadrant_num_children_t;
+/** Prototype to query if a quadrant touches a tree face boundaries and which */
+typedef p4est3_quadrant_in_j_t p4est3_quadrant_tree_boundary_t;
 /** Prototype to compare two quadrants by linear index. */
 typedef p4est3_quadrant_in2_j_t p4est3_quadrant_compare_t;
 /** Prototype to query the one quadrant is ancetor of another. */
@@ -158,6 +160,7 @@ typedef struct p4est3_quadrant_vtable
   /** Examine equality.
    * Pointer may be NULL, in which case we memcmp (3) the contents. */
   p4est3_quadrant_is2_t quadrant_is_equal;
+  p4est3_quadrant_tree_boundary_t quadrant_tree_boundary; /**< Query tree boundary */
   p4est3_quadrant_level_t quadrant_level;               /**< Query the level. */
   p4est3_quadrant_child_id_t quadrant_child_id;         /**< Query child id. */
   p4est3_quadrant_ancestor_id_t quadrant_ancestor_id;   /**< Query ancestor id. */
@@ -262,6 +265,22 @@ int                 p4est3_quadrant_is2_valid (p4est3_quadrant_vtable_t * qvt,
 int                 p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
                                                const void *q1, const void *q2,
                                                char *reason);
+
+/** Query if a quadrant touches a tree face boundaries and which if so 
+ * \param [in] qvt      Valid virtual quadrant table.
+ * \param [in] q        Valid quadrant in this implementation.
+ * \param [out] nf      Array of size dimension of \a qvt. Every element
+ *                      corresponds to a spatial direction and contains
+ *                      a face number of a quadrant toching the tree boundary
+ *                      at this direction. If quadrant touches no boundaries,
+ *                      then the element of array is filled by -1. If quadrant
+ *                      touches all the boundaries (iff a the quadrant is
+ *                      the whole tree), then array is filled by -2.
+ * \return              NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est_quadrant_tree_boundary (p4est3_quadrant_vtable_t *
+                                                  qvt, const void *q,
+                                                  int *nf);
 
 /** Query the refinement level of a quadrant.
  * \param [in] qvt      Valid virtual quadrant table.
