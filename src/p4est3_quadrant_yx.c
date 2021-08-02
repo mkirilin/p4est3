@@ -32,7 +32,10 @@
 /* These have the same values for the 2D and 3D implementations */
 #define P4EST3_YX_MAXLEVEL 30
 #define P4EST3_YX_QMAXLEVEL 30
-
+/** The length of a side of the root quadrant */
+#define P4EST3_YX_ROOT_LEN ((int32_t) 1 << P4EST3_YX_MAXLEVEL)
+/** The length of a quadrant of level l */
+#define P4EST3_YX_QUADRANT_LEN(l) ((int32_t) 1 << (P4EST3_YX_MAXLEVEL - (l)))
 #ifdef P4EST_ENABLE_AVX2
 
 #include <immintrin.h>
@@ -59,7 +62,7 @@ p4est3_quadrant_zyx_is_inside_root (const __m128i * q, char *reason)
   );
   SC3E_TEST (
     _mm_test_all_ones (
-      _mm_cmplt_epi32 (*q, _mm_set1_epi32 (P4EST_ROOT_LEN)) ) == 1
+      _mm_cmplt_epi32 (*q, _mm_set1_epi32 (P4EST3_YX_ROOT_LEN)) ) == 1
   , reason
   );
 /* *INDENT-ON* */
@@ -74,9 +77,9 @@ p4est3_quadrant_zyx_is_valid (const __m128i * q, char *reason)
   SC3E_TEST (level <= P4EST3_YX_MAXLEVEL, reason);
 /* *INDENT-OFF* */
   SC3E_TEST (
-    _mm_testz_si128 (*q, _mm_set_epi32 (P4EST_QUADRANT_LEN (level) - 1
-                                      , P4EST_QUADRANT_LEN (level) - 1
-                                      , P4EST_QUADRANT_LEN (level) - 1
+    _mm_testz_si128 (*q, _mm_set_epi32 (P4EST3_YX_QUADRANT_LEN (level) - 1
+                                      , P4EST3_YX_QUADRANT_LEN (level) - 1
+                                      , P4EST3_YX_QUADRANT_LEN (level) - 1
                                       , 0)) == 1
   , reason
   );
@@ -102,10 +105,10 @@ p4est3_quadrant_zyx_is_parent (const __m128i * q, const __m128i * r,
   __m128i             lhs = _mm_add_epi32 (*q, _mm_set_epi32 (0, 0, 0, 1));
   __m128i             rhs = _mm_and_si128 (*r
                             , _mm_set_epi32 ( /* Optimized by compiler? */
-                                             ~P4EST_QUADRANT_LEN (r_level)
-                                           , ~P4EST_QUADRANT_LEN (r_level)
+                                             ~P4EST3_YX_QUADRANT_LEN (r_level)
+                                           , ~P4EST3_YX_QUADRANT_LEN (r_level)
 #ifdef P4_TO_P8
-                                           , ~P4EST_QUADRANT_LEN (r_level)
+                                           , ~P4EST3_YX_QUADRANT_LEN (r_level)
 #else
                                            , 0
 #endif
@@ -187,9 +190,9 @@ p4est3_quadrant_zyx_parent (const __m128i * q, __m128i * r)
 /* *INDENT-OFF* */
   *r =
    _mm_sub_epi32 (
-     _mm_and_si128 (*q, _mm_set_epi32 (~P4EST_QUADRANT_LEN (level)
-                                     , ~P4EST_QUADRANT_LEN (level)
-                                     , ~P4EST_QUADRANT_LEN (level)
+     _mm_and_si128 (*q, _mm_set_epi32 (~P4EST3_YX_QUADRANT_LEN (level)
+                                     , ~P4EST3_YX_QUADRANT_LEN (level)
+                                     , ~P4EST3_YX_QUADRANT_LEN (level)
                                      , 0xFFFFFFFF))
    , _mm_set_epi32 (0, 0, 0, 1)
    );
@@ -197,6 +200,47 @@ p4est3_quadrant_zyx_parent (const __m128i * q, __m128i * r)
 
   SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
   SC3A_IS2 (p4est3_quadrant_zyx_is_parent, r, q);
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_quadrant_zyx_face_neighbor (const __m128i * q, int i, __m128i * r)
+{
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  int32_t             shift =
+    P4EST3_YX_QUADRANT_LEN (_mm_extract_epi32 (*q, 0));
+  shift = shift * (i & 0x01 ? 1 : -1);
+  const int           selector = 3 - i / 2;
+/* *INDENT-OFF* */
+  if (selector == 0) {
+    _mm_add_epi32 (
+      _mm_insert_epi32 (
+        _mm_setzero_si128 (), shift, 3
+      ),
+      *q);
+  }
+  else if (selector == 1){
+    _mm_add_epi32 (
+      _mm_insert_epi32 (
+        _mm_setzero_si128 (), shift, 2
+      ),
+      *q);
+  }
+#ifdef P4_TO_P8
+  else if (selector == 2) {
+    _mm_add_epi32 (
+      _mm_insert_epi32 (
+        _mm_setzero_si128 (), shift, 1
+      ),
+      *q);
+  }
+#endif
+  else {
+    SC3E_UNREACH ("wrong coordinate to edit");
+  }
+
+/* *INDENT-ON* */
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
   return NULL;
 }
 
@@ -283,7 +327,7 @@ p4est3_quadrant_zyx_ancestor_id (const __m128i * q, int level, int *j)
   }
 
   __m128i             t =
-    _mm_and_si128 (*q, _mm_set1_epi32 (P4EST_QUADRANT_LEN (level)));
+    _mm_and_si128 (*q, _mm_set1_epi32 (P4EST3_YX_QUADRANT_LEN (level)));
   *j |= _mm_extract_epi32 (t, 3) ? 0x01 : 0;
   *j |= _mm_extract_epi32 (t, 2) ? 0x02 : 0;
 #ifdef P4_TO_P8
@@ -335,7 +379,7 @@ p4est3_quadrant_zyx_ancestor (const __m128i * q, int level, __m128i * r)
 /* *INDENT-OFF* */
   *r =
     _mm_insert_epi32 (
-     _mm_and_si128 (*q, _mm_set1_epi32 (~(P4EST_QUADRANT_LEN (level) - 1))),
+     _mm_and_si128 (*q, _mm_set1_epi32 (~(P4EST3_YX_QUADRANT_LEN (level) - 1))),
      level, 0);
 /* *INDENT-ON* */
   SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
@@ -346,7 +390,7 @@ static sc3_error_t *
 p4est3_quadrant_zyx_sibling (const __m128i * q, __m128i * r, int sibling_id)
 {
   const p4est_qcoord_t q_level = _mm_extract_epi32 (*q, 0);
-  const p4est_qcoord_t shift = P4EST_QUADRANT_LEN (q_level);
+  const p4est_qcoord_t shift = P4EST3_YX_QUADRANT_LEN (q_level);
 /* *INDENT-OFF* */
   const __m128i       add =
                       _mm_slli_epi32 (
@@ -391,8 +435,8 @@ p4est3_quadrant_zyx_last_descendant (const __m128i * q, int level,
   SC3A_CHECK (_mm_extract_epi32 (*q, 0) <= level &&
               level <= P4EST3_YX_QMAXLEVEL);
 
-  shift = P4EST_QUADRANT_LEN (_mm_extract_epi32 (*q, 0))
-    - P4EST_QUADRANT_LEN (level);
+  shift = P4EST3_YX_QUADRANT_LEN (_mm_extract_epi32 (*q, 0))
+    - P4EST3_YX_QUADRANT_LEN (level);
 
   *ld = _mm_insert_epi32 (_mm_add_epi32 (*q, _mm_set1_epi32 (shift)),
                           level, 0);
@@ -472,9 +516,9 @@ p4est3_quadrant_zyx_successor (const __m128i * q, __m128i * r)
         )
       , _mm_set1_epi32 (P4EST3_YX_MAXLEVEL - level)
       )
-    , _mm_and_si128 (*q, _mm_set_epi32 (~(P4EST_QUADRANT_LEN (level - 1) - 1)
-                                      , ~(P4EST_QUADRANT_LEN (level - 1) - 1)
-                                      , ~(P4EST_QUADRANT_LEN (level - 1) - 1)
+    , _mm_and_si128 (*q, _mm_set_epi32 (~(P4EST3_YX_QUADRANT_LEN (level - 1) - 1)
+                                      , ~(P4EST3_YX_QUADRANT_LEN (level - 1) - 1)
+                                      , ~(P4EST3_YX_QUADRANT_LEN (level - 1) - 1)
                                       , 0xFFFFFFFF))
     );
 /* *INDENT-ON* */
@@ -521,9 +565,9 @@ p4est3_quadrant_zyx_predecessor (const __m128i * q, __m128i * r)
         )
       , _mm_set1_epi32 (P4EST3_YX_MAXLEVEL - level)
       )
-    , _mm_and_si128 (*q, _mm_set_epi32 (~(P4EST_QUADRANT_LEN (level - 1) - 1)
-                                      , ~(P4EST_QUADRANT_LEN (level - 1) - 1)
-                                      , ~(P4EST_QUADRANT_LEN (level - 1) - 1)
+    , _mm_and_si128 (*q, _mm_set_epi32 (~(P4EST3_YX_QUADRANT_LEN (level - 1) - 1)
+                                      , ~(P4EST3_YX_QUADRANT_LEN (level - 1) - 1)
+                                      , ~(P4EST3_YX_QUADRANT_LEN (level - 1) - 1)
                                       , 0xFFFFFFFF))
     );
 /* *INDENT-ON* */
@@ -667,6 +711,9 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_parent =
     (p4est3_quadrant_parent_t) p4est3_quadrant_zyx_parent;
+
+  qvt->quadrant_face_neighbor =
+    (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_zyx_face_neighbor;
 
   qvt->quadrant_predecessor =
     (p4est3_quadrant_predecessor_t) p4est3_quadrant_zyx_predecessor;
