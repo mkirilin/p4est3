@@ -514,18 +514,17 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     for (i = 0; i < half_ch; ++i) {
       idx = i;
       if (side == 1) {
-        /* SC3E (p4est3_connectivity_face_neighbor_face_corner (p3->conn, &idx,
-           fside->face[0],
-           fside->face[1], ori)); */
+        SC3E (p4est3_connectivity_face_neighbor_face_corner
+              (p3->conn, &idx, fside->face[0], fside->face[1], ori));
       }
-      /*SC3E (p4est3_connectivity_get_face_child_id (p3->conn,
-         fside->face[side], &idx)); */
+      SC3E (p4est3_connectivity_get_face_child_id
+            (p3->conn, fside->face[side], &idx));
       b_f[side] = arr_it + idx;
       e_f[side] = arr_it + idx + 1;
       SC3A_CHECK (*(b_f[side]) < *(e_f[side]));
-      /*if (*(b_f[side]) == *(e_f[side]) - 1) {
+      if (*(b_f[side]) == *(e_f[side]) - 1) {
          continue;
-         } */
+      }
       SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
     }
     Level[side]--;
@@ -710,7 +709,7 @@ p4est3_iterate_volume (p4est3_t * p3,
     SC3E (p4est3_iterate_volume (p3, cvolume, cface, ccodim, search_area));
   }
   SC3A_CHECK (l2nch[*Level] == max_children);
-  //SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, search_area, arr_it));
+  SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, search_area, arr_it));
   l2nch[--(*Level)]++;
   SC3E (sc3_array_pop (idx_vol_stack));
   return NULL;
