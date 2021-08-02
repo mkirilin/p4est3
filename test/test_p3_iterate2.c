@@ -29,8 +29,6 @@
 #include <p4est3_p8est.h>
 #endif
 
-/*#define ENABLE_FACE_ITERATOR*/
-
 /* *INDENT-OFF* */
 const int           face_inner_nb_2d[4][4] =
 {{ 0, 1 },
@@ -150,7 +148,7 @@ face_callback (p4est3_iterate_face_info_t * fi)
   idx->orientation = fi->orientation;
   idx->tree_boundary = fi->tree_boundary;
 
-  SC3E (sc3_array_get_elem_count (idx->sides, &nsides));
+  SC3E (sc3_array_get_elem_count (fi->sides, &nsides));
   SC3E (sc3_array_index (fi->sides, 0, &in_side));
   for (side = 0; side < nsides; ++side, ++in_side) {
     SC3E (sc3_array_push (idx->sides, &out_side));
@@ -368,6 +366,9 @@ iterate_unimesh_inner_face (setup_t *t, p4est3_t *p3,
       level2nchildren[--level] += qvt->max_children;
     }
   }
+  SC3E (sc3_allocator_free (t->alloc, level2nchildren));
+  SC3E (sc3_allocator_free (t->alloc, q));
+  SC3E (sc3_allocator_free (t->alloc, r));
   return NULL;
 }
 
@@ -376,7 +377,9 @@ make_result_arrays (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
                     sc3_array_t ** voutput, sc3_array_t ** vpredef,
                     sc3_array_t ** foutput, sc3_array_t ** fpredef)
 {
+  p4est3_iterate_face_info_t *fit;
   const int nquad = (1 << (qvt->dim * t->level)) * t->num_trees;
+  int nface, i;
 
   SC3E (array_new (t->alloc, sizeof (p4est3_iterate_volume_info_t), nquad,
         0, voutput));
@@ -385,6 +388,19 @@ make_result_arrays (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
   SC3E (array_new
         (t->alloc, sizeof (p4est3_iterate_face_info_t), 0, 0, fpredef));
   SC3E (iterate_unimesh_inner_face (t, p3, qvt, *fpredef));
+  SC3E (sc3_array_get_elem_count (*fpredef, &nface));
+  SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_info_t),
+                   nface, nface, foutput));
+
+  /* allocate memory for sides arrays at faces */
+  /* side arrays for foutput have size 0, since we will extend them at
+     corresponding callback */
+  SC3E (sc3_array_index (*foutput, 0, &fit));
+  for (i = 0; i < nface; ++i, ++fit) {
+    SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_side_t), 2, 0,
+                     &fit->sides));
+  }
+  SC3E (sc3_array_resize (*foutput, 0));
 
   return NULL;
 }
@@ -482,17 +498,15 @@ free_arrays (sc3_array_t *voutput, sc3_array_t *vpredef, sc3_array_t *foutput,
   SC3E (sc3_array_destroy (&vpredef));
 
   SC3E (sc3_array_get_elem_count (fpredef, &nfaces_pre));
-  SC3E (sc3_array_index (fpredef, 0, &fit_pre));
-  for (i = 0; i < nfaces_pre; ++i, ++fit_pre) {
-    SC3E (sc3_array_destroy (&fit_pre->sides));
-  }
-  SC3E (sc3_array_destroy (&fpredef));
   SC3E (sc3_array_get_elem_count (foutput, &nfaces_out));
   SC3E_DEMAND (nfaces_pre == nfaces_out, "#Sides mismatches");
+  SC3E (sc3_array_index (fpredef, 0, &fit_pre));
   SC3E (sc3_array_index (foutput, 0, &fit_out));
-  for (i = 0; i < nfaces_out; ++i, ++fit_out, ++fit_pre) {
+  for (i = 0; i < nfaces_pre; ++i, ++fit_out, ++fit_pre) {
     SC3E (sc3_array_destroy (&fit_pre->sides));
+    SC3E (sc3_array_destroy (&fit_out->sides));
   }
+  SC3E (sc3_array_destroy (&fpredef));
   SC3E (sc3_array_destroy (&foutput));
   return NULL;
 }
@@ -547,9 +561,9 @@ main (int argc, char **argv)
               (t, p3, qvt, user_data->volumes, vpredef, user_data->faces, fpredef));
 
         /*destroy forest, that was referenced for others*/
+        SC3X (free_arrays (user_data->volumes, vpredef, user_data->faces, fpredef));
         SC3X (p4est3_destroy (&p3));
         SC3X (p4est3_connectivity_destroy (&t->conn));
-        SC3X (free_arrays (user_data->volumes, vpredef, user_data->faces, fpredef));
   //    }
   //  }
   //}
