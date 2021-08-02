@@ -474,11 +474,11 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       continue;
     }
     first_quad =
-      (void *) (trees[side]->tquads + p3->qvt->quadrant_size * (*b_f[side]));
+      (void *) (trees[side]->tquads + p3->qvt->quadrant_size * (*(b_f[side])));
     SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
     if (level == Level[side]) {
       is_refine[side] = 0;
-      fside[side].nquad = *b_f[side];
+      fside[side].nquad = *(b_f[side]);
       fside[side].quadrant = first_quad;
     }
   }
@@ -558,16 +558,16 @@ p4est3_iterate_face_inner_init (p4est3_t * p3,
   is_refine[0] = is_refine[1] = 1;
 
   SC3E (sc3_array_index (idx_f_stack[0], 0, &arr));
-  SC3E (sc3_array_index (*(sc3_array_t**)arr, 0, &b_f));
-  *b_f[0] = *(arr_it + child);
-  SC3E (sc3_array_index (*(sc3_array_t**)arr, 1, &e_f));
-  *e_f[0] = *(arr_it + child + 1);
+  SC3E (sc3_array_index (*(sc3_array_t**)arr, 0, &(b_f[0])));
+  *(b_f[0]) = *(arr_it + child);
+  SC3E (sc3_array_index (*(sc3_array_t**)arr, 1, &(e_f[0])));
+  *(e_f[0]) = *(arr_it + child + 1);
 
   SC3E (sc3_array_index (idx_f_stack[1], 0, &arr));
-  SC3E (sc3_array_index (*(sc3_array_t**)arr, 0, &b_f));
-  *b_f[1] = *(arr_it + neighbor);
-  SC3E (sc3_array_index (*(sc3_array_t**)arr, 1, &e_f));
-  *e_f[1] = *(arr_it + neighbor + 1);
+  SC3E (sc3_array_index (*(sc3_array_t**)arr, 0, &(b_f[1])));
+  *(b_f[1]) = *(arr_it + neighbor);
+  SC3E (sc3_array_index (*(sc3_array_t**)arr, 1, &(e_f[1])));
+  *(e_f[1]) = *(arr_it + neighbor + 1);
 
   return NULL;
 }
