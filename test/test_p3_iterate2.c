@@ -113,11 +113,11 @@ make_allocator (setup_t *t)
 static sc3_error_t *
 make_connectivity (setup_t * t, int dim, int l_face, int r_face, int ori)
 {
-  //SC3E (p4est3_connectivity_new (t->alloc, &t->conn));
-  //SC3E (p4est3_connectivity_set_dim (t->conn, dim));
-  //SC3E (p4est3_connectivity_set_num_trees (t->conn, t->num_trees));
-  //SC3E (p4est3_connectivity_setup (t->conn));
-  SC3E (p4est3_connectivity_new_p4est_twotrees
+  SC3E (p4est3_connectivity_new (t->alloc, &t->conn));
+  SC3E (p4est3_connectivity_set_dim (t->conn, dim));
+  SC3E (p4est3_connectivity_set_num_trees (t->conn, t->num_trees));
+  SC3E (p4est3_connectivity_setup (t->conn));
+  //SC3E (p4est3_connectivity_new_p4est_twotrees
         (t->alloc, &t->conn, l_face, r_face, ori));
 
   return NULL;
@@ -201,9 +201,6 @@ make_ref_array_volume (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
                        sc3_array_t ** vpredef)
 {
   const int nquad = (1 << (qvt->dim * t->level)) * t->num_trees;
-#ifdef ENABLE_FACE_ITERATOR
-  const int nface = qvt->dim * (nquad + (1 << t->level));
-#endif
   p4est3_iterate_volume_info_t *vit;
   p4est3_tree_t *tree;
   int i, ntree;
@@ -320,7 +317,7 @@ iterate_unimesh_inner_face_compl (setup_t *t, p4est3_quadrant_vtable_t *qvt,
         sinfo->is_ghost = 0;
 
         sinfo->nface = nface_predef[face][1];
-        //SC3E (p4est3_quadrant_face_neighbor (qvt, r, nface_predef[face][0], q));
+        SC3E (p4est3_quadrant_face_neighbor (qvt, r, nface_predef[face][0], q));
         SC3E (p4est3_quadrant_linear_id
               (qvt, q, qvt->max_level, &sinfo->nquad));
         sinfo->quadrant =
@@ -408,12 +405,12 @@ compare_results (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
 {
   const int nquad = (1 << (qvt->dim * t->level));
   p4est3_iterate_volume_info_t *vit_out, *vit_pre;
-#ifdef ENABLE_FACE_ITERATOR
-  const int nface = qvt->dim * (nquad + (1 << t->level));
+
+  const int nface_out, nface_pre;
   p4est3_iterate_face_info_t *fit_out, *fit_pre;
   p4est3_iterate_face_side_t *sit_out, *sit_pre;
   int side, nsides_out, nsides_pre;
-#endif
+
   int i;
   int out_coord[2], pre_coord[2];
   int out_l, pre_l;
@@ -437,7 +434,10 @@ compare_results (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
                  "Volumes poiner to various quadrants");
   }
 
-#ifdef ENABLE_FACE_ITERATOR
+  SC3E (sc3_array_get_elem_count (foutput, &nface_out));
+  SC3E (sc3_array_get_elem_count (fpredef, &nface_pre));
+  SC3E_DEMAND (nface_out == nface_pre,
+               "Face: number of faces are differs");
   SC3E (sc3_array_index (foutput, 0, &fit_out));
   SC3E (sc3_array_index (fpredef, 0, &fit_pre));
   for (i = 0; i < nface; ++i, ++fit_out, ++fit_pre) {
@@ -460,7 +460,7 @@ compare_results (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
                  "Faces poiner to various quadrants");
     }
   }
-#endif
+
   return NULL;
 }
 
@@ -470,16 +470,12 @@ free_arrays (sc3_array_t *voutput, sc3_array_t *vpredef, sc3_array_t *foutput,
 {
   p4est3_iterate_face_info_t *fit_pre;
   int i, nfaces_pre;
-#ifdef ENABLE_FACE_ITERATOR
   p4est3_iterate_face_info_t *fit_out;
   int nfaces_out;
-#endif
   SC3A_IS (sc3_array_is_setup, voutput);
   SC3A_IS (sc3_array_is_setup, vpredef);
   SC3A_IS (sc3_array_is_setup, fpredef);
-#ifdef ENABLE_FACE_ITERATOR
   SC3A_IS (sc3_array_is_setup, foutput);
-#endif
 
   SC3E (sc3_array_destroy (&voutput));
   SC3E (sc3_array_destroy (&vpredef));
@@ -490,7 +486,6 @@ free_arrays (sc3_array_t *voutput, sc3_array_t *vpredef, sc3_array_t *foutput,
     SC3E (sc3_array_destroy (&fit_pre->sides));
   }
   SC3E (sc3_array_destroy (&fpredef));
-#ifdef ENABLE_FACE_ITERATOR
   SC3E (sc3_array_get_elem_count (foutput, &nfaces_out));
   SC3E_DEMAND (nfaces_pre == nfaces_out, "#Sides mismatches");
   SC3E (sc3_array_index (foutput, 0, &fit_out));
@@ -498,7 +493,6 @@ free_arrays (sc3_array_t *voutput, sc3_array_t *vpredef, sc3_array_t *foutput,
     SC3E (sc3_array_destroy (&fit_pre->sides));
   }
   SC3E (sc3_array_destroy (&foutput));
-#endif
   return NULL;
 }
 
