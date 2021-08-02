@@ -456,7 +456,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
   p4est3_tree_t     **trees = search_area->tree_face;
   p4est3_locidx     **b_f = search_area->begin_face;
   p4est3_locidx     **e_f = search_area->end_face;
-  sc3_array_t        *stack_it;
+  void               *stack_it;
   p4est3_locidx      *arr_it;
   sc3_array_t        *view_q = search_area->view_quads;
   sc3_array_t       **idx_face_stack = search_area->idx_face_stack;
@@ -495,13 +495,13 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     }
     SC3E (sc3_array_push (idx_face_stack[side], &stack_it));
 #ifdef P4EST_ENABLE_DEBUG
-    SC3E (p4est3_array_set_zero (stack_it));
+    SC3E (p4est3_array_set_zero (*(sc3_array_t**)stack_it));
 #endif
     SC3E (sc3_array_renew_data (&view_q, trees[side]->tquads,
                                 p3->qvt->quadrant_size, *(b_f[side]),
                                 *(e_f[side]) - *(b_f[side])));
     SC3E (p4est3_quadrant_array_split
-          (p3->qvt, view_q, Level[side], stack_it));
+          (p3->qvt, view_q, Level[side], *(sc3_array_t**)stack_it));
 
      /* since array_split doesn't count shift from the beinning of quadrants
     in a tree, we shift result indices at the loop below*/
@@ -549,7 +549,7 @@ p4est3_iterate_face_inner_init (p4est3_t * p3,
   int                *is_refine = search_area->is_refine;
 
   sc3_array_t       **idx_f_stack = search_area->idx_face_stack;
-  sc3_array_t        *arr;
+  void               *arr;
   p4est3_locidx     **b_f = search_area->begin_face,
     **e_f = search_area->end_face;
 
@@ -558,15 +558,15 @@ p4est3_iterate_face_inner_init (p4est3_t * p3,
   is_refine[0] = is_refine[1] = 1;
 
   SC3E (sc3_array_index (idx_f_stack[0], 0, &arr));
-  SC3E (sc3_array_index (arr, 0, &b_f));
+  SC3E (sc3_array_index (*(sc3_array_t**)arr, 0, &b_f));
   *b_f[0] = *(arr_it + child);
-  SC3E (sc3_array_index (arr, 1, &e_f));
+  SC3E (sc3_array_index (*(sc3_array_t**)arr, 1, &e_f));
   *e_f[0] = *(arr_it + child + 1);
 
   SC3E (sc3_array_index (idx_f_stack[1], 0, &arr));
-  SC3E (sc3_array_index (arr, 0, &b_f));
+  SC3E (sc3_array_index (*(sc3_array_t**)arr, 0, &b_f));
   *b_f[1] = *(arr_it + neighbor);
-  SC3E (sc3_array_index (arr, 1, &e_f));
+  SC3E (sc3_array_index (*(sc3_array_t**)arr, 1, &e_f));
   *e_f[1] = *(arr_it + neighbor + 1);
 
   return NULL;
