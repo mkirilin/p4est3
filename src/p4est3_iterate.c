@@ -515,10 +515,10 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       idx = i;
       if (side == 1) {
         SC3E (p4est3_connectivity_face_neighbor_face_corner
-              (p3->conn, &idx, fside->face[0], fside->face[1], ori));
+              (p3->conn, &idx, fside[0].nface, fside[1].nface, ori));
       }
       SC3E (p4est3_connectivity_get_face_child_id
-            (p3->conn, fside->face[side], &idx));
+            (p3->conn, fside[side].nface, &idx));
       b_f[side] = arr_it + idx;
       e_f[side] = arr_it + idx + 1;
       SC3A_CHECK (*(b_f[side]) < *(e_f[side]));
