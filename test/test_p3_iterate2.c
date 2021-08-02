@@ -118,7 +118,7 @@ make_connectivity (setup_t * t, int dim, int l_face, int r_face, int ori)
   SC3E (p4est3_connectivity_set_num_trees (t->conn, t->num_trees));
   SC3E (p4est3_connectivity_setup (t->conn));
   //SC3E (p4est3_connectivity_new_p4est_twotrees
-        (t->alloc, &t->conn, l_face, r_face, ori));
+  //      (t->alloc, &t->conn, l_face, r_face, ori));
 
   return NULL;
 }
@@ -169,7 +169,7 @@ make_new_p4est3 (p4est3_t ** p3, sc3_allocator_t * alloc,
 
   /* create p4est object with connectivity */
   SC3E (p4est3_new (alloc, p3));
-  /* SC3E (p4est3_set_comm (*p3, mpicomm, 1)); */
+  //SC3E (p4est3_set_comm (*p3, mpicomm, 1));
   SC3E (p4est3_set_connectivity (*p3, conn));
   SC3E (p4est3_set_quadrant_vtable (*p3, qvt));
   SC3E (p4est3_set_level (*p3, level));
@@ -278,7 +278,7 @@ iterate_unimesh_inner_face_compl (setup_t *t, p4est3_quadrant_vtable_t *qvt,
   p4est3_iterate_face_side_t *sinfo;
   p4est3_gloidx nquads_per_level = 1L << (qvt->dim * level);
   p4est3_gloidx start_id = nquads_compl - (1L << (qvt->dim * level));
-  p4est3_gloidx bound_id;
+  p4est3_gloidx bound_id, linear_id;
   int i, face;
 
   if (qvt->dim == 2) {
@@ -288,10 +288,10 @@ iterate_unimesh_inner_face_compl (setup_t *t, p4est3_quadrant_vtable_t *qvt,
       start_id + nquads_per_level / (p4est3_gloidx) qvt->max_children;
     int bound_coords[2];
     int coords[2];
-    SC3E (p4est3_quadrant_morton (qvt, qvt->max_level, bound_id - 1, q));
+    SC3E (p4est3_quadrant_morton (qvt, t->level, bound_id - 1, q));
     SC3E (p4est3_quadrant_coordinates (qvt, q, qvt->dim, bound_coords));
     for (face = 0; face < 4; ++face) {
-      SC3E (p4est3_quadrant_morton (qvt, qvt->max_level, start_id, r));
+      SC3E (p4est3_quadrant_morton (qvt, t->level, start_id, r));
       for (i = 0; i < nquads_per_level; ++i) {
         SC3E (p4est3_quadrant_coordinates (qvt, r, qvt->dim, coords));
         if (coords[bound_dir[face]] != bound_coords[bound_dir[face]]) {
@@ -319,7 +319,8 @@ iterate_unimesh_inner_face_compl (setup_t *t, p4est3_quadrant_vtable_t *qvt,
         sinfo->nface = nface_predef[face][1];
         SC3E (p4est3_quadrant_face_neighbor (qvt, r, nface_predef[face][0], q));
         SC3E (p4est3_quadrant_linear_id
-              (qvt, q, qvt->max_level, &sinfo->nquad));
+              (qvt, q, qvt->max_level, &linear_id));
+        sinfo->nquad = (p4est3_locidx) linear_id;
         sinfo->quadrant =
           (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
         SC3E (p4est3_quadrant_successor (qvt, r, r));
@@ -337,7 +338,7 @@ iterate_unimesh_inner_face (setup_t *t, p4est3_t *p3,
                             p4est3_quadrant_vtable_t * qvt,
                             sc3_array_t * fpredef)
 {
-  int level = qvt->max_level - 1;
+  int level = t->level;
   p4est3_gloidx nquads_compl = 0;
   p4est3_topidx ntree;
   p4est3_tree_t *tree;
@@ -364,7 +365,7 @@ iterate_unimesh_inner_face (setup_t *t, p4est3_t *p3,
       SC3E (iterate_unimesh_simple_children
             (t, p3, qvt, nquads_compl, tree, fpredef));
       nquads_compl += qvt->max_children;
-      level2nchildren[level]++;
+      level2nchildren[--level] += qvt->max_children;
     }
   }
   return NULL;
@@ -406,7 +407,7 @@ compare_results (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
   const int nquad = (1 << (qvt->dim * t->level));
   p4est3_iterate_volume_info_t *vit_out, *vit_pre;
 
-  const int nface_out, nface_pre;
+  int nface_out, nface_pre;
   p4est3_iterate_face_info_t *fit_out, *fit_pre;
   p4est3_iterate_face_side_t *sit_out, *sit_pre;
   int side, nsides_out, nsides_pre;
@@ -440,7 +441,7 @@ compare_results (setup_t *t, p4est3_t *p3, p4est3_quadrant_vtable_t *qvt,
                "Face: number of faces are differs");
   SC3E (sc3_array_index (foutput, 0, &fit_out));
   SC3E (sc3_array_index (fpredef, 0, &fit_pre));
-  for (i = 0; i < nface; ++i, ++fit_out, ++fit_pre) {
+  for (i = 0; i < nface_out; ++i, ++fit_out, ++fit_pre) {
     SC3E_DEMAND (fit_out->tree_boundary == fit_pre->tree_boundary,
                  "Face: tree boundary property mismatches");
     SC3E_DEMAND (fit_out->orientation == fit_pre->orientation,
@@ -525,16 +526,16 @@ main (int argc, char **argv)
   nfaces = 2 * qvt->dim;
   nori = 1 << (qvt->dim - 1);
 
-  t->level = 5;
-  t->num_trees = 2;
+  t->level = 1;
+  t->num_trees = 1;
 
 #ifdef P4EST_ENABLE_DEBUG
   printf ("l = %d, t = %d\n", t->level, t->num_trees);
 #endif /* P4EST_ENABLE_DEBUG */
 
-  for (ori = 0; ori < nori; ++ori) {
-    for (l_face = 0; l_face < nfaces; ++l_face) {
-      for (r_face = 0; r_face < nfaces; ++r_face) {
+  //for (ori = 0; ori < nori; ++ori) {
+  //  for (l_face = 0; l_face < nfaces; ++l_face) {
+  //    for (r_face = 0; r_face < nfaces; ++r_face) {
         SC3X (make_connectivity (t, qvt->dim, l_face, r_face, ori));
         SC3X (make_new_p4est3 (&p3, t->alloc, t->conn, qvt, t->level));
 
@@ -549,9 +550,9 @@ main (int argc, char **argv)
         SC3X (p4est3_destroy (&p3));
         SC3X (p4est3_connectivity_destroy (&t->conn));
         SC3X (free_arrays (user_data->volumes, vpredef, user_data->faces, fpredef));
-      }
-    }
-  }
+  //    }
+  //  }
+  //}
   SC3X (free_allocator (&t->alloc));
   SC3X (sc3_MPI_Finalize ());
   return 0;
