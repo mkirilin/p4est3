@@ -456,7 +456,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
   p4est3_tree_t     **trees = search_area->tree_face;
   p4est3_locidx     **b_f = search_area->begin_face;
   p4est3_locidx     **e_f = search_area->end_face;
-  void               *stack_it;
+  void               *stack_it[2];
   p4est3_locidx      *arr_it;
   sc3_array_t        *view_q = search_area->view_quads;
   sc3_array_t       **idx_face_stack = search_area->idx_face_stack;
@@ -493,26 +493,30 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     if (!is_refine[side]) {
       continue;
     }
-    SC3E (sc3_array_push (idx_face_stack[side], &stack_it));
+    SC3E (sc3_array_push (idx_face_stack[side], &(stack_it[side])));
 #ifdef P4EST_ENABLE_DEBUG
-    SC3E (p4est3_array_set_zero (*(sc3_array_t**)stack_it));
+    SC3E (p4est3_array_set_zero (*(sc3_array_t**)(stack_it[side])));
 #endif
     SC3E (sc3_array_renew_data (&view_q, trees[side]->tquads,
                                 p3->qvt->quadrant_size, *(b_f[side]),
                                 *(e_f[side]) - *(b_f[side])));
     SC3E (p4est3_quadrant_array_split
-          (p3->qvt, view_q, Level[side], *(sc3_array_t**)stack_it));
+          (p3->qvt, view_q, Level[side], *(sc3_array_t**)(stack_it[side])));
 
      /* since array_split doesn't count shift from the beinning of quadrants
     in a tree, we shift result indices at the loop below*/
     for (i = 0; i < max_children + 1; ++i) {
-      SC3E (sc3_array_index (*(sc3_array_t **) stack_it, i, &arr_it));
+      SC3E (sc3_array_index (*(sc3_array_t **) (stack_it[side]), i, &arr_it));
       *arr_it += *(b_f[side]);
     }
-    SC3E (sc3_array_index (*(sc3_array_t **) stack_it, 0, &arr_it));
-    Level[side]++;
-    for (i = 0; i < half_ch; ++i) {
+  }
+  for (i = 0; i < half_ch; ++i) {
+    for (side = 0; side < search_area->nsides; ++side) {
       idx = i;
+      SC3E (sc3_array_index (*(sc3_array_t **) (stack_it[side]), 0, &arr_it));
+      if (!is_refine[side]) {
+        continue;
+      }
       if (side == 1) {
         SC3E (p4est3_connectivity_face_neighbor_face_corner
               (p3->conn, &idx, fside[0].nface, fside[1].nface, ori));
@@ -522,12 +526,15 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       b_f[side] = arr_it + idx;
       e_f[side] = arr_it + idx + 1;
       SC3A_CHECK (*(b_f[side]) < *(e_f[side]));
-      if (*(b_f[side]) == *(e_f[side]) - 1) {
-         continue;
-      }
-      SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
+      /*if (*(b_f[side]) == *(e_f[side]) - 1) {
+          continue;
+      }*/
     }
-    Level[side]--;
+    Level[0]++;
+    Level[1]++;
+    SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
+    Level[0]--;
+    Level[1]--;
   }
   for (side = 0; side < search_area->nsides; ++side) {
     if (!is_refine[side]) {
