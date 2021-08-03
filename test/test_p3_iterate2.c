@@ -267,20 +267,56 @@ iterate_unimesh_simple_children (setup_t *t, p4est3_t *p3,
 }
 
 static sc3_error_t *
+fill_face_info (sc3_array_t *fpredef, int start_id, int face, int i,
+                p4est3_tree_t *tree, p4est3_quadrant_vtable_t *qvt,
+                void *q, void *r, sc3_allocator_t *alloc)
+{
+  p4est3_iterate_face_info_t *finfo;
+  p4est3_iterate_face_side_t *sinfo;
+  p4est3_gloidx linear_id;
+  int nface_predef[4][2] = {{1, 0}, {3, 2}, {3, 2}, {1, 0}};
+
+  SC3E (sc3_array_push (fpredef, &finfo));
+  SC3E (array_new (alloc, sizeof (p4est3_iterate_face_side_t), 2, 0,
+                  &finfo->sides));
+  finfo->orientation = 0;
+  finfo->tree_boundary = 0;
+  SC3E (sc3_array_push (finfo->sides, &sinfo));
+  sinfo->ntree = tree->treeid;
+  sinfo->is_ghost = 0;
+
+  sinfo->nface = nface_predef[face][0];
+  sinfo->nquad = start_id + i;
+  sinfo->quadrant =
+    (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
+
+  SC3E (sc3_array_push (finfo->sides, &sinfo));
+  sinfo->ntree = tree->treeid;
+  sinfo->is_ghost = 0;
+
+  sinfo->nface = nface_predef[face][1];
+  SC3E (p4est3_quadrant_face_neighbor (qvt, r, nface_predef[face][0], q));
+  SC3E (p4est3_quadrant_linear_id
+        (qvt, q, qvt->max_level, &linear_id));
+  sinfo->nquad = (p4est3_locidx) linear_id;
+  sinfo->quadrant =
+    (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
+
+  return NULL;
+}
+
+static sc3_error_t *
 iterate_unimesh_inner_face_compl (setup_t *t, p4est3_quadrant_vtable_t *qvt,
                                   p4est3_gloidx nquads_compl, int level,
                                   void *q, void *r, p4est3_tree_t *tree,
                                   sc3_array_t *fpredef)
 {
-  p4est3_iterate_face_info_t *finfo;
-  p4est3_iterate_face_side_t *sinfo;
   p4est3_gloidx nquads_per_level = 1L << (qvt->dim * level);
   p4est3_gloidx start_id = nquads_compl - (1L << (qvt->dim * level));
-  p4est3_gloidx bound_id, linear_id;
+  p4est3_gloidx bound_id;
   int i, face;
 
   if (qvt->dim == 2) {
-    int nface_predef[4][2] = {{1, 0}, {3, 2}, {3, 2}, {1, 0}};
     int bound_dir[4] = {0, 1, 1, 0};
     bound_id =
       start_id + nquads_per_level / (p4est3_gloidx) qvt->max_children;
@@ -290,38 +326,18 @@ iterate_unimesh_inner_face_compl (setup_t *t, p4est3_quadrant_vtable_t *qvt,
     SC3E (p4est3_quadrant_coordinates (qvt, q, qvt->dim, bound_coords));
     for (face = 0; face < 4; ++face) {
       SC3E (p4est3_quadrant_morton (qvt, t->level, start_id, r));
-      for (i = 0; i < nquads_per_level; ++i) {
+      for (i = 0; i < nquads_per_level - 1; ++i) {
         SC3E (p4est3_quadrant_coordinates (qvt, r, qvt->dim, coords));
-        if (coords[bound_dir[face]] != bound_coords[bound_dir[face]]) {
-          SC3E (p4est3_quadrant_successor (qvt, r, r));
-          continue;
+        if (coords[bound_dir[face]] == bound_coords[bound_dir[face]]) {
+          SC3E (fill_face_info
+                (fpredef, start_id, face, i, tree, qvt, q, r, t->alloc));
         }
-        SC3E (sc3_array_push (fpredef, &finfo));
-        SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_side_t), 2, 0,
-                        &finfo->sides));
-        finfo->orientation = 0;
-        finfo->tree_boundary = 0;
-        SC3E (sc3_array_push (finfo->sides, &sinfo));
-        sinfo->ntree = tree->treeid;
-        sinfo->is_ghost = 0;
-
-        sinfo->nface = nface_predef[face][0];
-        sinfo->nquad = start_id + i;
-        sinfo->quadrant =
-          (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
-
-        SC3E (sc3_array_push (finfo->sides, &sinfo));
-        sinfo->ntree = tree->treeid;
-        sinfo->is_ghost = 0;
-
-        sinfo->nface = nface_predef[face][1];
-        SC3E (p4est3_quadrant_face_neighbor (qvt, r, nface_predef[face][0], q));
-        SC3E (p4est3_quadrant_linear_id
-              (qvt, q, qvt->max_level, &linear_id));
-        sinfo->nquad = (p4est3_locidx) linear_id;
-        sinfo->quadrant =
-          (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
         SC3E (p4est3_quadrant_successor (qvt, r, r));
+      }
+      SC3E (p4est3_quadrant_coordinates (qvt, r, qvt->dim, coords));
+      if (coords[bound_dir[face]] == bound_coords[bound_dir[face]]) {
+        SC3E (fill_face_info (fpredef, start_id, face, nquads_per_level - 1,
+                              tree, qvt, q, r, t->alloc));
       }
     }
   }
@@ -343,7 +359,7 @@ iterate_unimesh_inner_face (setup_t *t, p4est3_t *p3,
   int *level2nchildren; /*how many processed quads of level level*/
   void *q, *r;
   SC3E (sc3_allocator_calloc
-        (t->alloc, level, sizeof (int), &level2nchildren));
+        (t->alloc, level + 1, sizeof (int), &level2nchildren));
   SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &q));
   SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &r));
   memset (level2nchildren, 0, level * sizeof (int));
@@ -354,16 +370,22 @@ iterate_unimesh_inner_face (setup_t *t, p4est3_t *p3,
     {
       SC3A_CHECK (level2nchildren[level] <= qvt->max_children);
       if (level2nchildren[level] == qvt->max_children) {
+        if (level == t->level) {
+          SC3E (iterate_unimesh_simple_children
+                (t, p3, qvt, nquads_compl, tree, fpredef));
+          nquads_compl += qvt->max_children;
+        }
+        else {
+          SC3E (iterate_unimesh_inner_face_compl
+                (t, qvt, nquads_compl, level, q, r, tree, fpredef));
+        }
         level2nchildren[level] = 0;
-        SC3E (iterate_unimesh_inner_face_compl
-              (t, qvt, nquads_compl, level, q, r, tree, fpredef));
         level2nchildren[--level]++;
-        continue;
       }
-      SC3E (iterate_unimesh_simple_children
-            (t, p3, qvt, nquads_compl, tree, fpredef));
-      nquads_compl += qvt->max_children;
-      level2nchildren[--level] += qvt->max_children;
+      else {
+        level = t->level;
+        level2nchildren[level]++;
+      }
     }
   }
   SC3E (sc3_allocator_free (t->alloc, level2nchildren));
@@ -540,7 +562,7 @@ main (int argc, char **argv)
   nfaces = 2 * qvt->dim;
   nori = 1 << (qvt->dim - 1);
 
-  t->level = 1;
+  t->level = 2;
   t->num_trees = 1;
 
 #ifdef P4EST_ENABLE_DEBUG
