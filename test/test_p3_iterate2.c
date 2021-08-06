@@ -111,12 +111,12 @@ make_allocator (setup_t *t)
 static sc3_error_t *
 make_connectivity (setup_t * t, int dim, int l_face, int r_face, int ori)
 {
-  SC3E (p4est3_connectivity_new (t->alloc, &t->conn));
-  SC3E (p4est3_connectivity_set_dim (t->conn, dim));
-  SC3E (p4est3_connectivity_set_num_trees (t->conn, t->num_trees));
-  SC3E (p4est3_connectivity_setup (t->conn));
-  //SC3E (p4est3_connectivity_new_p4est_twotrees
-  //      (t->alloc, &t->conn, l_face, r_face, ori));
+  //SC3E (p4est3_connectivity_new (t->alloc, &t->conn));
+  //SC3E (p4est3_connectivity_set_dim (t->conn, dim));
+  //SC3E (p4est3_connectivity_set_num_trees (t->conn, t->num_trees));
+  //SC3E (p4est3_connectivity_setup (t->conn));
+  SC3E (p4est3_connectivity_new_p4est_twotrees
+        (t->alloc, &t->conn, l_face, r_face, ori));
 
   return NULL;
 }
@@ -269,7 +269,7 @@ iterate_unimesh_simple_children (setup_t *t, p4est3_t *p3,
 static sc3_error_t *
 fill_face_info (sc3_array_t *fpredef, int start_id, int face, int i,
                 p4est3_tree_t *tree, p4est3_quadrant_vtable_t *qvt,
-                void *q, void *r, sc3_allocator_t *alloc)
+                void *q, void *r, sc3_allocator_t *alloc, setup_t *t)
 {
   p4est3_iterate_face_info_t *finfo;
   p4est3_iterate_face_side_t *sinfo;
@@ -297,7 +297,7 @@ fill_face_info (sc3_array_t *fpredef, int start_id, int face, int i,
   sinfo->nface = nface_predef[face][1];
   SC3E (p4est3_quadrant_face_neighbor (qvt, r, nface_predef[face][0], q));
   SC3E (p4est3_quadrant_linear_id
-        (qvt, q, qvt->max_level, &linear_id));
+        (qvt, q, t->level, &linear_id));
   sinfo->nquad = (p4est3_locidx) linear_id;
   sinfo->quadrant =
     (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
@@ -311,33 +311,39 @@ iterate_unimesh_inner_face_compl (setup_t *t, p4est3_quadrant_vtable_t *qvt,
                                   void *q, void *r, p4est3_tree_t *tree,
                                   sc3_array_t *fpredef)
 {
+  p4est3_gloidx nquads_per_next_level = 1L << (qvt->dim * (level + 1));
   p4est3_gloidx nquads_per_level = 1L << (qvt->dim * level);
-  p4est3_gloidx start_id = nquads_compl - (1L << (qvt->dim * level));
+  p4est3_gloidx start_id = nquads_compl - nquads_per_next_level;
   p4est3_gloidx bound_id;
   int i, face;
 
   if (qvt->dim == 2) {
     int bound_dir[4] = {0, 1, 1, 0};
+    int start_ids[4];
+    start_ids[0] = start_id;
+    start_ids[1] = start_id;
+    start_ids[2] = start_id + nquads_per_level;
+    start_ids[3] = start_id + 2 * nquads_per_level;
     bound_id =
-      start_id + nquads_per_level / (p4est3_gloidx) qvt->max_children;
+      start_id + nquads_per_next_level / (p4est3_gloidx) qvt->max_children;
     int bound_coords[2];
     int coords[2];
     SC3E (p4est3_quadrant_morton (qvt, t->level, bound_id - 1, q));
     SC3E (p4est3_quadrant_coordinates (qvt, q, qvt->dim, bound_coords));
     for (face = 0; face < 4; ++face) {
-      SC3E (p4est3_quadrant_morton (qvt, t->level, start_id, r));
+      SC3E (p4est3_quadrant_morton (qvt, t->level, start_ids[face], r));
       for (i = 0; i < nquads_per_level - 1; ++i) {
         SC3E (p4est3_quadrant_coordinates (qvt, r, qvt->dim, coords));
         if (coords[bound_dir[face]] == bound_coords[bound_dir[face]]) {
           SC3E (fill_face_info
-                (fpredef, start_id, face, i, tree, qvt, q, r, t->alloc));
+                (fpredef, start_ids[face], face, i, tree, qvt, q, r, t->alloc, t));
         }
         SC3E (p4est3_quadrant_successor (qvt, r, r));
       }
       SC3E (p4est3_quadrant_coordinates (qvt, r, qvt->dim, coords));
       if (coords[bound_dir[face]] == bound_coords[bound_dir[face]]) {
-        SC3E (fill_face_info (fpredef, start_id, face, nquads_per_level - 1,
-                              tree, qvt, q, r, t->alloc));
+        SC3E (fill_face_info (fpredef, start_ids[face], face, nquads_per_level - 1,
+                              tree, qvt, q, r, t->alloc, t));
       }
     }
   }
@@ -352,25 +358,25 @@ iterate_unimesh_inner_face (setup_t *t, p4est3_t *p3,
                             p4est3_quadrant_vtable_t * qvt,
                             sc3_array_t * fpredef)
 {
-  int level = t->level;
+  int level = 0;
   p4est3_gloidx nquads_compl = 0;
   p4est3_topidx ntree;
   p4est3_tree_t *tree;
   int *level2nchildren; /*how many processed quads of level level*/
   void *q, *r;
   SC3E (sc3_allocator_calloc
-        (t->alloc, level + 1, sizeof (int), &level2nchildren));
+        (t->alloc, t->level + 1, sizeof (int), &level2nchildren));
   SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &q));
   SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &r));
-  memset (level2nchildren, 0, level * sizeof (int));
+  memset (level2nchildren, 0, t->level * sizeof (int));
 
   for (ntree = 0; ntree < t->num_trees; ++ntree) {
     SC3E (p4est3_tree_index (p3, ntree, &tree));
-    while (level > 0)
+    while (level < t->level)
     {
       SC3A_CHECK (level2nchildren[level] <= qvt->max_children);
       if (level2nchildren[level] == qvt->max_children) {
-        if (level == t->level) {
+        if (level == 0) {
           SC3E (iterate_unimesh_simple_children
                 (t, p3, qvt, nquads_compl, tree, fpredef));
           nquads_compl += qvt->max_children;
@@ -380,11 +386,11 @@ iterate_unimesh_inner_face (setup_t *t, p4est3_t *p3,
                 (t, qvt, nquads_compl, level, q, r, tree, fpredef));
         }
         level2nchildren[level] = 0;
-        level2nchildren[--level]++;
+        level2nchildren[++level]++;
       }
       else {
-        level = t->level;
-        level2nchildren[level]++;
+        level = 0;
+        level2nchildren[level] += 4;
       }
     }
   }
@@ -562,16 +568,16 @@ main (int argc, char **argv)
   nfaces = 2 * qvt->dim;
   nori = 1 << (qvt->dim - 1);
 
-  t->level = 2;
-  t->num_trees = 1;
+  t->level = 3;
+  t->num_trees = 2;
 
 #ifdef P4EST_ENABLE_DEBUG
   printf ("l = %d, t = %d\n", t->level, t->num_trees);
 #endif /* P4EST_ENABLE_DEBUG */
 
-  //for (ori = 0; ori < nori; ++ori) {
-  //  for (l_face = 0; l_face < nfaces; ++l_face) {
-  //    for (r_face = 0; r_face < nfaces; ++r_face) {
+  for (ori = 0; ori < nori; ++ori) {
+    for (l_face = 0; l_face < nfaces; ++l_face) {
+      for (r_face = 0; r_face < nfaces; ++r_face) {
         SC3X (make_connectivity (t, qvt->dim, l_face, r_face, ori));
         SC3X (make_new_p4est3 (&p3, t->alloc, t->conn, qvt, t->level));
 
@@ -586,9 +592,9 @@ main (int argc, char **argv)
         SC3X (free_arrays (user_data->volumes, vpredef, user_data->faces, fpredef));
         SC3X (p4est3_destroy (&p3));
         SC3X (p4est3_connectivity_destroy (&t->conn));
-  //    }
-  //  }
-  //}
+      }
+    }
+  }
   SC3X (free_allocator (&t->alloc));
   SC3X (sc3_MPI_Finalize ());
   return 0;
