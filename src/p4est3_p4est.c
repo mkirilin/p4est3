@@ -71,6 +71,22 @@ p4est3_connectivity_p4est_get_face (void *cslf, p4est3_topidx * which_tree,
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_connectivity_p4est_find_face_transform (void *cslf, int32_t iface,
+                                               int *itree, int transform[])
+{
+  p4est_connectivity_t *c4 = (p4est_connectivity_t *) cslf;
+
+  SC3A_CHECK (itree != NULL);
+  SC3A_CHECK (transform != NULL);
+
+  SC3A_CHECK (0 <= iface && iface < P4EST_FACES);
+  SC3A_CHECK (0 <= *itree && *itree < c4->num_trees);
+
+  *itree = p4est_find_face_transform (c4, *itree, iface, transform);
+  return NULL;
+}
+
 sc3_error_t        *
 p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
                                p4est3_connectivity_t ** pc,
@@ -92,6 +108,7 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
     cvt->destroy = p4est3_connectivity_p4est_destroy;
   }
   cvt->get_face = p4est3_connectivity_p4est_get_face;
+  cvt->find_face_transform = p4est3_connectivity_p4est_find_face_transform;
 
   /* create connectivity */
   SC3E (p4est3_connectivity_new (alloc, &c));
