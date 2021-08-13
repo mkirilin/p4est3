@@ -390,7 +390,7 @@ p4est_quadrant_vtable_face_neighbor_extra (void *conn,
   }
 
   temp = *((p4est_quadrant_t *) r);
-  /* SC3E (p4est3_connectivity_find_face_transform (conn, face, t, transform)); */
+  SC3E (p4est3_connectivity_find_face_transform (conn, face, t, transform));
   if (*t == -1) {
     if (r != q) {
       *((p4est_quadrant_t *) r) = *((p4est_quadrant_t *) q);
