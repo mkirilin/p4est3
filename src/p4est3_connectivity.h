@@ -69,6 +69,14 @@ typedef             sc3_error_t
   * (*p4est3_connectivity_get_face_t) (void *slf, p4est3_topidx * which_tree,
                                        int *nface, int *orient);
 
+/** In: tree number; in/out: face number; out: axis combinations
+ * of a tree neighbor transform.
+ */
+typedef             sc3_error_t
+  * (*p4est3_connectivity_find_face_transform_t) (void *slf, int32_t iface,
+                                                  int *itree,
+                                                  int transform[]);
+
 /** One way to create a connectivity is to provide a virtual table with state.
  * The members of this table must be set before passing it to \ref
  * p4est3_connectivity_set_vtable, where we make a shallow copy.
@@ -87,6 +95,8 @@ typedef struct p4est3_connectivity_vtable
   p4est3_connectivity_inout_t destroy;
   /** Query face connection; if NULL report physical boundary always */
   p4est3_connectivity_get_face_t get_face;
+  /** Query axis combinations of a tree neighbor transform */
+  p4est3_connectivity_find_face_transform_t find_face_transform;
 }
 p4est3_connectivity_vtable_t;
 
@@ -232,6 +242,52 @@ sc3_error_t        *p4est3_connectivity_get_num_trees
 sc3_error_t        *p4est3_connectivity_get_face
   (const p4est3_connectivity_t * c,
    p4est3_topidx * which_tree, int *nface, int *orient);
+
+/** Fill an array with the axis combination of a face neighbor transform.
+ * \param [in] iface        The number of the originating tree's face.
+ * \param [in, out]  itree  On input, the number of the originating tree.
+ *                          On output, the face neighbor tree if it exists, -1 otherwise.
+ * \param [out] ftransform  This array holds 9 integers.
+ *                          For 3D:
+ *              [0]..[2]    The coordinate axis sequence of the origin face.
+ *              [3]..[5]    The coordinate axis sequence of the target face.
+ *              [6]..[8]    Edge reverse flag for axes t1, t2; face code for n.
+ *                          For 2D:
+ *              [0,2]       The coordinate axis sequence of the origin face.
+ *              [3,5]       The coordinate axis sequence of the target face.
+ *              [6,8]       Edge reverse flag for axis t; face code for axis n.
+ *              [1,4,7]     0 (unused for compatibility with 3D).
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_find_face_transform
+  (const p4est3_connectivity_t * c,
+   int32_t iface, int *itree, int transform[]);
+
+/** Query index of a child that touches a face at some its corner.
+ * \param [in] c            Connectivity must be setup.
+ * \param [in] nface        Valid face number.
+ * \param [in, out] i       On input, a face corner number for the
+ *                          face \a nface in 0..3.
+ *                          On output, index of the child touches both
+ *                          the face \a nface and the \a i-th face corner.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_get_face_child_id
+  (const p4est3_connectivity_t * c, int nface, int *i);
+
+/** Transform a face corner across one of the adjacent faces into a neighbor tree.
+ * This version expects the neighbor face and orientation separately.
+ * \param [in] c            Connectivity must be setup.
+ * \param [in,out] fc       On input, a face corner number in 0..3.
+ *                          On output, the face corner number relative
+ *                          to the neighbor's face.
+ * \param [in] f     A face that the face corner \a fc is relative to.
+ * \param [in] nf    A neighbor face that is on the other side of \f.
+ * \param [in] o     The orientation between tree boundary faces \a f and \nf.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_connectivity_face_neighbor_face_corner
+  (const p4est3_connectivity_t * c, int *fc, int f, int nf, int o);
 
 /** Create a connectivity readily setup to represent the 2D unit square.
  * \param [in,out] alloc   Allocator must be setup.  It is referenced

@@ -57,6 +57,7 @@ p4est_test_programs += \
         test/p8est_test_reorder
 endif
 endif
+p4est_test_programs += test/p4est3_test_conn3_transformation
 if P4EST_ENABLE_BUILD_2D
 if P4EST_ENABLE_BUILD_3D
 if P4EST_ENABLE_BUILD_P6EST
@@ -155,6 +156,8 @@ test_p8est_test_plex_CPPFLAGS = @P4EST_PETSC_INCLUDE_DIRS@ $(AM_CPPFLAGS)
 test_p8est_test_plex_LDADD = @P4EST_PETSC_LINK_LIBS@ $(LDADD)
 endif
 
+test_p4est3_test_conn3_transformation_SOURCES = test/test_conn3_transformation.c
+
 if P4EST_ENABLE_BUILD_2D
 if P4EST_ENABLE_BUILD_3D
 if P4EST_ENABLE_BUILD_P6EST
@@ -231,7 +234,8 @@ LINT_CSOURCES += \
         $(test_p8est3_test_setup_SOURCES) \
         $(test_p8est_test_avx_SOURCES) \
         $(test_p8est_test_version_SOURCES) \
-        $(test_p6est_test_all_SOURCES)
+        $(test_p6est_test_all_SOURCES) \
+        $(test_p4est3_test_conn3_transformation)
 
 if P4EST_WITH_METIS
 LINT_CSOURCES += \
