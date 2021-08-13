@@ -47,6 +47,7 @@ p4est3_quadrant_vtable_is_valid (p4est3_quadrant_vtable_t * qvt, char *reason)
   SC3E_TEST (qvt->quadrant_parent != NULL || qvt->quadrant_ancestor != NULL,
              reason);
   SC3E_TEST (qvt->quadrant_face_neighbor != NULL, reason);
+  SC3E_TEST (qvt->quadrant_face_neighbor_extra != NULL, reason);
   SC3E_TEST (qvt->quadrant_predecessor != NULL, reason);
   SC3E_TEST (qvt->quadrant_successor != NULL, reason);
   SC3E_TEST (qvt->quadrant_child != NULL, reason);
@@ -259,6 +260,16 @@ p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t * qvt,
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_face_neighbor != NULL);
   SC3E (qvt->quadrant_face_neighbor (q, i, r));
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_quadrant_face_neighbor_extra (p4est3_quadrant_vtable_t * qvt,
+                                     void *c, const void *q, int i,
+                                     int *j, int *k, void *r)
+{
+  SC3A_CHECK (qvt != NULL && qvt->quadrant_face_neighbor_extra != NULL);
+  SC3E (qvt->quadrant_face_neighbor_extra (c, q, i, j, k, r));
   return NULL;
 }
 

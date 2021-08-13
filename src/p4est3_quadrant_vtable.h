@@ -81,6 +81,12 @@ typedef sc3_error_t *(*p4est3_quadrant_in_out_t) (const void *q, void *r);
 /** Generic prototype to take a quadrant and int and output another value. */
 typedef sc3_error_t *(*p4est3_quadrant_in_i_out_t) (const void *q, int i,
                                                     void *r);
+/** Generic prototype to take a connectivity, quadrant and three ints
+ *  and output two ints and a quadrant. */
+typedef sc3_error_t *(*p4est3_quadrant_c_in_i_j_k_out_t) (void *c,
+                                                          const void *q,
+                                                          int i, int *j,
+                                                          int *k, void *r);
 /** Prototype to set a quadrant based on a linear index. */
 typedef sc3_error_t *(*p4est3_quadrant_morton_t) (int l, p4est3_gloidx i,
                                                   void *r);
@@ -133,6 +139,8 @@ typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_first_descendant_t;
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_last_descendant_t;
 /** Prototype to construct the face neighbor of a quadrant. */
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_face_neighbor_t;
+/** Prototype to construct the face neighbor of a quadrant across a tree boundary. */
+typedef p4est3_quadrant_c_in_i_j_k_out_t p4est3_quadrant_face_neighbor_extra_t;
 
 /* *INDENT-ON* */
 
@@ -176,6 +184,8 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_copy_t quadrant_copy;
   p4est3_quadrant_parent_t quadrant_parent;     /**< Generate parent. */
   p4est3_quadrant_face_neighbor_t quadrant_face_neighbor; /**< Generate face neighbor */
+  /** Generate face neighbor across a tree boundary*/
+  p4est3_quadrant_face_neighbor_extra_t quadrant_face_neighbor_extra;
   p4est3_quadrant_predecessor_t quadrant_predecessor;   /**< Generate predecessor. */
   p4est3_quadrant_successor_t quadrant_successor;       /**< Generate successor. */
   p4est3_quadrant_child_t quadrant_child;       /**< Generate a child by number. */
@@ -378,10 +388,36 @@ sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
  * \param [in] q        Valid quadrant in this implementation.
  * \param [in] i        The face across which to generate the neighbor.
  * \param [out] r       The neighbor quadrant is placed here.
+ * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t *
                                                    qvt, const void *q, int i,
                                                    void *r);
+
+/** Compute the face neighbor of a quadrant, transforming across tree
+ * boundaries if necessary.
+ * \param [in] qvt      Valid virtual quadrant table.
+ * \param [in] c        The connectivity structure for the forest.
+ * \param [in] q        Valid quadrant in this implementation.
+ * \param [in] i        The face across which to generate the neighbor.
+ * \param [in,out] j    On input: id of the tree that contains \a q.
+ *                      On output: id of the tree that contains \a r.
+ *                      By convention, if there is no tree across face \a j,
+ *                      then set \a j to -1.
+ * \param [out] k       Face number of \a r that neighbors \a q.
+ *                      It is encoded with orientation information
+ *                      in the same manner as the tree_to_face array in
+ *                      the p4est_connectivity_t struct.
+ * \param [out] r       The neighbor quadrant is placed here.
+ *                      By convention, if there is no tree across face \a i,
+ *                      \a r has the same Morton index as \a q.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_quadrant_face_neighbor_extra (p4est3_quadrant_vtable_t *
+                                                         qvt, void *c,
+                                                         const void *q, int i,
+                                                         int *j, int *k,
+                                                         void *r);
 
 /** Generate the predecessor quadrant.
  * \param [in] qvt      Valid virtual quadrant table.

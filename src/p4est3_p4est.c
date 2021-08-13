@@ -352,6 +352,41 @@ p4est_quadrant_vtable_face_neighbor (const void *q, int i, void *r)
 }
 
 static sc3_error_t *
+p4est_quadrant_vtable_face_neighbor_extra (void *conn,
+                                           const void *q, int face, int *t,
+                                           int *nface, void *r)
+{
+  SC3A_IS (p4est3_connectivity_is_valid, conn);
+  SC3A_IS (p4est_quadrant_vtable_is_valid, q);
+  SC3A_CHECK (t != NULL);
+  SC3A_CHECK (r != NULL);
+  SC3A_CHECK (nface != NULL);
+
+  p4est_quadrant_t temp;
+  int transform[9];
+
+  p4est_quadrant_face_neighbor
+    ((const p4est_quadrant_t *) q, face, (p4est_quadrant_t *) r);
+  if (p4est_quadrant_is_inside_root ((p4est_quadrant_t *) r)) {
+    *nface = (face ^ 1);
+    return NULL;
+  }
+
+  temp = *((p4est_quadrant_t *) r);
+  /* SC3E (p4est3_connectivity_find_face_transform (conn, face, t, transform)); */
+  if (*t == -1) {
+    if (r != q) {
+      *((p4est_quadrant_t *) r) = *((p4est_quadrant_t *) q);
+    }
+    *nface = -1;
+    return NULL;
+  }
+  p4est_quadrant_transform_face (&temp, r, transform);  
+
+  return NULL;
+}
+
+static sc3_error_t *
 p4est_quadrant_vtable_predecessor (const void *q, void *r)
 {
   p4est_quadrant_predecessor
@@ -464,6 +499,8 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->quadrant_copy = p4est_quadrant_vtable_copy;
   qvt->quadrant_parent = p4est_quadrant_vtable_parent;
   qvt->quadrant_face_neighbor = p4est_quadrant_vtable_face_neighbor;
+  qvt->quadrant_face_neighbor_extra =
+    p4est_quadrant_vtable_face_neighbor_extra;
   qvt->quadrant_predecessor = p4est_quadrant_vtable_predecessor;
   qvt->quadrant_successor = p4est_quadrant_vtable_successor;
   qvt->quadrant_child = p4est_quadrant_vtable_child;
