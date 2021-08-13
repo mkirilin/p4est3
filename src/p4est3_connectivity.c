@@ -284,6 +284,25 @@ p4est3_connectivity_get_face (const p4est3_connectivity_t * c,
 }
 
 sc3_error_t        *
+p4est3_connectivity_find_face_transform (const p4est3_connectivity_t * c,
+                                         int32_t iface, int *itree,
+                                         int transform[])
+{
+  SC3A_IS (p4est3_connectivity_is_setup, c);
+  SC3A_CHECK (itree != NULL);
+  SC3A_CHECK (transform != NULL);
+
+  SC3A_CHECK (0 <= iface && iface < c->num_faces);
+  SC3A_CHECK (0 <= *itree && *itree < c->num_trees);
+
+  if (c->cvt != NULL && c->cvt->find_face_transform != NULL) {
+    SC3E (c->cvt->find_face_transform (c->slf, iface, itree, transform));
+  }
+
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_connectivity_get_face_child_id (const p4est3_connectivity_t * c,
                                        int nface, int *i)
 {
