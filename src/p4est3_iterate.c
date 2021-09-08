@@ -300,7 +300,7 @@ static int
 p4est3_get_children_face_nb_id (p4est3_search_area_t * sa,
                                 int child_id, int face)
 {
-  return sa->children_face_neighbors[child_id * sa->max_children + face];
+  return sa->children_face_neighbors[child_id * sa->nfaces + face];
 }
 
 static int
