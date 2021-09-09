@@ -373,29 +373,28 @@ p4est3_connectivity_get_face_transform (const p4est3_connectivity_t * c,
 
 sc3_error_t        *
 p4est3_connectivity_get_face_child_id (const p4est3_connectivity_t * c,
-                                       int nface, int *i)
+                                       int nface, int fcorner, int *childid)
 {
   SC3A_IS (p4est3_connectivity_is_setup, c);
-  SC3A_CHECK (i != NULL);
+  SC3A_CHECK (childid != NULL);
 
   SC3A_CHECK (0 <= nface && nface < c->num_faces);
-  SC3A_CHECK (0 <= *i && *i < c->num_orient);
+  SC3A_CHECK (0 <= fcorner && fcorner < c->num_orient);
 
   if (c->dim == 2) {
-    *i = face_corners_2d[nface][*i];
+    *childid = face_corners_2d[nface][fcorner];
   }
   else {
-    *i = face_corners_3d[nface][*i];
+    *childid = face_corners_3d[nface][fcorner];
   }
 
-  SC3A_CHECK (0 <= *i && *i < (1 << c->dim));
+  SC3A_CHECK (0 <= *childid && *childid < (1 << c->dim));
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_connectivity_face_neighbor_face_corner (const p4est3_connectivity_t *
-                                               c, int *fc, int f, int nf,
-                                               int o)
+p4est3_connectivity_get_neighbor_face_corner (const p4est3_connectivity_t * c,
+                                              int f, int nf, int o, int *fc)
 {
   int                 pref, pset;
 

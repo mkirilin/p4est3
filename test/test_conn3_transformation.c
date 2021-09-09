@@ -84,10 +84,10 @@ test_face_neighbor_face_corner (sc3_allocator_t * alloc,
         /* verify bijectivity of transformation */
         for (c0 = 0; c0 < nFaceCorners; ++c0) {
           c1 = c0;
-          SC3E (p4est3_connectivity_face_neighbor_face_corner
-                (conn, &c1, lowerFaceIdx, higherFaceIdx, ori));
-          SC3E (p4est3_connectivity_face_neighbor_face_corner
-                (conn, &c1, higherFaceIdx, lowerFaceIdx, ori));
+          SC3E (p4est3_connectivity_get_neighbor_face_corner
+                (conn, lowerFaceIdx, higherFaceIdx, ori, &c1));
+          SC3E (p4est3_connectivity_get_neighbor_face_corner
+                (conn, higherFaceIdx, lowerFaceIdx, ori, &c1));
           SC3E_DEMAND (c0 == c1, "Face <-> neighbor face corner "
                        "transformation is not bijective");
         }
@@ -109,8 +109,7 @@ test_face_child (sc3_allocator_t * alloc,
   SC3A_IS (p4est3_connectivity_is_setup, conn);
   for (face = 0; face < numFaces; ++face) {
     for (c0 = 0; c0 < nFaceCorners; ++c0) {
-      c1 = c0;
-      SC3E (p4est3_connectivity_get_face_child_id (conn, face, &c1));
+      SC3E (p4est3_connectivity_get_face_child_id (conn, face, c0, &c1));
       if (dim == 2) {
         SC3E_DEMAND (c1 == face_corners_2d[face][c0],
                      "Connectivity provides a wrong child id for a corner");
