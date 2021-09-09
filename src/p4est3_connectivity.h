@@ -50,6 +50,7 @@
 #define P4EST3_CONNECTIVITY_H
 
 #include <p4est3_base.h>
+#include <sc3_array.h>
 
 #ifdef __cplusplus
 extern              "C"
@@ -63,19 +64,12 @@ extern              "C"
 typedef sc3_error_t *(*p4est3_connectivity_inout_t) (void *slf);
 
 /** In/out: tree number, face number; out: orientation (input 0).
+ * TODO: Add to documentation.
  * Only for a tree connection the output arguments need to be updated.
  */
 typedef             sc3_error_t
   * (*p4est3_connectivity_get_face_t) (void *slf, p4est3_topidx * which_tree,
                                        int *nface, int *orient);
-
-/** In: tree number; in/out: face number; out: axis combinations
- * of a tree neighbor transform.
- */
-typedef             sc3_error_t
-  * (*p4est3_connectivity_find_face_transform_t) (void *slf, int32_t iface,
-                                                  int *itree,
-                                                  int transform[]);
 
 /** One way to create a connectivity is to provide a virtual table with state.
  * The members of this table must be set before passing it to \ref
@@ -95,8 +89,6 @@ typedef struct p4est3_connectivity_vtable
   p4est3_connectivity_inout_t destroy;
   /** Query face connection; if NULL report physical boundary always */
   p4est3_connectivity_get_face_t get_face;
-  /** Query axis combinations of a tree neighbor transform */
-  p4est3_connectivity_find_face_transform_t find_face_transform;
 }
 p4est3_connectivity_vtable_t;
 
@@ -247,7 +239,7 @@ sc3_error_t        *p4est3_connectivity_get_face
  * \param [in] iface        The number of the originating tree's face.
  * \param [in, out]  itree  On input, the number of the originating tree.
  *                          On output, the face neighbor tree if it exists, -1 otherwise.
- * \param [out] ftransform  This array holds 9 integers.
+ * \param [in,out] ftransform  This array holds 9 integers.
  *                          For 3D:
  *              [0]..[2]    The coordinate axis sequence of the origin face.
  *              [3]..[5]    The coordinate axis sequence of the target face.
