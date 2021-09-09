@@ -257,7 +257,7 @@ p4est_quadrant_vtable_is_equal (const void *q1, const void *q2, char *reason)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_tree_boundary (const void *q, int *nf)
+p4est_quadrant_vtable_tree_boundary (const void *q, sc3_array_t * nf)
 {
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (nf != NULL);
@@ -265,19 +265,29 @@ p4est_quadrant_vtable_tree_boundary (const void *q, int *nf)
   SC3A_CHECK (p4est_quadrant_is_inside_root (q) == 1);
   const p4est_quadrant_t * quad = (const p4est_quadrant_t *) q;
   const int upper_bound = P4EST_ROOT_LEN - P4EST_QUADRANT_LEN (quad->level);
+  int *x, *y;
+#ifdef P4_TO_P8
+  int *z;
+#endif
+
+  SC3E (sc3_array_index (nf, 0, &x));
+  SC3E (sc3_array_index (nf, 1, &y));
+#ifdef P4_TO_P8
+  SC3E (sc3_array_index (nf, 2, &z));
+#endif
 
   if (quad->level == 0) {
-    nf[0] = nf[1] = -2;
+    *x = *y = -2;
 #ifdef P4_TO_P8
-    nf[2] = -2;
+    *z = -2;
 #endif
     return NULL;
   }
 
-  nf[0] = quad->x == 0 ? 0 : (quad->x == upper_bound) ? 1 : -1;
-  nf[1] = quad->y == 0 ? 2 : (quad->y == upper_bound) ? 3 : -1;
+  *x = quad->x == 0 ? 0 : (quad->x == upper_bound) ? 1 : -1;
+  *y = quad->y == 0 ? 2 : (quad->y == upper_bound) ? 3 : -1;
 #ifdef P4_TO_P8
-  nf[2] = quad->z == 0 ? 4 : (quad->z == upper_bound) ? 5 : -1;
+  *z = quad->z == 0 ? 4 : (quad->z == upper_bound) ? 5 : -1;
 #endif
 
   return NULL;

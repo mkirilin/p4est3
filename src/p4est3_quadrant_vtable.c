@@ -139,8 +139,8 @@ p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est_quadrant_tree_boundary (p4est3_quadrant_vtable_t * qvt,
-                              const void *q, int *nf)
+p4est3_quadrant_tree_boundary (p4est3_quadrant_vtable_t * qvt,
+                              const void *q, sc3_array_t * nf)
 {
   SC3A_CHECK (qvt != NULL);
   SC3E (qvt->quadrant_tree_boundary (q, nf));
