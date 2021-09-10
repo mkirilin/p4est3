@@ -125,6 +125,17 @@ p4est3_quadrant_is2_valid (p4est3_quadrant_vtable_t * qvt,
 }
 
 int
+p4est3_quadrant_is2_inside_root (p4est3_quadrant_vtable_t * qvt,
+                                const void *q, char *reason)
+{
+  SC3E_TEST (qvt != NULL, reason);
+  if (qvt->quadrant_is_inside_root != NULL) {
+    SC3E_IS (qvt->quadrant_is_inside_root, q, reason);
+  }
+  SC3E_YES (reason);
+}
+
+int
 p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
                            const void *q1, const void *q2, char *reason)
 {

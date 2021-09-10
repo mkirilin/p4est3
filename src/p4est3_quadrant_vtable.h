@@ -166,6 +166,9 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_num_uniform_t quadrant_num_uniform;   /**< Quadrants per level. */
   /** Examine validity.  Pointer may be NULL, in which case validity is true. */
   p4est3_quadrant_is_t quadrant_is_valid;
+  /** Examine if a quadrant is inside a root.
+   * Pointer may be NULL, in which case we return true. */
+  p4est3_quadrant_is_t quadrant_is_inside_root;
   /** Examine equality.
    * Pointer may be NULL, in which case we memcmp (3) the contents. */
   p4est3_quadrant_is2_t quadrant_is_equal;
@@ -263,6 +266,17 @@ p4est3_gloidx       p4est3_quadrant_num_uniform (p4est3_quadrant_vtable_t *
  */
 int                 p4est3_quadrant_is2_valid (p4est3_quadrant_vtable_t * qvt,
                                                const void *q, char *reason);
+
+/** Query if a quadrant is inside a root in the style of \c sc3_<object>_is2_valid.
+ * \param [in] qvt      NULL is allowed and considered not inside a root.
+ * \param [in] q        NULL is allowed and considered not inside a root.
+ * \param [out] reason  May be NULL.  Otherwise, set to "" on output when valid
+ *                      or, as applicable, the reason for not being valid.
+ * \return              True if the quadrant \a q is inside a root, false otherwise.
+ */
+int                 p4est3_quadrant_is2_inside_root (p4est3_quadrant_vtable_t
+                                                     * qvt, const void *q,
+                                                     char *reason);
 
 /** Query equality of two quadrants in the style of \c sc3_<object>_is3_valid.
  * \param [in] qvt      NULL is allowed and considered not equal.
@@ -493,17 +507,6 @@ sc3_error_t        *p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t
  */
 sc3_error_t        *p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
                                             int l, p4est3_gloidx id, void *r);
-sc3_error_t        *p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t
-                                                    * qvt, const void *q1,
-                                                    const void *q2, void *r);
-
-sc3_error_t        *p4est3_quadrant_linear_id (p4est3_quadrant_vtable_t * qvt,
-                                               const void *q, int l,
-                                               p4est3_gloidx * id);
-
-sc3_error_t        *p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t
-                                                 * qvt, const void *q1,
-                                                 const void *q2, int *j);
 
 /** Generate a common nearest ancestor of two quadrants. 
  * \param [in] qvt      Valid virtual quadrant table.
