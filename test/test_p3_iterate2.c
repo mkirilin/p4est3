@@ -455,7 +455,7 @@ iterate_unimesh_tree_boundary_face (setup_t * t, p4est3_t * p3,
     }
     SC3E (p4est3_quadrant_tree_boundary (qvt, r, t->nf));
     for (d = 0; d < qvt->dim; ++d) {
-        SC3E (sc3_array_index (t->nf, d, &idx));
+      SC3E (sc3_array_index (t->nf, d, &idx));
       if (*idx == face || *idx == -2) {
         SC3E (fill_face_info (fpredef, nquads_per_level - 1, face,
                               face_neighbor, nsides, ori, is_tree_bound,
