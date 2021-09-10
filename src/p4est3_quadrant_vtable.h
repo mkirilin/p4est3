@@ -398,11 +398,11 @@ sc3_error_t        *p4est3_quadrant_copy (p4est3_quadrant_vtable_t * qvt,
 sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
                                             const void *q, void *r);
 
-/** Generate the face neighbor quadrant 
+/** Generate the face neighbor quadrant within the same tree.
  * \param [in] qvt      Valid virtual quadrant table.
  * \param [in] q        Valid quadrant in this implementation.
  * \param [in] i        The face across which to generate the neighbor.
- * \param [out] r       The neighbor quadrant is placed here.
+ * \param [out] r       The neighbor quadrant is placed here in existing memory.
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t *
