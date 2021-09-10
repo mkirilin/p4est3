@@ -100,6 +100,10 @@ typedef sc3_error_t *(*p4est3_quadrant_linear_id_t) (const void *q, int l,
 /** Prototype to query if a quadrant touches a tree face boundaries and which */
 typedef sc3_error_t *(*p4est3_quadrant_tree_boundary_t) (const void *q,
                                                          sc3_array_t * a);
+/** Prototype to transform a quadrant across a face between trees*/
+typedef sc3_error_t *(*p4est3_quadrant_transform_face_t) (const void *q,
+                                                          sc3_array_t * a,
+                                                          void *r);
 
 /*** Specific prototypes for quadrant query functions ***/
 
@@ -188,6 +192,8 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_copy_t quadrant_copy;
   p4est3_quadrant_parent_t quadrant_parent;     /**< Generate parent. */
   p4est3_quadrant_face_neighbor_t quadrant_face_neighbor; /**< Generate face neighbor */
+  /** Transform a quadrant across a face between trees */
+  p4est3_quadrant_transform_face_t quadrant_transform_face;
   /** Generate face neighbor across a tree boundary*/
   p4est3_quadrant_face_neighbor_extra_t quadrant_face_neighbor_extra;
   p4est3_quadrant_predecessor_t quadrant_predecessor;   /**< Generate predecessor. */
@@ -408,6 +414,26 @@ sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
 sc3_error_t        *p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t *
                                                    qvt, const void *q, int i,
                                                    void *r);
+
+/** Transforms a quadrant/node across a face between trees.
+ * \param [in] q          Valid quadrant in this implementation
+ *                        that will be transformed.
+ * \param [in] transform  This array holds 9 integers.
+ *                        For 3D:
+ *            [0]..[2]    The coordinate axis sequence of the origin face.
+ *            [3]..[5]    The coordinate axis sequence of the target face.
+ *            [6]..[8]    Edge reverse flag for axes t1, t2; face code for n.
+ *                        For 2D:
+ *            [0,2]       The coordinate axis sequence of the origin face.
+ *            [3,5]       The coordinate axis sequence of the target face.
+ *            [6,8]       Edge reverse flag for axis t; face code for axis n.
+ * \param [out] r         Tansformed quadrant is placed here in existing memory.
+ * \return                NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_quadrant_transform_face (p4est3_quadrant_vtable_t *
+                                                    qvt, const void *q,
+                                                    sc3_array_t * transform,
+                                                    void *r);
 
 /** Compute the face neighbor of a quadrant, transforming across tree
  * boundaries if necessary.
