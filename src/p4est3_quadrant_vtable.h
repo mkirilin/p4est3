@@ -99,7 +99,7 @@ typedef sc3_error_t *(*p4est3_quadrant_linear_id_t) (const void *q, int l,
                                                      p4est3_gloidx *i);
 /** Prototype to query if a quadrant touches a tree face boundaries and which */
 typedef sc3_error_t *(*p4est3_quadrant_tree_boundary_t) (const void *q,
-                                                         sc3_array_t * i);
+                                                         sc3_array_t * a);
 
 /*** Specific prototypes for quadrant query functions ***/
 
