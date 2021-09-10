@@ -300,7 +300,6 @@ p4est3_connectivity_get_face_transform (const p4est3_connectivity_t * c,
   SC3E (p4est3_connectivity_get_face
         (c, &itree_neighbor, &iface_neighbor, &orient));
 
-  *itree = *itree == itree_neighbor ? -1 : itree_neighbor;
   if (*itree == itree_neighbor && iface == iface_neighbor) {
     SC3A_CHECK (orient == 0);
     *itree = -1;
