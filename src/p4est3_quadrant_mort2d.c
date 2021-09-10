@@ -491,6 +491,9 @@ p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_is_valid =
     (p4est3_quadrant_is_t) p4est3_quadrant_mort_is_valid;
 
+  qvt->quadrant_is_inside_root =
+    (p4est3_quadrant_is_t) p4est3_quadrant_mort_is_inside_root;
+
   qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_mort_level;
 
   qvt->quadrant_child_id =

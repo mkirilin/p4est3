@@ -465,7 +465,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
   p4est3_iterate_face_side_t *fside;
   int                *is_refine = search_area->is_refine;
   int                *Level = search_area->Level_face;
-  int                 i, side, level, idx;
+  int                 i, side, level, idx, child_id;
   int                 ori = search_area->finfo->orientation;
   void               *first_quad;
 
@@ -523,13 +523,13 @@ p4est3_internal_iterate_face (p4est3_t * p3,
         continue;
       }
       if (side == 1) {
-        SC3E (p4est3_connectivity_face_neighbor_face_corner
-              (p3->conn, &idx, fside[0].nface, fside[1].nface, ori));
+        SC3E (p4est3_connectivity_get_neighbor_face_corner
+              (p3->conn, fside[0].nface, fside[1].nface, ori, &idx));
       }
       SC3E (p4est3_connectivity_get_face_child_id
-            (p3->conn, fside[side].nface, &idx));
-      b_f[side] = arr_it + idx;
-      e_f[side] = arr_it + idx + 1;
+            (p3->conn, fside[side].nface, idx, &child_id));
+      b_f[side] = arr_it + child_id;
+      e_f[side] = arr_it + child_id + 1;
       SC3A_CHECK (*(b_f[side]) < *(e_f[side]));
       /*if (*(b_f[side]) == *(e_f[side]) - 1) {
          continue;

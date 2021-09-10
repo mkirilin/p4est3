@@ -81,12 +81,6 @@ typedef sc3_error_t *(*p4est3_quadrant_in_out_t) (const void *q, void *r);
 /** Generic prototype to take a quadrant and int and output another value. */
 typedef sc3_error_t *(*p4est3_quadrant_in_i_out_t) (const void *q, int i,
                                                     void *r);
-/** Generic prototype to take a connectivity, quadrant and three ints
- *  and output two ints and a quadrant. */
-typedef sc3_error_t *(*p4est3_quadrant_c_in_i_j_k_out_t) (void *c,
-                                                          const void *q,
-                                                          int i, int *j,
-                                                          int *k, void *r);
 /** Prototype to set a quadrant based on a linear index. */
 typedef sc3_error_t *(*p4est3_quadrant_morton_t) (int l, p4est3_gloidx i,
                                                   void *r);
@@ -97,6 +91,17 @@ typedef sc3_error_t *(*p4est3_nearest_common_ancestor_t) (const void * q1,
 /** Prototype to set a linear index of a quadrant based on its morton index. */
 typedef sc3_error_t *(*p4est3_quadrant_linear_id_t) (const void *q, int l,
                                                      p4est3_gloidx *i);
+/** Prototype to query if a quadrant touches a tree face boundaries and which */
+typedef sc3_error_t *(*p4est3_quadrant_tree_boundary_t) (const void *q,
+                                                         sc3_array_t * a);
+/** Prototype to transform a quadrant across a face between trees*/
+typedef sc3_error_t *(*p4est3_quadrant_transform_face_t) (const void *q,
+                                                          sc3_array_t * a,
+                                                          void *r);
+/** Prototype to construct the face neighbor of a quadrant accross a tree. */
+typedef sc3_error_t *(*p4est3_quadrant_tree_face_neighbor_t) (const void *q,
+                                                              sc3_array_t * t,
+                                                              int i, void *r);
 
 /*** Specific prototypes for quadrant query functions ***/
 
@@ -110,8 +115,6 @@ typedef p4est3_quadrant_in_j_t p4est3_quadrant_child_id_t;
 typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_ancestor_id_t;
 /** Prototype to query the number of children of a quadrant. */
 typedef p4est3_quadrant_in_j_t p4est3_quadrant_num_children_t;
-/** Prototype to query if a quadrant touches a tree face boundaries and which */
-typedef p4est3_quadrant_in_j_t p4est3_quadrant_tree_boundary_t;
 /** Prototype to compare two quadrants by linear index. */
 typedef p4est3_quadrant_in2_j_t p4est3_quadrant_compare_t;
 /** Prototype to query the one quadrant is ancetor of another. */
@@ -139,8 +142,6 @@ typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_first_descendant_t;
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_last_descendant_t;
 /** Prototype to construct the face neighbor of a quadrant. */
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_face_neighbor_t;
-/** Prototype to construct the face neighbor of a quadrant across a tree boundary. */
-typedef p4est3_quadrant_c_in_i_j_k_out_t p4est3_quadrant_face_neighbor_extra_t;
 
 /* *INDENT-ON* */
 
@@ -165,6 +166,9 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_num_uniform_t quadrant_num_uniform;   /**< Quadrants per level. */
   /** Examine validity.  Pointer may be NULL, in which case validity is true. */
   p4est3_quadrant_is_t quadrant_is_valid;
+  /** Examine if a quadrant is inside a root.
+   * Pointer may be NULL, in which case we return true. */
+  p4est3_quadrant_is_t quadrant_is_inside_root;
   /** Examine equality.
    * Pointer may be NULL, in which case we memcmp (3) the contents. */
   p4est3_quadrant_is2_t quadrant_is_equal;
@@ -184,8 +188,10 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_copy_t quadrant_copy;
   p4est3_quadrant_parent_t quadrant_parent;     /**< Generate parent. */
   p4est3_quadrant_face_neighbor_t quadrant_face_neighbor; /**< Generate face neighbor */
+  /** Transform a quadrant across a face between trees */
+  p4est3_quadrant_transform_face_t quadrant_transform_face;
   /** Generate face neighbor across a tree boundary*/
-  p4est3_quadrant_face_neighbor_extra_t quadrant_face_neighbor_extra;
+  p4est3_quadrant_tree_face_neighbor_t quadrant_tree_face_neighbor;
   p4est3_quadrant_predecessor_t quadrant_predecessor;   /**< Generate predecessor. */
   p4est3_quadrant_successor_t quadrant_successor;       /**< Generate successor. */
   p4est3_quadrant_child_t quadrant_child;       /**< Generate a child by number. */
@@ -263,6 +269,17 @@ p4est3_gloidx       p4est3_quadrant_num_uniform (p4est3_quadrant_vtable_t *
 int                 p4est3_quadrant_is2_valid (p4est3_quadrant_vtable_t * qvt,
                                                const void *q, char *reason);
 
+/** Query if a quadrant is inside a root in the style of \c sc3_<object>_is2_valid.
+ * \param [in] qvt      NULL is allowed and considered not inside a root.
+ * \param [in] q        NULL is allowed and considered not inside a root.
+ * \param [out] reason  May be NULL.  Otherwise, set to "" on output when valid
+ *                      or, as applicable, the reason for not being valid.
+ * \return              True if the quadrant \a q is inside a root, false otherwise.
+ */
+int                 p4est3_quadrant_is2_inside_root (p4est3_quadrant_vtable_t
+                                                     * qvt, const void *q,
+                                                     char *reason);
+
 /** Query equality of two quadrants in the style of \c sc3_<object>_is3_valid.
  * \param [in] qvt      NULL is allowed and considered not equal.
  * \param [in] q1       NULL is allowed and considered not equal.
@@ -281,16 +298,16 @@ int                 p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
  * \param [in] q        Valid quadrant in this implementation.
  * \param [out] nf      Array of size dimension of \a qvt. Every element
  *                      corresponds to a spatial direction and contains
- *                      a face number of a quadrant toching the tree boundary
- *                      at this direction. If quadrant touches no boundaries,
- *                      then the element of array is filled by -1. If quadrant
- *                      touches all the boundaries (iff a the quadrant is
- *                      the whole tree), then array is filled by -2.
+ *                      a face number of a quadrant touching the tree boundary
+ *                      in this direction.  If quadrant touches no boundaries,
+ *                      then the element of array is filled by -1.  If quadrant
+ *                      touches all the boundaries (i.e., the quadrant is
+ *                      the whole tree), then the entry is filled by -2.
  * \return              NULL on success, error object otherwise.
 */
-sc3_error_t        *p4est_quadrant_tree_boundary (p4est3_quadrant_vtable_t *
-                                                  qvt, const void *q,
-                                                  int *nf);
+sc3_error_t        *p4est3_quadrant_tree_boundary (p4est3_quadrant_vtable_t *
+                                                   qvt, const void *q,
+                                                   sc3_array_t * nf);
 
 /** Query the refinement level of a quadrant.
  * \param [in] qvt      Valid virtual quadrant table.
@@ -383,41 +400,64 @@ sc3_error_t        *p4est3_quadrant_copy (p4est3_quadrant_vtable_t * qvt,
 sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
                                             const void *q, void *r);
 
-/** Generate the face neighbor quadrant 
+/** Generate the face neighbor quadrant within the same tree.
  * \param [in] qvt      Valid virtual quadrant table.
  * \param [in] q        Valid quadrant in this implementation.
  * \param [in] i        The face across which to generate the neighbor.
- * \param [out] r       The neighbor quadrant is placed here.
+ * \param [out] r       The neighbor quadrant is placed here in existing memory.
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t *
                                                    qvt, const void *q, int i,
                                                    void *r);
 
-/** Compute the face neighbor of a quadrant, transforming across tree
- * boundaries if necessary.
+/** Transforms a quadrant/node across a face between trees.
+ * \param [in] q          Valid quadrant in this implementation
+ *                        that will be transformed.
+ * \param [in] transform  This array holds 9 integers.
+ *                        For 3D:
+ *            [0]..[2]    The coordinate axis sequence of the origin face.
+ *            [3]..[5]    The coordinate axis sequence of the target face.
+ *            [6]..[8]    Edge reverse flag for axes t1, t2; face code for n.
+ *                        For 2D:
+ *            [0,2]       The coordinate axis sequence of the origin face.
+ *            [3,5]       The coordinate axis sequence of the target face.
+ *            [6,8]       Edge reverse flag for axis t; face code for axis n.
+ * \param [out] r         Tansformed quadrant is placed here in existing memory.
+ * \return                NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_quadrant_transform_face (p4est3_quadrant_vtable_t *
+                                                    qvt, const void *q,
+                                                    sc3_array_t * transform,
+                                                    void *r);
+
+/** Compute the face neighbor of a quadrant across a tree boundary.
  * \param [in] qvt      Valid virtual quadrant table.
- * \param [in] c        The connectivity structure for the forest.
  * \param [in] q        Valid quadrant in this implementation.
+ * \param [in] transform  This array holds 9 integers.
+ *                        For 3D:
+ *            [0]..[2]    The coordinate axis sequence of the origin face.
+ *            [3]..[5]    The coordinate axis sequence of the target face.
+ *            [6]..[8]    Edge reverse flag for axes t1, t2; face code for n.
+ *                        For 2D:
+ *            [0,2]       The coordinate axis sequence of the origin face.
+ *            [3,5]       The coordinate axis sequence of the target face.
+ *            [6,8]       Edge reverse flag for axis t; face code for axis n.
+ *            [1,4,7]     0 (unused for compatibility with 3D).
+ *                      TODO: The connectivity should not be referenced in qvt.
+ *                            Instead pass transformation array.
+ *                            No need to compute tree numbers etc. inside here
+ *                            since (a) function is only called between trees
+ *                            and (b) those are used beforehand to find transform.
  * \param [in] i        The face across which to generate the neighbor.
- * \param [in,out] j    On input: id of the tree that contains \a q.
- *                      On output: id of the tree that contains \a r.
- *                      By convention, if there is no tree across face \a j,
- *                      then set \a j to -1.
- * \param [out] k       Face number of \a r that neighbors \a q.
- *                      It is encoded with orientation information
- *                      in the same manner as the tree_to_face array in
- *                      the p4est_connectivity_t struct.
- * \param [out] r       The neighbor quadrant is placed here.
- *                      By convention, if there is no tree across face \a i,
- *                      \a r has the same Morton index as \a q.
+ * \param [out] r       The neighbor quadrant is placed here in existing memory.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_face_neighbor_extra (p4est3_quadrant_vtable_t *
-                                                         qvt, void *c,
-                                                         const void *q, int i,
-                                                         int *j, int *k,
-                                                         void *r);
+sc3_error_t        *p4est3_quadrant_tree_face_neighbor (p4est3_quadrant_vtable_t *
+                                                        qvt, const void *q,
+                                                        sc3_array_t *
+                                                        transform, int i,
+                                                        void *r);
 
 /** Generate the predecessor quadrant.
  * \param [in] qvt      Valid virtual quadrant table.
@@ -492,17 +532,6 @@ sc3_error_t        *p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t
  */
 sc3_error_t        *p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
                                             int l, p4est3_gloidx id, void *r);
-sc3_error_t        *p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t
-                                                    * qvt, const void *q1,
-                                                    const void *q2, void *r);
-
-sc3_error_t        *p4est3_quadrant_linear_id (p4est3_quadrant_vtable_t * qvt,
-                                               const void *q, int l,
-                                               p4est3_gloidx * id);
-
-sc3_error_t        *p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t
-                                                 * qvt, const void *q1,
-                                                 const void *q2, int *j);
 
 /** Generate a common nearest ancestor of two quadrants. 
  * \param [in] qvt      Valid virtual quadrant table.

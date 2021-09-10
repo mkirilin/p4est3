@@ -97,6 +97,8 @@ typedef struct setup
   int                 mpirank;
   int                 level;
   p4est3_topidx       num_trees;
+  sc3_array_t        *transform;
+  sc3_array_t        *nf;
 }
 setup_t;
 
@@ -307,8 +309,10 @@ fill_face_info (sc3_array_t * fpredef, int nquad, int face, int face_neighbor,
   sinfo->nface = face_neighbor;
   if (finfo->tree_boundary) {
     ntree = tree->treeid;
-    SC3E (p4est3_quadrant_face_neighbor_extra
-          (qvt, t->conn, r, face, &ntree, &face_neighbor, q));
+    SC3E (p4est3_connectivity_get_face_transform
+          (t->conn, face, &ntree, t->transform));
+    SC3A_CHECK (ntree != -1);
+    SC3E (p4est3_quadrant_tree_face_neighbor (qvt, r, t->transform, face, q));
     SC3A_CHECK (sinfo->nface == face_neighbor % (2 * qvt->dim));
   }
   else {
@@ -420,8 +424,7 @@ iterate_unimesh_tree_boundary_face (setup_t * t, p4est3_t * p3,
   p4est3_gloidx       nquads_per_level = 1L << (qvt->dim * t->level);
   int                 i, d, face, face_neighbor, ori, nsides;
   int                 nfaces = 2 * qvt->dim;
-  int                *nf;
-  SC3E (sc3_allocator_calloc (t->alloc, qvt->dim, sizeof (int), &nf));
+  int                *idx;
 
   for (face = 0; face < nfaces; ++face) {
     nsides = 2;
@@ -438,9 +441,10 @@ iterate_unimesh_tree_boundary_face (setup_t * t, p4est3_t * p3,
     SC3E (p4est3_tree_index (p3, ntree_neighbor, &tree_neighbor));
     SC3E (p4est3_quadrant_morton (qvt, t->level, 0L, r));
     for (i = 0; i < nquads_per_level - 1; ++i) {
-      SC3E (p4est_quadrant_tree_boundary (qvt, r, nf));
+      SC3E (p4est3_quadrant_tree_boundary (qvt, r, t->nf));
       for (d = 0; d < qvt->dim; ++d) {
-        if (nf[d] == face || nf[d] == -2) {
+        SC3E (sc3_array_index (t->nf, d, &idx));
+        if (*idx == face || *idx == -2) {
           SC3E (fill_face_info (fpredef, i, face, face_neighbor, nsides, ori,
                                 is_tree_bound, tree, tree_neighbor, qvt, q, r,
                                 t));
@@ -449,9 +453,10 @@ iterate_unimesh_tree_boundary_face (setup_t * t, p4est3_t * p3,
       }
       SC3E (p4est3_quadrant_successor (qvt, r, r));
     }
-    SC3E (p4est_quadrant_tree_boundary (qvt, r, nf));
+    SC3E (p4est3_quadrant_tree_boundary (qvt, r, t->nf));
     for (d = 0; d < qvt->dim; ++d) {
-      if (nf[d] == face || nf[d] == -2) {
+        SC3E (sc3_array_index (t->nf, d, &idx));
+      if (*idx == face || *idx == -2) {
         SC3E (fill_face_info (fpredef, nquads_per_level - 1, face,
                               face_neighbor, nsides, ori, is_tree_bound,
                               tree, tree_neighbor, qvt, q, r, t));
@@ -459,7 +464,6 @@ iterate_unimesh_tree_boundary_face (setup_t * t, p4est3_t * p3,
       }
     }
   }
-  sc3_allocator_free (t->alloc, nf);
   return NULL;
 }
 
@@ -674,6 +678,8 @@ main (int argc, char **argv)
   SC3X (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
   SC3X (make_allocator (t));
   SC3X (p4est3_quadrant_vtable_p4est (qvt, 0));
+  SC3X (array_new (t->alloc, sizeof (int), 9, 9, &t->transform));
+  SC3X (array_new (t->alloc, sizeof (int), qvt->dim, qvt->dim, &t->nf));
   nfaces = 2 * qvt->dim;
   nori = 1 << (qvt->dim - 1);
 
@@ -706,6 +712,8 @@ main (int argc, char **argv)
       }
     }
   }
+  SC3X (sc3_array_destroy (&t->transform));
+  SC3X (sc3_array_destroy (&t->nf));
   SC3X (free_allocator (&t->alloc));
   SC3X (sc3_MPI_Finalize ());
   return 0;

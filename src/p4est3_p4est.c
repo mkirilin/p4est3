@@ -71,22 +71,6 @@ p4est3_connectivity_p4est_get_face (void *cslf, p4est3_topidx * which_tree,
   return NULL;
 }
 
-static sc3_error_t *
-p4est3_connectivity_p4est_find_face_transform (void *cslf, int32_t iface,
-                                               int *itree, int transform[])
-{
-  p4est_connectivity_t *c4 = (p4est_connectivity_t *) cslf;
-
-  SC3A_CHECK (itree != NULL);
-  SC3A_CHECK (transform != NULL);
-
-  SC3A_CHECK (0 <= iface && iface < P4EST_FACES);
-  SC3A_CHECK (0 <= *itree && *itree < c4->num_trees);
-
-  *itree = p4est_find_face_transform (c4, *itree, iface, transform);
-  return NULL;
-}
-
 sc3_error_t        *
 p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
                                p4est3_connectivity_t ** pc,
@@ -108,7 +92,6 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
     cvt->destroy = p4est3_connectivity_p4est_destroy;
   }
   cvt->get_face = p4est3_connectivity_p4est_get_face;
-  cvt->find_face_transform = p4est3_connectivity_p4est_find_face_transform;
 
   /* create connectivity */
   SC3E (p4est3_connectivity_new (alloc, &c));
@@ -281,6 +264,14 @@ p4est_quadrant_vtable_is_valid (const void *q, char *reason)
 }
 
 static int
+p4est_quadrant_vtable_is_inside_root (const void *q, char *reason)
+{
+  SC3E_TEST (p4est_quadrant_is_inside_root
+              ((const p4est_quadrant_t *) q), reason);
+  SC3E_YES (reason);
+}
+
+static int
 p4est_quadrant_vtable_is_equal (const void *q1, const void *q2, char *reason)
 {
   SC3E_TEST (p4est_quadrant_is_equal ((const p4est_quadrant_t *) q1,
@@ -289,27 +280,37 @@ p4est_quadrant_vtable_is_equal (const void *q1, const void *q2, char *reason)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_tree_boundary (const void *q, int *nf)
+p4est_quadrant_vtable_tree_boundary (const void *q, sc3_array_t * nf)
 {
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (nf != NULL);
   SC3A_IS (p4est_quadrant_vtable_is_valid, q);
-  SC3A_CHECK (p4est_quadrant_is_inside_root (q) == 1);
+  SC3A_CHECK (p4est_quadrant_is_inside_root (q));
   const p4est_quadrant_t * quad = (const p4est_quadrant_t *) q;
   const int upper_bound = P4EST_ROOT_LEN - P4EST_QUADRANT_LEN (quad->level);
+  int *x, *y;
+#ifdef P4_TO_P8
+  int *z;
+#endif
+
+  SC3E (sc3_array_index (nf, 0, &x));
+  SC3E (sc3_array_index (nf, 1, &y));
+#ifdef P4_TO_P8
+  SC3E (sc3_array_index (nf, 2, &z));
+#endif
 
   if (quad->level == 0) {
-    nf[0] = nf[1] = -2;
+    *x = *y = -2;
 #ifdef P4_TO_P8
-    nf[2] = -2;
+    *z = -2;
 #endif
     return NULL;
   }
 
-  nf[0] = quad->x == 0 ? 0 : (quad->x == upper_bound) ? 1 : -1;
-  nf[1] = quad->y == 0 ? 2 : (quad->y == upper_bound) ? 3 : -1;
+  *x = quad->x == 0 ? 0 : (quad->x == upper_bound) ? 1 : -1;
+  *y = quad->y == 0 ? 2 : (quad->y == upper_bound) ? 3 : -1;
 #ifdef P4_TO_P8
-  nf[2] = quad->z == 0 ? 4 : (quad->z == upper_bound) ? 5 : -1;
+  *z = quad->z == 0 ? 4 : (quad->z == upper_bound) ? 5 : -1;
 #endif
 
   return NULL;
@@ -401,37 +402,18 @@ p4est_quadrant_vtable_face_neighbor (const void *q, int i, void *r)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_face_neighbor_extra (void *conn,
-                                           const void *q, int face, int *t,
-                                           int *nface, void *r)
+p4est_quadrant_vtable_transform_face (const void *q, sc3_array_t * transform,
+                                      void *r)
 {
-  SC3A_IS (p4est3_connectivity_is_valid, conn);
-  SC3A_IS (p4est_quadrant_vtable_is_valid, q);
-  SC3A_CHECK (t != NULL);
-  SC3A_CHECK (r != NULL);
-  SC3A_CHECK (nface != NULL);
-
   p4est_quadrant_t temp;
-  int transform[9];
-
-  p4est_quadrant_face_neighbor
-    ((const p4est_quadrant_t *) q, face, (p4est_quadrant_t *) r);
-  if (p4est_quadrant_is_inside_root ((p4est_quadrant_t *) r)) {
-    *nface = (face ^ 1);
-    return NULL;
+  int *idx;
+  if (q == r) {
+    /* q and r pointing on the same memory are forbidden.
+       See the documentation for p4est_quadrant_transform_face */
+    temp = *((p4est_quadrant_t *) q);
   }
-
-  temp = *((p4est_quadrant_t *) r);
-  SC3E (p4est3_connectivity_find_face_transform (conn, face, t, transform));
-  if (*t == -1) {
-    if (r != q) {
-      *((p4est_quadrant_t *) r) = *((p4est_quadrant_t *) q);
-    }
-    *nface = -1;
-    return NULL;
-  }
-  p4est_quadrant_transform_face (&temp, r, transform);  
-
+  SC3E (sc3_array_index (transform, 0, &idx));
+  p4est_quadrant_transform_face (&temp, r, idx);
   return NULL;
 }
 
@@ -534,6 +516,7 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
 
   /* populate member functions */
   qvt->quadrant_is_valid = p4est_quadrant_vtable_is_valid;
+  qvt->quadrant_is_inside_root = p4est_quadrant_vtable_is_inside_root;
   qvt->quadrant_is_equal = p4est_quadrant_vtable_is_equal;
   qvt->quadrant_tree_boundary =
     p4est_quadrant_vtable_tree_boundary;
@@ -548,8 +531,7 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->quadrant_copy = p4est_quadrant_vtable_copy;
   qvt->quadrant_parent = p4est_quadrant_vtable_parent;
   qvt->quadrant_face_neighbor = p4est_quadrant_vtable_face_neighbor;
-  qvt->quadrant_face_neighbor_extra =
-    p4est_quadrant_vtable_face_neighbor_extra;
+  qvt->quadrant_transform_face = p4est_quadrant_vtable_transform_face;
   qvt->quadrant_predecessor = p4est_quadrant_vtable_predecessor;
   qvt->quadrant_successor = p4est_quadrant_vtable_successor;
   qvt->quadrant_child = p4est_quadrant_vtable_child;
