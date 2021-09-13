@@ -344,7 +344,7 @@ p4est3_connectivity_get_face_transform (const p4est3_connectivity_t * c,
       face_permutation_refs[0][iface] ^
       face_permutation_refs[0][iface_neighbor] ^ (orient == 0 || orient == 3);
     iter[3 + reverse] = iface_neighbor < 2 ? 1 : 0;
-    iter[3 + !reverse] = itree_neighbor < 4 ? 2 : 1;
+    iter[3 + !reverse] = iface_neighbor < 4 ? 2 : 1;
     iter[5] = iface_neighbor / 2;
     reverse = (face_permutation_refs[iface][iface_neighbor] == 1);
     iter[6 + reverse] = (orient & 1);
