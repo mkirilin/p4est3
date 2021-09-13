@@ -127,6 +127,18 @@ test_face_child (sc3_allocator_t * alloc,
 }
 
 static sc3_error_t *
+perform_tests (sc3_allocator_t * alloc, p4est3_connectivity_t ** conn)
+{
+  for (int dim = 2; dim <= 3; ++dim) {
+    SC3E (make_connectivity (alloc, conn, dim));
+    SC3E (test_face_neighbor_face_corner (alloc, *conn, dim));
+    SC3E (test_face_child (alloc, *conn, dim));
+    SC3E (p4est3_connectivity_destroy (conn));
+  }
+  return NULL;
+}
+
+static sc3_error_t *
 free_allocator (sc3_allocator_t ** alloc)
 {
   SC3A_IS (sc3_allocator_is_setup, *alloc);
@@ -140,16 +152,9 @@ main (int argc, char **argv)
   sc3_allocator_t    *alloc;
   p4est3_connectivity_t *conn;
 
-  /* make allocator */
   SC3X (sc3_allocator_new (sc3_allocator_nothread (), &alloc));
   SC3X (sc3_allocator_setup (alloc));
-
-  for (int dim = 2; dim <= 3; ++dim) {
-    SC3X (make_connectivity (alloc, &conn, dim));
-    SC3X (test_face_neighbor_face_corner (alloc, conn, dim));
-    SC3X (test_face_child (alloc, conn, dim));
-    SC3X (p4est3_connectivity_destroy (&conn));
-  }
+  SC3X (perform_tests (alloc, &conn));
   SC3X (free_allocator (&alloc));
 
   return 0;
