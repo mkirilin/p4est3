@@ -126,7 +126,7 @@ p4est3_quadrant_is2_valid (p4est3_quadrant_vtable_t * qvt,
 
 int
 p4est3_quadrant_is2_inside_root (p4est3_quadrant_vtable_t * qvt,
-                                const void *q, char *reason)
+                                 const void *q, char *reason)
 {
   SC3E_TEST (qvt != NULL, reason);
   if (qvt->quadrant_is_inside_root != NULL) {
@@ -151,7 +151,7 @@ p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
 
 sc3_error_t        *
 p4est3_quadrant_tree_boundary (p4est3_quadrant_vtable_t * qvt,
-                              const void *q, sc3_array_t * nf)
+                               const void *q, sc3_array_t * nf)
 {
   SC3A_CHECK (qvt != NULL);
   SC3E (qvt->quadrant_tree_boundary (q, nf));

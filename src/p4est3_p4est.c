@@ -267,7 +267,7 @@ static int
 p4est_quadrant_vtable_is_inside_root (const void *q, char *reason)
 {
   SC3E_TEST (p4est_quadrant_is_inside_root
-              ((const p4est_quadrant_t *) q), reason);
+             ((const p4est_quadrant_t *) q), reason);
   SC3E_YES (reason);
 }
 
@@ -286,11 +286,12 @@ p4est_quadrant_vtable_tree_boundary (const void *q, sc3_array_t * nf)
   SC3A_CHECK (nf != NULL);
   SC3A_IS (p4est_quadrant_vtable_is_valid, q);
   SC3A_CHECK (p4est_quadrant_is_inside_root (q));
-  const p4est_quadrant_t * quad = (const p4est_quadrant_t *) q;
-  const int upper_bound = P4EST_ROOT_LEN - P4EST_QUADRANT_LEN (quad->level);
-  int *x, *y;
+  const p4est_quadrant_t *quad = (const p4est_quadrant_t *) q;
+  const int           upper_bound =
+    P4EST_ROOT_LEN - P4EST_QUADRANT_LEN (quad->level);
+  int                *x, *y;
 #ifdef P4_TO_P8
-  int *z;
+  int                *z;
 #endif
 
   SC3E (sc3_array_index (nf, 0, &x));
@@ -405,8 +406,8 @@ static sc3_error_t *
 p4est_quadrant_vtable_transform_face (const void *q, sc3_array_t * transform,
                                       void *r)
 {
-  p4est_quadrant_t temp;
-  int *idx;
+  p4est_quadrant_t    temp;
+  int                *idx;
   if (q == r) {
     /* q and r pointing on the same memory are forbidden.
        See the documentation for p4est_quadrant_transform_face */
@@ -518,8 +519,7 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->quadrant_is_valid = p4est_quadrant_vtable_is_valid;
   qvt->quadrant_is_inside_root = p4est_quadrant_vtable_is_inside_root;
   qvt->quadrant_is_equal = p4est_quadrant_vtable_is_equal;
-  qvt->quadrant_tree_boundary =
-    p4est_quadrant_vtable_tree_boundary;
+  qvt->quadrant_tree_boundary = p4est_quadrant_vtable_tree_boundary;
   qvt->quadrant_num_uniform = p4est_quadrant_vtable_num_uniform;
   qvt->quadrant_level = p4est_quadrant_vtable_level;
   qvt->quadrant_child_id = p4est_quadrant_vtable_child_id;

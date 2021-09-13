@@ -453,11 +453,10 @@ sc3_error_t        *p4est3_quadrant_transform_face (p4est3_quadrant_vtable_t *
  * \param [out] r       The neighbor quadrant is placed here in existing memory.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_tree_face_neighbor (p4est3_quadrant_vtable_t *
-                                                        qvt, const void *q,
-                                                        sc3_array_t *
-                                                        transform, int i,
-                                                        void *r);
+sc3_error_t       
+  *p4est3_quadrant_tree_face_neighbor (p4est3_quadrant_vtable_t * qvt,
+                                       const void *q, sc3_array_t * transform,
+                                       int i, void *r);
 
 /** Generate the predecessor quadrant.
  * \param [in] qvt      Valid virtual quadrant table.
