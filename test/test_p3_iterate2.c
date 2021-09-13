@@ -660,61 +660,82 @@ free_allocator (sc3_allocator_t ** alloc)
   return NULL;
 }
 
-int
-main (int argc, char **argv)
+static sc3_error_t *
+set_parameters (setup_t *t, p4est3_quadrant_vtable_t *qvt)
 {
-  setup_t             st, *t = &st;
-  p4est3_t           *p3;
-  sc3_array_t        *vpredef, *fpredef;
-  callback_data_t     sud, *user_data = &sud;
-  p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
-  int                 l_face, r_face, ori;
-  int                 nfaces, nori;
-
-  /* v3 standard procedure to isolate memory allocation contexts */
   t->mainalloc = sc3_allocator_nothread ();
-  SC3X (sc3_MPI_Init (&argc, &argv));
   t->mpicomm = SC3_MPI_COMM_WORLD;
-  SC3X (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
-  SC3X (make_allocator (t));
-  SC3X (p4est3_quadrant_vtable_p4est (qvt, 0));
-  SC3X (array_new (t->alloc, sizeof (int), 9, 9, &t->transform));
-  SC3X (array_new (t->alloc, sizeof (int), qvt->dim, qvt->dim, &t->nf));
-  nfaces = 2 * qvt->dim;
-  nori = 1 << (qvt->dim - 1);
+  SC3E (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
+  SC3E (make_allocator (t));
+  SC3E (p4est3_quadrant_vtable_p4est (qvt, 0));
+  SC3E (array_new (t->alloc, sizeof (int), 9, 9, &t->transform));
+  SC3E (array_new (t->alloc, sizeof (int), qvt->dim, qvt->dim, &t->nf));
 
   t->level = 3;
   t->num_trees = 2;
 
-#ifdef P4EST_ENABLE_DEBUG
-  printf ("l = %d, t = %d\n", t->level, t->num_trees);
-#endif /* P4EST_ENABLE_DEBUG */
+  return NULL;
+}
+
+static sc3_error_t *
+perform_tests (setup_t *t, p4est3_quadrant_vtable_t *qvt)
+{
+  const int           nfaces = 2 * qvt->dim;
+  const int           nori = 1 << (qvt->dim - 1);
+  int                 l_face, r_face, ori;
+  p4est3_t           *p3;
+  sc3_array_t        *vpredef, *fpredef;
+  callback_data_t     sud, *user_data = &sud;
 
   for (ori = 0; ori < nori; ++ori) {
     for (l_face = 0; l_face < nfaces; ++l_face) {
       for (r_face = 0; r_face < nfaces; ++r_face) {
-        SC3X (make_connectivity (t, qvt->dim, l_face, r_face, ori));
-        SC3X (make_new_p4est3 (&p3, t->alloc, t->conn, qvt, t->level));
+        SC3E (make_connectivity (t, qvt->dim, l_face, r_face, ori));
+        SC3E (make_new_p4est3 (&p3, t->alloc, t->conn, qvt, t->level));
 
-        SC3X (make_result_arrays
+        SC3E (make_result_arrays
               (t, p3, qvt, &user_data->volumes, &vpredef, &user_data->faces,
                &fpredef));
-        SC3X (perform_test (t, p3, qvt, user_data));
-        SC3X (compare_results
+        SC3E (perform_test (t, p3, qvt, user_data));
+        SC3E (compare_results
               (t, p3, qvt, user_data->volumes, vpredef, user_data->faces,
                fpredef));
 
         /*destroy forest, that was referenced for others */
-        SC3X (free_arrays
+        SC3E (free_arrays
               (user_data->volumes, vpredef, user_data->faces, fpredef));
-        SC3X (p4est3_destroy (&p3));
-        SC3X (p4est3_connectivity_destroy (&t->conn));
+        SC3E (p4est3_destroy (&p3));
+        SC3E (p4est3_connectivity_destroy (&t->conn));
       }
     }
   }
-  SC3X (sc3_array_destroy (&t->transform));
-  SC3X (sc3_array_destroy (&t->nf));
-  SC3X (free_allocator (&t->alloc));
+  return NULL;
+}
+
+static sc3_error_t *
+clean_up (setup_t * t)
+{
+  SC3E (sc3_array_destroy (&t->transform));
+  SC3E (sc3_array_destroy (&t->nf));
+  SC3E (free_allocator (&t->alloc));
+  return NULL;
+}
+
+int
+main (int argc, char **argv)
+{
+  setup_t             st, *t = &st;
+  p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
+
+  SC3X (sc3_MPI_Init (&argc, &argv));
+  /* v3 standard procedure to isolate memory allocation contexts */
+  SC3X (set_parameters (t, qvt));
+#ifdef P4EST_ENABLE_DEBUG
+  printf ("l = %d, t = %d\n", t->level, t->num_trees);
+#endif /* P4EST_ENABLE_DEBUG */
+
+  SC3X (perform_tests (t, qvt));
+  SC3X (clean_up (t));
   SC3X (sc3_MPI_Finalize ());
   return 0;
 }
