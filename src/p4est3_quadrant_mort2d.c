@@ -54,21 +54,11 @@ p4est3_quadrant_mort_num_uniform (int level)
 }
 
 static int
-p4est3_quadrant_mort_is_inside_root (const p4est3_quadrant_mort_t * q,
-                                     char *reason)
-{
-  SC3E_TEST (q->coords < ((uint64_t) 1 << (P4EST3_MORT_MAXLEVEL * P4EST_DIM)),
-             reason);
-  SC3E_YES (reason);
-}
-
-static int
 p4est3_quadrant_mort_is_valid (const p4est3_quadrant_mort_t * q, char *reason)
 {
   SC3E_TEST ((q->level >= 0 && q->level <= P4EST3_MORT_QMAXLEVEL) &&
              ((q->coords & (P4EST3_QUADRANT_MORT_LEN (0x01, q->level) - 1)) ==
               0), reason);
-  SC3E_IS (p4est3_quadrant_mort_is_inside_root, q, reason);
   SC3E_YES (reason);
 }
 
@@ -490,9 +480,6 @@ p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_is_valid =
     (p4est3_quadrant_is_t) p4est3_quadrant_mort_is_valid;
-
-  qvt->quadrant_is_inside_root =
-    (p4est3_quadrant_is_t) p4est3_quadrant_mort_is_inside_root;
 
   qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_mort_level;
 

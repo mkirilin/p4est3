@@ -52,24 +52,6 @@ p4est3_quadrant_zyx_num_uniform (int level)
 }
 
 static int
-p4est3_quadrant_zyx_is_inside_root (const __m128i * q, char *reason)
-{
-/* *INDENT-OFF* */
-  SC3E_TEST (
-    _mm_test_all_ones (
-      _mm_cmpgt_epi32 (*q, _mm_set1_epi32(-1)) ) == 1
-  , reason
-  );
-  SC3E_TEST (
-    _mm_test_all_ones (
-      _mm_cmplt_epi32 (*q, _mm_set1_epi32 (P4EST3_YX_ROOT_LEN)) ) == 1
-  , reason
-  );
-/* *INDENT-ON* */
-  SC3E_YES (reason);
-}
-
-static int
 p4est3_quadrant_zyx_is_valid (const __m128i * q, char *reason)
 {
   int32_t             level = _mm_extract_epi32 (*q, 0);
@@ -84,7 +66,6 @@ p4est3_quadrant_zyx_is_valid (const __m128i * q, char *reason)
   , reason
   );
 /* *INDENT-ON* */
-  SC3E_IS (p4est3_quadrant_zyx_is_inside_root, q, reason);
   SC3E_YES (reason);
 }
 
@@ -155,7 +136,6 @@ p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (nf != NULL);
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
-  SC3A_IS (p4est3_quadrant_zyx_is_inside_root, q);
 
   const int  level = _mm_extract_epi32 (*q, 0);
   const int           upper_bound =
@@ -747,9 +727,6 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_is_valid =
     (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_valid;
-
-  qvt->quadrant_is_inside_root =
-    (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_inside_root;
 
   qvt->quadrant_tree_boundary =
     (p4est3_quadrant_tree_boundary_t) p4est3_quadrant_zyx_tree_boundary;

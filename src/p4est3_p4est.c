@@ -232,14 +232,6 @@ p4est_quadrant_vtable_is_valid (const void *q, char *reason)
 }
 
 static int
-p4est_quadrant_vtable_is_inside_root (const void *q, char *reason)
-{
-  SC3E_TEST (p4est_quadrant_is_inside_root
-             ((const p4est_quadrant_t *) q), reason);
-  SC3E_YES (reason);
-}
-
-static int
 p4est_quadrant_vtable_is_equal (const void *q1, const void *q2, char *reason)
 {
   SC3E_TEST (p4est_quadrant_is_equal ((const p4est_quadrant_t *) q1,
@@ -253,7 +245,6 @@ p4est_quadrant_vtable_tree_boundary (const void *q, sc3_array_t * nf)
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (nf != NULL);
   SC3A_IS (p4est_quadrant_vtable_is_valid, q);
-  SC3A_CHECK (p4est_quadrant_is_inside_root (q));
   const p4est_quadrant_t *quad = (const p4est_quadrant_t *) q;
   const int           upper_bound =
     P4EST_ROOT_LEN - P4EST_QUADRANT_LEN (quad->level);
@@ -485,7 +476,6 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
 
   /* populate member functions */
   qvt->quadrant_is_valid = p4est_quadrant_vtable_is_valid;
-  qvt->quadrant_is_inside_root = p4est_quadrant_vtable_is_inside_root;
   qvt->quadrant_is_equal = p4est_quadrant_vtable_is_equal;
   qvt->quadrant_tree_boundary = p4est_quadrant_vtable_tree_boundary;
   qvt->quadrant_num_uniform = p4est_quadrant_vtable_num_uniform;
