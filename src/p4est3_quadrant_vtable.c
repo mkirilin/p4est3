@@ -271,6 +271,8 @@ p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t * qvt,
                                const void *q, int i, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_face_neighbor != NULL);
+  SC3A_CHECK (qvt->quadrant_is_tree_boundary != NULL);
+  SC3A_CHECK (qvt->quadrant_is_tree_boundary (q, &i, NULL) == 0);
   SC3E (qvt->quadrant_face_neighbor (q, i, r));
   return NULL;
 }
@@ -291,6 +293,8 @@ p4est3_quadrant_tree_face_neighbor (p4est3_quadrant_vtable_t * qvt,
                                     int i, void *r)
 {
   SC3A_CHECK (qvt != NULL);
+  SC3A_CHECK (qvt->quadrant_is_tree_boundary != NULL);
+  SC3A_IS2 (qvt->quadrant_is_tree_boundary, q, &i);
   SC3A_CHECK (qvt->quadrant_face_neighbor != NULL);
   SC3E (qvt->quadrant_face_neighbor (q, i, r));
 
