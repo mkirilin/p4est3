@@ -239,6 +239,28 @@ p4est_quadrant_vtable_is_equal (const void *q1, const void *q2, char *reason)
   SC3E_YES (reason);
 }
 
+static int
+p4est_quadrant_vtable_is_tree_boundary (const void *q, const void *i,
+                                        char *reason)
+{
+  const p4est_quadrant_t *quad = (const p4est_quadrant_t *) q;
+  const int           face = *((const int *) i);
+  p4est_qcoord_t      direction = face / 2;
+  int                 bound;
+
+#ifdef P4_TO_P8
+  direction =
+    (direction == 0) ? quad->x : (direction == 1) ? quad->y : quad->z;
+#else
+  direction = (direction == 0) ? quad->x : quad->y;
+#endif
+  bound =
+    face % 2 == 0 ? 0 : P4EST_ROOT_LEN - P4EST_QUADRANT_LEN (quad->level);
+
+  SC3E_TEST (direction == bound, reason);
+  SC3E_YES (reason);
+}
+
 static sc3_error_t *
 p4est_quadrant_vtable_tree_boundary (const void *q, sc3_array_t * nf)
 {
@@ -477,6 +499,7 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   /* populate member functions */
   qvt->quadrant_is_valid = p4est_quadrant_vtable_is_valid;
   qvt->quadrant_is_equal = p4est_quadrant_vtable_is_equal;
+  qvt->quadrant_is_tree_boundary = p4est_quadrant_vtable_is_tree_boundary;
   qvt->quadrant_tree_boundary = p4est_quadrant_vtable_tree_boundary;
   qvt->quadrant_num_uniform = p4est_quadrant_vtable_num_uniform;
   qvt->quadrant_level = p4est_quadrant_vtable_level;

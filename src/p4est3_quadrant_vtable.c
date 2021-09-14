@@ -36,6 +36,7 @@ p4est3_quadrant_vtable_is_valid (p4est3_quadrant_vtable_t * qvt, char *reason)
 
   /*** test member functions ***/
   SC3E_TEST (qvt->quadrant_tree_boundary != NULL, reason);
+  SC3E_TEST (qvt->quadrant_is_tree_boundary != NULL, reason);
   SC3E_TEST (qvt->quadrant_num_uniform != NULL, reason);
   SC3E_TEST (qvt->quadrant_level != NULL, reason);
   SC3E_TEST (qvt->quadrant_child_id != NULL, reason);
@@ -134,6 +135,17 @@ p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
   }
   else {
     SC3E_TEST (!memcmp (q1, q2, qvt->quadrant_size), reason);
+  }
+  SC3E_YES (reason);
+}
+
+int
+p4est3_quadrant_is_tree_boundary (p4est3_quadrant_vtable_t * qvt,
+                                  const void *q, const void *i, char *reason)
+{
+  SC3E_TEST (qvt != NULL, reason);
+  if (qvt->quadrant_is_tree_boundary != NULL) {
+    SC3E_IS2 (qvt->quadrant_is_tree_boundary, q, i, reason);
   }
   SC3E_YES (reason);
 }

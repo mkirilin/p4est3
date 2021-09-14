@@ -169,6 +169,8 @@ typedef struct p4est3_quadrant_vtable
   /** Examine equality.
    * Pointer may be NULL, in which case we memcmp (3) the contents. */
   p4est3_quadrant_is2_t quadrant_is_equal;
+  /** Query tree boundary in a specific direction */
+  p4est3_quadrant_is2_t quadrant_is_tree_boundary;
   p4est3_quadrant_tree_boundary_t quadrant_tree_boundary; /**< Query tree boundary */
   p4est3_quadrant_level_t quadrant_level;               /**< Query the level. */
   p4est3_quadrant_child_id_t quadrant_child_id;         /**< Query child id. */
@@ -278,6 +280,21 @@ int                 p4est3_quadrant_is2_valid (p4est3_quadrant_vtable_t * qvt,
 int                 p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
                                                const void *q1, const void *q2,
                                                char *reason);
+
+/** Query is a quadrant touches a specific boundary of a tree it is contained in
+ * in the style of \c sc3_<object>_is3_valid.
+ * \param [in] qvt      Valid virtual quadrant table.
+ * \param [in] q        Valid quadrant in this implementation.
+ * \param [in] i        A index of a tree's face for that the intersection
+ *                      with the quadrant \a q will be checked.
+ *                      For 3D: 0..5. For 2D: 0..3.
+ * \return              True if the quadrant \a q touches the \a i-th boundary
+ *                      face of the tree, false otherwise.
+ */
+int                 p4est3_quadrant_is_tree_boundary (p4est3_quadrant_vtable_t
+                                                      * qvt, const void *q,
+                                                      const void *i,
+                                                      char *reason);
 
 /** Query if a quadrant touches a tree face boundaries and which if so 
  * \param [in] qvt      Valid virtual quadrant table.
@@ -439,10 +456,11 @@ sc3_error_t        *p4est3_quadrant_transform_face (p4est3_quadrant_vtable_t *
  * \param [out] r       The neighbor quadrant is placed here in existing memory.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t       
-  *p4est3_quadrant_tree_face_neighbor (p4est3_quadrant_vtable_t * qvt,
-                                       const void *q, sc3_array_t * transform,
-                                       int i, void *r);
+sc3_error_t
+  * p4est3_quadrant_tree_face_neighbor (p4est3_quadrant_vtable_t * qvt,
+                                        const void *q,
+                                        sc3_array_t * transform, int i,
+                                        void *r);
 
 /** Generate the predecessor quadrant.
  * \param [in] qvt      Valid virtual quadrant table.
