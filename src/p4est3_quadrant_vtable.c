@@ -48,7 +48,7 @@ p4est3_quadrant_vtable_is_valid (p4est3_quadrant_vtable_t * qvt, char *reason)
   SC3E_TEST (qvt->quadrant_parent != NULL || qvt->quadrant_ancestor != NULL,
              reason);
   SC3E_TEST (qvt->quadrant_face_neighbor != NULL, reason);
-  SC3E_TEST (qvt->quadrant_transform_face != NULL, reason);
+  SC3E_TEST (qvt->quadrant_tree_face_neighbor != NULL, reason);
   SC3E_TEST (qvt->quadrant_predecessor != NULL, reason);
   SC3E_TEST (qvt->quadrant_successor != NULL, reason);
   SC3E_TEST (qvt->quadrant_child != NULL, reason);
@@ -272,18 +272,9 @@ p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t * qvt,
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_face_neighbor != NULL);
   SC3A_CHECK (qvt->quadrant_is_tree_boundary != NULL);
-  SC3A_CHECK (qvt->quadrant_is_tree_boundary (q, &i, NULL) == 0);
-  SC3E (qvt->quadrant_face_neighbor (q, i, r));
-  return NULL;
-}
+  SC3A_IS2 (!qvt->quadrant_is_tree_boundary, q, &i);
 
-sc3_error_t        *
-p4est3_quadrant_transform_face (p4est3_quadrant_vtable_t * qvt,
-                                const void *q, sc3_array_t * transform,
-                                void *r)
-{
-  SC3A_CHECK (qvt != NULL && qvt->quadrant_transform_face != NULL);
-  SC3E (qvt->quadrant_transform_face (q, transform, r));
+  SC3E (qvt->quadrant_face_neighbor (q, i, r));
   return NULL;
 }
 
@@ -292,14 +283,12 @@ p4est3_quadrant_tree_face_neighbor (p4est3_quadrant_vtable_t * qvt,
                                     const void *q, sc3_array_t * transform,
                                     int i, void *r)
 {
-  SC3A_CHECK (qvt != NULL);
+  SC3A_CHECK (qvt != NULL && qvt->quadrant_tree_face_neighbor != NULL);
   SC3A_CHECK (qvt->quadrant_is_tree_boundary != NULL);
   SC3A_IS2 (qvt->quadrant_is_tree_boundary, q, &i);
-  SC3A_CHECK (qvt->quadrant_face_neighbor != NULL);
-  SC3E (qvt->quadrant_face_neighbor (q, i, r));
 
-  SC3A_CHECK (qvt->quadrant_transform_face != NULL);
-  SC3E (qvt->quadrant_transform_face (r, transform, r));
+  SC3E (qvt->quadrant_tree_face_neighbor (q, transform, i, r));
+
   return NULL;
 }
 
