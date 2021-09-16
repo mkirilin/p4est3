@@ -52,24 +52,6 @@ p4est3_quadrant_zyx_num_uniform (int level)
 }
 
 static int
-p4est3_quadrant_zyx_is_inside_root (const __m128i * q, char *reason)
-{
-/* *INDENT-OFF* */
-  SC3E_TEST (
-    _mm_test_all_ones (
-      _mm_cmpgt_epi32 (*q, _mm_set1_epi32(-1)) ) == 1
-  , reason
-  );
-  SC3E_TEST (
-    _mm_test_all_ones (
-      _mm_cmplt_epi32 (*q, _mm_set1_epi32 (P4EST3_YX_ROOT_LEN)) ) == 1
-  , reason
-  );
-/* *INDENT-ON* */
-  SC3E_YES (reason);
-}
-
-static int
 p4est3_quadrant_zyx_is_valid (const __m128i * q, char *reason)
 {
   int32_t             level = _mm_extract_epi32 (*q, 0);
@@ -84,7 +66,6 @@ p4est3_quadrant_zyx_is_valid (const __m128i * q, char *reason)
   , reason
   );
 /* *INDENT-ON* */
-  SC3E_IS (p4est3_quadrant_zyx_is_inside_root, q, reason);
   SC3E_YES (reason);
 }
 
@@ -146,6 +127,62 @@ p4est3_quadrant_zyx_is_ancestor (const __m128i * q, const __m128i * r, int *j)
            );
 /* *INDENT-ON* */
   *j = _mm_test_all_zeros (exclor, _mm_set1_epi32 (0xFFFFFFFF));
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
+{
+  SC3A_CHECK (q != NULL);
+  SC3A_CHECK (nf != NULL);
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+
+  const int  level = _mm_extract_epi32 (*q, 0);
+  const int           upper_bound =
+    P4EST3_YX_ROOT_LEN - P4EST3_YX_QUADRANT_LEN (level);
+  __m128i r;
+  int *_mem_addr;
+  SC3E (sc3_array_index (nf, 0, &_mem_addr));
+
+  if (level == 0) {
+    _mm_maskstore_epi32 (
+      _mem_addr
+    , _mm_set_epi32 (1, 1, 1, 0)
+    , _mm_set1_epi32 (-2)
+    );
+    return NULL;
+  }
+
+/* *INDENT-OFF* */
+  r =
+  _mm_or_si128 (
+    _mm_and_si128 (
+      _mm_cmpeq_epi32 (
+        _mm_setzero_si128 ()
+      , *q)
+    , _mm_set_epi32 (0, 5, 3, 1)
+    )
+  , _mm_and_si128 (
+      _mm_cmpeq_epi32 (
+        _mm_set1_epi32 (upper_bound)
+      , *q)
+    , _mm_set_epi32 (0, 6, 4, 2)
+    )
+  );
+
+  r =
+  _mm_sub_epi32 (
+    r
+  , _mm_set1_epi32 (1)
+  );
+
+  _mm_maskstore_epi32 (
+    _mem_addr
+  , _mm_set_epi32 (1, 1, 1, 0)
+  , r
+  );
+/* *INDENT-ON* */
+
   return NULL;
 }
 
@@ -691,8 +728,8 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_is_valid =
     (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_valid;
 
-  qvt->quadrant_is_inside_root =
-    (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_inside_root;
+  qvt->quadrant_tree_boundary =
+    (p4est3_quadrant_tree_boundary_t) p4est3_quadrant_zyx_tree_boundary;
 
   qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_zyx_level;
 

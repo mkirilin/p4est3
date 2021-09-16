@@ -264,18 +264,32 @@ p4est_quadrant_vtable_is_valid (const void *q, char *reason)
 }
 
 static int
-p4est_quadrant_vtable_is_inside_root (const void *q, char *reason)
-{
-  SC3E_TEST (p4est_quadrant_is_inside_root
-             ((const p4est_quadrant_t *) q), reason);
-  SC3E_YES (reason);
-}
-
-static int
 p4est_quadrant_vtable_is_equal (const void *q1, const void *q2, char *reason)
 {
   SC3E_TEST (p4est_quadrant_is_equal ((const p4est_quadrant_t *) q1,
                                       (const p4est_quadrant_t *) q2), reason);
+  SC3E_YES (reason);
+}
+
+static int
+p4est_quadrant_vtable_is_tree_boundary (const void *q, const void *i,
+                                        char *reason)
+{
+  const p4est_quadrant_t *quad = (const p4est_quadrant_t *) q;
+  const int           face = *((const int *) i);
+  p4est_qcoord_t      direction = face / 2;
+  int                 bound;
+
+#ifdef P4_TO_P8
+  direction =
+    (direction == 0) ? quad->x : (direction == 1) ? quad->y : quad->z;
+#else
+  direction = (direction == 0) ? quad->x : quad->y;
+#endif
+  bound =
+    face % 2 == 0 ? 0 : P4EST_ROOT_LEN - P4EST_QUADRANT_LEN (quad->level);
+
+  SC3E_TEST (direction == bound, reason);
   SC3E_YES (reason);
 }
 
@@ -285,7 +299,6 @@ p4est_quadrant_vtable_tree_boundary (const void *q, sc3_array_t * nf)
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (nf != NULL);
   SC3A_IS (p4est_quadrant_vtable_is_valid, q);
-  SC3A_CHECK (p4est_quadrant_is_inside_root (q));
   const p4est_quadrant_t *quad = (const p4est_quadrant_t *) q;
   const int           upper_bound =
     P4EST_ROOT_LEN - P4EST_QUADRANT_LEN (quad->level);
@@ -395,24 +408,26 @@ p4est_quadrant_vtable_parent (const void *q, void *r)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_face_neighbor (const void *q, int i, void *r)
+p4est_quadrant_vtable_face_neighbor (const void *q, int face, void *r)
 {
   p4est_quadrant_face_neighbor
-    ((const p4est_quadrant_t *) q, i, (p4est_quadrant_t *) r);
+    ((const p4est_quadrant_t *) q, face, (p4est_quadrant_t *) r);
   return NULL;
 }
 
-static sc3_error_t *
-p4est_quadrant_vtable_transform_face (const void *q, sc3_array_t * transform,
-                                      void *r)
+static sc3_error_t        *
+p4est3_quadrant_vtable_tree_face_neighbor (const void *q,
+                                           sc3_array_t * transform,
+                                           int face, void *r)
 {
   p4est_quadrant_t    temp;
   int                *idx;
-  if (q == r) {
-    /* q and r pointing on the same memory are forbidden.
-       See the documentation for p4est_quadrant_transform_face */
-    temp = *((p4est_quadrant_t *) q);
-  }
+
+  p4est_quadrant_face_neighbor
+    ((const p4est_quadrant_t *) q, face, (p4est_quadrant_t *) r);
+  /* Input and output pointing on the same memory are forbidden.
+    See the documentation for p4est_quadrant_transform_face */
+  temp = *((p4est_quadrant_t *) r);
   SC3E (sc3_array_index (transform, 0, &idx));
   p4est_quadrant_transform_face (&temp, r, idx);
   return NULL;
@@ -517,8 +532,8 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
 
   /* populate member functions */
   qvt->quadrant_is_valid = p4est_quadrant_vtable_is_valid;
-  qvt->quadrant_is_inside_root = p4est_quadrant_vtable_is_inside_root;
   qvt->quadrant_is_equal = p4est_quadrant_vtable_is_equal;
+  qvt->quadrant_is_tree_boundary = p4est_quadrant_vtable_is_tree_boundary;
   qvt->quadrant_tree_boundary = p4est_quadrant_vtable_tree_boundary;
   qvt->quadrant_num_uniform = p4est_quadrant_vtable_num_uniform;
   qvt->quadrant_level = p4est_quadrant_vtable_level;
@@ -531,7 +546,8 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->quadrant_copy = p4est_quadrant_vtable_copy;
   qvt->quadrant_parent = p4est_quadrant_vtable_parent;
   qvt->quadrant_face_neighbor = p4est_quadrant_vtable_face_neighbor;
-  qvt->quadrant_transform_face = p4est_quadrant_vtable_transform_face;
+  qvt->quadrant_tree_face_neighbor =
+    p4est3_quadrant_vtable_tree_face_neighbor;
   qvt->quadrant_predecessor = p4est_quadrant_vtable_predecessor;
   qvt->quadrant_successor = p4est_quadrant_vtable_successor;
   qvt->quadrant_child = p4est_quadrant_vtable_child;

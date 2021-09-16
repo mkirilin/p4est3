@@ -36,6 +36,7 @@ p4est3_quadrant_vtable_is_valid (p4est3_quadrant_vtable_t * qvt, char *reason)
 
   /*** test member functions ***/
   SC3E_TEST (qvt->quadrant_tree_boundary != NULL, reason);
+  SC3E_TEST (qvt->quadrant_is_tree_boundary != NULL, reason);
   SC3E_TEST (qvt->quadrant_num_uniform != NULL, reason);
   SC3E_TEST (qvt->quadrant_level != NULL, reason);
   SC3E_TEST (qvt->quadrant_child_id != NULL, reason);
@@ -47,7 +48,7 @@ p4est3_quadrant_vtable_is_valid (p4est3_quadrant_vtable_t * qvt, char *reason)
   SC3E_TEST (qvt->quadrant_parent != NULL || qvt->quadrant_ancestor != NULL,
              reason);
   SC3E_TEST (qvt->quadrant_face_neighbor != NULL, reason);
-  SC3E_TEST (qvt->quadrant_transform_face != NULL, reason);
+  SC3E_TEST (qvt->quadrant_tree_face_neighbor != NULL, reason);
   SC3E_TEST (qvt->quadrant_predecessor != NULL, reason);
   SC3E_TEST (qvt->quadrant_successor != NULL, reason);
   SC3E_TEST (qvt->quadrant_child != NULL, reason);
@@ -125,17 +126,6 @@ p4est3_quadrant_is2_valid (p4est3_quadrant_vtable_t * qvt,
 }
 
 int
-p4est3_quadrant_is2_inside_root (p4est3_quadrant_vtable_t * qvt,
-                                 const void *q, char *reason)
-{
-  SC3E_TEST (qvt != NULL, reason);
-  if (qvt->quadrant_is_inside_root != NULL) {
-    SC3E_IS (qvt->quadrant_is_inside_root, q, reason);
-  }
-  SC3E_YES (reason);
-}
-
-int
 p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
                            const void *q1, const void *q2, char *reason)
 {
@@ -145,6 +135,17 @@ p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
   }
   else {
     SC3E_TEST (!memcmp (q1, q2, qvt->quadrant_size), reason);
+  }
+  SC3E_YES (reason);
+}
+
+int
+p4est3_quadrant_is_tree_boundary (p4est3_quadrant_vtable_t * qvt,
+                                  const void *q, const void *i, char *reason)
+{
+  SC3E_TEST (qvt != NULL, reason);
+  if (qvt->quadrant_is_tree_boundary != NULL) {
+    SC3E_IS2 (qvt->quadrant_is_tree_boundary, q, i, reason);
   }
   SC3E_YES (reason);
 }
@@ -270,17 +271,10 @@ p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t * qvt,
                                const void *q, int i, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_face_neighbor != NULL);
-  SC3E (qvt->quadrant_face_neighbor (q, i, r));
-  return NULL;
-}
+  SC3A_CHECK (qvt->quadrant_is_tree_boundary != NULL);
+  SC3A_IS2 (!qvt->quadrant_is_tree_boundary, q, &i);
 
-sc3_error_t        *
-p4est3_quadrant_transform_face (p4est3_quadrant_vtable_t * qvt,
-                                const void *q, sc3_array_t * transform,
-                                void *r)
-{
-  SC3A_CHECK (qvt != NULL && qvt->quadrant_transform_face != NULL);
-  SC3E (qvt->quadrant_transform_face (q, transform, r));
+  SC3E (qvt->quadrant_face_neighbor (q, i, r));
   return NULL;
 }
 
@@ -289,16 +283,12 @@ p4est3_quadrant_tree_face_neighbor (p4est3_quadrant_vtable_t * qvt,
                                     const void *q, sc3_array_t * transform,
                                     int i, void *r)
 {
-  SC3A_CHECK (qvt != NULL);
-  SC3A_CHECK (qvt->quadrant_face_neighbor != NULL);
-  SC3E (qvt->quadrant_face_neighbor (q, i, r));
-  if (qvt->quadrant_is_inside_root != NULL) {
-    /* since this is ONLY called between trees */
-    SC3A_IS (!qvt->quadrant_is_inside_root, r);
-  }
+  SC3A_CHECK (qvt != NULL && qvt->quadrant_tree_face_neighbor != NULL);
+  SC3A_CHECK (qvt->quadrant_is_tree_boundary != NULL);
+  SC3A_IS2 (qvt->quadrant_is_tree_boundary, q, &i);
 
-  SC3A_CHECK (qvt->quadrant_transform_face != NULL);
-  SC3E (qvt->quadrant_transform_face (r, transform, r));
+  SC3E (qvt->quadrant_tree_face_neighbor (q, transform, i, r));
+
   return NULL;
 }
 
