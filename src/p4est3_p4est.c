@@ -245,19 +245,20 @@ p4est_quadrant_vtable_is_tree_boundary (const void *q, const void *i,
 {
   const p4est_quadrant_t *quad = (const p4est_quadrant_t *) q;
   const int           face = *((const int *) i);
-  p4est_qcoord_t      direction = face / 2;
+  int                 direction = face / 2;
+  p4est_qcoord_t      coord;
   int                 bound;
 
 #ifdef P4_TO_P8
-  direction =
+  coord =
     (direction == 0) ? quad->x : (direction == 1) ? quad->y : quad->z;
 #else
-  direction = (direction == 0) ? quad->x : quad->y;
+  coord = (direction == 0) ? quad->x : quad->y;
 #endif
   bound =
     face % 2 == 0 ? 0 : P4EST_ROOT_LEN - P4EST_QUADRANT_LEN (quad->level);
 
-  SC3E_TEST (direction == bound, reason);
+  SC3E_TEST (coord == bound, reason);
   SC3E_YES (reason);
 }
 
