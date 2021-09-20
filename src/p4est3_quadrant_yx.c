@@ -131,14 +131,14 @@ p4est3_quadrant_zyx_is_ancestor (const __m128i * q, const __m128i * r, int *j)
 }
 
 static int
-p4est3_quadrant_zyx_is_tree_boundary (const __m128i *q, const int *face,
+p4est3_quadrant_zyx_is_tree_boundary (const __m128i * q, const int *face,
                                       char *reason)
 {
   SC3A_CHECK (0 <= *face && *face < P4EST_FACES);
-  const int32_t l = _mm_extract_epi32 (*q, 0);
-  const int direction = *face / 2;
-  const int32_t coord = _mm_extract_epi32 (*q, 0x3 - direction);
-  int32_t bound;
+  const int32_t       l = _mm_extract_epi32 (*q, 0);
+  const int           direction = *face / 2;
+  const int32_t       coord = _mm_extract_epi32 (*q, 0x3 - direction);
+  int32_t             bound;
 
   bound =
     *face % 2 == 0 ? 0 : P4EST3_YX_ROOT_LEN - P4EST3_YX_QUADRANT_LEN (l);
@@ -153,13 +153,14 @@ p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
   SC3A_CHECK (nf != NULL);
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
 
-  const int  level = _mm_extract_epi32 (*q, 0);
+  const int           level = _mm_extract_epi32 (*q, 0);
   const int           upper_bound =
     P4EST3_YX_ROOT_LEN - P4EST3_YX_QUADRANT_LEN (level);
-  __m128i r;
-  int *_mem_addr;
+  __m128i             r;
+  int                *_mem_addr;
   SC3E (sc3_array_index (nf, 0, &_mem_addr));
 
+/* *INDENT-OFF* */
   if (level == 0) {
     _mm_maskstore_epi32 (
       _mem_addr
@@ -169,7 +170,6 @@ p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
     return NULL;
   }
 
-/* *INDENT-OFF* */
   r =
   _mm_or_si128 (
     _mm_and_si128 (
@@ -263,35 +263,13 @@ p4est3_quadrant_zyx_face_neighbor (const __m128i * q, int i, __m128i * r)
   int32_t             shift =
     P4EST3_YX_QUADRANT_LEN (_mm_extract_epi32 (*q, 0));
   shift = shift * (i & 0x01 ? 1 : -1);
-  const int           selector = 3 - i / 2;
 /* *INDENT-OFF* */
-  if (selector == 0) {
+  *r =
     _mm_add_epi32 (
       _mm_insert_epi32 (
-        _mm_setzero_si128 (), shift, 3
+        _mm_setzero_si128 (), shift, i / 2
       ),
       *q);
-  }
-  else if (selector == 1){
-    _mm_add_epi32 (
-      _mm_insert_epi32 (
-        _mm_setzero_si128 (), shift, 2
-      ),
-      *q);
-  }
-#ifdef P4_TO_P8
-  else if (selector == 2) {
-    _mm_add_epi32 (
-      _mm_insert_epi32 (
-        _mm_setzero_si128 (), shift, 1
-      ),
-      *q);
-  }
-#endif
-  else {
-    SC3E_UNREACH ("wrong coordinate to edit");
-  }
-
 /* *INDENT-ON* */
   SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
   return NULL;
