@@ -130,6 +130,22 @@ p4est3_quadrant_zyx_is_ancestor (const __m128i * q, const __m128i * r, int *j)
   return NULL;
 }
 
+static int
+p4est3_quadrant_zyx_is_tree_boundary (const __m128i *q, const int *face,
+                                      char *reason)
+{
+  SC3A_CHECK (0 <= *face && *face < P4EST_FACES);
+  const int32_t l = _mm_extract_epi32 (*q, 0);
+  const int direction = *face / 2;
+  const int32_t coord = _mm_extract_epi32 (*q, 0x3 - direction);
+  int32_t bound;
+
+  bound =
+    *face % 2 == 0 ? 0 : P4EST3_YX_ROOT_LEN - P4EST3_YX_QUADRANT_LEN (l);
+  SC3E_TEST (coord == bound, reason);
+  SC3E_YES (reason);
+}
+
 static sc3_error_t *
 p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
 {
@@ -727,6 +743,9 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_is_valid =
     (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_valid;
+
+  qvt->quadrant_is_tree_boundary =
+    (p4est3_quadrant_is2_t) p4est3_quadrant_zyx_is_tree_boundary;
 
   qvt->quadrant_tree_boundary =
     (p4est3_quadrant_tree_boundary_t) p4est3_quadrant_zyx_tree_boundary;
