@@ -130,6 +130,33 @@ p4est3_quadrant_zyx_is_ancestor (const __m128i * q, const __m128i * r, int *j)
   return NULL;
 }
 
+static int
+p4est3_quadrant_zyx_is_tree_boundary (const __m128i * q, const int *face,
+                                      char *reason)
+{
+  const int32_t       l = _mm_extract_epi32 (*q, 0);
+  const int           direction = *face / 2;
+  int32_t             coord, bound;
+  switch (direction) {
+  case 0:
+    coord = _mm_extract_epi32 (*q, 3);
+    break;
+  case 1:
+    coord = _mm_extract_epi32 (*q, 2);
+    break;
+  case 2:
+    coord = _mm_extract_epi32 (*q, 1);
+    break;
+  default:
+    break;
+  }
+
+  bound =
+    *face % 2 == 0 ? 0 : P4EST3_YX_ROOT_LEN - P4EST3_YX_QUADRANT_LEN (l);
+  SC3E_TEST (coord == bound, reason);
+  SC3E_YES (reason);
+}
+
 static sc3_error_t *
 p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
 {
@@ -137,13 +164,14 @@ p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
   SC3A_CHECK (nf != NULL);
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
 
-  const int  level = _mm_extract_epi32 (*q, 0);
+  const int           level = _mm_extract_epi32 (*q, 0);
   const int           upper_bound =
     P4EST3_YX_ROOT_LEN - P4EST3_YX_QUADRANT_LEN (level);
-  __m128i r;
-  int *_mem_addr;
+  __m128i             r;
+  int                *_mem_addr;
   SC3E (sc3_array_index (nf, 0, &_mem_addr));
 
+/* *INDENT-OFF* */
   if (level == 0) {
     _mm_maskstore_epi32 (
       _mem_addr
@@ -153,7 +181,6 @@ p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
     return NULL;
   }
 
-/* *INDENT-OFF* */
   r =
   _mm_or_si128 (
     _mm_and_si128 (
@@ -247,36 +274,128 @@ p4est3_quadrant_zyx_face_neighbor (const __m128i * q, int i, __m128i * r)
   int32_t             shift =
     P4EST3_YX_QUADRANT_LEN (_mm_extract_epi32 (*q, 0));
   shift = shift * (i & 0x01 ? 1 : -1);
-  const int           selector = 3 - i / 2;
 /* *INDENT-OFF* */
-  if (selector == 0) {
+  switch (i / 2)
+  {
+  case 0:
+  *r =
     _mm_add_epi32 (
       _mm_insert_epi32 (
         _mm_setzero_si128 (), shift, 3
       ),
       *q);
-  }
-  else if (selector == 1){
+    break;
+  case 1:
+  *r =
     _mm_add_epi32 (
       _mm_insert_epi32 (
         _mm_setzero_si128 (), shift, 2
       ),
       *q);
-  }
-#ifdef P4_TO_P8
-  else if (selector == 2) {
+    break;
+  case 2:
+  *r =
     _mm_add_epi32 (
       _mm_insert_epi32 (
         _mm_setzero_si128 (), shift, 1
       ),
       *q);
+    break;
+  default:
+    break;
   }
-#endif
-  else {
-    SC3E_UNREACH ("wrong coordinate to edit");
-  }
-
 /* *INDENT-ON* */
+
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_quadrant_zyx_tree_face_neighbor (const __m128i * q,
+                                        sc3_array_t * transform,
+                                        int face, __m128i * r)
+{
+  int                 i;
+  int                *my_axis;
+  int                *target_axis;
+  int                *edge_reverse;
+  int32_t             target_xyzl[4];
+  int32_t             q_as_array[4];
+  int32_t             level, mh, Rmh;
+
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  SC3E (sc3_array_index (transform, 0, &my_axis));
+  SC3E (sc3_array_index (transform, 3, &target_axis));
+  SC3E (sc3_array_index (transform, 3, &edge_reverse));
+
+  _mm_storeu_si128 ((__m128i *) & q_as_array[0], *q);
+
+  SC3A_CHECK (q != r);
+#ifdef P4EST_ENABLE_DEBUG
+
+  for (i = 0; i < 3; ++i) {
+    SC3A_CHECK (0 <= my_axis[i] && my_axis[i] < P4EST_DIM);
+    SC3A_CHECK (0 <= target_axis[i] && target_axis[i] < P4EST_DIM);
+  }
+  SC3A_CHECK (my_axis[0] != my_axis[2]);
+  SC3A_CHECK (target_axis[0] != target_axis[2]);
+  SC3A_CHECK (0 <= edge_reverse[0] && edge_reverse[0] < 2);
+  SC3A_CHECK (0 <= edge_reverse[2] && edge_reverse[2] < 4);
+
+#ifdef P4_TO_P8
+  *r = _mm_set_epi32 (INT32_MIN, INT32_MIN, INT32_MIN, 0);
+  SC3A_CHECK (my_axis[0] != my_axis[1] && my_axis[1] != my_axis[2]);
+  SC3A_CHECK (target_axis[0] != target_axis[1] &&
+              target_axis[1] != target_axis[2]);
+  SC3A_CHECK (0 <= edge_reverse[1] && edge_reverse[1] < 2);
+#endif
+  *r = _mm_set_epi32 (INT32_MIN, INT32_MIN, 0, 0);
+  SC3A_CHECK (my_axis[1] == 0 && target_axis[1] == 0);
+  SC3A_CHECK (edge_reverse[1] == 0);
+#endif
+
+  level = q_as_array[0];
+  target_xyzl[3] = level;
+  if (level == P4EST3_YX_MAXLEVEL) {
+    /* If (P4EST3_YX_MAXLEVEL == 31) Rmh will overflow.
+       P4EST3_YX_MAXLEVEL == 30 so far,
+       but will be increased in long term perspective. */
+    mh = 0;
+  }
+  else {
+    mh = P4EST3_YX_QUADRANT_LEN (level);
+  }
+  Rmh = P4EST3_YX_ROOT_LEN - mh;
+
+  if (!edge_reverse[0]) {
+    target_xyzl[target_axis[0]] = q_as_array[my_axis[0]];
+  }
+  else {
+    target_xyzl[target_axis[0]] = Rmh - q_as_array[my_axis[0]];
+  }
+#ifdef P4_TO_P8
+  if (!edge_reverse[1]) {
+    target_xyzl[target_axis[1]] = q_as_array[my_axis[1]];
+  }
+  else {
+    target_xyzl[target_axis[1]] = Rmh - q_as_array[my_axis[1]];
+  }
+#else
+  target_xyzl[target_axis[1]] = 0;
+#endif
+
+  switch (edge_reverse[2]) {
+  case 1:
+    target_xyzl[target_axis[2]] = Rmh;
+    break;
+  case 2:
+    target_xyzl[target_axis[2]] = 0;
+    break;
+  default:
+    /* do nothing to the codes 0 and 3 */
+    break;
+  }
+  *r = _mm_loadu_si128 ((__m128i *) & target_xyzl[0]);
   SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
   return NULL;
 }
@@ -728,6 +847,9 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_is_valid =
     (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_valid;
 
+  qvt->quadrant_is_tree_boundary =
+    (p4est3_quadrant_is2_t) p4est3_quadrant_zyx_is_tree_boundary;
+
   qvt->quadrant_tree_boundary =
     (p4est3_quadrant_tree_boundary_t) p4est3_quadrant_zyx_tree_boundary;
 
@@ -754,6 +876,9 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_face_neighbor =
     (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_zyx_face_neighbor;
+
+  qvt->quadrant_tree_face_neighbor = (p4est3_quadrant_tree_face_neighbor_t)
+    p4est3_quadrant_zyx_tree_face_neighbor;
 
   qvt->quadrant_predecessor =
     (p4est3_quadrant_predecessor_t) p4est3_quadrant_zyx_predecessor;
