@@ -25,8 +25,10 @@
 #include <p4est3_internal.h>
 #ifndef P4_TO_P8
 #include <p4est3_p4est.h>
+#include <p4est3_quadrant_yx.h>
 #else
 #include <p4est3_p8est.h>
+#include <p4est3_quadrant_zyx.h>
 #endif
 
 /* *INDENT-OFF* */
@@ -471,19 +473,21 @@ static sc3_error_t *
 iterate_unimesh_face (setup_t * t, p4est3_t * p3,
                       p4est3_quadrant_vtable_t * qvt, sc3_array_t * fpredef)
 {
-  p4est3_gloidx       nquads_compl = 0;
+  p4est3_gloidx       nquads_compl;
   p4est3_topidx       ntree;
   p4est3_tree_t      *tree;
-  int                 level = 0;
+  int                 level;
   int                *level2nchildren;  /*how many processed quads of level level */
   void               *q, *r;
   SC3E (sc3_allocator_calloc
         (t->alloc, t->level + 1, sizeof (int), &level2nchildren));
   SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &q));
   SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &r));
-  memset (level2nchildren, 0, t->level * sizeof (int));
 
   for (ntree = 0; ntree < t->num_trees; ++ntree) {
+    level = 0;
+    nquads_compl = 0;
+    memset (level2nchildren, 0, t->level * sizeof (int));
     SC3E (p4est3_tree_index (p3, ntree, &tree));
     while (level < t->level) {
       SC3A_CHECK (level2nchildren[level] <= qvt->max_children);
@@ -502,7 +506,7 @@ iterate_unimesh_face (setup_t * t, p4est3_t * p3,
       }
       else {
         level = 0;
-        level2nchildren[level] += 4;
+        level2nchildren[level] += qvt->max_children;
       }
     }
     SC3E (iterate_unimesh_tree_boundary_face
@@ -563,7 +567,7 @@ compare_results (setup_t * t, p4est3_t * p3, p4est3_quadrant_vtable_t * qvt,
                  sc3_array_t * voutput, sc3_array_t * vpredef,
                  sc3_array_t * foutput, sc3_array_t * fpredef)
 {
-  const int           nquad = (1 << (qvt->dim * t->level));
+  const int           nquad = (1 << (qvt->dim * t->level)) * t->num_trees;
   p4est3_iterate_volume_info_t *vit_out, *vit_pre;
   p4est3_iterate_face_info_t *fit_out, *fit_pre;
   p4est3_iterate_face_side_t *sit_out, *sit_pre;
@@ -661,13 +665,16 @@ free_allocator (sc3_allocator_t ** alloc)
 }
 
 static sc3_error_t *
-set_parameters (setup_t *t, p4est3_quadrant_vtable_t *qvt)
+set_parameters (setup_t * t, p4est3_quadrant_vtable_t * qvt,
+                p4est3_quadrant_vtable_t * qvt_avx, sc3_error_t ** e)
 {
   t->mainalloc = sc3_allocator_nothread ();
   t->mpicomm = SC3_MPI_COMM_WORLD;
   SC3E (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
   SC3E (make_allocator (t));
   SC3E (p4est3_quadrant_vtable_p4est (qvt, 0));
+  /* the AVX virtual table can only be set with hardware support */
+  SC3F (p4est3_quadrant_yx_vtable (qvt_avx), *e);
   SC3E (array_new (t->alloc, sizeof (int), 9, 9, &t->transform));
   SC3E (array_new (t->alloc, sizeof (int), qvt->dim, qvt->dim, &t->nf));
 
@@ -678,7 +685,7 @@ set_parameters (setup_t *t, p4est3_quadrant_vtable_t *qvt)
 }
 
 static sc3_error_t *
-perform_tests (setup_t *t, p4est3_quadrant_vtable_t *qvt)
+perform_tests (setup_t * t, p4est3_quadrant_vtable_t * qvt)
 {
   const int           nfaces = 2 * qvt->dim;
   const int           nori = 1 << (qvt->dim - 1);
@@ -726,16 +733,23 @@ main (int argc, char **argv)
 {
   setup_t             st, *t = &st;
   p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
+  p4est3_quadrant_vtable_t vtable_avx, *qvt_avx = &vtable_avx;
+  sc3_error_t        *e_avx;
 
   SC3X (sc3_MPI_Init (&argc, &argv));
-  /* v3 standard procedure to isolate memory allocation contexts */
-  SC3X (set_parameters (t, qvt));
+  SC3X (set_parameters (t, qvt, qvt_avx, &e_avx));
 #ifdef P4EST_ENABLE_DEBUG
   printf ("l = %d, t = %d\n", t->level, t->num_trees);
 #endif /* P4EST_ENABLE_DEBUG */
 
   SC3X (perform_tests (t, qvt));
+  if (!sc3_error_is2_kind (e_avx, SC3_ERROR_RUNTIME, NULL)) {
+    SC3X (perform_tests (t, qvt_avx));
+  }
   SC3X (clean_up (t));
+  if (e_avx != NULL) {
+    SC3X (sc3_error_unref (&e_avx));
+  }
   SC3X (sc3_MPI_Finalize ());
   return 0;
 }
