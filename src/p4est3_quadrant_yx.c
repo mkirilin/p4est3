@@ -173,11 +173,11 @@ p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
 
 /* *INDENT-OFF* */
   if (level == 0) {
-    _mm_maskstore_epi32 (
-      _mem_addr
-    , _mm_set_epi32 (1, 1, 1, 0)
-    , _mm_set1_epi32 (-2)
-    );
+    _mem_addr[0] = -2;
+    _mem_addr[1] = -2;
+#ifdef P4_TO_P8
+    _mem_addr[2] = -2;
+#endif
     return NULL;
   }
 
@@ -187,13 +187,13 @@ p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
       _mm_cmpeq_epi32 (
         _mm_setzero_si128 ()
       , *q)
-    , _mm_set_epi32 (0, 5, 3, 1)
+    , _mm_set_epi32 (1, 3, 5, 0)
     )
   , _mm_and_si128 (
       _mm_cmpeq_epi32 (
         _mm_set1_epi32 (upper_bound)
       , *q)
-    , _mm_set_epi32 (0, 6, 4, 2)
+    , _mm_set_epi32 (2, 4, 6, 0)
     )
   );
 
@@ -202,12 +202,11 @@ p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
     r
   , _mm_set1_epi32 (1)
   );
-
-  _mm_maskstore_epi32 (
-    _mem_addr
-  , _mm_set_epi32 (1, 1, 1, 0)
-  , r
-  );
+  _mem_addr[0] = _mm_extract_epi32 (r, 3);
+  _mem_addr[1] = _mm_extract_epi32 (r, 2);
+#ifdef P4_TO_P8
+  _mem_addr[2] = _mm_extract_epi32 (r, 1);
+#endif
 /* *INDENT-ON* */
 
   return NULL;
