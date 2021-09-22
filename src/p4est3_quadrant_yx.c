@@ -173,11 +173,11 @@ p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
 
 /* *INDENT-OFF* */
   if (level == 0) {
-    _mm_maskstore_epi32 (
-      _mem_addr
-    , _mm_set_epi32 (1, 1, 1, 0)
-    , _mm_set1_epi32 (-2)
-    );
+    _mem_addr[0] = -2;
+    _mem_addr[1] = -2;
+#ifdef P4_TO_P8
+    _mem_addr[2] = -2;
+#endif
     return NULL;
   }
 
@@ -187,13 +187,13 @@ p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
       _mm_cmpeq_epi32 (
         _mm_setzero_si128 ()
       , *q)
-    , _mm_set_epi32 (0, 5, 3, 1)
+    , _mm_set_epi32 (1, 3, 5, 0)
     )
   , _mm_and_si128 (
       _mm_cmpeq_epi32 (
         _mm_set1_epi32 (upper_bound)
       , *q)
-    , _mm_set_epi32 (0, 6, 4, 2)
+    , _mm_set_epi32 (2, 4, 6, 0)
     )
   );
 
@@ -202,12 +202,11 @@ p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
     r
   , _mm_set1_epi32 (1)
   );
-
-  _mm_maskstore_epi32 (
-    _mem_addr
-  , _mm_set_epi32 (1, 1, 1, 0)
-  , r
-  );
+  _mem_addr[0] = _mm_extract_epi32 (r, 3);
+  _mem_addr[1] = _mm_extract_epi32 (r, 2);
+#ifdef P4_TO_P8
+  _mem_addr[2] = _mm_extract_epi32 (r, 1);
+#endif
 /* *INDENT-ON* */
 
   return NULL;
@@ -319,20 +318,23 @@ p4est3_quadrant_zyx_tree_face_neighbor (const __m128i * q,
   int                *my_axis;
   int                *target_axis;
   int                *edge_reverse;
-  int32_t             target_xyzl[4];
-  int32_t             q_as_array[4];
+  int32_t             target_xyzl[3] = { 0, 0, 0 };
+  int32_t             q_coords[3];
   int32_t             level, mh, Rmh;
 
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  SC3A_CHECK (q != r);
+
   SC3E (sc3_array_index (transform, 0, &my_axis));
   SC3E (sc3_array_index (transform, 3, &target_axis));
-  SC3E (sc3_array_index (transform, 3, &edge_reverse));
+  SC3E (sc3_array_index (transform, 6, &edge_reverse));
 
-  _mm_storeu_si128 ((__m128i *) & q_as_array[0], *q);
+  q_coords[0] = _mm_extract_epi32 (*q, 3);
+  q_coords[1] = _mm_extract_epi32 (*q, 2);
+  q_coords[2] = _mm_extract_epi32 (*q, 1);
+  level = _mm_extract_epi32 (*q, 0);
 
-  SC3A_CHECK (q != r);
 #ifdef P4EST_ENABLE_DEBUG
-
   for (i = 0; i < 3; ++i) {
     SC3A_CHECK (0 <= my_axis[i] && my_axis[i] < P4EST_DIM);
     SC3A_CHECK (0 <= target_axis[i] && target_axis[i] < P4EST_DIM);
@@ -348,14 +350,13 @@ p4est3_quadrant_zyx_tree_face_neighbor (const __m128i * q,
   SC3A_CHECK (target_axis[0] != target_axis[1] &&
               target_axis[1] != target_axis[2]);
   SC3A_CHECK (0 <= edge_reverse[1] && edge_reverse[1] < 2);
-#endif
+#else
   *r = _mm_set_epi32 (INT32_MIN, INT32_MIN, 0, 0);
   SC3A_CHECK (my_axis[1] == 0 && target_axis[1] == 0);
   SC3A_CHECK (edge_reverse[1] == 0);
-#endif
+#endif /* P4_TO_P8 */
+#endif /* P4EST_ENABLE_DEBUG */
 
-  level = q_as_array[0];
-  target_xyzl[3] = level;
   if (level == P4EST3_YX_MAXLEVEL) {
     /* If (P4EST3_YX_MAXLEVEL == 31) Rmh will overflow.
        P4EST3_YX_MAXLEVEL == 30 so far,
@@ -368,34 +369,25 @@ p4est3_quadrant_zyx_tree_face_neighbor (const __m128i * q,
   Rmh = P4EST3_YX_ROOT_LEN - mh;
 
   if (!edge_reverse[0]) {
-    target_xyzl[target_axis[0]] = q_as_array[my_axis[0]];
+    target_xyzl[target_axis[0]] = q_coords[my_axis[0]];
   }
   else {
-    target_xyzl[target_axis[0]] = Rmh - q_as_array[my_axis[0]];
+    target_xyzl[target_axis[0]] = Rmh - q_coords[my_axis[0]];
   }
 #ifdef P4_TO_P8
   if (!edge_reverse[1]) {
-    target_xyzl[target_axis[1]] = q_as_array[my_axis[1]];
+    target_xyzl[target_axis[1]] = q_coords[my_axis[1]];
   }
   else {
-    target_xyzl[target_axis[1]] = Rmh - q_as_array[my_axis[1]];
+    target_xyzl[target_axis[1]] = Rmh - q_coords[my_axis[1]];
   }
-#else
-  target_xyzl[target_axis[1]] = 0;
 #endif
 
-  switch (edge_reverse[2]) {
-  case 1:
+  if (edge_reverse[2] == 1 || edge_reverse[2] == 3) {
     target_xyzl[target_axis[2]] = Rmh;
-    break;
-  case 2:
-    target_xyzl[target_axis[2]] = 0;
-    break;
-  default:
-    /* do nothing to the codes 0 and 3 */
-    break;
   }
-  *r = _mm_loadu_si128 ((__m128i *) & target_xyzl[0]);
+  *r = _mm_set_epi32 (target_xyzl[0], target_xyzl[1], target_xyzl[2], level);
+
   SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
   return NULL;
 }
