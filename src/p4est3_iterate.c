@@ -438,6 +438,11 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
     Level_face[side] = 0;
     is_refine[side] = 1;
     SC3E (sc3_array_index (idx_f_stack[side], 0, &arr));
+#ifdef P4EST_ENABLE_DEBUG
+    int                 ecount;
+    SC3E (sc3_array_get_elem_count (idx_f_stack[side], &ecount));
+    SC3A_CHECK (ecount == 1);
+#endif
     SC3E (sc3_array_index (*(sc3_array_t **) arr, 0, &b_f[side]));
     *(b_f[side]) = 0;
     SC3E (sc3_array_index (*(sc3_array_t **) arr, 1, &e_f[side]));
@@ -568,6 +573,13 @@ p4est3_iterate_face_inner_init (p4est3_t * p3,
   search_area->nsides = 2;
   Level_face[0] = Level_face[1] = search_area->Level;
   is_refine[0] = is_refine[1] = 1;
+#ifdef P4EST_ENABLE_DEBUG
+  int                 ecount, side;
+  for (side = 0; side < search_area->nsides; ++side) {
+    SC3E (sc3_array_get_elem_count (idx_f_stack[side], &ecount));
+    SC3A_CHECK (ecount == 1);
+  }
+#endif
 
   SC3E (sc3_array_index (idx_f_stack[0], 0, &arr));
   SC3E (sc3_array_index (*(sc3_array_t **) arr, 0, &(b_f[0])));
@@ -625,11 +637,16 @@ p4est3_iterate_volume_init (p4est3_t * p3,
   sa->finfo->tree_boundary = 0;
   SC3E (sc3_array_resize (sa->finfo->sides, 2));
 
+  memset (sa->level2nchildren, 0, sizeof (int) * p3->qvt->max_level);
+  SC3A_CHECK (sa->Level == 0);
+
   SC3E (sc3_array_index (sa->idx_vol_stack, 0, &arr));
 #ifdef P4EST_ENABLE_DEBUG
   int                 ecount;
   SC3E (sc3_array_get_elem_count (*(sc3_array_t **) arr, &ecount));
   SC3A_CHECK (ecount == 2);
+  SC3E (sc3_array_get_elem_count (sa->idx_vol_stack, &ecount));
+  SC3A_CHECK (ecount == 1);
 #endif
 
   SC3E (sc3_array_index (*(sc3_array_t **) arr, 0, &sa->begin));
