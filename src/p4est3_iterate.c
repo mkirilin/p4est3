@@ -284,10 +284,9 @@ p4est3_destroy_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
 static sc3_error_t *
 p4est3_array_is_sorted (const void *q1, const void *q2, void *qvt, int *j)
 {
-  p4est3_quadrant_vtable_t *qvtable;
-  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt);
+  p4est3_quadrant_vtable_t *qvtable = (p4est3_quadrant_vtable_t *) qvt;
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvtable);
 
-  qvtable = (p4est3_quadrant_vtable_t *) qvt;
   SC3A_IS (qvtable->quadrant_is_valid, q1);
   SC3A_IS (qvtable->quadrant_is_valid, q2);
   SC3A_CHECK (j != NULL);
