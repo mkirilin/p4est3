@@ -394,11 +394,12 @@ p4est3_quadrant_vtable_tree_face_neighbor (const void *q,
 
   p4est_quadrant_face_neighbor
     ((const p4est_quadrant_t *) q, face, (p4est_quadrant_t *) r);
+
   /* Input and output pointing on the same memory are forbidden.
     See the documentation for p4est_quadrant_transform_face */
   temp = *((p4est_quadrant_t *) r);
   SC3E (sc3_array_index (transform, 0, &idx));
-  p4est_quadrant_transform_face (&temp, r, idx);
+  p4est_quadrant_transform_face (&temp, (p4est_quadrant_t *) r, idx);
   return NULL;
 }
 
