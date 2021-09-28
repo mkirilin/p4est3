@@ -144,9 +144,11 @@ p4est3_quadrant_zyx_is_tree_boundary (const __m128i * q, const int *face,
   case 1:
     coord = _mm_extract_epi32 (*q, 2);
     break;
+#ifdef P4_TO_P8
   case 2:
     coord = _mm_extract_epi32 (*q, 1);
     break;
+#endif
   default:
     break;
   }
