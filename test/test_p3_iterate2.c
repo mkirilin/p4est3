@@ -26,9 +26,12 @@
 #ifndef P4_TO_P8
 #include <p4est3_p4est.h>
 #include <p4est3_quadrant_yx.h>
+#include <p4est3_quadrant_mort2d.h>
+
 #else
 #include <p4est3_p8est.h>
 #include <p4est3_quadrant_zyx.h>
+#include <p4est3_quadrant_mort3d.h>
 #endif
 
 /* *INDENT-OFF* */
@@ -664,13 +667,15 @@ free_allocator (sc3_allocator_t ** alloc)
 
 static sc3_error_t *
 set_parameters (setup_t * t, p4est3_quadrant_vtable_t * qvt,
-                p4est3_quadrant_vtable_t * qvt_avx, sc3_error_t ** e)
+                p4est3_quadrant_vtable_t * qvt_avx,
+                p4est3_quadrant_vtable_t * qvt_mrt, sc3_error_t ** e)
 {
   t->mainalloc = sc3_allocator_nothread ();
   SC3E (make_allocator (t));
   SC3E (p4est3_quadrant_vtable_p4est (qvt, 0));
   /* the AVX virtual table can only be set with hardware support */
   SC3F (p4est3_quadrant_yx_vtable (qvt_avx), *e);
+  SC3E (p4est3_quadrant_mort2d_vtable (qvt_mrt));
   SC3E (array_new (t->alloc, sizeof (int), 9, 9, &t->transform));
   SC3E (array_new (t->alloc, sizeof (int), qvt->dim, qvt->dim, &t->nf));
 
@@ -730,13 +735,14 @@ main (int argc, char **argv)
   setup_t             st, *t = &st;
   p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
   p4est3_quadrant_vtable_t vtable_avx, *qvt_avx = &vtable_avx;
+  p4est3_quadrant_vtable_t vtable_mrt, *qvt_mrt = &vtable_mrt;
   sc3_error_t        *e_avx;
 
   SC3X (sc3_MPI_Init (&argc, &argv));
   SC3X (sc3_MPI_Comm_rank (SC3_MPI_COMM_WORLD, &t->mpirank));
   if (t->mpirank == 0) {
     t->mpicomm = SC3_MPI_COMM_SELF;
-    SC3X (set_parameters (t, qvt, qvt_avx, &e_avx));
+    SC3X (set_parameters (t, qvt, qvt_avx, qvt_mrt, &e_avx));
 #ifdef P4EST_ENABLE_DEBUG
     printf ("l = %d, t = %d\n", t->level, t->num_trees);
 #endif /* P4EST_ENABLE_DEBUG */
@@ -745,6 +751,7 @@ main (int argc, char **argv)
     if (!sc3_error_is2_kind (e_avx, SC3_ERROR_RUNTIME, NULL)) {
       SC3X (perform_tests (t, qvt_avx));
     }
+    SC3X (perform_tests (t, qvt_mrt));
     SC3X (clean_up (t));
     if (e_avx != NULL) {
       SC3X (sc3_error_unref (&e_avx));
