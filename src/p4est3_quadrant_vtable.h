@@ -287,7 +287,7 @@ int                 p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
  */
 int                 p4est3_quadrant_is_tree_boundary (p4est3_quadrant_vtable_t
                                                       * qvt, const void *q,
-                                                      const void *i,
+                                                      const int *i,
                                                       char *reason);
 
 /** Query if a quadrant touches a tree face boundaries and which if so 
