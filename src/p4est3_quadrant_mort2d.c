@@ -307,31 +307,101 @@ p4est3_quadrant_mort_face_neighbor (const p4est3_quadrant_mort_t * q,
                                     int i, p4est3_quadrant_mort_t * r)
 {
   SC3A_IS (p4est3_quadrant_mort_is_valid, q);
-  r->coords = q->coords;
-  r->level = q->level;
-  const int32_t       shift_sign = i & 0x01 ? 1 : -1;
-  uint64_t            mask = P4EST3_QUADRANT_MORT_LEN (0x01, r->level);
-  int                 j;
+  SC3A_CHECK (0 <= i && i < P4EST_FACES);
 
-  mask <<= i / 2;
-  if (shift_sign == 1) {
-    for (j = P4EST3_MORT_MAXLEVEL - r->level; j < P4EST3_MORT_MAXLEVEL; ++j) {
-      r->coords ^= mask;
-      if (r->coords & mask) {
-        break;
-      }
-      mask <<= P4EST_DIM;
-    }
+  const int8_t        sign = i & 0x01 ? 1 : -1;
+  const uint64_t      l_mask =
+    ~(P4EST3_QUADRANT_MORT_LEN (0x01, q->level) - 1);
+  const uint64_t      dir_mask = (P4EST3_MORT_COORD_MASK & l_mask) << (i / 2);
+
+  r->level = q->level;
+  if (sign == 1) {
+    r->coords = (q->coords | ~dir_mask) + 1;
   }
   else {
-    for (j = P4EST3_MORT_MAXLEVEL - r->level; j < P4EST3_MORT_MAXLEVEL; ++j) {
-      r->coords ^= mask;
-      if (!(r->coords & mask)) {
-        break;
-      }
-      mask <<= P4EST_DIM;
-    }
+    r->coords = (q->coords & dir_mask) - 1;
   }
+  r->coords = (r->coords & dir_mask) | (q->coords & ~dir_mask);
+  SC3A_IS (p4est3_quadrant_mort_is_valid, r);
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_quadrant_mort_tree_face_neighbor (const p4est3_quadrant_mort_t * q,
+                                         sc3_array_t * transform,
+                                         int face, p4est3_quadrant_mort_t * r)
+{
+  const uint64_t      l_mask =
+    ~(P4EST3_QUADRANT_MORT_LEN (0x01, q->level) - 1);
+  const uint64_t      dir_level_mask = P4EST3_MORT_COORD_MASK & l_mask;
+  int                 i;
+  int                *my_axis;
+  int                *target_axis;
+  int                *edge_reverse;
+  uint64_t            extracted, mh, Rmh;
+
+  SC3A_IS (p4est3_quadrant_mort_is_valid, q);
+  SC3A_CHECK (q != r);
+
+  SC3E (sc3_array_index (transform, 0, &my_axis));
+  SC3E (sc3_array_index (transform, 3, &target_axis));
+  SC3E (sc3_array_index (transform, 6, &edge_reverse));
+
+#ifdef P4EST_ENABLE_DEBUG
+  for (i = 0; i < 3; ++i) {
+    SC3A_CHECK (0 <= my_axis[i] && my_axis[i] < P4EST_DIM);
+    SC3A_CHECK (0 <= target_axis[i] && target_axis[i] < P4EST_DIM);
+  }
+  SC3A_CHECK (my_axis[0] != my_axis[2]);
+  SC3A_CHECK (target_axis[0] != target_axis[2]);
+  SC3A_CHECK (0 <= edge_reverse[0] && edge_reverse[0] < 2);
+  SC3A_CHECK (0 <= edge_reverse[2] && edge_reverse[2] < 4);
+
+#ifdef P4_TO_P8
+  SC3A_CHECK (my_axis[0] != my_axis[1] && my_axis[1] != my_axis[2]);
+  SC3A_CHECK (target_axis[0] != target_axis[1] &&
+              target_axis[1] != target_axis[2]);
+  SC3A_CHECK (0 <= edge_reverse[1] && edge_reverse[1] < 2);
+#else
+  SC3A_CHECK (my_axis[1] == 0 && target_axis[1] == 0);
+  SC3A_CHECK (edge_reverse[1] == 0);
+#endif /* P4_TO_P8 */
+#endif
+
+  r->level = q->level;
+  r->coords = (uint64_t) 0;
+
+  if (q->level == P4EST3_MORT_MAXLEVEL) {
+    /* If (P4EST3_YX_MAXLEVEL == 31) Rmh will overflow. */
+    mh = 0;
+  }
+  else {
+    mh = P4EST3_QUADRANT_MORT_LEN (0x01, q->level);
+  }
+  Rmh = P4EST3_QUADRANT_MORT_LEN (0x01, 0) - mh;
+
+  if (!edge_reverse[0]) {
+    extracted = q->coords & (dir_level_mask << my_axis[0]);
+  }
+  else {
+    extracted = (Rmh ^ q->coords) & (dir_level_mask << my_axis[0]);
+  }
+  r->coords |= ((extracted >> my_axis[0]) << target_axis[0]);
+
+#ifdef P4_TO_P8
+  if (!edge_reverse[1]) {
+    extracted = q->coords & (dir_level_mask << my_axis[1]);
+  }
+  else {
+    extracted = (Rmh ^ q->coords) & (dir_level_mask << my_axis[1]);
+  }
+  r->coords |= ((extracted >> my_axis[1]) << target_axis[1]);
+#endif
+
+  if (edge_reverse[2] == 1 || edge_reverse[2] == 3) {
+    r->coords |= (Rmh & (dir_level_mask << target_axis[2]));
+  }
+
   SC3A_IS (p4est3_quadrant_mort_is_valid, r);
   return NULL;
 }
@@ -573,6 +643,12 @@ p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_parent =
     (p4est3_quadrant_parent_t) p4est3_quadrant_mort_parent;
+
+  qvt->quadrant_face_neighbor =
+    (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_mort_face_neighbor;
+
+  qvt->quadrant_tree_face_neighbor = (p4est3_quadrant_tree_face_neighbor_t)
+    p4est3_quadrant_mort_tree_face_neighbor;
 
   qvt->quadrant_face_neighbor =
     (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_mort_face_neighbor;
