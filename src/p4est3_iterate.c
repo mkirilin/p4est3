@@ -99,6 +99,7 @@ p4est3_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
   return NULL;
 }
 
+#ifdef P4EST_ENABLE_DEBUG
 static sc3_error_t *
 p4est3_array_set_zero (sc3_array_t * arr)
 {
@@ -111,6 +112,7 @@ p4est3_array_set_zero (sc3_array_t * arr)
   memset (idx, 0, ecount * esize);
   return NULL;
 }
+#endif
 
 static sc3_error_t *
 p4est3_set_children_face_neighbors (p4est3_t * p3, p4est3_search_area_t * sa)
@@ -281,6 +283,7 @@ p4est3_destroy_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
   return NULL;
 }
 
+#ifdef P4EST_ENABLE_DEBUG
 static sc3_error_t *
 p4est3_array_is_sorted (const void *q1, const void *q2, void *qvt, int *j)
 {
@@ -294,6 +297,7 @@ p4est3_array_is_sorted (const void *q1, const void *q2, void *qvt, int *j)
   SC3E (qvtable->quadrant_compare (q1, q2, j));
   return NULL;
 }
+#endif
 
 static int
 p4est3_get_children_face_nb_id (p4est3_search_area_t * sa,
