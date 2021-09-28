@@ -141,7 +141,7 @@ p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
 
 int
 p4est3_quadrant_is_tree_boundary (p4est3_quadrant_vtable_t * qvt,
-                                  const void *q, const void *i, char *reason)
+                                  const void *q, const int *i, char *reason)
 {
   SC3E_TEST (qvt != NULL, reason);
   if (qvt->quadrant_is_tree_boundary != NULL) {
