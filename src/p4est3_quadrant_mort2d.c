@@ -334,7 +334,6 @@ p4est3_quadrant_mort_tree_face_neighbor (const p4est3_quadrant_mort_t * q,
   const uint64_t      l_mask =
     ~(P4EST3_QUADRANT_MORT_LEN (0x01, q->level) - 1);
   const uint64_t      dir_level_mask = P4EST3_MORT_COORD_MASK & l_mask;
-  int                 i;
   int                *my_axis;
   int                *target_axis;
   int                *edge_reverse;
@@ -348,7 +347,7 @@ p4est3_quadrant_mort_tree_face_neighbor (const p4est3_quadrant_mort_t * q,
   SC3E (sc3_array_index (transform, 6, &edge_reverse));
 
 #ifdef P4EST_ENABLE_DEBUG
-  for (i = 0; i < 3; ++i) {
+  for (int i = 0; i < 3; ++i) {
     SC3A_CHECK (0 <= my_axis[i] && my_axis[i] < P4EST_DIM);
     SC3A_CHECK (0 <= target_axis[i] && target_axis[i] < P4EST_DIM);
   }
