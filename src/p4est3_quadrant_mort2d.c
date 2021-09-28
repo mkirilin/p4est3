@@ -315,8 +315,8 @@ p4est3_quadrant_mort_ancestor_id (const p4est3_quadrant_mort_t * q,
     return NULL;
   }
 
-  *j = (q->coords & P4EST3_QUADRANT_MORT_LEN (mask, level));
-  *j >>= P4EST_DIM * (P4EST3_MORT_MAXLEVEL - level);
+  *j = (q->coords & P4EST3_QUADRANT_MORT_LEN (mask, level))
+    >> P4EST_DIM * (P4EST3_MORT_MAXLEVEL - level);
 
   return NULL;
 }
