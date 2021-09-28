@@ -316,7 +316,6 @@ p4est3_quadrant_zyx_tree_face_neighbor (const __m128i * q,
                                         sc3_array_t * transform,
                                         int face, __m128i * r)
 {
-  int                 i;
   int                *my_axis;
   int                *target_axis;
   int                *edge_reverse;
@@ -337,7 +336,7 @@ p4est3_quadrant_zyx_tree_face_neighbor (const __m128i * q,
   level = _mm_extract_epi32 (*q, 0);
 
 #ifdef P4EST_ENABLE_DEBUG
-  for (i = 0; i < 3; ++i) {
+  for (int i = 0; i < 3; ++i) {
     SC3A_CHECK (0 <= my_axis[i] && my_axis[i] < P4EST_DIM);
     SC3A_CHECK (0 <= target_axis[i] && target_axis[i] < P4EST_DIM);
   }
