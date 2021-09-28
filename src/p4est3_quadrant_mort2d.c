@@ -25,10 +25,16 @@
 #include <p4est3_quadrant_mort2d.h>
 #define P4EST3_MORT_MAXLEVEL 31
 #define P4EST3_MORT_QMAXLEVEL 31
+/* This mask is used to extract a coordinate at 0 position.
+  It's binary representation is 00|0101..01 (00 x1|01 x31)*/
+#define P4EST3_MORT_COORD_MASK (((1431655765UL << 32) | 1431655765UL) >> 2)
 #else
 #include <p4est3_quadrant_mort3d.h>
 #define P4EST3_MORT_MAXLEVEL 21
 #define P4EST3_MORT_QMAXLEVEL 21
+/* This mask is used to extract a coordinate at 0 position.
+  It's binary representation is 0|001001001..001 (0 x1| 001 x21)*/
+#define P4EST3_MORT_COORD_MASK ((((299593UL << 21) | 299593UL) << 21) | 299593UL)
 #endif
 
 #define P4EST3_QUADRANT_MORT_LEN(n, l) \
@@ -194,6 +200,66 @@ p4est3_quadrant_mort_is_ancestor (const p4est3_quadrant_mort_t * q,
     (q->coords ^ r->coords) >> (P4EST_DIM *
                                 (P4EST3_MORT_MAXLEVEL - q->level));
   *j = exclor == 0 ? 1 : 0;
+  return NULL;
+}
+
+static int
+p4est3_quadrant_mort_is_tree_boundary (const p4est3_quadrant_mort_t * q,
+                                       const int *face, char *reason)
+{
+  const uint64_t      l_mask =
+    ~(P4EST3_QUADRANT_MORT_LEN (0x01, q->level) - 1);
+  const uint64_t      my_coord_mask =
+    (P4EST3_MORT_COORD_MASK & l_mask) << (*face / 2);
+  const uint64_t      bound = *face % 2 == 0 ? 0 : my_coord_mask;
+
+  SC3E_TEST ((q->coords & my_coord_mask) == bound, reason);
+  SC3E_YES (reason);
+}
+
+static sc3_error_t *
+p4est3_quadrant_mort_tree_boundary (const p4est3_quadrant_mort_t * q,
+                                    sc3_array_t * nf)
+{
+  SC3A_CHECK (q != NULL);
+  SC3A_CHECK (nf != NULL);
+  SC3A_IS (p4est3_quadrant_mort_is_valid, q);
+  const uint64_t      l_mask =
+    ~(P4EST3_QUADRANT_MORT_LEN (0x01, q->level) - 1);
+  const uint64_t      x_mask = P4EST3_MORT_COORD_MASK & l_mask;
+  const uint64_t      y_mask = x_mask << 1;
+  const uint64_t      x_extracted = q->coords & x_mask;
+  const uint64_t      y_extracted = q->coords & y_mask;
+#ifdef P4_TO_P8
+  const uint64_t      z_mask = x_mask << 2;
+  const uint64_t      z_extracted = q->coords & z_mask;
+#endif
+
+  int                *x, *y;
+#ifdef P4_TO_P8
+  int                *z;
+#endif
+
+  SC3E (sc3_array_index (nf, 0, &x));
+  SC3E (sc3_array_index (nf, 1, &y));
+#ifdef P4_TO_P8
+  SC3E (sc3_array_index (nf, 2, &z));
+#endif
+
+  if (q->level == 0) {
+    *x = *y = -2;
+#ifdef P4_TO_P8
+    *z = -2;
+#endif
+    return NULL;
+  }
+
+  *x = x_extracted == 0 ? 0 : (x_extracted == x_mask) ? 1 : -1;
+  *y = y_extracted == 0 ? 2 : (y_extracted == y_mask) ? 3 : -1;
+#ifdef P4_TO_P8
+  *z = z_extracted == 0 ? 4 : (z_extracted == z_mask) ? 5 : -1;
+#endif
+
   return NULL;
 }
 
@@ -488,6 +554,12 @@ p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_ancestor_id =
     (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_mort_ancestor_id;
+
+  qvt->quadrant_is_tree_boundary =
+    (p4est3_quadrant_is2_t) p4est3_quadrant_mort_is_tree_boundary;
+
+  qvt->quadrant_tree_boundary =
+    (p4est3_quadrant_tree_boundary_t) p4est3_quadrant_mort_tree_boundary;
 
   qvt->quadrant_coordinates =
     (p4est3_quadrant_in_i_out_t) p4est3_quadrant_mort_coords;
