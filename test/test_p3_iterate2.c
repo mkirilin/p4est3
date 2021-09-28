@@ -172,18 +172,16 @@ face_callback (p4est3_iterate_face_info_t * fi)
 }
 
 static sc3_error_t *
-make_new_p4est3 (p4est3_t ** p3, sc3_allocator_t * alloc,
-                 p4est3_connectivity_t * conn,
-                 p4est3_quadrant_vtable_t * qvt, int level)
+make_new_p4est3 (p4est3_t ** p3, setup_t * t, p4est3_quadrant_vtable_t * qvt)
 {
-  SC3A_IS (sc3_allocator_is_setup, alloc);
+  SC3A_IS (sc3_allocator_is_setup, t->alloc);
 
   /* create p4est object with connectivity */
-  SC3E (p4est3_new (alloc, p3));
-  /* SC3E (p4est3_set_comm (*p3, mpicomm, 1)); */
-  SC3E (p4est3_set_connectivity (*p3, conn));
+  SC3E (p4est3_new (t->alloc, p3));
+  SC3E (p4est3_set_comm (*p3, t->mpicomm, 1));
+  SC3E (p4est3_set_connectivity (*p3, t->conn));
   SC3E (p4est3_set_quadrant_vtable (*p3, qvt));
-  SC3E (p4est3_set_level (*p3, level));
+  SC3E (p4est3_set_level (*p3, t->level));
   SC3E (p4est3_setup (*p3));
 
   return NULL;
@@ -669,8 +667,6 @@ set_parameters (setup_t * t, p4est3_quadrant_vtable_t * qvt,
                 p4est3_quadrant_vtable_t * qvt_avx, sc3_error_t ** e)
 {
   t->mainalloc = sc3_allocator_nothread ();
-  t->mpicomm = SC3_MPI_COMM_WORLD;
-  SC3E (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
   SC3E (make_allocator (t));
   SC3E (p4est3_quadrant_vtable_p4est (qvt, 0));
   /* the AVX virtual table can only be set with hardware support */
@@ -698,7 +694,7 @@ perform_tests (setup_t * t, p4est3_quadrant_vtable_t * qvt)
     for (l_face = 0; l_face < nfaces; ++l_face) {
       for (r_face = 0; r_face < nfaces; ++r_face) {
         SC3E (make_connectivity (t, qvt->dim, l_face, r_face, ori));
-        SC3E (make_new_p4est3 (&p3, t->alloc, t->conn, qvt, t->level));
+        SC3E (make_new_p4est3 (&p3, t, qvt));
 
         SC3E (make_result_arrays
               (t, p3, qvt, &user_data->volumes, &vpredef, &user_data->faces,
@@ -737,18 +733,22 @@ main (int argc, char **argv)
   sc3_error_t        *e_avx;
 
   SC3X (sc3_MPI_Init (&argc, &argv));
-  SC3X (set_parameters (t, qvt, qvt_avx, &e_avx));
+  SC3X (sc3_MPI_Comm_rank (SC3_MPI_COMM_WORLD, &t->mpirank));
+  if (t->mpirank == 0) {
+    t->mpicomm = SC3_MPI_COMM_SELF;
+    SC3X (set_parameters (t, qvt, qvt_avx, &e_avx));
 #ifdef P4EST_ENABLE_DEBUG
-  printf ("l = %d, t = %d\n", t->level, t->num_trees);
+    printf ("l = %d, t = %d\n", t->level, t->num_trees);
 #endif /* P4EST_ENABLE_DEBUG */
 
-  SC3X (perform_tests (t, qvt));
-  if (!sc3_error_is2_kind (e_avx, SC3_ERROR_RUNTIME, NULL)) {
-    SC3X (perform_tests (t, qvt_avx));
-  }
-  SC3X (clean_up (t));
-  if (e_avx != NULL) {
-    SC3X (sc3_error_unref (&e_avx));
+    SC3X (perform_tests (t, qvt));
+    if (!sc3_error_is2_kind (e_avx, SC3_ERROR_RUNTIME, NULL)) {
+      SC3X (perform_tests (t, qvt_avx));
+    }
+    SC3X (clean_up (t));
+    if (e_avx != NULL) {
+      SC3X (sc3_error_unref (&e_avx));
+    }
   }
   SC3X (sc3_MPI_Finalize ());
   return 0;
