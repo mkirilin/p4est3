@@ -141,6 +141,18 @@ p4est3_iterate_codim_info_t;
 typedef sc3_error_t *(*p4est3_iterate_codim_t) (p4est3_iterate_codim_info_t *
                                                 fi);
 
+/** Iterate through the forest for volumes. This functions provides
+ * a simple non-recursion iterator.
+ * \param [in] p3       Forest passed for reference.
+ * \param [in] cvolume  Volume callback called for every local quadrant.
+ *                      Ignored if NULL.
+ * \param [in,out] user_data        Passed through to the callbacks.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_iterate_volume (p4est3_t * p3,
+                                           p4est3_iterate_volume_t cvolume,
+                                           void *user_data);
+
 /** Iterate through the forest for volumes and face connections.
  * \param [in] p3       Forest passed for reference.
  * \param [in] cvolume  Volume callback called for every local quadrant.

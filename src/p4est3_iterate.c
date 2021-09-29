@@ -373,15 +373,19 @@ p4est3_iterate_face (p4est3_t * p3,
   return NULL;
 }
 
-static sc3_error_t *
-p4est3_iterate_volume_simple (p4est3_t * p3,
-                              p4est3_iterate_volume_t cvolume,
-                              void *user_data)
+sc3_error_t        *
+p4est3_iterate_volume (p4est3_t * p3,
+                       p4est3_iterate_volume_t cvolume, void *user_data)
 {
   p4est3_topidx       ntree;
   p4est3_tree_t      *tree;
   p4est3_iterate_volume_info_t info;
   p4est3_locidx       si;
+
+  SC3A_IS (p4est3_is_setup, p3);
+  if (p3->fltree < 0 || cvolume == NULL) {
+    return NULL;
+  }
 
   info.p3 = p3;
   info.user_data = user_data;
@@ -628,8 +632,8 @@ p4est3_iterate_face_inner (p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_iterate_volume_init (p4est3_t * p3,
-                            p4est3_search_area_t * sa, p4est3_topidx tree)
+p4est3_iterate_volume_rec_init (p4est3_t * p3,
+                                p4est3_search_area_t * sa, p4est3_topidx tree)
 {
   void               *arr;
   p4est3_iterate_face_side_t *fside;
@@ -667,11 +671,11 @@ p4est3_iterate_volume_init (p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_iterate_volume (p4est3_t * p3,
-                       p4est3_iterate_volume_t cvolume,
-                       p4est3_iterate_face_t cface,
-                       p4est3_iterate_codim_t ccodim,
-                       p4est3_search_area_t * search_area)
+p4est3_iterate_volume_rec (p4est3_t * p3,
+                           p4est3_iterate_volume_t cvolume,
+                           p4est3_iterate_face_t cface,
+                           p4est3_iterate_codim_t ccodim,
+                           p4est3_search_area_t * search_area)
 {
   int                 i;
   void               *first_quad;       /*first quadrant in this search area */
@@ -730,7 +734,8 @@ p4est3_iterate_volume (p4est3_t * p3,
        l2nch[*Level]++;
        continue;
        } */
-    SC3E (p4est3_iterate_volume (p3, cvolume, cface, ccodim, search_area));
+    SC3E (p4est3_iterate_volume_rec
+          (p3, cvolume, cface, ccodim, search_area));
   }
   SC3A_CHECK (l2nch[*Level] == max_children);
   SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, search_area, arr_it));
@@ -760,7 +765,7 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
   }
 
   if (codims == P4EST3_ITERATE_VOLUME) {
-    SC3E (p4est3_iterate_volume_simple (p3, cvolume, user_data));
+    SC3E (p4est3_iterate_volume (p3, cvolume, user_data));
     return NULL;
   }
 
@@ -768,8 +773,9 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
   SC3E (sc3_array_index (search_area->finfo->sides, 0, &fside));
   for (tree = p3->fltree; tree <= p3->lltree; ++tree) {
 
-    SC3E (p4est3_iterate_volume_init (p3, search_area, tree));
-    SC3E (p4est3_iterate_volume (p3, cvolume, cface, ccodim, search_area));
+    SC3E (p4est3_iterate_volume_rec_init (p3, search_area, tree));
+    SC3E (p4est3_iterate_volume_rec
+          (p3, cvolume, cface, ccodim, search_area));
 
     /* frame faces part */
     search_area->finfo->tree_boundary = 1;
