@@ -275,7 +275,7 @@ p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t * qvt,
 #ifdef P4EST_ENABLE_DEBUG
   int                 j;
   SC3E (qvt->quadrant_get_tree_boundary (q, i, &j));
-  SC3A_CHECK (j);
+  SC3A_CHECK (!j);
 #endif
 
   SC3E (qvt->quadrant_face_neighbor (q, i, r));
