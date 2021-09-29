@@ -203,18 +203,18 @@ p4est3_quadrant_mort_is_ancestor (const p4est3_quadrant_mort_t * q,
   return NULL;
 }
 
-static int
+static sc3_error_t *
 p4est3_quadrant_mort_get_tree_boundary (const p4est3_quadrant_mort_t * q,
-                                        const int *face, char *reason)
+                                        int face, int *j)
 {
   const uint64_t      l_mask =
     ~(P4EST3_QUADRANT_MORT_LEN (0x01, q->level) - 1);
   const uint64_t      my_coord_mask =
-    (P4EST3_MORT_COORD_MASK & l_mask) << (*face / 2);
-  const uint64_t      bound = *face % 2 == 0 ? 0 : my_coord_mask;
+    (P4EST3_MORT_COORD_MASK & l_mask) << (face / 2);
+  const uint64_t      bound = face % 2 == 0 ? 0 : my_coord_mask;
 
-  SC3E_TEST ((q->coords & my_coord_mask) == bound, reason);
-  SC3E_YES (reason);
+  *j = ((q->coords & my_coord_mask) == bound);
+  return NULL;
 }
 
 static sc3_error_t *
