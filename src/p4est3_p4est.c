@@ -239,31 +239,28 @@ p4est_quadrant_vtable_is_equal (const void *q1, const void *q2, char *reason)
   SC3E_YES (reason);
 }
 
-static int
-p4est_quadrant_vtable_is_tree_boundary (const void *q, const void *i,
-                                        char *reason)
+static sc3_error_t *
+p4est_quadrant_vtable_get_tree_boundary (const void *q, int face, int *j)
 {
   const p4est_quadrant_t *quad = (const p4est_quadrant_t *) q;
-  const int           face = *((const int *) i);
   int                 direction = face / 2;
   p4est_qcoord_t      coord;
   int                 bound;
 
 #ifdef P4_TO_P8
-  coord =
-    (direction == 0) ? quad->x : (direction == 1) ? quad->y : quad->z;
+  coord = (direction == 0) ? quad->x : (direction == 1) ? quad->y : quad->z;
 #else
   coord = (direction == 0) ? quad->x : quad->y;
 #endif
   bound =
     face % 2 == 0 ? 0 : P4EST_ROOT_LEN - P4EST_QUADRANT_LEN (quad->level);
 
-  SC3E_TEST (coord == bound, reason);
-  SC3E_YES (reason);
+  *j = (coord == bound);
+  return NULL;
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_tree_boundary (const void *q, sc3_array_t * nf)
+p4est_quadrant_vtable_tree_boundaries (const void *q, sc3_array_t * nf)
 {
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (nf != NULL);
@@ -384,7 +381,7 @@ p4est_quadrant_vtable_face_neighbor (const void *q, int face, void *r)
   return NULL;
 }
 
-static sc3_error_t        *
+static sc3_error_t *
 p4est3_quadrant_vtable_tree_face_neighbor (const void *q,
                                            sc3_array_t * transform,
                                            int face, void *r)
@@ -396,7 +393,7 @@ p4est3_quadrant_vtable_tree_face_neighbor (const void *q,
     ((const p4est_quadrant_t *) q, face, (p4est_quadrant_t *) r);
 
   /* Input and output pointing on the same memory are forbidden.
-    See the documentation for p4est_quadrant_transform_face */
+     See the documentation for p4est_quadrant_transform_face */
   temp = *((p4est_quadrant_t *) r);
   SC3E (sc3_array_index (transform, 0, &idx));
   p4est_quadrant_transform_face (&temp, (p4est_quadrant_t *) r, idx);
@@ -503,8 +500,8 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   /* populate member functions */
   qvt->quadrant_is_valid = p4est_quadrant_vtable_is_valid;
   qvt->quadrant_is_equal = p4est_quadrant_vtable_is_equal;
-  qvt->quadrant_is_tree_boundary = p4est_quadrant_vtable_is_tree_boundary;
-  qvt->quadrant_tree_boundary = p4est_quadrant_vtable_tree_boundary;
+  qvt->quadrant_get_tree_boundary = p4est_quadrant_vtable_get_tree_boundary;
+  qvt->quadrant_tree_boundaries = p4est_quadrant_vtable_tree_boundaries;
   qvt->quadrant_num_uniform = p4est_quadrant_vtable_num_uniform;
   qvt->quadrant_level = p4est_quadrant_vtable_level;
   qvt->quadrant_child_id = p4est_quadrant_vtable_child_id;
