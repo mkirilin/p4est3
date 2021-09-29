@@ -334,7 +334,8 @@ p4est3_quadrant_zyx_tree_face_neighbor (const __m128i * q,
   level = _mm_extract_epi32 (*q, 0);
 
 #ifdef P4EST_ENABLE_DEBUG
-  for (int i = 0; i < 3; ++i) {
+  int                 i;
+  for (i = 0; i < 3; ++i) {
     SC3A_CHECK (0 <= my_axis[i] && my_axis[i] < P4EST_DIM);
     SC3A_CHECK (0 <= target_axis[i] && target_axis[i] < P4EST_DIM);
   }
@@ -838,8 +839,7 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_is_valid =
     (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_valid;
 
-  qvt->quadrant_get_tree_boundary =
-    (p4est3_quadrant_get_tree_boundary_t)
+  qvt->quadrant_get_tree_boundary = (p4est3_quadrant_get_tree_boundary_t)
     p4est3_quadrant_zyx_get_tree_boundary;
 
   qvt->quadrant_tree_boundaries =

@@ -347,7 +347,8 @@ p4est3_quadrant_mort_tree_face_neighbor (const p4est3_quadrant_mort_t * q,
   SC3E (sc3_array_index (transform, 6, &edge_reverse));
 
 #ifdef P4EST_ENABLE_DEBUG
-  for (int i = 0; i < 3; ++i) {
+  int                 i;
+  for (i = 0; i < 3; ++i) {
     SC3A_CHECK (0 <= my_axis[i] && my_axis[i] < P4EST_DIM);
     SC3A_CHECK (0 <= target_axis[i] && target_axis[i] < P4EST_DIM);
   }
@@ -624,8 +625,7 @@ p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_ancestor_id =
     (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_mort_ancestor_id;
 
-  qvt->quadrant_get_tree_boundary =
-    (p4est3_quadrant_get_tree_boundary_t)
+  qvt->quadrant_get_tree_boundary = (p4est3_quadrant_get_tree_boundary_t)
     p4est3_quadrant_mort_get_tree_boundary;
 
   qvt->quadrant_tree_boundaries =
