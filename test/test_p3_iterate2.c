@@ -444,7 +444,7 @@ iterate_unimesh_tree_boundary_face (setup_t * t, p4est3_t * p3,
     SC3E (p4est3_tree_index (p3, ntree_neighbor, &tree_neighbor));
     SC3E (p4est3_quadrant_morton (qvt, t->level, 0L, r));
     for (i = 0; i < nquads_per_level - 1; ++i) {
-      SC3E (p4est3_quadrant_tree_boundary (qvt, r, t->nf));
+      SC3E (p4est3_quadrant_tree_boundaries (qvt, r, t->nf));
       for (d = 0; d < qvt->dim; ++d) {
         SC3E (sc3_array_index (t->nf, d, &idx));
         if (*idx == face || *idx == -2) {
@@ -456,7 +456,7 @@ iterate_unimesh_tree_boundary_face (setup_t * t, p4est3_t * p3,
       }
       SC3E (p4est3_quadrant_successor (qvt, r, r));
     }
-    SC3E (p4est3_quadrant_tree_boundary (qvt, r, t->nf));
+    SC3E (p4est3_quadrant_tree_boundaries (qvt, r, t->nf));
     for (d = 0; d < qvt->dim; ++d) {
       SC3E (sc3_array_index (t->nf, d, &idx));
       if (*idx == face || *idx == -2) {
