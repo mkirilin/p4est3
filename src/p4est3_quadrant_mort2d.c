@@ -204,8 +204,8 @@ p4est3_quadrant_mort_is_ancestor (const p4est3_quadrant_mort_t * q,
 }
 
 static int
-p4est3_quadrant_mort_is_tree_boundary (const p4est3_quadrant_mort_t * q,
-                                       const int *face, char *reason)
+p4est3_quadrant_mort_get_tree_boundary (const p4est3_quadrant_mort_t * q,
+                                        const int *face, char *reason)
 {
   const uint64_t      l_mask =
     ~(P4EST3_QUADRANT_MORT_LEN (0x01, q->level) - 1);
@@ -218,8 +218,8 @@ p4est3_quadrant_mort_is_tree_boundary (const p4est3_quadrant_mort_t * q,
 }
 
 static sc3_error_t *
-p4est3_quadrant_mort_tree_boundary (const p4est3_quadrant_mort_t * q,
-                                    sc3_array_t * nf)
+p4est3_quadrant_mort_tree_boundaries (const p4est3_quadrant_mort_t * q,
+                                      sc3_array_t * nf)
 {
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (nf != NULL);
@@ -347,7 +347,8 @@ p4est3_quadrant_mort_tree_face_neighbor (const p4est3_quadrant_mort_t * q,
   SC3E (sc3_array_index (transform, 6, &edge_reverse));
 
 #ifdef P4EST_ENABLE_DEBUG
-  for (int i = 0; i < 3; ++i) {
+  int                 i;
+  for (i = 0; i < 3; ++i) {
     SC3A_CHECK (0 <= my_axis[i] && my_axis[i] < P4EST_DIM);
     SC3A_CHECK (0 <= target_axis[i] && target_axis[i] < P4EST_DIM);
   }
@@ -624,11 +625,11 @@ p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_ancestor_id =
     (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_mort_ancestor_id;
 
-  qvt->quadrant_is_tree_boundary =
-    (p4est3_quadrant_is2_t) p4est3_quadrant_mort_is_tree_boundary;
+  qvt->quadrant_get_tree_boundary = (p4est3_quadrant_get_tree_boundary_t)
+    p4est3_quadrant_mort_get_tree_boundary;
 
-  qvt->quadrant_tree_boundary =
-    (p4est3_quadrant_tree_boundary_t) p4est3_quadrant_mort_tree_boundary;
+  qvt->quadrant_tree_boundaries =
+    (p4est3_quadrant_tree_boundaries_t) p4est3_quadrant_mort_tree_boundaries;
 
   qvt->quadrant_coordinates =
     (p4est3_quadrant_in_i_out_t) p4est3_quadrant_mort_coords;

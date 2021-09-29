@@ -58,15 +58,24 @@ extern              "C"
 
 /* *INDENT-OFF* */
 
-/*** Generic prototypes for quadrant functions ***/
+/*** Generic prototypes for quadrant functions -- debugging ***/
 
-/** Generic prototype to compute a global index from an integer. */
-typedef p4est3_gloidx (*p4est3_quadrant_glo_t) (int level);
-/** Generic prototype according to the \c sc3_object_is* query format. */
+/** Generic prototype according to the \c sc3_object_is* query format.
+ * The _is_ functions carry a \a reason parameter to facilitate debugging.
+ */
 typedef int         (*p4est3_quadrant_is_t) (const void * q, char *reason);
-/** Generic prototype according to the \c sc3_object_is2* query format. */
+
+/** Generic prototype according to the \c sc3_object_is2* query format.
+ * The _is2_ functions carry a \a reason parameter to facilitate debugging.
+ */
 typedef int         (*p4est3_quadrant_is2_t) (const void * q1, const void *q2,
                                               char *reason);
+
+/*** Generic prototypes for quadrant functions -- production ***/
+
+/** Generic prototype to compute a global index from an integer input. */
+typedef p4est3_gloidx (*p4est3_quadrant_glo_t) (int level);
+
 /** Generic prototype to extract one int from a quadrant. */
 typedef sc3_error_t *(*p4est3_quadrant_in_j_t) (const void *q, int *j);
 /** Generic prototype to take and extract one int from a quadrant. */
@@ -74,6 +83,10 @@ typedef sc3_error_t *(*p4est3_quadrant_in_i_j_t) (const void *q, int i, int *j);
 /** Generic prototype to take two quadrants inputs and output an int. */
 typedef sc3_error_t *(*p4est3_quadrant_in2_j_t) (const void * q1,
                                                  const void * q2, int *j);
+/** Prototype to take a quadrant and output an array. */
+typedef sc3_error_t *(*p4est3_quadrant_in_arr_t) (const void *q,
+                                                  sc3_array_t * a);
+
 /** Generic prototype to set a quadrant. */
 typedef sc3_error_t *(*p4est3_quadrant_out_t) (void *r);
 /** Generic prototype to take a quadrant and output another. */
@@ -84,16 +97,15 @@ typedef sc3_error_t *(*p4est3_quadrant_in_i_out_t) (const void *q, int i,
 /** Prototype to set a quadrant based on a linear index. */
 typedef sc3_error_t *(*p4est3_quadrant_morton_t) (int l, p4est3_gloidx i,
                                                   void *r);
+
 /** Prototype to set a common nearest ancestor of two quadrants. */
 typedef sc3_error_t *(*p4est3_nearest_common_ancestor_t) (const void * q1,
                                                           const void * q2,
                                                           void *r);
-/** Prototype to set a linear index of a quadrant based on its morton index. */
+/** Prototype to set a linear index of a quadrant based on its Morton index. */
 typedef sc3_error_t *(*p4est3_quadrant_linear_id_t) (const void *q, int l,
                                                      p4est3_gloidx *i);
-/** Prototype to query if a quadrant touches a tree face boundaries and which */
-typedef sc3_error_t *(*p4est3_quadrant_tree_boundary_t) (const void *q,
-                                                         sc3_array_t * a);
+
 /** Prototype to construct the face neighbor of a quadrant accross a tree. */
 typedef sc3_error_t *(*p4est3_quadrant_tree_face_neighbor_t) (const void *q,
                                                               sc3_array_t * t,
@@ -136,6 +148,11 @@ typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_child_t;
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_first_descendant_t;
 /** Prototype to construct the last descendant at maximum level of a quadrant. */
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_last_descendant_t;
+
+/** Prototype to query if a quadrant touches a given tree face boundary */
+typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_get_tree_boundary_t;
+/** Prototype to query if a quadrant touches tree face boundaries and which */
+typedef p4est3_quadrant_in_arr_t p4est3_quadrant_tree_boundaries_t;
 /** Prototype to construct the face neighbor of a quadrant. */
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_face_neighbor_t;
 
@@ -166,8 +183,8 @@ typedef struct p4est3_quadrant_vtable
    * Pointer may be NULL, in which case we memcmp (3) the contents. */
   p4est3_quadrant_is2_t quadrant_is_equal;
   /** Query tree boundary in a specific direction */
-  p4est3_quadrant_is2_t quadrant_is_tree_boundary;
-  p4est3_quadrant_tree_boundary_t quadrant_tree_boundary; /**< Query tree boundary */
+  p4est3_quadrant_get_tree_boundary_t quadrant_get_tree_boundary;
+  p4est3_quadrant_in_arr_t quadrant_tree_boundaries; /**< Query tree boundary */
   p4est3_quadrant_level_t quadrant_level;               /**< Query the level. */
   p4est3_quadrant_child_id_t quadrant_child_id;         /**< Query child id. */
   p4est3_quadrant_ancestor_id_t quadrant_ancestor_id;   /**< Query ancestor id. */
@@ -196,7 +213,7 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_morton_t quadrant_morton;     /**< Generate by linear index. */
   /**< Generate a common nearest ancestor of a quadrant. */
   p4est3_nearest_common_ancestor_t nearest_common_ancestor;
-  p4est3_quadrant_linear_id_t quadrant_linear_id;   /**< Generate by morton index. */
+  p4est3_quadrant_linear_id_t quadrant_linear_id;   /**< Generate by Morton index. */
   /**< Query if a quadrant is a ancestor of another. */
   p4est3_quadrant_is_ancestor_t quadrant_is_ancestor;
 }
@@ -282,13 +299,13 @@ int                 p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
  * \param [in] i        A index of a tree's face for that the intersection
  *                      with the quadrant \a q will be checked.
  *                      For 3D: 0..5. For 2D: 0..3.
- * \return              True if the quadrant \a q touches the \a i-th boundary
+ * \param [out] j       True if the quadrant \a q touches the \a i-th boundary
  *                      face of the tree, false otherwise.
+* \return               NULL on success, error object otherwise.
  */
-int                 p4est3_quadrant_is_tree_boundary (p4est3_quadrant_vtable_t
-                                                      * qvt, const void *q,
-                                                      const int *i,
-                                                      char *reason);
+sc3_error_t       
+  *p4est3_quadrant_get_tree_boundary (p4est3_quadrant_vtable_t * qvt,
+                                      const void *q, int i, int *j);
 
 /** Query if a quadrant touches a tree face boundaries and which if so 
  * \param [in] qvt      Valid virtual quadrant table.
@@ -302,9 +319,9 @@ int                 p4est3_quadrant_is_tree_boundary (p4est3_quadrant_vtable_t
  *                      the whole tree), then the entry is filled by -2.
  * \return              NULL on success, error object otherwise.
 */
-sc3_error_t        *p4est3_quadrant_tree_boundary (p4est3_quadrant_vtable_t *
-                                                   qvt, const void *q,
-                                                   sc3_array_t * nf);
+sc3_error_t        *p4est3_quadrant_tree_boundaries (p4est3_quadrant_vtable_t
+                                                     * qvt, const void *q,
+                                                     sc3_array_t * nf);
 
 /** Query the refinement level of a quadrant.
  * \param [in] qvt      Valid virtual quadrant table.

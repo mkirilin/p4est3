@@ -130,12 +130,11 @@ p4est3_quadrant_zyx_is_ancestor (const __m128i * q, const __m128i * r, int *j)
   return NULL;
 }
 
-static int
-p4est3_quadrant_zyx_is_tree_boundary (const __m128i * q, const int *face,
-                                      char *reason)
+static sc3_error_t *
+p4est3_quadrant_zyx_get_tree_boundary (const __m128i * q, int face, int *j)
 {
   const int32_t       l = _mm_extract_epi32 (*q, 0);
-  const int           direction = *face / 2;
+  const int           direction = face / 2;
   int32_t             coord, bound;
   switch (direction) {
   case 0:
@@ -153,14 +152,13 @@ p4est3_quadrant_zyx_is_tree_boundary (const __m128i * q, const int *face,
     break;
   }
 
-  bound =
-    *face % 2 == 0 ? 0 : P4EST3_YX_ROOT_LEN - P4EST3_YX_QUADRANT_LEN (l);
-  SC3E_TEST (coord == bound, reason);
-  SC3E_YES (reason);
+  bound = face % 2 == 0 ? 0 : P4EST3_YX_ROOT_LEN - P4EST3_YX_QUADRANT_LEN (l);
+  *j = (coord == bound);
+  return NULL;
 }
 
 static sc3_error_t *
-p4est3_quadrant_zyx_tree_boundary (const __m128i * q, sc3_array_t * nf)
+p4est3_quadrant_zyx_tree_boundaries (const __m128i * q, sc3_array_t * nf)
 {
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (nf != NULL);
@@ -336,7 +334,8 @@ p4est3_quadrant_zyx_tree_face_neighbor (const __m128i * q,
   level = _mm_extract_epi32 (*q, 0);
 
 #ifdef P4EST_ENABLE_DEBUG
-  for (int i = 0; i < 3; ++i) {
+  int                 i;
+  for (i = 0; i < 3; ++i) {
     SC3A_CHECK (0 <= my_axis[i] && my_axis[i] < P4EST_DIM);
     SC3A_CHECK (0 <= target_axis[i] && target_axis[i] < P4EST_DIM);
   }
@@ -840,11 +839,11 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_is_valid =
     (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_valid;
 
-  qvt->quadrant_is_tree_boundary =
-    (p4est3_quadrant_is2_t) p4est3_quadrant_zyx_is_tree_boundary;
+  qvt->quadrant_get_tree_boundary = (p4est3_quadrant_get_tree_boundary_t)
+    p4est3_quadrant_zyx_get_tree_boundary;
 
-  qvt->quadrant_tree_boundary =
-    (p4est3_quadrant_tree_boundary_t) p4est3_quadrant_zyx_tree_boundary;
+  qvt->quadrant_tree_boundaries =
+    (p4est3_quadrant_tree_boundaries_t) p4est3_quadrant_zyx_tree_boundaries;
 
   qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_zyx_level;
 
