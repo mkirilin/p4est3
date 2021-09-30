@@ -394,7 +394,7 @@ p4est3_iterate_volume (p4est3_t * p3,
     SC3E (p4est3_tree_index (p3, ntree, &tree));
     for (si = 0; si < tree->num_quads; ++si) {
       info.quadrant = tree->tquads + si * p3->qvt->quadrant_size;
-      info.nquad = si + tree->quad_offset;
+      info.nquad = si + tree->first_tquad;
       SC3E (cvolume (&info));
     }
   }

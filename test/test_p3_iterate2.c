@@ -212,7 +212,7 @@ static sc3_error_t *
 make_ref_array_volume (setup_t * t, p4est3_t * p3,
                        p4est3_quadrant_vtable_t * qvt, sc3_array_t ** vpredef)
 {
-  const int           nquad = (1 << (qvt->dim * t->level)) * t->num_trees;
+  const int           nquad = p3->local_num_quads;
   p4est3_iterate_volume_info_t *vit;
   p4est3_tree_t      *tree;
   int                 i, ntree;
@@ -222,12 +222,12 @@ make_ref_array_volume (setup_t * t, p4est3_t * p3,
                    nquad, vpredef));
 
   SC3E (sc3_array_index (*vpredef, 0, &vit));
-  for (ntree = 0; ntree < t->num_trees; ++ntree) {
+  for (ntree = p3->fltree; ntree <= p3->lltree; ++ntree) {
     SC3E (p4est3_tree_index (p3, ntree, &tree));
     qit = tree->tquads;
     for (i = 0; i < tree->num_quads; ++i, ++vit, qit += qvt->quadrant_size) {
       vit->ntree = ntree;
-      vit->nquad = i;
+      vit->nquad = i + tree->first_tquad;
       vit->quadrant = (void *) qit;
     }
   }
@@ -526,13 +526,16 @@ make_result_arrays (setup_t * t, p4est3_t * p3,
                     sc3_array_t ** fpredef)
 {
   p4est3_iterate_face_info_t *fit;
-  const int           nquad = (1 << (qvt->dim * t->level)) * t->num_trees;
+  const int           nquad = p3->local_num_quads;
   int                 nface, i;
 
   SC3E (array_new (t->alloc, sizeof (p4est3_iterate_volume_info_t), nquad,
                    0, voutput));
   SC3E (make_ref_array_volume (t, p3, qvt, vpredef));
 
+  if (fpredef == NULL && foutput == NULL) {
+    return NULL;
+  }
   SC3E (array_new
         (t->alloc, sizeof (p4est3_iterate_face_info_t), 0, 0, fpredef));
   SC3E (iterate_unimesh_face (t, p3, qvt, *fpredef));
@@ -554,49 +557,43 @@ make_result_arrays (setup_t * t, p4est3_t * p3,
 }
 
 static sc3_error_t *
-perform_test (setup_t * t, p4est3_t * p3, p4est3_quadrant_vtable_t * qvt,
-              callback_data_t * user_data)
-{
-  SC3E (p4est3_iterate_codim
-        (p3, P4EST3_ITERATE_VOLUME || P4EST3_ITERATE_FACE,
-         volume_callback, face_callback, NULL, user_data));
-  return NULL;
-}
-
-static sc3_error_t *
 compare_results (setup_t * t, p4est3_t * p3, p4est3_quadrant_vtable_t * qvt,
                  sc3_array_t * voutput, sc3_array_t * vpredef,
                  sc3_array_t * foutput, sc3_array_t * fpredef)
 {
-  const int           nquad = (1 << (qvt->dim * t->level)) * t->num_trees;
+  const int           nquad = p3->local_num_quads;
   p4est3_iterate_volume_info_t *vit_out, *vit_pre;
   p4est3_iterate_face_info_t *fit_out, *fit_pre;
   p4est3_iterate_face_side_t *sit_out, *sit_pre;
 
   int                 nface_out, nface_pre;
   int                 i, side, nsides_out, nsides_pre;
+#ifdef P4EST_ENABLE_DEBUG
   int                 out_coord[2], pre_coord[2];
   int                 out_l, pre_l;
-
+#endif
   SC3E (sc3_array_index (voutput, 0, &vit_out));
   SC3E (sc3_array_index (vpredef, 0, &vit_pre));
   for (i = 0; i < nquad; ++i, ++vit_out, ++vit_pre) {
     SC3E_DEMAND (vit_out->ntree == vit_pre->ntree, "Volume's ntree differs");
     SC3E_DEMAND (vit_out->nquad == vit_pre->nquad, "Volume's nquad differs");
 
-    /* degub purposes only */
+#ifdef P4EST_ENABLE_DEBUG
     SC3E (p4est3_quadrant_coordinates
           (qvt, vit_out->quadrant, qvt->dim, out_coord));
     SC3E (p4est3_quadrant_coordinates
           (qvt, vit_pre->quadrant, qvt->dim, pre_coord));
     SC3E (p4est3_quadrant_level (qvt, vit_out->quadrant, &out_l));
     SC3E (p4est3_quadrant_level (qvt, vit_pre->quadrant, &pre_l));
-    /* degub purposes only */
+#endif
 
     SC3E_DEMAND (vit_out->quadrant == vit_pre->quadrant,
                  "Volumes poiner to various quadrants");
   }
 
+  if (foutput == NULL || fpredef == NULL) {
+    return NULL;
+  }
   SC3E (sc3_array_get_elem_count (foutput, &nface_out));
   SC3E (sc3_array_get_elem_count (fpredef, &nface_pre));
   SC3E_DEMAND (nface_out == nface_pre, "Face: number of faces differs");
@@ -637,12 +634,20 @@ free_arrays (sc3_array_t * voutput, sc3_array_t * vpredef,
 
   SC3A_IS (sc3_array_is_setup, voutput);
   SC3A_IS (sc3_array_is_setup, vpredef);
-  SC3A_IS (sc3_array_is_setup, fpredef);
-  SC3A_IS (sc3_array_is_setup, foutput);
-
+#ifdef P4EST_ENABLE_DEBUG
+  if (fpredef != NULL) {
+    SC3A_IS (sc3_array_is_setup, fpredef);
+  }
+  if (foutput != NULL) {
+    SC3A_IS (sc3_array_is_setup, foutput);
+  }
+#endif
   SC3E (sc3_array_destroy (&voutput));
   SC3E (sc3_array_destroy (&vpredef));
 
+  if (fpredef == NULL && foutput == NULL) {
+    return NULL;
+  }
   SC3E (sc3_array_get_elem_count (fpredef, &nfaces_pre));
   SC3E (sc3_array_get_elem_count (foutput, &nfaces_out));
   SC3E_DEMAND (nfaces_pre == nfaces_out, "#Sides mismatches");
@@ -704,7 +709,9 @@ perform_tests (setup_t * t, p4est3_quadrant_vtable_t * qvt)
         SC3E (make_result_arrays
               (t, p3, qvt, &user_data->volumes, &vpredef, &user_data->faces,
                &fpredef));
-        SC3E (perform_test (t, p3, qvt, user_data));
+        SC3E (p4est3_iterate_codim
+              (p3, P4EST3_ITERATE_VOLUME || P4EST3_ITERATE_FACE,
+               volume_callback, face_callback, NULL, user_data));
         SC3E (compare_results
               (t, p3, qvt, user_data->volumes, vpredef, user_data->faces,
                fpredef));
@@ -729,6 +736,50 @@ clean_up (setup_t * t)
   return NULL;
 }
 
+static sc3_error_t *
+perform_tests_simple_volume_iterator (setup_t * t,
+                                      p4est3_quadrant_vtable_t * qvt)
+{
+  p4est3_t           *p3;
+  sc3_array_t        *vpredef;
+  callback_data_t     sud, *user_data = &sud;
+
+  SC3E (make_connectivity (t, qvt->dim, 0, 0, 0));
+  SC3E (make_new_p4est3 (&p3, t, qvt));
+
+  SC3E (make_result_arrays
+        (t, p3, qvt, &user_data->volumes, &vpredef, NULL, NULL));
+  SC3E (p4est3_iterate_volume (p3, volume_callback, user_data));
+  SC3E (compare_results
+        (t, p3, qvt, user_data->volumes, vpredef, NULL, NULL));
+
+  /*destroy forest, that was referenced for others */
+  SC3E (free_arrays (user_data->volumes, vpredef, NULL, NULL));
+  SC3E (p4est3_destroy (&p3));
+  SC3E (p4est3_connectivity_destroy (&t->conn));
+
+  return NULL;
+}
+
+static sc3_error_t *
+test_simple_volume_iterator (setup_t * t, p4est3_quadrant_vtable_t * qvt,
+                             p4est3_quadrant_vtable_t * qvt_avx,
+                             p4est3_quadrant_vtable_t * qvt_mrt,
+                             sc3_error_t ** e)
+{
+  SC3E (set_parameters (t, qvt, qvt_avx, qvt_mrt, e));
+  SC3E (perform_tests_simple_volume_iterator (t, qvt));
+  SC3E (perform_tests_simple_volume_iterator (t, qvt_avx));
+  if (!sc3_error_is2_kind (*e, SC3_ERROR_RUNTIME, NULL)) {
+    SC3E (perform_tests_simple_volume_iterator (t, qvt_mrt));
+  }
+  SC3E (clean_up (t));
+  if (e != NULL && *e != NULL) {
+    SC3E (sc3_error_unref (e));
+  }
+  return NULL;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -739,7 +790,9 @@ main (int argc, char **argv)
   sc3_error_t        *e_avx;
 
   SC3X (sc3_MPI_Init (&argc, &argv));
-  SC3X (sc3_MPI_Comm_rank (SC3_MPI_COMM_WORLD, &t->mpirank));
+  t->mpicomm = SC3_MPI_COMM_WORLD;
+  SC3X (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
+  SC3X (test_simple_volume_iterator (t, qvt, qvt_avx, qvt_mrt, &e_avx));
   if (t->mpirank == 0) {
     t->mpicomm = SC3_MPI_COMM_SELF;
     SC3X (set_parameters (t, qvt, qvt_avx, qvt_mrt, &e_avx));
