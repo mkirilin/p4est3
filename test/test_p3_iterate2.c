@@ -34,6 +34,8 @@
 #include <p4est3_quadrant_mort3d.h>
 #endif
 
+#define DISABLE_TEST_FACES
+
 /* *INDENT-OFF* */
 static const int    nface_predef_2d[4][2] =
 {{1, 0}, {3, 2}, {3, 2}, {1, 0}};
@@ -706,19 +708,28 @@ perform_tests (setup_t * t, p4est3_quadrant_vtable_t * qvt)
         SC3E (make_connectivity (t, qvt->dim, l_face, r_face, ori));
         SC3E (make_new_p4est3 (&p3, t, qvt));
 
+#ifndef DISABLE_TEST_FACES
         SC3E (make_result_arrays
               (t, p3, qvt, &user_data->volumes, &vpredef, &user_data->faces,
                &fpredef));
+#else
+        SC3E (make_result_arrays
+              (t, p3, qvt, &user_data->volumes, &vpredef, NULL, NULL));
+#endif
         SC3E (p4est3_iterate_codim
               (p3, P4EST3_ITERATE_VOLUME || P4EST3_ITERATE_FACE,
                volume_callback, face_callback, NULL, user_data));
+#ifndef DISABLE_TEST_FACES
         SC3E (compare_results
               (t, p3, qvt, user_data->volumes, vpredef, user_data->faces,
                fpredef));
-
-        /*destroy forest, that was referenced for others */
         SC3E (free_arrays
               (user_data->volumes, vpredef, user_data->faces, fpredef));
+#else
+        SC3E (compare_results
+              (t, p3, qvt, user_data->volumes, vpredef, NULL, NULL));
+        SC3E (free_arrays (user_data->volumes, vpredef, NULL, NULL));
+#endif
         SC3E (p4est3_destroy (&p3));
         SC3E (p4est3_connectivity_destroy (&t->conn));
       }
@@ -793,23 +804,25 @@ main (int argc, char **argv)
   t->mpicomm = SC3_MPI_COMM_WORLD;
   SC3X (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
   SC3X (test_simple_volume_iterator (t, qvt, qvt_avx, qvt_mrt, &e_avx));
-  if (t->mpirank == 0) {
-    t->mpicomm = SC3_MPI_COMM_SELF;
-    SC3X (set_parameters (t, qvt, qvt_avx, qvt_mrt, &e_avx));
+  //if (t->mpirank == 0) {
+  //  t->mpicomm = SC3_MPI_COMM_SELF;
+  SC3X (set_parameters (t, qvt, qvt_avx, qvt_mrt, &e_avx));
 #ifdef P4EST_ENABLE_DEBUG
+  if (t->mpirank == 0) {
     printf ("l = %d, t = %d\n", t->level, t->num_trees);
+  }
 #endif /* P4EST_ENABLE_DEBUG */
 
-    SC3X (perform_tests (t, qvt));
-    if (!sc3_error_is2_kind (e_avx, SC3_ERROR_RUNTIME, NULL)) {
-      SC3X (perform_tests (t, qvt_avx));
-    }
-    SC3X (perform_tests (t, qvt_mrt));
-    SC3X (clean_up (t));
-    if (e_avx != NULL) {
-      SC3X (sc3_error_unref (&e_avx));
-    }
+  SC3X (perform_tests (t, qvt));
+  if (!sc3_error_is2_kind (e_avx, SC3_ERROR_RUNTIME, NULL)) {
+    SC3X (perform_tests (t, qvt_avx));
   }
+  SC3X (perform_tests (t, qvt_mrt));
+  SC3X (clean_up (t));
+  if (e_avx != NULL) {
+    SC3X (sc3_error_unref (&e_avx));
+  }
+  //}
   SC3X (sc3_MPI_Finalize ());
   return 0;
 }

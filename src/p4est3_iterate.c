@@ -183,7 +183,7 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
   SC3E (p4est3_set_face_dual (p3, sa));
 
   /*set volume section of sa */
-  SC3E (p4est3_tree_index (p3, 0, &sa->tree));
+  SC3E (p4est3_tree_index (p3, p3->fltree, &sa->tree));
   sa->begin = NULL;
   sa->end = NULL;
   sa->Level = 0;
@@ -693,13 +693,19 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
   sc3_array_t        *idx_vol_stack = search_area->idx_vol_stack;
   p4est3_iterate_volume_info_t *vinfo = search_area->vinfo;
 
+  /* Check if the considered search area intersect
+     the area of the local process. If not, then skip it. */
+  if (begin == end) {
+    l2nch[*Level]++;
+    return NULL;
+  }
 /*Are trees with no quads possible?*/
   first_quad = (void *) (tree->tquads + p3->qvt->quadrant_size * begin);
   SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
   if (level == *Level) {
     if (cvolume != NULL) {
       vinfo->quadrant = first_quad;
-      vinfo->nquad = begin;
+      vinfo->nquad = begin + tree->first_tquad;
       SC3E (cvolume (vinfo));
     }
     l2nch[*Level]++;
@@ -738,7 +744,7 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
           (p3, cvolume, cface, ccodim, search_area));
   }
   SC3A_CHECK (l2nch[*Level] == max_children);
-  SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, search_area, arr_it));
+  //SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, search_area, arr_it));
   l2nch[--(*Level)]++;
   SC3E (sc3_array_pop (idx_vol_stack));
   return NULL;
@@ -778,21 +784,21 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
           (p3, cvolume, cface, ccodim, search_area));
 
     /* frame faces part */
-    search_area->finfo->tree_boundary = 1;
-    search_area->tree_face[0] = search_area->tree;
-    for (face = 0; face < search_area->nfaces; ++face) {
-      SC3E (p4est3_iterate_face_bound_init
-            (p3, search_area, tree, face, fside, &is_lower));
-      if (is_lower) {
-        /* we iterate over such trees that tree_neighbor < tree */
-        SC3E (sc3_array_pop (search_area->finfo->sides));
-        continue;
-      }
-      SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
-      if (is_lower) {
-        SC3E (sc3_array_push (search_area->finfo->sides, NULL));
-      }
-    }
+    //  search_area->finfo->tree_boundary = 1;
+    //  search_area->tree_face[0] = search_area->tree;
+    //  for (face = 0; face < search_area->nfaces; ++face) {
+    //    SC3E (p4est3_iterate_face_bound_init
+    //          (p3, search_area, tree, face, fside, &is_lower));
+    //    if (is_lower) {
+    //      /* we iterate over such trees that tree_neighbor < tree */
+    //      SC3E (sc3_array_pop (search_area->finfo->sides));
+    //      continue;
+    //    }
+    //    SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
+    //    if (is_lower) {
+    //      SC3E (sc3_array_push (search_area->finfo->sides, NULL));
+    //    }
+    //  }
   }
   SC3E (p4est3_destroy_outer_data (p3, search_area));
   return NULL;
