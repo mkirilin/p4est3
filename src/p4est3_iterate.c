@@ -481,6 +481,13 @@ p4est3_internal_iterate_face (p4est3_t * p3,
   int                 ori = search_area->finfo->orientation;
   void               *first_quad;
 
+  /* Check if both sides belong to the same process (at least, partly).
+     If not, we ignore this face. */
+  for (side = 0; side < search_area->nsides; ++side) {
+    if (*b_f[side] == *e_f[side]) {
+      return NULL;
+    }
+  }
   /* first check if the whole quadrant passes */
   SC3E (sc3_array_index (search_area->finfo->sides, 0, &fside));
   for (side = 0; side < search_area->nsides; ++side) {
@@ -493,7 +500,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
     if (level == Level[side]) {
       is_refine[side] = 0;
-      fside[side].nquad = *(b_f[side]);
+      fside[side].nquad = *(b_f[side]) + trees[side]->first_tquad;
       fside[side].quadrant = first_quad;
     }
   }
@@ -542,10 +549,6 @@ p4est3_internal_iterate_face (p4est3_t * p3,
             (p3->conn, fside[side].nface, idx, &child_id));
       b_f[side] = arr_it + child_id;
       e_f[side] = arr_it + child_id + 1;
-      SC3A_CHECK (*(b_f[side]) < *(e_f[side]));
-      /*if (*(b_f[side]) == *(e_f[side]) - 1) {
-         continue;
-         } */
     }
     Level[0]++;
     Level[1]++;
@@ -744,7 +747,7 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
           (p3, cvolume, cface, ccodim, search_area));
   }
   SC3A_CHECK (l2nch[*Level] == max_children);
-  //SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, search_area, arr_it));
+  SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, search_area, arr_it));
   l2nch[--(*Level)]++;
   SC3E (sc3_array_pop (idx_vol_stack));
   return NULL;

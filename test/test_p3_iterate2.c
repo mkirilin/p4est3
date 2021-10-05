@@ -34,7 +34,7 @@
 #include <p4est3_quadrant_mort3d.h>
 #endif
 
-#define DISABLE_TEST_FACES
+//#define DISABLE_TEST_FACES
 
 /* *INDENT-OFF* */
 static const int    nface_predef_2d[4][2] =
@@ -246,10 +246,24 @@ iterate_unimesh_inner_simple_children (setup_t * t, p4est3_t * p3,
   p4est3_iterate_face_info_t *finfo;
   p4est3_iterate_face_side_t *sinfo;
   int                 i, side, nfaces = ((1 << (qvt->dim - 1))) * qvt->dim;
+  p4est3_gloidx       qid0, qid1;
 
   SC3A_CHECK (qvt->dim == 2 || qvt->dim == 3);
 
   for (i = 0; i < nfaces; ++i) {
+    if (qvt->dim == 2) {
+      qid0 = first_qid + nquad_predef_2d[i][0];
+      qid1 = first_qid + nquad_predef_2d[i][1];
+    }
+    else {
+      qid0 = first_qid + nquad_predef_3d[i][0];
+      qid1 = first_qid + nquad_predef_3d[i][1];
+    }
+
+    if (qid0 < tree->first_tquad || qid0 > tree->last_tquad
+        || qid1 < tree->first_tquad || qid1 > tree->last_tquad) {
+      continue;
+    }
     SC3E (sc3_array_push (fpredef, &finfo));
     SC3E (array_new
           (t->alloc, sizeof (p4est3_iterate_face_side_t), 2, 0,
@@ -271,7 +285,8 @@ iterate_unimesh_inner_simple_children (setup_t * t, p4est3_t * p3,
         sinfo->nquad = first_qid + nquad_predef_3d[i][side];
       }
       sinfo->quadrant =
-        (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
+        (void *) (tree->tquads +
+                  qvt->quadrant_size * (sinfo->nquad - tree->first_tquad));
     }
   }
   return NULL;
@@ -289,6 +304,28 @@ fill_face_info (sc3_array_t * fpredef, int nquad, int face, int face_neighbor,
   p4est3_topidx       ntree;
 
   SC3A_CHECK (nsides == 1 || nsides == 2);
+  if (nquad < tree->first_tquad || nquad > tree->last_tquad) {
+    return NULL;
+  }
+  if (nsides == 2) {
+    if (is_tree_boundary) {
+      ntree = tree->treeid;
+      SC3E (p4est3_connectivity_get_face_transform
+            (t->conn, face, &ntree, t->transform));
+      SC3A_CHECK (ntree != -1);
+      SC3E (p4est3_quadrant_tree_face_neighbor
+            (qvt, r, t->transform, face, q));
+    }
+    else {
+      SC3E (p4est3_quadrant_face_neighbor (qvt, r, face, q));
+    }
+    SC3E (p4est3_quadrant_linear_id (qvt, q, t->level, &linear_id));
+
+    if (linear_id < tree_neighbor->first_tquad
+        || linear_id > tree_neighbor->last_tquad) {
+      return NULL;
+    }
+  }
   SC3E (sc3_array_push (fpredef, &finfo));
   SC3E (array_new (t->alloc, sizeof (p4est3_iterate_face_side_t), 2, 0,
                    &finfo->sides));
@@ -301,7 +338,8 @@ fill_face_info (sc3_array_t * fpredef, int nquad, int face, int face_neighbor,
   sinfo->nface = face;
   sinfo->nquad = nquad;
   sinfo->quadrant =
-    (void *) (tree->tquads + qvt->quadrant_size * sinfo->nquad);
+    (void *) (tree->tquads +
+              qvt->quadrant_size * (sinfo->nquad - tree->first_tquad));
 
   if (nsides == 1) {
     return NULL;
@@ -312,21 +350,11 @@ fill_face_info (sc3_array_t * fpredef, int nquad, int face, int face_neighbor,
   sinfo->is_ghost = 0;
 
   sinfo->nface = face_neighbor;
-  if (finfo->tree_boundary) {
-    ntree = tree->treeid;
-    SC3E (p4est3_connectivity_get_face_transform
-          (t->conn, face, &ntree, t->transform));
-    SC3A_CHECK (ntree != -1);
-    SC3E (p4est3_quadrant_tree_face_neighbor (qvt, r, t->transform, face, q));
-    SC3A_CHECK (sinfo->nface == face_neighbor % (2 * qvt->dim));
-  }
-  else {
-    SC3E (p4est3_quadrant_face_neighbor (qvt, r, face, q));
-  }
-  SC3E (p4est3_quadrant_linear_id (qvt, q, t->level, &linear_id));
   sinfo->nquad = (p4est3_locidx) linear_id;
   sinfo->quadrant =
-    (void *) (tree_neighbor->tquads + qvt->quadrant_size * sinfo->nquad);
+    (void *) (tree_neighbor->tquads +
+              qvt->quadrant_size * (sinfo->nquad -
+                                    tree_neighbor->first_tquad));
 
   return NULL;
 }
@@ -487,7 +515,7 @@ iterate_unimesh_face (setup_t * t, p4est3_t * p3,
   SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &q));
   SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &r));
 
-  for (ntree = 0; ntree < t->num_trees; ++ntree) {
+  for (ntree = p3->fltree; ntree <= p3->lltree; ++ntree) {
     level = 0;
     nquads_compl = 0;
     memset (level2nchildren, 0, t->level * sizeof (int));
@@ -512,8 +540,8 @@ iterate_unimesh_face (setup_t * t, p4est3_t * p3,
         level2nchildren[level] += qvt->max_children;
       }
     }
-    SC3E (iterate_unimesh_tree_boundary_face
-          (t, p3, fpredef, ntree, q, r, tree, qvt));
+    //SC3E (iterate_unimesh_tree_boundary_face
+    //      (t, p3, fpredef, ntree, q, r, tree, qvt));
   }
   SC3E (sc3_allocator_free (t->alloc, level2nchildren));
   SC3E (sc3_allocator_free (t->alloc, q));
