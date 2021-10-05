@@ -424,6 +424,10 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
   fside[0].nface = face;
   SC3E (p4est3_connectivity_get_face
         (p3->conn, &tree_neighbor, &face, &orient));
+  if (tree_neighbor > p3->lltree || tree_neighbor < p3->fltree) {
+    *is_lower = 1;
+    return NULL;
+  }
   if (tree_neighbor < tree) {
     *is_lower = 1;
     return NULL;
@@ -787,21 +791,21 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
           (p3, cvolume, cface, ccodim, search_area));
 
     /* frame faces part */
-    //  search_area->finfo->tree_boundary = 1;
-    //  search_area->tree_face[0] = search_area->tree;
-    //  for (face = 0; face < search_area->nfaces; ++face) {
-    //    SC3E (p4est3_iterate_face_bound_init
-    //          (p3, search_area, tree, face, fside, &is_lower));
-    //    if (is_lower) {
-    //      /* we iterate over such trees that tree_neighbor < tree */
-    //      SC3E (sc3_array_pop (search_area->finfo->sides));
-    //      continue;
-    //    }
-    //    SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
-    //    if (is_lower) {
-    //      SC3E (sc3_array_push (search_area->finfo->sides, NULL));
-    //    }
-    //  }
+    search_area->finfo->tree_boundary = 1;
+    search_area->tree_face[0] = search_area->tree;
+    for (face = 0; face < search_area->nfaces; ++face) {
+      SC3E (p4est3_iterate_face_bound_init
+            (p3, search_area, tree, face, fside, &is_lower));
+      if (is_lower) {
+        /* we iterate over such trees that tree_neighbor < tree */
+        SC3E (sc3_array_pop (search_area->finfo->sides));
+        continue;
+      }
+      SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
+      if (is_lower) {
+        SC3E (sc3_array_push (search_area->finfo->sides, NULL));
+      }
+    }
   }
   SC3E (p4est3_destroy_outer_data (p3, search_area));
   return NULL;

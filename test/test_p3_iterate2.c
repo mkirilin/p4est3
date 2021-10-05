@@ -471,6 +471,9 @@ iterate_unimesh_tree_boundary_face (setup_t * t, p4est3_t * p3,
     if (ntree_neighbor == ntree) {
       nsides = 1;
     }
+    if (ntree_neighbor > p3->lltree || ntree_neighbor < p3->fltree) {
+      continue;
+    }
     SC3E (p4est3_tree_index (p3, ntree_neighbor, &tree_neighbor));
     SC3E (p4est3_quadrant_morton (qvt, t->level, 0L, r));
     for (i = 0; i < nquads_per_level - 1; ++i) {
@@ -540,8 +543,8 @@ iterate_unimesh_face (setup_t * t, p4est3_t * p3,
         level2nchildren[level] += qvt->max_children;
       }
     }
-    //SC3E (iterate_unimesh_tree_boundary_face
-    //      (t, p3, fpredef, ntree, q, r, tree, qvt));
+    SC3E (iterate_unimesh_tree_boundary_face
+          (t, p3, fpredef, ntree, q, r, tree, qvt));
   }
   SC3E (sc3_allocator_free (t->alloc, level2nchildren));
   SC3E (sc3_allocator_free (t->alloc, q));
@@ -832,8 +835,6 @@ main (int argc, char **argv)
   t->mpicomm = SC3_MPI_COMM_WORLD;
   SC3X (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
   SC3X (test_simple_volume_iterator (t, qvt, qvt_avx, qvt_mrt, &e_avx));
-  //if (t->mpirank == 0) {
-  //  t->mpicomm = SC3_MPI_COMM_SELF;
   SC3X (set_parameters (t, qvt, qvt_avx, qvt_mrt, &e_avx));
 #ifdef P4EST_ENABLE_DEBUG
   if (t->mpirank == 0) {
@@ -850,7 +851,6 @@ main (int argc, char **argv)
   if (e_avx != NULL) {
     SC3X (sc3_error_unref (&e_avx));
   }
-  //}
   SC3X (sc3_MPI_Finalize ());
   return 0;
 }
