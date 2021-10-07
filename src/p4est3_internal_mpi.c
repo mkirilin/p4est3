@@ -537,7 +537,7 @@ p4est3_region_end (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
   SC3E (sc3_array_set_elem_count (buff, 2));
   SC3E (sc3_array_setup (buff));
 
-  SC3E (sc3_array_push(testq, &c));
+  SC3E (sc3_array_push (testq, &c));
   SC3E (p4est3_nearest_common_ancestor (p3->qvt, a, b, c));
 
   SC3E (sc3_array_get_elem_count (testq, &ecount));
@@ -731,6 +731,73 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
 }
 
 static sc3_error_t *
+p4est3_lowest_children_pattern (p4est3_t * p3, p4est3_tree_t * tree,
+                                const void *q, sc3_array_t * levelq,
+                                sc3_array_t * pattern, int *deep_idx)
+{
+  int                *deep;
+  void               *child;
+  int                 i, level;
+
+  SC3E (p4est3_quadrant_level (p3->qvt, q, &level));
+  SC3E (sc3_array_index (pattern, *deep_idx, &deep));
+  SC3A_CHECK (level <= *deep && *deep <= p3->level);
+  if (level < *deep) {
+    SC3E (sc3_array_index (levelq, level + 1, &child));
+    for (i = 0; i < p3->num_children; ++i) {
+      SC3E (p4est3_quadrant_child (p3->qvt, q, i, child));
+      SC3E (p4est3_lowest_children_pattern
+            (p3, tree, child, levelq, pattern, deep_idx));
+    }
+  }
+  else {
+    SC3E (p4est3_quadrant_copy
+          (p3->qvt, q, tree->tquads + *deep_idx * p3->qsize));
+    (*deep_idx)++;
+  }
+  return NULL;
+}
+
+/* This functions does not support multithreading */
+static sc3_error_t *
+p4est3_internal_pattern_populate_tree (p4est3_t * p3, int level,
+                                       p4est3_tree_t * tree,
+                                       sc3_array_t * pattern,
+                                       sc3_array_t * levelq,
+                                       p4est3_locidx range_begin,
+                                       p4est3_locidx range_end, int *deep_idx)
+{
+  void               *q, *child;
+  int                 i;
+  p4est3_locidx       n_lowerq;
+  SC3A_CHECK (sc3_omp_num_threads () == 1);
+
+  if (range_begin >= tree->first_tquad && range_end <= tree->end_tquad) {
+    SC3E (sc3_array_index (levelq, level, &q));
+    SC3E (p4est3_lowest_children_pattern
+          (p3, tree, q, levelq, pattern, deep_idx));
+  }
+  else if (range_begin > tree->last_tquad || range_end <= tree->first_tquad) {
+    return NULL;
+  }
+  else {
+    n_lowerq = (range_end - range_begin) / p3->num_children;
+    range_end = range_begin + n_lowerq;
+    for (i = 0; i < p3->num_children; ++i,
+         range_begin += n_lowerq, range_end += n_lowerq) {
+      SC3A_CHECK (level < p3->level);
+      SC3E (sc3_array_index (levelq, level, &q));
+      SC3E (sc3_array_index (levelq, level + 1, &child));
+      SC3E (p4est3_quadrant_child (p3->qvt, q, i, child));
+      SC3E (p4est3_internal_pattern_populate_tree
+            (p3, level + 1, tree, pattern, levelq,
+             range_begin, range_end, deep_idx));
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_internal_populate (p4est3_locidx tmine, p4est3_t * p3,
                           p4est3_locidx * tq, p4est3_gloidx * gq,
                           char **charq)
@@ -822,13 +889,15 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
     if (e == NULL) {
       tq = first_quad_num;
       gq = tree->first_tquad + (first_quad_num - tree->quad_offset);
-      charq = p3->quads + (p4est3_gloidx) first_quad_num * p3->qsize;
+      charq = p3->quads + (p4est3_gloidx) first_quad_num *p3->qsize;
 
       /* loop over subset of local trees */
       for (;;) {
         SC3E_NULL_REQ (e, tree->quad_offset <= tq);
         SC3E_NULL_REQ (e, tq < tree->quad_offset + tree->num_quads);
-        tmine = SC3_MIN (end_quad_num, (p4est3_gloidx) tree->quad_offset + tree->num_quads);
+        tmine =
+          SC3_MIN (end_quad_num,
+                   (p4est3_gloidx) tree->quad_offset + tree->num_quads);
 
         /* loop over quadrants in local tree with creating of quadrants
            by selected method */
