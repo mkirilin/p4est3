@@ -141,6 +141,8 @@ struct p4est3
                                      or -2 if process holds no quadrants. */
   p4est3_topidx       nltrees;  /**< Number of trees with local quadrants. */
 
+  /* functions set before p4est3_setup */
+  p4est3_refine_callback_t crefine; /**< Refinemet callback function */
 };
 
 #ifdef __cplusplus

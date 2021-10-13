@@ -66,6 +66,11 @@ typedef sc3_error_t *(*p4est3_out2t_t) (const void *slf,
  *
  * This method is suited to wrap any compatible third-party object into p4est.
  */
+
+typedef struct p4est3_refine_callback_info p4est3_refine_callback_info_t;
+typedef             sc3_error_t
+  * (*p4est3_refine_callback_t) (p4est3_refine_callback_info_t * ci);
+
 typedef struct p4est3_vtable
 {
   int                 dim;      /**< Space dimension is 1, 2 or 3. */
@@ -208,13 +213,32 @@ sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
  */
 sc3_error_t        *p4est3_set_setup_mode (p4est3_t * p3,
                                            p4est3_setup_mode_t mode);
+
+/** Provide a forest to be used in setting up a new one.
+ * \param [in,out] p3       Forest object under construction.
+ * \param [in] old          Source forest object that data will be used on
+ *                          the setting up stage.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old);
+
+/** Provide a function to be used as refinement contition.
+ * \param [in,out] p3       Forest object under construction.
+ * \param [in] crefine      Callback function prototype to decide
+ *                          for refinement. NULL value is possible,
+ *                          in this case refinement decision is always false.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_set_refine (p4est3_t * p3,
+                                       p4est3_refine_callback_t crefine);
+
 /** Enable/disable use of MPI shared memory
  * \param [in,out] p3       The forest must not have been setup.
- * \param [in] is_split     The value 1 indicating enabling,
+ * \param [in] shared       The value 1 indicating enabling,
  *                          while 1 is for disabling of MPI shared memory.
  *                          Defauld value is 1.
 */
-sc3_error_t        *p4est3_set_is_split_comm (p4est3_t * p3, int is_split);
+sc3_error_t        *p4est3_set_shared (p4est3_t * p3, int shared);
 
 /** Finalize construction of a forest.
  * Afterwards, no more \c p4est3_set_* functions may be called.

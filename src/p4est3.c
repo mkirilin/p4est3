@@ -233,12 +233,37 @@ p4est3_set_setup_mode (p4est3_t * p3, p4est3_setup_mode_t mode)
 }
 
 sc3_error_t        *
-p4est3_set_is_split_comm (p4est3_t * p3, int is_split)
+p4est3_set_source (p4est3_t * p3, p4est3_t * old)
 {
   SC3A_IS (p4est3_is_new, p3);
-  SC3A_CHECK (is_split == 0 || is_split == 1);
+  SC3A_IS (p4est3_is_setup, old);
 
-  p3->shared = is_split;
+  p3->old = old;
+  if (p3->old != NULL) {
+    SC3E (p4est3_unref (p3->old));
+  }
+  p3->old = old;
+  SC3E (p4est3_ref (p3->old));
+
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  p3->crefine = crefine;
+
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_set_shared (p4est3_t * p3, int shared)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  SC3A_CHECK (shared == 0 || shared == 1);
+
+  p3->shared = shared;
   return NULL;
 }
 
