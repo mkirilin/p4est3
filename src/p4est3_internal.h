@@ -92,6 +92,8 @@ struct p4est3
                                      Depending on the available memory and
                                      index space, may be reduced during
                                      \ref p4est3_setup. */
+  p4est3_setup_mode_t setup_mode;       /**< Choose the method of quadrant creation*/
+  p4est3_t           *old;      /**< Pointer to the setup forest */
 
   /* variables populated during p4est3_setup: communicator related */
   int                 mpisize;          /**< Size of forest communicator. */
@@ -120,7 +122,6 @@ struct p4est3
   p4est3_gloidx      *goffset;          /**< Pointer to \ref goffsetwin's memory. */
   p4est3_topidx      *gftree;           /**< Pointer to \ref gftreewin's memory. */
   char               *gfpos;            /**< Pointer to \ref gfposwin's memory. */
-  p4est3_setup_mode_t setup_mode;       /**< Choose the method of quadrant creation*/
 
   /* variables populated during p4est3_setup: tree and quadrant storage */
   sc3_MPI_Win_t       quadwin;          /**< Shared memory stores the quadrants
@@ -174,6 +175,7 @@ sc3_error_t        *p4est3_internal_setup_cut (p4est3_t * p3,
 sc3_error_t        *p4est3_internal_setup_tree (p4est3_t * p3,
                                                 p4est3_gloidx num_uniform);
 sc3_error_t        *p4est3_internal_setup_quadrants (p4est3_t * p3);
+sc3_error_t        *p4est3_internal_setup_from_source (p4est3_t * p3);
 /** \endcond */
 
 #ifdef __cplusplus

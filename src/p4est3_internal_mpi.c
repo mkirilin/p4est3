@@ -884,3 +884,99 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
   SC3E (sc3_MPI_Barrier (nodecomm));
   return NULL;
 }
+
+sc3_error_t        *
+p4est3_internal_setup_from_source (p4est3_t * p3)
+{
+  int                 ti, nodesize;
+  p4est3_t           *old = p3->old;
+  SC3A_IS (p4est3_is_new, p3);
+  SC3A_CHECK (p3->old != NULL);
+  SC3A_IS (p4est3_is_setup, p3->old);
+
+  /* variables of internal state used during the whole lifetime */
+  /* or is it == 0? */
+  p3->accessed_conn = old->accessed_conn;
+
+  /* virtual implementation variables */
+  if (old->slf != NULL) {
+    /** TODO: decide what to do if a virtual implementation exists */
+  }
+
+  /* variables set before p4est3_setup */
+  /* this call also sets p4est3_t::commdup */
+  SC3E (p4est3_set_comm (p3, old->mpicomm, 1));
+
+  /* this call also sets p4est3_t::num_trees */
+  SC3E (p4est3_set_connectivity (p3, old->conn));
+
+  /* inherit qvt only if we didn't set it up visibly */
+  if (p3->qvt == NULL) {
+    /* this call also sets p4est3_t::sqvt */
+    SC3E (p4est3_set_quadrant_vtable (p3, old->qvt));
+  }
+  /* the next two calls are not necessary,
+     but leave them here for completeness */
+  SC3E (p4est3_set_level (p3, old->level));
+  SC3E (p4est3_set_setup_mode (p3, old->setup_mode));
+
+  /* variables populated during p4est3_setup: communicator related */
+  p3->mpisize = old->mpisize;
+  p3->mpirank = old->mpirank;
+  SC3E (p4est3_set_shared (p3, old->shared));
+  /* p3->split_info == NULL at the current code state,
+     but we check it just in case of future development */
+  if (p3->split_info != NULL) {
+    SC3E (sc3_mpienv_unref (&p3->split_info));
+  }
+  p3->split_info = old->split_info;
+  SC3E (sc3_mpienv_ref (p3->split_info));
+
+  /* variables populated during p4est3_setup: partition related */
+  /** TODO: What to do with p4est3_t::gftreewin, p4est3_t::gfposwin
+   * and p4est3_t::goffsetwin?
+  */
+ /** TODO: why is it int type while p4est3_quadrant_size returs size_t? */
+  p3->qsize = (int) p4est3_quadrant_size (p3->qvt);
+  p3->qmaxlevel = old->qmaxlevel;
+  p3->num_children = old->num_children;
+  p3->max_threads = old->max_threads;
+  SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),
+                              &p3->temp_quad));
+  for (ti = 0; ti < p3->max_threads; ++ti) {
+    SC3E (sc3_allocator_malloc (p3->alloc, p3->qsize, &p3->temp_quad[ti]));
+  }
+  p3->local_num_quads = old->local_num_quads;
+  p3->global_num_quads = old->global_num_quads;
+  /** TODO: What to do with p4est3_t::goffset, p4est3_t::gftree
+   * and p4est3_t::gfpos?
+  */
+
+  /* variables populated during p4est3_setup: tree and quadrant storage */
+  /** TODO: What to do with p4est3_t::quadwin?
+  */
+  SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
+  /** TODO: Don't forget to populate p4est3_t::nodequadrs
+   *  and p4est3_t::quads */
+  SC3E (sc3_allocator_malloc (p3->alloc, nodesize * sizeof (char *),
+                              &p3->nodequads));
+  /* p3->trees == NULL at the current code state,
+     but we check it just in case of future development */
+  if (p3->split_info != NULL) {
+    SC3E (sc3_array_unref (&p3->trees));
+  }
+  p3->trees = old->trees;
+  SC3E (sc3_array_ref (p3->trees));
+  p3->fltree = old->fltree;
+  p3->lltree = old->lltree;
+  p3->nltrees = old->nltrees;
+
+  /* functions set before p4est3_setup */
+  if (p3->crefine == NULL) {
+    p3->crefine = old->crefine;
+  }
+
+  p3->setup = 1;
+  SC3A_IS (p4est3_is_setup, p3);
+  return NULL;
+}
