@@ -58,9 +58,11 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
 
   if (!p3->setup) {
     SC3E_TEST (p3->accessed_conn == 0, reason);
+    SC3E_TEST (p3->split_info == NULL, reason);
   }
   else {
     SC3E_TEST (p3->accessed_conn >= 0, reason);
+    SC3E_IS (sc3_mpienv_is_valid, p3->split_info, reason);
   }
 
   /* TODO check communicator and connectivity members */
@@ -82,11 +84,6 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
       SC3E_IS (p4est3_connectivity_is_setup, p3->conn, reason);
       SC3E_TEST (p3->num_trees > 0, reason);
       SC3E_TEST (p3->qvt == &p3->sqvt, reason);
-
-      SC3E_TEST (p3->nodesizewin != SC3_MPI_WIN_NULL, reason);
-      SC3E_TEST (p3->headcomm != SC3_MPI_COMM_NULL
-                 || p3->noderank > 0, reason);
-      SC3E_TEST (p3->nodecomm != SC3_MPI_COMM_NULL, reason);
 
       /* TODO thoroughly test all member variables */
     }
@@ -124,11 +121,8 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   SC3E (sc3_refcount_init (&p3->rc));
   p3->alloc = alloc;
   p3->mpicomm = SC3_MPI_COMM_WORLD;
-  p3->nodesizewin = SC3_MPI_WIN_NULL;
-  p3->headcomm = SC3_MPI_COMM_NULL;
-  p3->nodecomm = SC3_MPI_COMM_NULL;
   p3->setup_mode = P4EST3_NEW_MORTON;
-  p3->is_split_comm = 1;
+  p3->shared = 1;
   SC3A_IS (p4est3_is_new, p3);
 
   *pp3 = p3;
@@ -244,7 +238,7 @@ p4est3_set_is_split_comm (p4est3_t * p3, int is_split)
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (is_split == 0 || is_split == 1);
 
-  p3->is_split_comm = is_split;
+  p3->shared = is_split;
   return NULL;
 }
 
@@ -381,20 +375,10 @@ p4est3_destroy (p4est3_t ** pp3)
       int                 ti;
 
       /* free internal MPI objects */
-      SC3E (sc3_MPI_Win_free (&p3->nodesizewin));
       SC3E (sc3_MPI_Win_free (&p3->gfposwin));
       SC3E (sc3_MPI_Win_free (&p3->gftreewin));
       SC3E (sc3_MPI_Win_free (&p3->goffsetwin));
       SC3E (sc3_MPI_Win_free (&p3->quadwin));
-      if (p3->noderank == 0) {
-        if (p3->is_split_comm == 1) {
-          SC3E (sc3_MPI_Comm_free (&p3->nodecomm));
-        }
-      }
-      if (p3->is_split_comm == 1) {
-        SC3E (sc3_MPI_Comm_free (&p3->headcomm));
-      }
-      SC3E (sc3_MPI_Info_free (&p3->info_noncontig));
 
       /* deallocate internal storage */
       for (ti = 0; ti < p3->max_threads; ++ti) {
@@ -413,6 +397,8 @@ p4est3_destroy (p4est3_t ** pp3)
     if (p3->commdup) {
       SC3E (sc3_MPI_Comm_free (&p3->mpicomm));
     }
+    /* unref mpi environment related data */
+    SC3E (sc3_mpienv_unref (&p3->split_info));
   }
 
   /* remove allocation */
