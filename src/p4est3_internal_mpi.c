@@ -22,6 +22,7 @@
 */
 
 #include <p4est3_internal.h>
+#include <p4est3_refine.h>
 #include <sc3_omp.h>
 
 #ifndef P4EST_ENABLE_OPENMP
@@ -816,11 +817,45 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
   return NULL;
 }
 
+/** TODO: add a coordinate-based translation to a quadrant virtual table. */
+/* Where to put this function for the best? */
+static sc3_error_t *
+p4est3_internal_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
+                                    p4est3_quadrant_vtable_t * qvt_new,
+                                    void *qin, void *qout)
+{
+  int                 level;
+  p4est3_gloidx       id;
+
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_old);
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_new);
+  SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_old, qin);
+  SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_new, qout);
+
+  if (qvt_old == qvt_new) {
+    /* just hardcopy the quadrant */
+    SC3E (p4est3_quadrant_copy (qvt_old, qin, qout));
+  }
+  else {
+    SC3E (p4est3_quadrant_level (qvt_old, qin, &level));
+    SC3A_CHECK (level <= qvt_new->max_level);
+    SC3E (p4est3_quadrant_linear_id (qvt_old, qin, level, &id));
+    SC3E (p4est3_quadrant_morton (qvt_new, level, id, qout));
+  }
+
+  return NULL;
+}
+
 sc3_error_t        *
 p4est3_internal_setup_from_source (p4est3_t * p3)
 {
-  int                 ti, nodesize;
+  int                 i, nodesize, noderank;
+  int                 dispunit, beginr, endr;
   p4est3_t           *old = p3->old;
+  sc3_MPI_Aint_t      gftreebytes, tempbytes, gfposbytes;
+  sc3_MPI_Info_t      info_noncontig;
+  sc3_MPI_Comm_t      nodecomm;
+
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (p3->old != NULL);
   SC3A_IS (p4est3_is_setup, p3->old);
@@ -833,7 +868,6 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   if (old->slf != NULL) {
     /** TODO: decide what to do if a virtual implementation exists */
   }
-
   /* variables set before p4est3_setup */
   /* this call also sets p4est3_t::commdup */
   SC3E (p4est3_set_comm (p3, old->mpicomm, 1));
@@ -864,40 +898,64 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   SC3E (sc3_mpienv_ref (p3->split_info));
 
   /* variables populated during p4est3_setup: partition related */
-  /** TODO: What to do with p4est3_t::gftreewin, p4est3_t::gfposwin
-   * and p4est3_t::goffsetwin?
-  */
  /** TODO: why is it int type while p4est3_quadrant_size returs size_t? */
   p3->qsize = (int) p4est3_quadrant_size (p3->qvt);
   p3->qmaxlevel = old->qmaxlevel;
   p3->num_children = old->num_children;
   p3->max_threads = old->max_threads;
+
+  SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
+  SC3E (sc3_mpienv_get_info_noncont (p3->split_info, &info_noncontig));
+  SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
+
+  gftreebytes = (p3->mpisize + 1) * sizeof (p4est3_topidx);
+  SC3E (sc3_MPI_Win_allocate_shared
+        (noderank == 0 ? gftreebytes : 0, sizeof (p4est3_topidx),
+         info_noncontig, nodecomm, &p3->gftree, &p3->gftreewin));
+  gfposbytes = (p3->mpisize + 1) * p3->qsize;
+  SC3E (sc3_MPI_Win_allocate_shared
+        (noderank == 0 ? gfposbytes : 0, p3->qsize,
+         info_noncontig, nodecomm, &p3->gfpos, &p3->gfposwin));
+
+  if (noderank > 0) {
+    SC3E (sc3_MPI_Win_shared_query (p3->gftreewin, 0,
+                                    &tempbytes, &dispunit, &p3->gftree));
+    SC3A_CHECK (tempbytes >= gftreebytes);
+    SC3A_CHECK (dispunit == sizeof (p4est3_topidx));
+    SC3A_CHECK (p3->gftree != NULL);
+    SC3E (sc3_MPI_Win_shared_query (p3->gfposwin, 0,
+                                    &tempbytes, &dispunit, &p3->gfpos));
+    SC3A_CHECK (tempbytes >= gfposbytes);
+    SC3A_CHECK (dispunit == p3->qsize);
+    SC3A_CHECK (p3->gfpos != NULL);
+  }
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gftreewin));
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gfposwin));
+
+  /* We make a hardcopy (with allocating new shared memory)
+     of p4est3_t::gftreewin and p4est3_t::gfposwin so far.
+     In the future we will introduce reference interface for them since they
+     stay the same in a new tree. */
+  SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
+  beginr = sc3_intcut (p3->mpisize + 1, nodesize, noderank);
+  endr = sc3_intcut (p3->mpisize + 1, nodesize, noderank + 1);
+  for (i = 0; i < endr - beginr; ++i) {
+    p3->gftree[i] = old->gftree[i];
+    SC3E (p4est3_internal_translate_quadrant
+          (old->qvt, p3->qvt, (void *) (old->gfpos + i * old->qsize),
+           (void *) (p3->gfpos + i * p3->qsize)));
+  }
+  SC3E (sc3_MPI_Win_unlock (0, p3->gftreewin));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gfposwin));
+
   SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),
                               &p3->temp_quad));
-  for (ti = 0; ti < p3->max_threads; ++ti) {
-    SC3E (sc3_allocator_malloc (p3->alloc, p3->qsize, &p3->temp_quad[ti]));
+  for (i = 0; i < p3->max_threads; ++i) {
+    SC3E (sc3_allocator_malloc (p3->alloc, p3->qsize, &p3->temp_quad[i]));
   }
-  p3->local_num_quads = old->local_num_quads;
-  p3->global_num_quads = old->global_num_quads;
-  /** TODO: What to do with p4est3_t::goffset, p4est3_t::gftree
-   * and p4est3_t::gfpos?
-  */
-
   /* variables populated during p4est3_setup: tree and quadrant storage */
-  /** TODO: What to do with p4est3_t::quadwin?
-  */
-  SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
-  /** TODO: Don't forget to populate p4est3_t::nodequadrs
-   *  and p4est3_t::quads */
-  SC3E (sc3_allocator_malloc (p3->alloc, nodesize * sizeof (char *),
-                              &p3->nodequads));
-  /* p3->trees == NULL at the current code state,
-     but we check it just in case of future development */
-  if (p3->split_info != NULL) {
-    SC3E (sc3_array_unref (&p3->trees));
-  }
-  p3->trees = old->trees;
-  SC3E (sc3_array_ref (p3->trees));
   p3->fltree = old->fltree;
   p3->lltree = old->lltree;
   p3->nltrees = old->nltrees;
@@ -906,6 +964,11 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   if (p3->crefine == NULL) {
     p3->crefine = old->crefine;
   }
+  /** We set inside all the values left, namely:
+   * p4est3_t::nodequads, local_num_quads, quadwin,
+   * quads, trees, goffsetwin, goffset and global_num_quads.
+  */
+  SC3E (p4est3_refine (p3));
 
   p3->setup = 1;
   SC3A_IS (p4est3_is_setup, p3);
