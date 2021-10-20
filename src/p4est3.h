@@ -69,7 +69,8 @@ typedef sc3_error_t *(*p4est3_out2t_t) (const void *slf,
 
 typedef struct p4est3_refine_callback_info p4est3_refine_callback_info_t;
 typedef             sc3_error_t
-  * (*p4est3_refine_callback_t) (p4est3_refine_callback_info_t * ci);
+  * (*p4est3_refine_callback_t) (p4est3_refine_callback_info_t * ci,
+                                 int *is_refine);
 
 typedef struct p4est3_vtable
 {
