@@ -76,6 +76,7 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
     SC3E_TEST (p3->mpicomm != SC3_MPI_COMM_NULL, reason);
     SC3E_TEST (p3->level >= 0, reason);
     SC3E_TEST (p3->setup_mode < P4EST3_NEW_MODE_LAST, reason);
+    SC3E_TEST (p3->source_setup_mode < P4EST3_SRC_MODE_LAST, reason);
 
     if (!p3->setup) {
       SC3E_TEST (p3->mpisize == 0 && p3->mpirank == 0, reason);
@@ -122,6 +123,7 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   p3->alloc = alloc;
   p3->mpicomm = SC3_MPI_COMM_WORLD;
   p3->setup_mode = P4EST3_NEW_MORTON;
+  p3->source_setup_mode = P4EST3_SRC_COPY;
   p3->shared = 1;
   SC3A_IS (p4est3_is_new, p3);
 
@@ -245,6 +247,16 @@ p4est3_set_source (p4est3_t * p3, p4est3_t * old)
   p3->old = old;
   SC3E (p4est3_ref (p3->old));
 
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_set_setup_source_mode (p4est3_t * p3, p4est3_source_setup_t mode)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  SC3A_CHECK (0 <= mode && mode < P4EST3_SRC_MODE_LAST);
+
+  p3->source_setup_mode = mode;
   return NULL;
 }
 

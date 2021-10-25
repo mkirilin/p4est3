@@ -93,6 +93,7 @@ struct p4est3
                                      index space, may be reduced during
                                      \ref p4est3_setup. */
   p4est3_setup_mode_t setup_mode;       /**< Choose the method of quadrant creation*/
+  p4est3_source_setup_t source_setup_mode; /** Choose the method of setting up from source */
   p4est3_t           *old;      /**< Pointer to the setup forest */
 
   /* variables populated during p4est3_setup: communicator related */
