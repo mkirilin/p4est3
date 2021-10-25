@@ -68,9 +68,13 @@ typedef sc3_error_t *(*p4est3_out2t_t) (const void *slf,
  */
 
 typedef struct p4est3_refine_callback_info p4est3_refine_callback_info_t;
+typedef struct p4est3_coarse_callback_info p4est3_coarse_callback_info_t;
 typedef             sc3_error_t
   * (*p4est3_refine_callback_t) (p4est3_refine_callback_info_t * ci,
                                  int *is_refine);
+typedef             sc3_error_t
+  * (*p4est3_coarse_callback_t) (p4est3_coarse_callback_info_t * ci,
+                                 int *is_coarse);
 
 typedef struct p4est3_vtable
 {
@@ -253,6 +257,16 @@ sc3_error_t        *p4est3_set_setup_source_mode (p4est3_t * p3,
  */
 sc3_error_t        *p4est3_set_refine (p4est3_t * p3,
                                        p4est3_refine_callback_t crefine);
+
+/** Provide a function to be used as coarsening contition.
+ * \param [in,out] p3       Forest object under construction.
+ * \param [in] ccoarse      Callback function prototype to decide
+ *                          for coarsening. NULL value is possible,
+ *                          in this case coarsening decision is always false.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_set_coarse (p4est3_t * p3,
+                                       p4est3_coarse_callback_t ccoarse);
 
 /** Enable/disable use of MPI shared memory
  * \param [in,out] p3       The forest must not have been setup.

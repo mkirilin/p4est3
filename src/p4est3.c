@@ -270,6 +270,15 @@ p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine)
 }
 
 sc3_error_t        *
+p4est3_set_coarse (p4est3_t * p3, p4est3_coarse_callback_t ccoarse)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  p3->ccoarse = ccoarse;
+
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_set_shared (p4est3_t * p3, int shared)
 {
   SC3A_IS (p4est3_is_new, p3);
