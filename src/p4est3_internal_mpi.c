@@ -961,14 +961,33 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   p3->nltrees = old->nltrees;
 
   /* functions set before p4est3_setup */
-  if (p3->crefine == NULL) {
-    p3->crefine = old->crefine;
+  switch (p3->source_setup_mode) {
+  case P4EST3_SRC_REFINE:
+    if (p3->crefine == NULL) {
+      SC3A_CHECK (old->crefine != NULL);
+      SC3E (p4est3_set_refine (p3, old->crefine));
+    }
+    break;
+
+  case P4EST3_SRC_COARSE:
+    if (p3->crefine == NULL) {
+      SC3A_CHECK (old->crefine != NULL);
+      SC3E (p4est3_set_coarse (p3, old->ccoarse));
+    }
+    break;
+
+  case P4EST3_SRC_COPY:
+    break;
+
+  default:
+    SC3E_UNREACH ("Wrong setup from sourse mode");
   }
+
   /** We set inside all the values left, namely:
    * p4est3_t::nodequads, local_num_quads, quadwin,
    * quads, trees, goffsetwin, goffset and global_num_quads.
   */
-  SC3E (p4est3_refine (p3));
+  SC3E (p4est3_fill_from_source (p3));
 
   p3->setup = 1;
   SC3A_IS (p4est3_is_setup, p3);

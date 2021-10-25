@@ -275,7 +275,7 @@ p4est3_pattern_populate_tree (p4est3_t * p3, p4est3_tree_t * tree,
 }
 
 sc3_error_t        *
-p4est3_refine (p4est3_t * p3)
+p4est3_fill_from_source (p4est3_t * p3)
 {
   int                 i, nodesize;
   int                 dispunit;
@@ -291,6 +291,7 @@ p4est3_refine (p4est3_t * p3)
   sc3_array_t        *pattern; /**< Array of patterns that we will use
                               to run top-down forest creation */
   sc3_array_t        *levelq;
+  coarse_callback_data_t scdata, *cdata = &scdata;
 #ifdef P4EST_ENABLE_DEBUG
   int                 level, new_count;
 #endif
@@ -354,8 +355,27 @@ p4est3_refine (p4est3_t * p3)
   /* All the preparations are done. Begin with the algorithm. */
   /* A call to fill in level information, that is necessary for
      generation of a new forest's mesh */
-  SC3E (p4est3_iterate_volume (p3, p4est3_refine_volume_callback, &pattern));
-  SC3E (sc3_array_get_elem_count (pattern, &p3->local_num_quads));
+  switch (p3->source_setup_mode) {
+  case P4EST3_SRC_REFINE:
+    SC3E (p4est3_iterate_volume (p3, p4est3_refine_volume_callback, pattern));
+    break;
+
+  case P4EST3_SRC_COARSE:
+    cdata->pattern = pattern;
+    SC3E (p4est3_refine_array_new
+          (p3->alloc, p3->qsize, p3->qvt->max_children,
+           p3->qvt->max_children, &cdata->family));
+    cdata->nsiblings = 0;
+    SC3E (p4est3_iterate_volume (p3, p4est3_coarse_volume_callback, cdata));
+    break;
+
+  case P4EST3_SRC_COPY:
+    SC3E (p4est3_iterate_volume (p3, p4est3_copy_volume_callback, pattern));
+    break;
+
+  default:
+    SC3E_UNREACH ("wrong setup from source mode");
+  }
 
 #ifdef P4EST_ENABLE_DEBUG
   SC3E (sc3_array_get_elem_count (pattern, &new_count));
@@ -418,7 +438,9 @@ p4est3_refine (p4est3_t * p3)
   SC3E (sc3_array_destroy (&levelq));
   SC3E (sc3_allocator_free (p3->alloc, &local_num_quads));
   SC3E (sc3_allocator_free (p3->alloc, &first_tree_quads));
-
+  if (p3->source_setup_mode == P4EST3_SRC_COARSE) {
+    SC3E (sc3_array_destroy (&cdata->family));
+  }
   sc3_MPI_Barrier (nodecomm);
   p3->global_num_quads = p3->goffset[p3->mpisize];
 
