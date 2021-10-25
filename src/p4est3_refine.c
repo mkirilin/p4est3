@@ -33,6 +33,27 @@ extern              "C"
 #endif
 #endif
 
+typedef struct coarse_callback_data
+{
+  sc3_array_t        *family;
+  sc3_array_t        *pattern;
+  int                 nsiblings;
+}
+coarse_callback_data_t;
+
+/* A trivial callback that copies volumes' level into levels array */
+static sc3_error_t *
+p4est3_copy_volume_callback (p4est3_iterate_volume_info_t * vi)
+{
+  int                 level;
+  int                *pattern_it;
+
+  SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
+  SC3E (sc3_array_push ((sc3_array_t *) vi->user_data, &pattern_it));
+  *pattern_it = level;
+  return NULL;
+}
+
 /* Specific volume iterator callback that processes volume info by refinement
    callback and returns (with user_data) population pattern
    (see refinement documentation) */
@@ -53,9 +74,76 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
   }
   else {
     for (i = 0; i < vi->p3->num_children; ++i) {
-      /* indexing */
       SC3E (sc3_array_push ((sc3_array_t *) vi->user_data, &pattern_it));
+      SC3A_CHECK (level + 1 <= vi->p3->qmaxlevel);
       *pattern_it = level + 1;
+    }
+  }
+  return NULL;
+}
+
+/* Specific volume iterator callback that processes volume info by coarsining
+   callback and returns (with user_data) population pattern
+   (see coarsining documentation) */
+static sc3_error_t *
+p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
+{
+  SC3A_CHECK (vi->p3->ccoarse != NULL);
+  int                 is_coarse, level, i, child_id;
+  int                *pattern_it;
+  void               *quad;
+  coarse_callback_data_t *cdata = (coarse_callback_data_t *) vi->user_data;
+  p4est3_coarse_callback_info_t ci;     /* = { vi->p3, vi->ntree, vi->quadrant }; */
+
+  /* Decide if we call coarse callback.
+     We do this only if we find a whole family. */
+  SC3E (p4est3_quadrant_child_id (vi->p3->qvt, vi->quadrant, &child_id));
+  if (cdata->nsiblings != child_id) {
+    /* possibly the benning of a new family */
+    if (child_id == 0) {
+      /* the beginning indeed, start the family */
+      SC3E (sc3_array_index (cdata->family, 0, &quad));
+      quad = vi->quadrant;
+      cdata->nsiblings = 1;
+    }
+    else {
+      /* cannot be a part of a complete family */
+      SC3E (sc3_array_push ((sc3_array_t *) vi->user_data, &pattern_it));
+      SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
+      *pattern_it = level;
+    }
+    return NULL;
+  }
+
+  /* cdata->nsiblings == child_id: the volume is a part of the family */
+  SC3E (sc3_array_index (cdata->family, cdata->nsiblings, &quad));
+  quad = vi->quadrant;
+  cdata->nsiblings++;
+
+  if (cdata->nsiblings == vi->p3->num_children) {
+    /* we have complete family, pack data and call coarsening */
+    ci.p3 = vi->p3;
+    ci.ntree = vi->ntree;
+    ci.family = cdata->family;
+    SC3E (vi->p3->ccoarse (&ci, &is_coarse));
+    cdata->nsiblings = 0;
+  }
+  else {
+    /* nothing left to do here, go to the next volume */
+    return NULL;
+  }
+
+  /* fill in the level information */
+  SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
+  if (is_coarse) {
+    SC3E (sc3_array_push ((sc3_array_t *) vi->user_data, &pattern_it));
+    SC3A_CHECK (level - 1 >= 0);
+    *pattern_it = level - 1;
+  }
+  else {
+    for (i = 0; i < vi->p3->num_children; ++i) {
+      SC3E (sc3_array_push ((sc3_array_t *) vi->user_data, &pattern_it));
+      *pattern_it = level;
     }
   }
   return NULL;
