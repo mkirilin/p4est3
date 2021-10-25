@@ -817,20 +817,19 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
   return NULL;
 }
 
-/** TODO: add a coordinate-based translation to a quadrant virtual table. */
 /* Where to put this function for the best? */
 static sc3_error_t *
 p4est3_internal_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
                                     p4est3_quadrant_vtable_t * qvt_new,
-                                    void *qin, void *qout)
+                                    const void *qin, void *qout, int32_t * c)
 {
   int                 level;
-  p4est3_gloidx       id;
 
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_old);
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_new);
   SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_old, qin);
   SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_new, qout);
+  SC3A_CHECK (qvt_old->dim == qvt_new->dim);
 
   if (qvt_old == qvt_new) {
     /* just hardcopy the quadrant */
@@ -839,8 +838,8 @@ p4est3_internal_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
   else {
     SC3E (p4est3_quadrant_level (qvt_old, qin, &level));
     SC3A_CHECK (level <= qvt_new->max_level);
-    SC3E (p4est3_quadrant_linear_id (qvt_old, qin, level, &id));
-    SC3E (p4est3_quadrant_morton (qvt_new, level, id, qout));
+    SC3E (p4est3_quadrant_coordinates (qvt_old, qin, qvt_old->dim, c));
+    SC3E (p4est3_quadrant_quadrant (qvt_new, c, level, qout));
   }
 
   return NULL;
@@ -851,6 +850,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
 {
   int                 i, nodesize, noderank;
   int                 dispunit, beginr, endr;
+  int32_t            *coords;
   p4est3_t           *old = p3->old;
   sc3_MPI_Aint_t      gftreebytes, tempbytes, gfposbytes;
   sc3_MPI_Info_t      info_noncontig;
@@ -941,12 +941,15 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
   beginr = sc3_intcut (p3->mpisize + 1, nodesize, noderank);
   endr = sc3_intcut (p3->mpisize + 1, nodesize, noderank + 1);
+  SC3E (sc3_allocator_calloc
+        (p3->alloc, p3->qvt->dim, sizeof (int32_t), &coords));
   for (i = 0; i < endr - beginr; ++i) {
     p3->gftree[i] = old->gftree[i];
     SC3E (p4est3_internal_translate_quadrant
           (old->qvt, p3->qvt, (void *) (old->gfpos + i * old->qsize),
-           (void *) (p3->gfpos + i * p3->qsize)));
+           (void *) (p3->gfpos + i * p3->qsize), coords));
   }
+  SC3E (sc3_allocator_free (p3->alloc, coords));
   SC3E (sc3_MPI_Win_unlock (0, p3->gftreewin));
   SC3E (sc3_MPI_Win_unlock (0, p3->gfposwin));
 
