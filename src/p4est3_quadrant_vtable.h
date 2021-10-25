@@ -148,6 +148,8 @@ typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_child_t;
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_first_descendant_t;
 /** Prototype to construct the last descendant at maximum level of a quadrant. */
 typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_last_descendant_t;
+/** Prototype to construct one quadrant from coordinates and level */
+typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_quadrant_t;
 
 /** Prototype to query if a quadrant touches a given tree face boundary */
 typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_get_tree_boundary_t;
@@ -210,6 +212,7 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_first_descendant_t quadrant_first_descendant;
   /** Generate last smallest descendant of a quadrant at \a max_level. */
   p4est3_quadrant_last_descendant_t quadrant_last_descendant;
+  p4est3_quadrant_quadrant_t quadrant_quadrant;
   p4est3_quadrant_morton_t quadrant_morton;     /**< Generate by linear index. */
   /**< Generate a common nearest ancestor of a quadrant. */
   p4est3_nearest_common_ancestor_t nearest_common_ancestor;
@@ -303,9 +306,9 @@ int                 p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
  *                      face of the tree, false otherwise.
 * \return               NULL on success, error object otherwise.
  */
-sc3_error_t       
-  *p4est3_quadrant_get_tree_boundary (p4est3_quadrant_vtable_t * qvt,
-                                      const void *q, int i, int *j);
+sc3_error_t
+  * p4est3_quadrant_get_tree_boundary (p4est3_quadrant_vtable_t * qvt,
+                                       const void *q, int i, int *j);
 
 /** Query if a quadrant touches a tree face boundaries and which if so 
  * \param [in] qvt      Valid virtual quadrant table.
@@ -364,6 +367,16 @@ sc3_error_t        *p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t *
 sc3_error_t        *p4est3_quadrant_coordinates (p4est3_quadrant_vtable_t *
                                                  qvt, const void *q, int n,
                                                  void *j);
+
+/** Construct a quadrant assigning its coordinates and level.
+ * \param [in] qvt      Valid virtual quadrant table.
+ * \param [in] c        Array of size dimension of \a qvt storing values
+ *                      for quadrant coordinates.
+ * \param [in] l        Desired level of the quadrant.
+ * \param [in] q        Constructed quadrant is placed here.
+*/
+sc3_error_t        *p4est3_quadrant_quadrant (p4est3_quadrant_vtable_t * qvt,
+                                              const void *c, int l, void *q);
 
 /** Query the number of distinct children a quadrant can have.
  * \param [in] qvt      Valid virtual quadrant table.

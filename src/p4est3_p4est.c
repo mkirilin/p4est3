@@ -107,7 +107,7 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
   return NULL;
 }
 
-static const char *P4EST3_P4EST_SELF_MAGIC = "p4est3_p4est_self_magic";
+static const char  *P4EST3_P4EST_SELF_MAGIC = "p4est3_p4est_self_magic";
 
 sc3_error_t        *
 p4est3_connectivity_new_p4est_brick (sc3_allocator_t * alloc,
@@ -374,6 +374,25 @@ p4est_quadrant_vtable_coordinates (const void *q, int n, void *j)
 }
 
 static sc3_error_t *
+p4est_quadrant_vtable_quadrant (const void *c, int l, void *q)
+{
+  const p4est_qcoord_t *coords = (const p4est_qcoord_t *) c;
+  p4est_quadrant_t   *quad = (p4est_quadrant_t *) q;
+  SC3A_CHECK (coords != NULL);
+  SC3A_CHECK (q != NULL);
+  SC3A_CHECK (0 <= l && l <= P4EST_MAXLEVEL);
+
+  quad->x = coords[0];
+  quad->y = coords[1];
+#ifdef P4_TO_P8
+  quad->z = coords[2];
+#endif
+  quad->level = l;
+  SC3A_IS (p4est_quadrant_vtable_is_valid, q);
+  return NULL;
+}
+
+static sc3_error_t *
 p4est_quadrant_vtable_compare (const void *q1, const void *q2, int *j)
 {
   SC3A_CHECK (j != NULL);
@@ -539,6 +558,7 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->quadrant_child_id = p4est_quadrant_vtable_child_id;
   qvt->quadrant_ancestor_id = p4est_quadrant_vtable_ancestor_id;
   qvt->quadrant_coordinates = p4est_quadrant_vtable_coordinates;
+  qvt->quadrant_quadrant = p4est_quadrant_vtable_quadrant;
   /* quadrant_num_children is not necessary */
   qvt->quadrant_compare = p4est_quadrant_vtable_compare;
   qvt->quadrant_root = p4est_quadrant_vtable_root;
