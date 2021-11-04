@@ -64,7 +64,8 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
   int                 is_refine, level, i;
   int                *pattern_it;
   /* pack data for refinement callback input */
-  p4est3_refine_callback_info_t ri = { vi->p3, vi->ntree, vi->quadrant };
+  p4est3_refine_callback_info_t ri =
+    { vi->p3, vi->ntree, vi->quadrant, vi->p3->qvt };
   SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
 
   SC3E (vi->p3->crefine (&ri, &is_refine));
@@ -125,6 +126,7 @@ p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
     ci.p3 = vi->p3;
     ci.ntree = vi->ntree;
     ci.family = cdata->family;
+    ci.qvt = vi->p3->qvt;
     SC3E (vi->p3->ccoarse (&ci, &is_coarse));
     cdata->nsiblings = 0;
   }
@@ -189,7 +191,7 @@ p4est3_lowest_children_pattern (p4est3_t * p3, p4est3_tree_t * tree,
   }
   else {
     SC3E (p4est3_quadrant_copy
-          (p3->qvt, q, tree->tquads + *deep_idx * p3->qsize));
+          (p3->qvt, q, p3->quads + *deep_idx * p3->qsize));
     (*deep_idx)++;
   }
   return NULL;
@@ -208,12 +210,12 @@ p4est3_pattern_populate_tree_rec (p4est3_t * p3, int level,
                                   p4est3_tree_t * tree,
                                   sc3_array_t * pattern,
                                   sc3_array_t * levelq,
-                                  p4est3_locidx range_begin,
-                                  p4est3_locidx range_end, int *deep_idx)
+                                  p4est3_gloidx range_begin,
+                                  p4est3_gloidx range_end, int *deep_idx)
 {
   void               *q, *child;
   int                 i;
-  p4est3_locidx       n_lowerq;
+  p4est3_gloidx       n_lowerq;
 
   if (range_begin >= tree->first_tquad && range_end <= tree->end_tquad) {
     SC3E (sc3_array_index (levelq, level, &q));
@@ -246,7 +248,7 @@ p4est3_pattern_populate_tree (p4est3_t * p3, p4est3_tree_t * tree,
                               int *deep_idx)
 {
   void               *quad;
-  p4est3_locidx       range_end;
+  p4est3_gloidx       range_end;
   p4est3_tree_t      *oldtree;
 
   /* Prepare some temporaty values of the tree here */
@@ -268,6 +270,7 @@ p4est3_pattern_populate_tree (p4est3_t * p3, p4est3_tree_t * tree,
   range_end = p4est3_quadrant_num_uniform (p3->qvt, p3->qmaxlevel);
 
   /* populate the tree */
+  SC3A_IS (p4est3_is_valid, p3);
   SC3E (p4est3_pattern_populate_tree_rec
         (p3, 0, tree, pattern, levelq, 0, range_end, deep_idx));
 
@@ -293,20 +296,18 @@ p4est3_fill_from_source (p4est3_t * p3)
   sc3_array_t        *levelq;
   coarse_callback_data_t scdata, *cdata = &scdata;
 #ifdef P4EST_ENABLE_DEBUG
-  int                 level, new_count;
+  int                *level;
 #endif
 
   /* We suppose to call this function after setting up routine */
-  SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (p3->crefine != NULL);
   SC3A_CHECK (p3->old != NULL);
   SC3A_IS (p4est3_is_setup, p3->old);
 
-  SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
-  SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
-  SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
-  SC3E (sc3_mpienv_get_info_noncont (p3->split_info, &info_noncontig));
-
+  SC3E (sc3_mpienv_get_nodesize (p3->old->split_info, &nodesize));
+  SC3E (sc3_mpienv_get_noderank (p3->old->split_info, &noderank));
+  SC3E (sc3_mpienv_get_nodecomm (p3->old->split_info, &nodecomm));
+  SC3E (sc3_mpienv_get_info_noncont (p3->old->split_info, &info_noncontig));
   /* Do some preliminary allocations */
   SC3E (sc3_allocator_calloc
         (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &local_num_quads));
@@ -315,7 +316,7 @@ p4est3_fill_from_source (p4est3_t * p3)
 
   SC3E (p4est3_refine_array_new
         (p3->alloc, sizeof (int),
-         p3->local_num_quads * p3->num_children, 0, &pattern));
+         p3->old->local_num_quads * p3->num_children, 0, &pattern));
 
   SC3E (p4est3_refine_array_new (p3->alloc, p3->qsize, p3->qmaxlevel + 1,
                                  p3->qmaxlevel + 1, &levelq));
@@ -323,12 +324,49 @@ p4est3_fill_from_source (p4est3_t * p3)
   SC3E (p4est3_refine_array_new (p3->alloc, sizeof (p4est3_tree_t),
                                  p3->nltrees, p3->nltrees, &p3->trees));
 
+  /* All the preparations are done. Begin with the algorithm. */
+  /* A call to fill in level information, that is necessary for
+     generation of a new forest's mesh */
+  switch (p3->source_setup_mode) {
+  case P4EST3_SRC_REFINE:
+    SC3E (p4est3_iterate_volume
+          (p3->old, p4est3_refine_volume_callback, pattern));
+    break;
+
+  case P4EST3_SRC_COARSE:
+    cdata->pattern = pattern;
+    SC3E (p4est3_refine_array_new
+          (p3->alloc, p3->qsize, p3->qvt->max_children,
+           p3->qvt->max_children, &cdata->family));
+    cdata->nsiblings = 0;
+    SC3E (p4est3_iterate_volume
+          (p3->old, p4est3_coarse_volume_callback, cdata));
+    break;
+
+  case P4EST3_SRC_COPY:
+    SC3E (p4est3_iterate_volume
+          (p3->old, p4est3_copy_volume_callback, pattern));
+    break;
+
+  default:
+    SC3E_UNREACH ("wrong setup from source mode");
+  }
+  SC3E (sc3_array_get_elem_count (pattern, &p3->local_num_quads));
+
+#ifdef P4EST_ENABLE_DEBUG
+  for (i = 0; i < p3->local_num_quads; ++i) {
+    SC3E (sc3_array_index (pattern, i, &level));
+    /** TODO: Check on p3->qmaxlevel at populating stage and skip
+     * if it is impossible to split*/
+    SC3A_CHECK (*level <= p3->qmaxlevel);
+  }
+#endif
   /* Here we allocate shared p4est3_t::quadwin and p4est3_t::nodequads.
      We will fill in the latter later. */
   SC3E (sc3_allocator_malloc (p3->alloc, nodesize * sizeof (char *),
                               &p3->nodequads));
   SC3E (sc3_MPI_Win_allocate_shared
-        (p3->local_num_quads * p3->qsize, p3->qsize,
+        ((sc3_MPI_Aint_t) (p3->local_num_quads * p3->qsize), p3->qsize,
          info_noncontig, nodecomm, &quadmem, &p3->quadwin));
   for (i = 0; i < nodesize; ++i) {
     SC3E (sc3_MPI_Win_shared_query (p3->quadwin, i,
@@ -343,7 +381,7 @@ p4est3_fill_from_source (p4est3_t * p3)
   /* Allocate shared memory for global offsets */
   goffsetbytes = (p3->mpisize + 1) * sizeof (p4est3_gloidx);
   SC3E (sc3_MPI_Win_allocate_shared
-        (noderank == 0 ? goffsetbytes : 0, p3->qsize,
+        (noderank == 0 ? goffsetbytes : 0, sizeof (p4est3_gloidx),
          info_noncontig, nodecomm, &p3->goffset, &p3->goffsetwin));
   if (noderank > 0) {
     SC3E (sc3_MPI_Win_shared_query (p3->goffsetwin, 0,
@@ -352,46 +390,11 @@ p4est3_fill_from_source (p4est3_t * p3)
     SC3A_CHECK (dispunit == sizeof (p4est3_gloidx));
     SC3A_CHECK (p3->goffset != NULL);
   }
-  /* All the preparations are done. Begin with the algorithm. */
-  /* A call to fill in level information, that is necessary for
-     generation of a new forest's mesh */
-  switch (p3->source_setup_mode) {
-  case P4EST3_SRC_REFINE:
-    SC3E (p4est3_iterate_volume (p3, p4est3_refine_volume_callback, pattern));
-    break;
-
-  case P4EST3_SRC_COARSE:
-    cdata->pattern = pattern;
-    SC3E (p4est3_refine_array_new
-          (p3->alloc, p3->qsize, p3->qvt->max_children,
-           p3->qvt->max_children, &cdata->family));
-    cdata->nsiblings = 0;
-    SC3E (p4est3_iterate_volume (p3, p4est3_coarse_volume_callback, cdata));
-    break;
-
-  case P4EST3_SRC_COPY:
-    SC3E (p4est3_iterate_volume (p3, p4est3_copy_volume_callback, pattern));
-    break;
-
-  default:
-    SC3E_UNREACH ("wrong setup from source mode");
-  }
-
-#ifdef P4EST_ENABLE_DEBUG
-  SC3E (sc3_array_get_elem_count (pattern, &new_count));
-  for (i = 0; i < new_count; ++i) {
-    SC3E (sc3_array_index (pattern, i, &level));
-    /** TODO: Check on p3->qmaxlevel at populating stage and skip
-     * if it is impossible to split*/
-    SC3A_CHECK (level <= p3->qmaxlevel);
-  }
-#endif
   /* We got a pattern of population, and now we populate it
      and set p4est3_tree_t:: treeid, quad_offset and num_quads.
      We also initialize p4est3_tree_t::first_tquad by 0.
      We work on the process-local window onto the quadrants */
-  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, noderank,
-                          SC3_MPI_MODE_NOCHECK, p3->quadwin));
+
   lt_offset = 0;
   for (i = p3->fltree; i <= p3->lltree; ++i) {
     SC3E (p4est3_tree_index (p3, i, &tree));
@@ -403,7 +406,6 @@ p4est3_fill_from_source (p4est3_t * p3)
     tree->num_quads = lt_offset - tree->quad_offset;
     tree->first_tquad = 0;
   }
-  SC3E (sc3_MPI_Win_unlock (noderank, p3->quadwin));
 
   /* This check here is only to avoid creating a new mpi datatype. */
   SC3A_CHECK (sizeof (p4est3_locidx) == sizeof (int));
@@ -414,7 +416,8 @@ p4est3_fill_from_source (p4est3_t * p3)
   SC3E (sc3_MPI_Allgather
         (&tree->num_quads, 1, SC3_MPI_INT,
          first_tree_quads, p3->mpisize, SC3_MPI_INT, p3->mpicomm));
-
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->goffsetwin));
   if (noderank == 0) {
     p3->goffset[0] = 0;
     for (i = 1; i < p3->mpisize + 1; ++i) {
@@ -422,6 +425,8 @@ p4est3_fill_from_source (p4est3_t * p3)
         + (p4est3_gloidx) local_num_quads[i - 1];
     }
   }
+  SC3E (sc3_MPI_Win_unlock (0, p3->goffsetwin));
+
   if (p3->mpirank != 0) {
     for (i = p3->gftree[p3->mpirank - 1]; i == p3->fltree; --i) {
       tree->first_tquad += first_tree_quads[i];
@@ -436,12 +441,12 @@ p4est3_fill_from_source (p4est3_t * p3)
 
   SC3E (sc3_array_destroy (&pattern));
   SC3E (sc3_array_destroy (&levelq));
-  SC3E (sc3_allocator_free (p3->alloc, &local_num_quads));
-  SC3E (sc3_allocator_free (p3->alloc, &first_tree_quads));
+  SC3E (sc3_allocator_free (p3->alloc, local_num_quads));
+  SC3E (sc3_allocator_free (p3->alloc, first_tree_quads));
   if (p3->source_setup_mode == P4EST3_SRC_COARSE) {
     SC3E (sc3_array_destroy (&cdata->family));
   }
-  sc3_MPI_Barrier (nodecomm);
+  sc3_MPI_Barrier (p3->mpicomm);
   p3->global_num_quads = p3->goffset[p3->mpisize];
 
   return NULL;
