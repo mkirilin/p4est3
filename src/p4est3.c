@@ -251,6 +251,17 @@ p4est3_set_source (p4est3_t * p3, p4est3_t * old)
 }
 
 sc3_error_t        *
+p4est3_unset_source (p4est3_t * p3)
+{
+  SC3A_IS (p4est3_is_valid, p3);
+  SC3A_CHECK (p3->old != NULL);
+
+  SC3E (p4est3_unref (p3->old));
+  p3->old = NULL;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_set_setup_source_mode (p4est3_t * p3, p4est3_source_setup_t mode)
 {
   SC3A_IS (p4est3_is_new, p3);

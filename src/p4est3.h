@@ -256,6 +256,12 @@ sc3_error_t        *p4est3_set_setup_mode (p4est3_t * p3,
  */
 sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old);
 
+/** Unref and unset a source forest that must not be NULL.
+ * \param [in,out] p3       Forest object under construction.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_unset_source (p4est3_t * p3);
+
 /**
  * Set a way that populates a new forest according to a source
  * in a setup p4est3 phase.
