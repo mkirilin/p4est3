@@ -239,8 +239,8 @@ p4est3_set_source (p4est3_t * p3, p4est3_t * old)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_IS (p4est3_is_setup, old);
+  SC3A_CHECK (p3 != old);
 
-  p3->old = old;
   if (p3->old != NULL) {
     SC3E (p4est3_unref (p3->old));
   }
@@ -319,17 +319,21 @@ p4est3_setup (p4est3_t * p3)
 
   /* Check conditions that arise due to omitting mandatory _set_ functions.
      Note that p4est3_set_vtable sets connectivity and quadrant vtable. */
-  SC3E_DEMAND (p3->conn != NULL, "Connectivity must be set");
-  SC3E_DEMAND (p3->qvt == &p3->sqvt, "Quadrant virtual table must be set");
-  SC3E (p4est3_connectivity_get_dim (p3->conn, &cdim));
-  SC3E_DEMAND (cdim == p3->qvt->dim,
-               "Dimensions of connectivity and quadrant vtable must match");
-
-  /* further pre-setup consistency checks */
-  SC3A_CHECK (p3->num_trees > 0);
+  if (p3->old == NULL) {
+    SC3E_DEMAND (p3->conn != NULL, "Connectivity must be set");
+    SC3E_DEMAND (p3->qvt == &p3->sqvt, "Quadrant virtual table must be set");
+    SC3E (p4est3_connectivity_get_dim (p3->conn, &cdim));
+    SC3E_DEMAND (cdim == p3->qvt->dim,
+                 "Dimensions of connectivity and quadrant vtable must match");
+    /* further pre-setup consistency checks */
+    SC3A_CHECK (p3->num_trees > 0);
+  }
 
   if (p3->pvt != NULL) {
     SC3E (p4est3_setup_vtable (p3));
+  }
+  if (p3->old != NULL) {
+    SC3E (p4est3_internal_setup_from_source (p3));
   }
   else {
     /* query input communicator and populate node and head communicators */
@@ -456,6 +460,9 @@ p4est3_destroy (p4est3_t ** pp3)
     }
     /* unref mpi environment related data */
     SC3E (sc3_mpienv_unref (&p3->split_info));
+    if (p3->old != NULL) {
+      SC3E (p4est3_unref (p3->old));
+    }
   }
 
   /* remove allocation */
