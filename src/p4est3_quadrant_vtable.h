@@ -46,7 +46,7 @@
  * This is done to make the coordinates of various virtual quadrant
  * implementations comparable with each other.
  */
-#define P4EST3_REF_MAXLEVEL 32
+#define P4EST3_REF_MAXLEVEL 31
 
 #ifdef __cplusplus
 extern              "C"
