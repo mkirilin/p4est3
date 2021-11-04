@@ -828,7 +828,6 @@ p4est3_internal_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_old);
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_new);
   SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_old, qin);
-  SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_new, qout);
   SC3A_CHECK (qvt_old->dim == qvt_new->dim);
 
   if (qvt_old == qvt_new) {
@@ -842,6 +841,7 @@ p4est3_internal_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
     SC3E (p4est3_quadrant_quadrant (qvt_new, c, level, qout));
   }
 
+  SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_new, qout);
   return NULL;
 }
 
@@ -855,6 +855,8 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   sc3_MPI_Aint_t      gftreebytes, tempbytes, gfposbytes;
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Comm_t      nodecomm;
+  p4est3_refine_callback_t crefine;
+  p4est3_coarse_callback_t ccoarse;
 
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (p3->old != NULL);
@@ -886,16 +888,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   SC3E (p4est3_set_setup_mode (p3, old->setup_mode));
 
   /* variables populated during p4est3_setup: communicator related */
-  p3->mpisize = old->mpisize;
-  p3->mpirank = old->mpirank;
   SC3E (p4est3_set_shared (p3, old->shared));
-  /* p3->split_info == NULL at the current code state,
-     but we check it just in case of future development */
-  if (p3->split_info != NULL) {
-    SC3E (sc3_mpienv_unref (&p3->split_info));
-  }
-  p3->split_info = old->split_info;
-  SC3E (sc3_mpienv_ref (p3->split_info));
 
   /* variables populated during p4est3_setup: partition related */
  /** TODO: why is it int type while p4est3_quadrant_size returs size_t? */
@@ -904,15 +897,15 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   p3->num_children = old->num_children;
   p3->max_threads = old->max_threads;
 
-  SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
-  SC3E (sc3_mpienv_get_info_noncont (p3->split_info, &info_noncontig));
-  SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
+  SC3E (sc3_mpienv_get_noderank (old->split_info, &noderank));
+  SC3E (sc3_mpienv_get_info_noncont (old->split_info, &info_noncontig));
+  SC3E (sc3_mpienv_get_nodecomm (old->split_info, &nodecomm));
 
-  gftreebytes = (p3->mpisize + 1) * sizeof (p4est3_topidx);
+  gftreebytes = (old->mpisize + 1) * sizeof (p4est3_topidx);
   SC3E (sc3_MPI_Win_allocate_shared
         (noderank == 0 ? gftreebytes : 0, sizeof (p4est3_topidx),
          info_noncontig, nodecomm, &p3->gftree, &p3->gftreewin));
-  gfposbytes = (p3->mpisize + 1) * p3->qsize;
+  gfposbytes = (old->mpisize + 1) * p3->qsize;
   SC3E (sc3_MPI_Win_allocate_shared
         (noderank == 0 ? gfposbytes : 0, p3->qsize,
          info_noncontig, nodecomm, &p3->gfpos, &p3->gfposwin));
@@ -938,9 +931,9 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
      of p4est3_t::gftreewin and p4est3_t::gfposwin so far.
      In the future we will introduce reference interface for them since they
      stay the same in a new tree. */
-  SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
-  beginr = sc3_intcut (p3->mpisize + 1, nodesize, noderank);
-  endr = sc3_intcut (p3->mpisize + 1, nodesize, noderank + 1);
+  SC3E (sc3_mpienv_get_nodesize (old->split_info, &nodesize));
+  beginr = sc3_intcut (old->mpisize + 1, nodesize, noderank);
+  endr = sc3_intcut (old->mpisize + 1, nodesize, noderank + 1);
   SC3E (sc3_allocator_calloc
         (p3->alloc, p3->qvt->dim, sizeof (int32_t), &coords));
   for (i = 0; i < endr - beginr; ++i) {
@@ -964,18 +957,30 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   p3->nltrees = old->nltrees;
 
   /* functions set before p4est3_setup */
+  crefine = old->crefine;
+  ccoarse = old->ccoarse;
   switch (p3->source_setup_mode) {
   case P4EST3_SRC_REFINE:
     if (p3->crefine == NULL) {
-      SC3A_CHECK (old->crefine != NULL);
-      SC3E (p4est3_set_refine (p3, old->crefine));
+      SC3A_CHECK (crefine != NULL);
+      SC3E (p4est3_set_refine (p3, crefine));
+    }
+    else {
+      /* adjust new forest's callback to the old one
+         to iterate over the old forest */
+      old->crefine = p3->crefine;
     }
     break;
 
   case P4EST3_SRC_COARSE:
     if (p3->crefine == NULL) {
-      SC3A_CHECK (old->crefine != NULL);
-      SC3E (p4est3_set_coarse (p3, old->ccoarse));
+      SC3A_CHECK (ccoarse != NULL);
+      SC3E (p4est3_set_coarse (p3, ccoarse));
+    }
+    else {
+      /* adjust new forest's callback to the old one
+         to iterate over the old forest */
+      old->ccoarse = p3->ccoarse;
     }
     break;
 
@@ -986,13 +991,27 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
     SC3E_UNREACH ("Wrong setup from sourse mode");
   }
 
+  p3->mpisize = old->mpisize;
+  p3->mpirank = old->mpirank;
+  /* p3->split_info == NULL at the current code state,
+     but we check it just in case of future development */
+  if (p3->split_info != NULL) {
+    SC3E (sc3_mpienv_unref (&p3->split_info));
+  }
+  SC3A_CHECK (p3->split_info == NULL);
+  p3->split_info = old->split_info;
+  SC3E (sc3_mpienv_ref (p3->split_info));
+
   /** We set inside all the values left, namely:
    * p4est3_t::nodequads, local_num_quads, quadwin,
    * quads, trees, goffsetwin, goffset and global_num_quads.
   */
+  p3->setup = 1;
   SC3E (p4est3_fill_from_source (p3));
 
-  p3->setup = 1;
+  /* restore refinement and coarsening callback of the old forest */
+  old->crefine = crefine;
+  old->ccoarse = ccoarse;
   SC3A_IS (p4est3_is_setup, p3);
   return NULL;
 }
