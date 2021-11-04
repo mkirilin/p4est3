@@ -67,15 +67,6 @@ typedef sc3_error_t *(*p4est3_out2t_t) (const void *slf,
  * This method is suited to wrap any compatible third-party object into p4est.
  */
 
-typedef struct p4est3_refine_callback_info p4est3_refine_callback_info_t;
-typedef struct p4est3_coarse_callback_info p4est3_coarse_callback_info_t;
-typedef             sc3_error_t
-  * (*p4est3_refine_callback_t) (p4est3_refine_callback_info_t * ci,
-                                 int *is_refine);
-typedef             sc3_error_t
-  * (*p4est3_coarse_callback_t) (p4est3_coarse_callback_info_t * ci,
-                                 int *is_coarse);
-
 typedef struct p4est3_vtable
 {
   int                 dim;      /**< Space dimension is 1, 2 or 3. */
@@ -129,6 +120,34 @@ int                 p4est3_vtable_is_valid (const p4est3_vtable_t * pvt,
 
 /** The forest is an opaque structure. */
 typedef struct p4est3 p4est3_t;
+
+/** Pass context information about a local element to decide for refinement. */
+typedef struct p4est3_refine_callback_info
+{
+  p4est3_t           *p3;               /**< Pointer to the forest */
+  p4est3_topidx       ntree;            /**< Number of tree of quadrant */
+  void               *quadrant;         /**< Pointer to the quadrant that
+                                             may be refined */
+  p4est3_quadrant_vtable_t *qvt;        /**< Pointer to a quadrant virtual
+                                             table at current implementation */
+} p4est3_refine_callback_info_t;
+
+typedef struct p4est3_coarse_callback_info
+{
+  p4est3_t           *p3;               /**< Pointer to the forest */
+  p4est3_topidx       ntree;            /**< Number of tree of family */
+  sc3_array_t        *family;         /**< Array of quadrant that
+                                           represent a family. */
+  p4est3_quadrant_vtable_t *qvt;        /**< Pointer to a quadrant virtual
+                                             table at current implementation */
+} p4est3_coarse_callback_info_t;
+
+typedef             sc3_error_t
+  * (*p4est3_refine_callback_t) (p4est3_refine_callback_info_t * ci,
+                                 int *is_refine);
+typedef             sc3_error_t
+  * (*p4est3_coarse_callback_t) (p4est3_coarse_callback_info_t * ci,
+                                 int *is_coarse);
 
 /** Check whether a forest is valid (no matter if setup or not).
  * \param [in] p3       Forest pointer.  NULL is considered not valid.

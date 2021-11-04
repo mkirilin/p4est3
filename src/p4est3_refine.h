@@ -40,23 +40,6 @@ extern              "C"
 #endif
 #endif
 
-/** Pass context information about a local element to decide for refinement. */
-struct p4est3_refine_callback_info
-{
-  p4est3_t           *p3;               /**< Pointer to the forest */
-  p4est3_topidx       ntree;            /**< Number of tree of quadrant */
-  void               *quadrant;         /**< Pointer to the quadrant that
-                                             may be refined */
-};
-
-struct p4est3_coarse_callback_info
-{
-  p4est3_t           *p3;               /**< Pointer to the forest */
-  p4est3_topidx       ntree;            /**< Number of tree of family */
-  sc3_array_t        *family;         /**< Array of quadrant that
-                                           represent a family. */
-};
-
 /* Refine forest */
 /* Warning: this functions does not support multithreading */
 sc3_error_t        *p4est3_fill_from_source (p4est3_t * p3);
