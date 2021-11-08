@@ -413,10 +413,10 @@ p4est3_fill_from_source (p4est3_t * p3)
   SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
   SC3E (sc3_MPI_Allgather
         (&p3->local_num_quads, 1, SC3_MPI_INT,
-         local_num_quads, p3->mpisize, SC3_MPI_INT, p3->mpicomm));
+         local_num_quads, 1, SC3_MPI_INT, p3->mpicomm));
   SC3E (sc3_MPI_Allgather
         (&tree->num_quads, 1, SC3_MPI_INT,
-         first_tree_quads, p3->mpisize, SC3_MPI_INT, p3->mpicomm));
+         first_tree_quads, 1, SC3_MPI_INT, p3->mpicomm));
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsetwin));
   if (noderank == 0) {
