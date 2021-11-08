@@ -253,19 +253,20 @@ p4est3_pattern_populate_tree (p4est3_t * p3, p4est3_tree_t * tree,
 
   /* Prepare some temporaty values of the tree here */
   SC3E (p4est3_tree_index (p3->old, tree->treeid, &oldtree));
-  quad = (void *) (oldtree->tquads + p3->old->qsize * oldtree->first_tquad);
+  quad = (void *) oldtree->tquads;
   SC3E (p4est3_quadrant_first_descendant
         (p3->old->qvt, quad, p3->old->qmaxlevel, p3->old->temp_quad[0]));
   SC3E (p4est3_quadrant_linear_id
         (p3->old->qvt, p3->old->temp_quad[0],
          p3->old->qmaxlevel, &tree->first_tquad));
 
-  quad = (void *) (oldtree->tquads + p3->old->qsize * oldtree->last_tquad);
+  quad =
+    (void *) (oldtree->tquads + p3->old->qsize * (oldtree->num_quads - 1));
   SC3E (p4est3_quadrant_last_descendant
         (p3->old->qvt, quad, p3->old->qmaxlevel, p3->old->temp_quad[0]));
   SC3E (p4est3_quadrant_linear_id
-        (p3->old->qvt, p3->old->temp_quad[0],
-         p3->old->qmaxlevel, &tree->last_tquad));
+        (p3->old->qvt, p3->old->temp_quad[0], p3->old->qmaxlevel,
+         &tree->last_tquad));
   tree->end_tquad = tree->last_tquad + 1;
   range_end = p4est3_quadrant_num_uniform (p3->qvt, p3->qmaxlevel);
 
