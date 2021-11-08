@@ -378,14 +378,17 @@ p4est_quadrant_vtable_quadrant (const void *c, int l, void *q)
 {
   const p4est_qcoord_t *coords = (const p4est_qcoord_t *) c;
   p4est_quadrant_t   *quad = (p4est_quadrant_t *) q;
+  const int           d = P4EST3_REF_MAXLEVEL - P4EST_MAXLEVEL;
   SC3A_CHECK (coords != NULL);
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (0 <= l && l <= P4EST_MAXLEVEL);
 
-  quad->x = coords[0];
-  quad->y = coords[1];
+  /* Since the coordinates are normalized by the P4EST3_REF_MAXLEVEL,
+     we shift them according to qvt maxlevel */
+  quad->x = coords[0] >> d;
+  quad->y = coords[1] >> d;
 #ifdef P4_TO_P8
-  quad->z = coords[2];
+  quad->z = coords[2] >> d;
 #endif
   quad->level = l;
   SC3A_IS (p4est_quadrant_vtable_is_valid, q);
