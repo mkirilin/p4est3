@@ -223,7 +223,7 @@ compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
   for (tt = p->first_local_tree; tt <= p->last_local_tree; ++tt) {
     tree = p4est_tree_array_index (p->trees, tt);
     for (nq = 0; nq < tree->quadrants.elem_count; ++nq) {
-      q = sc_array_index (&tree->quadrants, nq);
+      q = (p4est_quadrant_t *) sc_array_index (&tree->quadrants, nq);
       SC3E (sc3_array_push (levels, &level));
       *level = q->level;
     }
@@ -287,8 +287,8 @@ perform_tests (setup_t * t, p4est3_quadrant_vtable_t * qvt)
   p4est_t            *p;
   p4est3_t           *p3;
 
-  for (t->level = 1; t->level <= 2; ++t->level) {
-    for (t->num_trees = 1; t->num_trees <= 2; ++t->num_trees) {
+  for (t->level = 1; t->level <= MAX_TEST_LEVEL; ++t->level) {
+    for (t->num_trees = 1; t->num_trees <= MAX_TEST_TREES; ++t->num_trees) {
 #ifdef P4EST_ENABLE_DEBUG
       if (t->mpirank == 0) {
         printf ("l = %d, t = %d\n", t->level, t->num_trees);
