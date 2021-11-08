@@ -893,7 +893,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   /* variables populated during p4est3_setup: partition related */
  /** TODO: why is it int type while p4est3_quadrant_size returs size_t? */
   p3->qsize = (int) p4est3_quadrant_size (p3->qvt);
-  p3->qmaxlevel = old->qmaxlevel;
+  p3->qmaxlevel = p3->qvt->max_level;
   p3->num_children = old->num_children;
   p3->max_threads = old->max_threads;
 
