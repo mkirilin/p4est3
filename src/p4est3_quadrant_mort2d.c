@@ -125,13 +125,16 @@ p4est3_quadrant_mort_quadrant (const p4est_qcoord_t * c, int l,
 #ifdef P4_TO_P8
   p4est_qcoord_t      z;
 #endif
+  const int           d = P4EST3_REF_MAXLEVEL - P4EST3_MORT_MAXLEVEL;
   SC3A_CHECK (c != NULL);
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (0 <= l && l <= P4EST3_MORT_MAXLEVEL);
-  x = c[0] >> (P4EST3_MORT_MAXLEVEL - l);
-  y = c[1] >> (P4EST3_MORT_MAXLEVEL - l);
+  /* Since the coordinates are normalized by the P4EST3_REF_MAXLEVEL,
+     we shift them according to qvt maxlevel */
+  x = (c[0] >> d) >> (P4EST3_MORT_MAXLEVEL - l);
+  y = (c[1] >> d) >> (P4EST3_MORT_MAXLEVEL - l);
 #ifdef P4_TO_P8
-  z = c[0] >> (P4EST3_MORT_MAXLEVEL - l);
+  z = (c[2] >> d) >> (P4EST3_MORT_MAXLEVEL - l);
 #endif
   q->coords = 0;
   for (i = 0; i < l + 2; ++i) {

@@ -517,12 +517,22 @@ p4est3_quadrant_zyx_quadrant (const p4est_qcoord_t * c, int l, __m128i * q)
   SC3A_CHECK (c != NULL);
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (0 <= l && l <= P4EST3_YX_MAXLEVEL);
+  const int           d = P4EST3_REF_MAXLEVEL - P4EST3_YX_MAXLEVEL;
 
+  /* Since the coordinates are normalized by the P4EST3_REF_MAXLEVEL,
+     we shift them according to qvt maxlevel */
+/* *INDENT-OFF* */
+  *q =
+  _mm_srli_epi32 (
 #ifdef P4_TO_P8
-  *q = _mm_set_epi32 (c[0], c[1], c[2], l);
-#else
-  *q = _mm_set_epi32 (c[0], c[1], 0, l);
+    _mm_set_epi32 (c[0], c[1], c[2], 0)
+#else 
+    _mm_set_epi32 (c[0], c[1], 0, 0)
 #endif
+  , d
+  );
+/* *INDENT-ON* */
+  *q = _mm_insert_epi32 (*q, l, 0);
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
   return NULL;
 }
