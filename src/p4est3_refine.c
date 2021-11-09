@@ -268,7 +268,7 @@ p4est3_pattern_populate_tree (p4est3_t * p3, p4est3_tree_t * tree,
         (p3->old->qvt, p3->old->temp_quad[0], p3->old->qmaxlevel,
          &tree->last_tquad));
   tree->end_tquad = tree->last_tquad + 1;
-  range_end = p4est3_quadrant_num_uniform (p3->qvt, p3->qmaxlevel);
+  range_end = p4est3_quadrant_num_uniform (p3->qvt, p3->old->qmaxlevel);
 
   /* populate the tree */
   SC3A_IS (p4est3_is_valid, p3);
