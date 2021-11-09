@@ -252,18 +252,45 @@ compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
   return NULL;
 }
 
+/**
+ * 0 - Classic
+ * 1 - AVX
+ * 2 - Morton
+*/
 static sc3_error_t *
-perform_test (setup_t * t, p4est3_t * p3, p4est_t * p,
-              p4est3_quadrant_vtable_t * qvt)
+set_qvt (p4est3_quadrant_vtable_t * qvt, int i)
+{
+  SC3A_CHECK (0 <= i && i <= 2);
+  switch (i)
+  {
+  case 0:
+    SC3E (p4est3_quadrant_vtable_p4est (qvt, 0));
+    break;
+  case 1:
+    SC3E (p4est3_quadrant_yx_vtable (qvt));
+    break;
+  case 2:
+    SC3E (p4est3_quadrant_mort2d_vtable (qvt));
+    break;
+  default:
+    SC3E_UNREACH ("wrong qvt mode");
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
 {
   int                 i;
   p4est3_t           *p3refined, *p3ptr = p3;
+  p4est3_quadrant_vtable_t sqvt, *qvt = &sqvt;
   /* refine the old forest */
   refine_level = t->level;
   p4est_refine (p, 1, refine_normal_fn, NULL);
 
   for (i = 0; i < refine_level; ++i) {
     SC3E (p4est3_new (t->alloc, &p3refined));
+    SC3E (set_qvt (qvt, i % 3));
     SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
     SC3E (p4est3_set_source (p3refined, p3ptr));
     SC3E (p4est3_set_setup_source_mode (p3refined, P4EST3_SRC_REFINE));
@@ -298,7 +325,7 @@ perform_tests (setup_t * t, p4est3_quadrant_vtable_t * qvt)
       SC3E (make_new_p4est (&p, t));
       SC3E (make_new_p4est3 (&p3, t, qvt));
 
-      SC3E (perform_test (t, p3, p, qvt));
+      SC3E (perform_test (t, p3, p));
 
       /*destroy forest, that was referenced for others */
       SC3E (p4est3_destroy (&p3));
