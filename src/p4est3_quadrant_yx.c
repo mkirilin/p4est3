@@ -765,22 +765,14 @@ p4est3_quadrant_zyx_linear_id (const __m128i * quadrant, int level,
 
   /* this preserves the high bits from negative numbers */
   shifted =
-    _mm_srlv_epi32 (*quadrant, _mm_set1_epi32 (P4EST3_YX_MAXLEVEL - level));
+    _mm_srli_epi32 (*quadrant, P4EST3_YX_MAXLEVEL - level);
 
   *id = (p4est3_gloidx) 0;
   for (i = 0; i < level; ++i) {
-/* *INDENT-OFF* */
-    res = _mm_sllv_epi32 (
-            _mm_and_si128 (shifted, _mm_set1_epi32 ((uint32_t) 1 << i))
-          , _mm_set_epi32 ((P4EST_DIM - 1) * i
-                         , (P4EST_DIM - 1) * i + 1
-                         , (P4EST_DIM - 1) * i + 2
-                         , 0)
-          );
-/* *INDENT-ON* */
-    *id |= _mm_extract_epi32 (res, 3);
-    *id |= _mm_extract_epi32 (res, 2);
-    *id |= _mm_extract_epi32 (res, 1);
+    res = _mm_and_si128 (shifted, _mm_set1_epi32 ((uint32_t) 1 << i));
+    *id |= ((uint64_t) _mm_extract_epi32 (res, 3)) << ((P4EST_DIM - 1) * i);
+    *id |= ((uint64_t) _mm_extract_epi32 (res, 2)) << ((P4EST_DIM - 1) * i + 1);
+    *id |= ((uint64_t) _mm_extract_epi32 (res, 1)) << ((P4EST_DIM - 1) * i + 2);
   }
   SC3A_CHECK (*id >= 0L && *id < ((int64_t) 1 << P4EST_DIM * level));
   return NULL;
