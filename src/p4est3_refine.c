@@ -177,8 +177,13 @@ p4est3_lowest_children_pattern (p4est3_t * p3, p4est3_tree_t * tree,
   int                *deep;
   void               *child;
   int                 i, level;
+  int                 ecount;
 
   SC3E (p4est3_quadrant_level (p3->qvt, q, &level));
+  SC3E (sc3_array_get_elem_count (pattern, &ecount));
+  if (ecount <= *deep_idx) {
+    return NULL;
+  }
   SC3E (sc3_array_index (pattern, *deep_idx, &deep));
   SC3A_CHECK (level <= *deep && *deep <= p3->qmaxlevel);
   if (level < *deep) {
