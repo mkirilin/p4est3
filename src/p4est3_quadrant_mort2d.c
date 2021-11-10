@@ -530,7 +530,7 @@ static sc3_error_t *
 p4est3_quadrant_mort_last_descendant (const p4est3_quadrant_mort_t * q,
                                       int level, p4est3_quadrant_mort_t * ld)
 {
-  p4est_qcoord_t      shift;
+  uint64_t            shift;
 
   SC3A_IS (p4est3_quadrant_mort_is_valid, q);
   SC3A_CHECK ((int) q->level <= level && level <= P4EST3_MORT_QMAXLEVEL);
