@@ -821,10 +821,9 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
 static sc3_error_t *
 p4est3_internal_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
                                     p4est3_quadrant_vtable_t * qvt_new,
-                                    const void *qin, void *qout, int32_t * c)
+                                    const void *qin, void *qout,
+                                    int32_t * c, int level)
 {
-  int                 level;
-
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_old);
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_new);
   SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_old, qin);
@@ -835,7 +834,6 @@ p4est3_internal_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
     SC3E (p4est3_quadrant_copy (qvt_old, qin, qout));
   }
   else {
-    SC3E (p4est3_quadrant_level (qvt_old, qin, &level));
     SC3A_CHECK (level <= qvt_new->max_level);
     SC3E (p4est3_quadrant_coordinates (qvt_old, qin, qvt_old->dim, c));
     SC3E (p4est3_quadrant_quadrant (qvt_new, c, level, qout));
@@ -940,7 +938,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
     p3->gftree[i] = old->gftree[i];
     SC3E (p4est3_internal_translate_quadrant
           (old->qvt, p3->qvt, (void *) (old->gfpos + i * old->qsize),
-           (void *) (p3->gfpos + i * p3->qsize), coords));
+           (void *) (p3->gfpos + i * p3->qsize), coords, p3->qvt->max_level));
   }
   SC3E (sc3_allocator_free (p3->alloc, coords));
   SC3E (sc3_MPI_Win_unlock (0, p3->gftreewin));
