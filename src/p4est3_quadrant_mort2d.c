@@ -147,6 +147,7 @@ p4est3_quadrant_mort_quadrant (const p4est_qcoord_t * c, int l,
 #endif
   }
   q->level = l;
+  q->coords = P4EST3_QUADRANT_MORT_LEN (q->coords, l);
   SC3A_IS (p4est3_quadrant_mort_is_valid, q);
   return NULL;
 }
