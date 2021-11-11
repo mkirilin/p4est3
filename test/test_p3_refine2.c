@@ -22,18 +22,19 @@
 */
 
 #include <p4est3.h>
-//#ifndef P4_TO_P8
+#ifndef P4_TO_P8
 #include <p4est_extended.h>
 #include <p4est_bits.h>
 #include <p4est3_p4est.h>
 #include <p4est3_quadrant_yx.h>
 #include <p4est3_quadrant_mort2d.h>
-
-//#else
-//#include <p4est3_p8est.h>
-//#include <p4est3_quadrant_zyx.h>
-//#include <p4est3_quadrant_mort3d.h>
-//#endif
+#else
+#include <p8est_extended.h>
+#include <p8est_bits.h>
+#include <p4est3_p8est.h>
+#include <p4est3_quadrant_zyx.h>
+#include <p4est3_quadrant_mort3d.h>
+#endif
 
 #define MAX_TEST_LEVEL 5
 #define MAX_TEST_TREES 5
@@ -126,7 +127,12 @@ make_allocator (setup_t * t)
 static sc3_error_t *
 make_connectivity (setup_t * t, int dim)
 {
-  t->conn2 = p4est_connectivity_new_brick (t->num_trees, 1, 0, 0);
+  t->conn2 =
+#ifdef P4_TO_P8
+  p8est_connectivity_new_brick (t->num_trees, 1, 1, 0, 0, 0);
+#else
+  p4est_connectivity_new_brick (t->num_trees, 1, 0, 0);
+#endif
   SC3E (p4est3_connectivity_new_p4est (t->alloc, &t->conn3, t->conn2, 1));
   return NULL;
 }

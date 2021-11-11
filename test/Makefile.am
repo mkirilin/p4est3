@@ -54,7 +54,8 @@ p4est_test_programs += \
         test/p8est3_test_setup \
         test/p8est_test_avx \
         test/p8est_test_version \
-        test/p8est3_test_p3_iterate
+        test/p8est3_test_p3_iterate \
+        test/p8est3_test_p3_refine
 if P4EST_WITH_METIS
 p4est_test_programs += \
         test/p8est_test_reorder
@@ -154,6 +155,7 @@ test_p8est3_test_setup_SOURCES = test/test_setup3.c
 test_p8est_test_avx_SOURCES = test/test_avx3.c
 test_p8est_test_version_SOURCES = test/test_version.c
 test_p8est3_test_p3_iterate_SOURCES = test/test_p3_iterate3.c
+test_p8est3_test_p3_refine_SOURCES = test/test_p3_refine3.c
 if P4EST_WITH_METIS
 test_p8est_test_reorder_SOURCES = test/test_reorder3.c
 endif
@@ -243,6 +245,7 @@ LINT_CSOURCES += \
         $(test_p8est_test_avx_SOURCES) \
         $(test_p8est_test_version_SOURCES) \
         $(test_p8est3_test_p3_iterate_SOURCES) \
+        $(test_p8est3_test_p3_refine_SOURCES) \
         $(test_p6est_test_all_SOURCES) \
         $(test_p4est3_test_conn3_transformation)
 
