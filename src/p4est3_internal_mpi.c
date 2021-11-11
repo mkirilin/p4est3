@@ -22,7 +22,8 @@
 */
 
 #include <p4est3_internal.h>
-#include <p4est3_refine.h>
+//#include <p4est3_refine.h>
+#include <p4est3_refine_translate.h>
 #include <sc3_omp.h>
 
 #ifndef P4EST_ENABLE_OPENMP
@@ -1005,7 +1006,8 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
    * quads, trees, goffsetwin, goffset and global_num_quads.
   */
   p3->setup = 1;
-  SC3E (p4est3_fill_from_source (p3));
+  //SC3E (p4est3_fill_from_source (p3));
+  SC3E (p4est3_fill_from_source_translate (p3));
 
   /* restore refinement and coarsening callback of the old forest */
   old->crefine = crefine;
