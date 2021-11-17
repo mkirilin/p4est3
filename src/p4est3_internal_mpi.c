@@ -972,7 +972,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
     break;
 
   case P4EST3_SRC_COARSE:
-    if (p3->crefine == NULL) {
+    if (p3->ccoarse == NULL) {
       SC3A_CHECK (ccoarse != NULL);
       SC3E (p4est3_set_coarse (p3, ccoarse));
     }

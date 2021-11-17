@@ -306,7 +306,7 @@ p4est3_fill_from_source (p4est3_t * p3)
 #endif
 
   /* We suppose to call this function after setting up routine */
-  SC3A_CHECK (p3->crefine != NULL);
+  SC3A_CHECK (p3->crefine != NULL || p3->ccoarse != NULL);
   SC3A_CHECK (p3->old != NULL);
   SC3A_IS (p4est3_is_setup, p3->old);
 

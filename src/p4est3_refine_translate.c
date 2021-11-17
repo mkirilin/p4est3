@@ -105,7 +105,7 @@ p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
   SC3A_CHECK (vi->p3->ccoarse != NULL);
   int                 is_coarse, i, child_id;
   char               *pattern_it;
-  void               *quad;
+  void              **quad;
   coarse_callback_data_t *cdata = (coarse_callback_data_t *) vi->user_data;
   p4est3_coarse_callback_info_t ci;     /* = { vi->p3, vi->ntree, vi->quadrant }; */
 
@@ -132,7 +132,7 @@ p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
 
   /* cdata->nsiblings == child_id: the volume is a part of the family */
   SC3E (sc3_array_index (cdata->family, cdata->nsiblings, &quad));
-  quad = vi->quadrant;
+  *quad = vi->quadrant;
   cdata->nsiblings++;
 
   if (cdata->nsiblings == vi->p3->num_children) {
@@ -153,7 +153,7 @@ p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
   if (is_coarse) {
     SC3E (sc3_array_index (cdata->pattern, cdata->n_new, &pattern_it));
     *pattern_it = vi->p3->num_children;
-    cdata->counter += vi->p3->num_children;
+    cdata->counter++;
     cdata->n_new++;
   }
   else {
@@ -162,6 +162,7 @@ p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
       *pattern_it = 1;
       cdata->n_new++;
     }
+    cdata->counter += vi->p3->num_children;
   }
   return NULL;
 }
@@ -198,14 +199,14 @@ p4est3_pattern_populate_tree_coarse (p4est3_t * p3, p4est3_tree_t * tree,
                                      sc3_array_t * pattern, int *lt_offset,
                                      int32_t * c)
 {
-  int                 i = 0, nch, n_new_quads = 0;
+  int                 i = 0, n_new_quads = 0;
   char               *n_insert;
   void               *quad_old, *quad_new;
   p4est3_tree_t      *oldtree;
 
   SC3E (p4est3_tree_index (p3->old, tree->treeid, &oldtree));
   while (i < oldtree->num_quads) {
-    SC3E (sc3_array_index (pattern, oldtree->quad_offset + i, &n_insert));
+    SC3E (sc3_array_index (pattern, *lt_offset + n_new_quads, &n_insert));
     SC3A_CHECK ((int) *n_insert == 1
                 || (int) *n_insert == p3->old->num_children);
     quad_old = (void *) (oldtree->tquads + i * p3->old->qsize);
@@ -281,15 +282,13 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
   sc3_MPI_Comm_t      nodecomm;
   sc3_MPI_Aint_t      tempbytes, goffsetbytes;
   p4est3_tree_t      *tree;
+  sc3_array_t        *pattern;
 
   coarse_callback_data_t scdata, *cdata = &scdata;
   refine_callback_data_t srdata, *rdata = &srdata;
-#ifdef P4EST_ENABLE_DEBUG
-  int                 new_nlocal_quads;
-#endif
 
   /* We suppose to call this function after setting up routine */
-  SC3A_CHECK (p3->crefine != NULL);
+  SC3A_CHECK (p3->crefine != NULL || p3->ccoarse != NULL);
   SC3A_CHECK (p3->old != NULL);
   SC3A_IS (p4est3_is_setup, p3->old);
 
@@ -305,7 +304,7 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
 
   SC3E (p4est3_refine_array_new
         (p3->alloc, sizeof (char), 0, p3->old->local_num_quads,
-         &rdata->pattern));
+         &pattern));
 
   SC3E (p4est3_refine_array_new (p3->alloc, sizeof (p4est3_tree_t),
                                  p3->nltrees, p3->nltrees, &p3->trees));
@@ -317,19 +316,23 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
   case P4EST3_SRC_REFINE:
     rdata->counter = 0;
     rdata->n_new = 0;
+    rdata->pattern = pattern;
     SC3E (p4est3_iterate_volume
           (p3->old, p4est3_refine_volume_callback, rdata));
+    p3->local_num_quads = rdata->counter;
     break;
 
   case P4EST3_SRC_COARSE:
-    rdata->counter = 0;
-    rdata->n_new = 0;
+    cdata->counter = 0;
+    cdata->n_new = 0;
+    cdata->pattern = pattern;
     SC3E (p4est3_refine_array_new
-    (p3->alloc, p3->qsize, p3->qvt->max_children,
+    (p3->alloc, sizeof (void *), p3->qvt->max_children,
     p3->qvt->max_children, &cdata->family));
     cdata->nsiblings = 0;
     SC3E (p4est3_iterate_volume
     (p3->old, p4est3_coarse_volume_callback, cdata));
+    p3->local_num_quads = cdata->counter;
     break;
 
   /*case P4EST3_SRC_COPY:
@@ -340,11 +343,6 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
   default:
     SC3E_UNREACH ("wrong setup from source mode");
   }
-  p3->local_num_quads = rdata->counter;
-#ifdef P4EST_ENABLE_DEBUG
-  SC3E (sc3_array_get_elem_count (rdata->pattern, &new_nlocal_quads));
-  SC3A_CHECK (p3->old->local_num_quads == new_nlocal_quads);
-#endif
 
   /* Here we allocate shared p4est3_t::quadwin and p4est3_t::nodequads.
      We will fill in the latter later. */
@@ -395,7 +393,7 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
 
     case P4EST3_SRC_COARSE:
       SC3E (p4est3_pattern_populate_tree_coarse
-            (p3, tree, rdata->pattern, &lt_offset, coords));
+            (p3, tree, cdata->pattern, &lt_offset, coords));
     break;
 
   /*case P4EST3_SRC_COPY:
@@ -440,7 +438,7 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
       (tree->end_tquad = tree->first_tquad + tree->num_quads) - 1;
   }
 
-  SC3E (sc3_array_destroy (&rdata->pattern));
+  SC3E (sc3_array_destroy (&pattern));
   SC3E (sc3_allocator_free (p3->alloc, local_num_quads));
   SC3E (sc3_allocator_free (p3->alloc, first_tree_quads));
   SC3E (sc3_allocator_free (p3->alloc, coords));
