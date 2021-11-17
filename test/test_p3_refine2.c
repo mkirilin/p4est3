@@ -82,6 +82,17 @@ refine_normal_fn (p4est_t * p4est, p4est_topidx_t which_tree,
   return 1;
 }
 
+static int
+coarse_normal_fn (p4est_t * p4est, p4est_topidx_t which_tree,
+                  p4est_quadrant_t * quadrants[])
+{
+  const int condition = refine_level - 2 < 1 ? 1 : refine_level - 2;
+  if ((int) quadrants[0]->level > condition) {
+    return 1;
+  }
+  return 0;
+}
+
 static sc3_error_t *
 refine_p3_normal_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
 {
@@ -110,6 +121,22 @@ refine_p3_normal_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
   if (coords[0] >= TEST_QUADRANT_LEN (2)) {
     *is_refine = 0;
     return NULL;
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+coarse_p3_normal_fn (p4est3_coarse_callback_info_t * ci, int *is_coarse)
+{
+  const int condition = refine_level - 2 < 1 ? 1 : refine_level - 2;
+  int level;
+  void **q;
+
+  SC3E_RETVAL (is_coarse, 0);
+  SC3E (sc3_array_index (ci->family, 0, &q));
+  SC3E (p4est3_quadrant_level (ci->qvt, *(void**) q, &level));
+  if (level > condition) {
+    *is_coarse = 1;
   }
   return NULL;
 }
@@ -310,6 +337,23 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
     p3ptr = p3refined;
   }
   SC3E (compare_results (t, p3ptr, p, qvt));
+
+  p4est_coarsen (p, 1, coarse_normal_fn, NULL);
+  for (i = 0; i < refine_level; ++i) {
+    SC3E (p4est3_new (t->alloc, &p3refined));
+    SC3E (set_qvt (qvt, i % 3));
+    SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
+    SC3E (p4est3_set_source (p3refined, p3ptr));
+    SC3E (p4est3_set_setup_source_mode (p3refined, P4EST3_SRC_COARSE));
+    SC3E (p4est3_set_coarse (p3refined, coarse_p3_normal_fn));
+    SC3E (p4est3_setup (p3refined));
+
+    SC3E (p4est3_unset_source (p3refined));
+    SC3E (p4est3_destroy (&p3ptr));
+    p3ptr = p3refined;
+  }
+  SC3E (compare_results (t, p3ptr, p, qvt));
+
   SC3E (p4est3_destroy (&p3ptr));
   return NULL;
 }
