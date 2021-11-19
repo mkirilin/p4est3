@@ -86,7 +86,7 @@ static int
 coarse_normal_fn (p4est_t * p4est, p4est_topidx_t which_tree,
                   p4est_quadrant_t * quadrants[])
 {
-  const int condition = refine_level - 2 < 1 ? 1 : refine_level - 2;
+  const int           condition = refine_level - 2 < 1 ? 1 : refine_level - 2;
   if ((int) quadrants[0]->level > condition) {
     return 1;
   }
@@ -128,13 +128,13 @@ refine_p3_normal_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
 static sc3_error_t *
 coarse_p3_normal_fn (p4est3_coarse_callback_info_t * ci, int *is_coarse)
 {
-  const int condition = refine_level - 2 < 1 ? 1 : refine_level - 2;
-  int level;
-  void **q;
+  const int           condition = refine_level - 2 < 1 ? 1 : refine_level - 2;
+  int                 level;
+  void              **q;
 
   SC3E_RETVAL (is_coarse, 0);
   SC3E (sc3_array_index (ci->family, 0, &q));
-  SC3E (p4est3_quadrant_level (ci->qvt, *(void**) q, &level));
+  SC3E (p4est3_quadrant_level (ci->qvt, *(void **) q, &level));
   if (level > condition) {
     *is_coarse = 1;
   }
@@ -156,9 +156,9 @@ make_connectivity (setup_t * t, int dim)
 {
   t->conn2 =
 #ifdef P4_TO_P8
-  p8est_connectivity_new_brick (t->num_trees, 1, 1, 0, 0, 0);
+    p8est_connectivity_new_brick (t->num_trees, 1, 1, 0, 0, 0);
 #else
-  p4est_connectivity_new_brick (t->num_trees, 1, 0, 0);
+    p4est_connectivity_new_brick (t->num_trees, 1, 0, 0);
 #endif
   SC3E (p4est3_connectivity_new_p4est (t->alloc, &t->conn3, t->conn2, 1));
   return NULL;
@@ -294,8 +294,7 @@ static sc3_error_t *
 set_qvt (p4est3_quadrant_vtable_t * qvt, int i)
 {
   SC3A_CHECK (0 <= i && i <= 2);
-  switch (i)
-  {
+  switch (i) {
   case 0:
     SC3E (p4est3_quadrant_vtable_p4est (qvt, 0));
     break;
