@@ -106,27 +106,45 @@ p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
   int                 is_coarse, i, child_id;
   char               *pattern_it;
   void              **quad;
+  p4est3_tree_t      *tree;
   coarse_callback_data_t *cdata = (coarse_callback_data_t *) vi->user_data;
   p4est3_coarse_callback_info_t ci;     /* = { vi->p3, vi->ntree, vi->quadrant }; */
 
   /* Decide if we call coarse callback.
      We do this only if we find a whole family. */
   SC3E (p4est3_quadrant_child_id (vi->p3->qvt, vi->quadrant, &child_id));
-  if (cdata->nsiblings != child_id) {
-    /* possibly the benning of a new family */
-    if (child_id == 0) {
-      /* the beginning indeed, start the family */
-      SC3E (sc3_array_index (cdata->family, 0, &quad));
-      quad = vi->quadrant;
-      cdata->nsiblings = 1;
-    }
-    else {
-      /* cannot be a part of a complete family */
+  if (child_id == 0) {
+  /* the beginning of a new family,
+    process previous (part of the) family*/
+    for (i = 0; i < cdata->nsiblings; ++i) {
       SC3E (sc3_array_index (cdata->pattern, cdata->n_new, &pattern_it));
       *pattern_it = 1;
-      cdata->counter++;
       cdata->n_new++;
     }
+    cdata->counter += cdata->nsiblings;
+    SC3E (sc3_array_index (cdata->family, 0, &quad));
+    *quad = vi->quadrant;
+    cdata->nsiblings = 1;
+    /* Check if it is the last quadrant in a forest.
+      If so, process quadrants in current family. */
+    SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
+    if (vi->nquad + 1 == vi->p3->local_num_quads) {
+      for (i = 0; i < cdata->nsiblings; ++i) {
+        SC3E (sc3_array_index (cdata->pattern, cdata->n_new, &pattern_it));
+        *pattern_it = 1;
+        cdata->n_new++;
+      }
+      cdata->counter += cdata->nsiblings;
+    }
+    return NULL;
+  }
+  if (cdata->nsiblings != child_id) {
+    /* cannot be a part of a complete family */
+    SC3E (sc3_array_index (cdata->pattern, cdata->n_new, &pattern_it));
+    *pattern_it = 1;
+    cdata->counter++;
+    cdata->n_new++;
+
     return NULL;
   }
 
@@ -145,6 +163,17 @@ p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
     cdata->nsiblings = 0;
   }
   else {
+    /* Check if it is the last quadrant in a forest.
+     If so, process quadrants in current family. */
+    SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
+    if (vi->nquad + 1 == vi->p3->local_num_quads) {
+      for (i = 0; i < cdata->nsiblings; ++i) {
+        SC3E (sc3_array_index (cdata->pattern, cdata->n_new, &pattern_it));
+        *pattern_it = 1;
+        cdata->n_new++;
+      }
+    cdata->counter += cdata->nsiblings;
+    }
     /* nothing left to do here, go to the next volume */
     return NULL;
   }
@@ -332,7 +361,7 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
     cdata->nsiblings = 0;
     SC3E (p4est3_iterate_volume
     (p3->old, p4est3_coarse_volume_callback, cdata));
-    p3->local_num_quads = cdata->counter;
+    p3->local_num_quads = cdata->n_new;
     break;
 
   /*case P4EST3_SRC_COPY:
