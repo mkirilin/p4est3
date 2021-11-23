@@ -281,6 +281,7 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
     p3->fltree = -1;
     p3->lltree = -2;
     p3->nltrees = 0;
+    num_uniform = 0;
   }
   else {
     p3->fltree = (p4est3_topidx) (first_quad / num_uniform);
@@ -537,7 +538,7 @@ p4est3_region_end (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
   SC3E (sc3_array_set_elem_count (buff, 2));
   SC3E (sc3_array_setup (buff));
 
-  SC3E (sc3_array_push(testq, &c));
+  SC3E (sc3_array_push (testq, &c));
   SC3E (p4est3_nearest_common_ancestor (p3->qvt, a, b, c));
 
   SC3E (sc3_array_get_elem_count (testq, &ecount));
@@ -618,6 +619,7 @@ p4est3_recursive_partition_region (p4est3_t * p3, int is_region_end,
   return NULL;
 }
 
+#if 0
 /** Binary search a local quad number in the local trees */
 static sc3_error_t *
 p4est3_local_quad_tree (p4est3_t * p3,
@@ -655,6 +657,7 @@ p4est3_local_quad_tree (p4est3_t * p3,
     }
   }
 }
+#endif
 
 /* TODO: char * is a good convention for type? */
 static sc3_error_t *
@@ -778,10 +781,11 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
     const int           tnum = sc3_omp_num_threads ();
     const int           tid = sc3_omp_thread_num ();
     char               *charq;
-    sc3_error_t        *e;
+    sc3_error_t        *e = NULL;
     p4est3_locidx       first_quad_num, end_quad_num, tmine, tq;
-    p4est3_gloidx       gq;
+    p4est3_gloidx       gq, num_uniform;
     p4est3_tree_t      *tree;
+    p4est3_topidx       treeid;
     sc3_allocator_t    *alloc;
 
     /* TODO: if recursive mode is selected, create one allocator per thread
@@ -794,8 +798,10 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
     /* find tree sub-range for each thread separately */
     first_quad_num = p4est3_loccut (p3->local_num_quads, tnum, tid);
     end_quad_num = p4est3_loccut (p3->local_num_quads, tnum, tid + 1);
-    SC3E_SET (e, p4est3_local_quad_tree (p3, first_quad_num, &tree));
-
+    num_uniform = p4est3_quadrant_num_uniform (p3->qvt, p3->level);
+    treeid =
+      ((p4est3_gloidx) first_quad_num +
+       p3->goffset[p3->mpirank]) / num_uniform;
     if (p3->setup_mode == P4EST3_NEW_RECURSIVE
         || p3->setup_mode == P4EST3_NEW_RECURSIVE_CHILD
         || p3->setup_mode == P4EST3_NEW_RECURSIVE_REGION) {
@@ -820,29 +826,34 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
       }
     }
     if (e == NULL) {
-      tq = first_quad_num;
-      gq = tree->first_tquad + (first_quad_num - tree->quad_offset);
-      charq = p3->quads + (p4est3_gloidx) first_quad_num * p3->qsize;
+      if (p3->fltree <= treeid && treeid <= p3->lltree) {
+        tq = first_quad_num;
+        SC3E_NULL_SET (e, p4est3_tree_index (p3, treeid, &tree));
+        gq = tree->first_tquad + (first_quad_num - tree->quad_offset);
+        charq = p3->quads + (p4est3_gloidx) first_quad_num *p3->qsize;
+        /* loop over subset of local trees */
+        for (;;) {
+          SC3E_NULL_REQ (e, tree->quad_offset <= tq);
+          SC3E_NULL_REQ (e, tq < tree->quad_offset + tree->num_quads);
+          tmine =
+            SC3_MIN (end_quad_num,
+                     (p4est3_gloidx) tree->quad_offset + tree->num_quads);
 
-      /* loop over subset of local trees */
-      for (;;) {
-        SC3E_NULL_REQ (e, tree->quad_offset <= tq);
-        SC3E_NULL_REQ (e, tq < tree->quad_offset + tree->num_quads);
-        tmine = SC3_MIN (end_quad_num, (p4est3_gloidx) tree->quad_offset + tree->num_quads);
+          /* loop over quadrants in local tree with creating of quadrants
+             by selected method */
+          SC3E_SET (e,
+                    p4est3_internal_populate (tmine, p3, &tq, &gq, &charq));
 
-        /* loop over quadrants in local tree with creating of quadrants
-           by selected method */
-        SC3E_SET (e, p4est3_internal_populate (tmine, p3, &tq, &gq, &charq));
+          SC3E_NULL_REQ (e, tq <= end_quad_num);
+          if (tq == end_quad_num) {
+            break;
+          }
 
-        SC3E_NULL_REQ (e, tq <= end_quad_num);
-        if (tq == end_quad_num) {
-          break;
+          /* move forward to next tree */
+          SC3E_NULL_SET (e, p4est3_tree_index (p3, tree->treeid + 1, &tree));
+          SC3E_NULL_BREAK (e);
+          gq = 0;
         }
-
-        /* move forward to next tree */
-        SC3E_NULL_SET (e, p4est3_tree_index (p3, tree->treeid + 1, &tree));
-        SC3E_NULL_BREAK (e);
-        gq = 0;
       }
     }
     sc3_omp_esync (s, &e);
