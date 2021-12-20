@@ -183,7 +183,7 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
   SC3E (p4est3_set_face_dual (p3, sa));
 
   /*set volume section of sa */
-  SC3E (p4est3_tree_index (p3, 0, &sa->tree));
+  SC3E (p4est3_tree_index (p3, p3->fltree, &sa->tree));
   sa->begin = NULL;
   sa->end = NULL;
   sa->Level = 0;
@@ -394,7 +394,7 @@ p4est3_iterate_volume (p4est3_t * p3,
     SC3E (p4est3_tree_index (p3, ntree, &tree));
     for (si = 0; si < tree->num_quads; ++si) {
       info.quadrant = tree->tquads + si * p3->qvt->quadrant_size;
-      info.nquad = si + tree->quad_offset;
+      info.nquad = si + tree->first_tquad;
       SC3E (cvolume (&info));
     }
   }
@@ -424,6 +424,10 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
   fside[0].nface = face;
   SC3E (p4est3_connectivity_get_face
         (p3->conn, &tree_neighbor, &face, &orient));
+  if (tree_neighbor > p3->lltree || tree_neighbor < p3->fltree) {
+    *is_lower = 1;
+    return NULL;
+  }
   if (tree_neighbor < tree) {
     *is_lower = 1;
     return NULL;
@@ -481,6 +485,13 @@ p4est3_internal_iterate_face (p4est3_t * p3,
   int                 ori = search_area->finfo->orientation;
   void               *first_quad;
 
+  /* Check if both sides belong to the same process (at least, partly).
+     If not, we ignore this face. */
+  for (side = 0; side < search_area->nsides; ++side) {
+    if (*b_f[side] == *e_f[side]) {
+      return NULL;
+    }
+  }
   /* first check if the whole quadrant passes */
   SC3E (sc3_array_index (search_area->finfo->sides, 0, &fside));
   for (side = 0; side < search_area->nsides; ++side) {
@@ -493,7 +504,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
     if (level == Level[side]) {
       is_refine[side] = 0;
-      fside[side].nquad = *(b_f[side]);
+      fside[side].nquad = *(b_f[side]) + trees[side]->first_tquad;
       fside[side].quadrant = first_quad;
     }
   }
@@ -542,10 +553,6 @@ p4est3_internal_iterate_face (p4est3_t * p3,
             (p3->conn, fside[side].nface, idx, &child_id));
       b_f[side] = arr_it + child_id;
       e_f[side] = arr_it + child_id + 1;
-      SC3A_CHECK (*(b_f[side]) < *(e_f[side]));
-      /*if (*(b_f[side]) == *(e_f[side]) - 1) {
-         continue;
-         } */
     }
     Level[0]++;
     Level[1]++;
@@ -693,13 +700,19 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
   sc3_array_t        *idx_vol_stack = search_area->idx_vol_stack;
   p4est3_iterate_volume_info_t *vinfo = search_area->vinfo;
 
+  /* Check if the considered search area intersect
+     the area of the local process. If not, then skip it. */
+  if (begin == end) {
+    l2nch[*Level]++;
+    return NULL;
+  }
 /*Are trees with no quads possible?*/
   first_quad = (void *) (tree->tquads + p3->qvt->quadrant_size * begin);
   SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
   if (level == *Level) {
     if (cvolume != NULL) {
       vinfo->quadrant = first_quad;
-      vinfo->nquad = begin;
+      vinfo->nquad = begin + tree->first_tquad;
       SC3E (cvolume (vinfo));
     }
     l2nch[*Level]++;
