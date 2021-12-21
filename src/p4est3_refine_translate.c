@@ -134,7 +134,8 @@ p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
     /* Check if it is the last quadrant in a forest.
        If so, process quadrants in current family. */
     SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
-    if (vi->nquad + 1 == vi->p3->local_num_quads) {
+    if (vi->nquad - tree->first_tquad + tree->quad_offset + 1 ==
+        vi->p3->local_num_quads) {
       for (i = 0; i < cdata->nsiblings; ++i) {
         SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
         *pattern_it = 1;
@@ -170,7 +171,8 @@ p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
     /* Check if it is the last quadrant in a forest.
        If so, process quadrants in current family. */
     SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
-    if (vi->nquad + 1 == vi->p3->local_num_quads) {
+    if (vi->nquad - tree->first_tquad + tree->quad_offset + 1 ==
+        vi->p3->local_num_quads) {
       for (i = 0; i < cdata->nsiblings; ++i) {
         SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
         *pattern_it = 1;
