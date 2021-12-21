@@ -56,7 +56,7 @@ typedef struct p4est3_iterate_volume_info
   p4est3_t           *p3;               /**< Pointer to the forest */
   void               *user_data;        /**< Passed into \a p4est_iterate_* */
   p4est3_topidx       ntree;            /**< Number of tree of quadrant */
-  p4est3_locidx       nquad;            /**< Local index of quadrant */
+  p4est3_locidx       nquad;            /**< Index of quadrant within a tree*/
   void               *quadrant;         /**< Pointer to iterated quadrant */
 }
 p4est3_iterate_volume_info_t;
@@ -70,7 +70,7 @@ typedef sc3_error_t *(*p4est3_iterate_volume_t) (p4est3_iterate_volume_info_t
 typedef struct p4est3_iterate_face_side
 {
   p4est3_topidx       ntree;            /**< Number of tree of quadrant */
-  p4est3_locidx       nquad;            /**< Local index of quadrant */
+  p4est3_locidx       nquad;            /**< Index of quadrant within a tree*/
   void               *quadrant;         /**< Pointer to quadrant itself */
   int                 nface;            /**< Number of face at connection */
   int                 is_ghost;         /**< Is this side a ghost quadrant */
@@ -106,7 +106,7 @@ typedef sc3_error_t *(*p4est3_iterate_face_t) (p4est3_iterate_face_info_t *
 typedef struct p4est3_iterate_codim_side
 {
   p4est3_topidx       ntree;            /**< Number of tree of quadrant */
-  p4est3_locidx       nquad;            /**< Local index of quadrant */
+  p4est3_locidx       nquad;            /**< Index of quadrant within a tree*/
   void               *quadrant;         /**< Pointer to quadrant itself */
   int                 nbound;           /**< Number of quadrant's connecting
                                              boundary entity */
