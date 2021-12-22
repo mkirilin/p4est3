@@ -263,8 +263,10 @@ compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
   }
 
   SC3E (p4est3_get_quadrants (p3, &q3));
-  SC3E (sc3_array_push (p3levels, &level));
-  SC3E (p4est3_quadrant_level (qvt, q3, level));
+  if (num_loc_quads > 0) {
+    SC3E (sc3_array_push (p3levels, &level));
+    SC3E (p4est3_quadrant_level (qvt, q3, level));
+  }
   for (i = 1; i < num_loc_quads; ++i) {
     q3 += qvt->quadrant_size;
     SC3E (sc3_array_push (p3levels, &level));

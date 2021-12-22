@@ -290,7 +290,7 @@ p4est3_fill_from_source (p4est3_t * p3)
   int                 dispunit;
   int                 noderank;
   char               *quadmem, *nqmem;
-  p4est3_locidx       lt_offset;
+  p4est3_locidx       lt_offset, num_quads = 0;
   p4est3_locidx      *local_num_quads;  /**< Array of the numbers of quadrants at every rank */
   p4est3_locidx      *first_tree_quads; /**< Array of the numbers of quadrants at the first local tree */
   sc3_MPI_Info_t      info_noncontig;
@@ -415,12 +415,15 @@ p4est3_fill_from_source (p4est3_t * p3)
 
   /* This check here is only to avoid creating a new mpi datatype. */
   SC3A_CHECK (sizeof (p4est3_locidx) == sizeof (int));
-  SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
+  if (p3->fltree != -1) {
+    SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
+    num_quads = tree->num_quads;
+  }
   SC3E (sc3_MPI_Allgather
         (&p3->local_num_quads, 1, SC3_MPI_INT,
          local_num_quads, 1, SC3_MPI_INT, p3->mpicomm));
   SC3E (sc3_MPI_Allgather
-        (&tree->num_quads, 1, SC3_MPI_INT,
+        (&num_quads, 1, SC3_MPI_INT,
          first_tree_quads, 1, SC3_MPI_INT, p3->mpicomm));
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsetwin));
@@ -434,8 +437,10 @@ p4est3_fill_from_source (p4est3_t * p3)
   SC3E (sc3_MPI_Win_unlock (0, p3->goffsetwin));
 
   if (p3->mpirank != 0) {
-    for (i = p3->gftree[p3->mpirank - 1]; i == p3->fltree; --i) {
-      tree->first_tquad += first_tree_quads[i];
+    if (p3->fltree != -1) {
+      for (i = p3->gftree[p3->mpirank - 1]; i == p3->fltree; --i) {
+        tree->first_tquad += first_tree_quads[i];
+      }
     }
   }
   for (i = p3->fltree; i <= p3->lltree; ++i) {
