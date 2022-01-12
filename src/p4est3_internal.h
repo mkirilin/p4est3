@@ -37,6 +37,7 @@
 
 #include <sc3_array.h>
 #include <sc3_refcount.h>
+#include <sc3_mpienv.h>
 #include <p4est3.h>
 
 /** Internal data for a process-local tree and the quadrants it contains. */
@@ -91,36 +92,18 @@ struct p4est3
                                      Depending on the available memory and
                                      index space, may be reduced during
                                      \ref p4est3_setup. */
+  p4est3_setup_mode_t setup_mode;       /**< Choose the method of quadrant creation*/
+  p4est3_source_setup_t source_setup_mode; /** Choose the method of setting up from source */
+  p4est3_t           *old;      /**< Pointer to the setup forest */
 
   /* variables populated during p4est3_setup: communicator related */
-  sc3_MPI_Comm_t      nodecomm;         /**< All ranks of shared memory node. */
-  sc3_MPI_Comm_t      headcomm;         /**< Contains first rank of each node. */
-  sc3_MPI_Info_t      info_noncontig;   /**< Key "alloc_shared_noncontig" set. */
-  sc3_MPI_Win_t       nodesizewin;      /**< Shared memory segment allocated
-                                             on first rank of a node, available
-                                             to all ranks on that node.  Its
-                                             element count is (2 + 2 * \ref
-                                             num_nodes + 1) integers.
-                                             Its contents hold
- *                                  * number of nodes for this run
- *                                  * zero-based number of this node
- *                                  * for each node number of ranks on it
- *                                  * for each node and one beyond the
- *                                    number of ranks before it
- */
   int                 mpisize;          /**< Size of forest communicator. */
   int                 mpirank;          /**< Rank in forest communicator. */
-  int                 nodesize;         /**< Size of node communicator. */
-  int                 noderank;         /**< Rank in node communicator. */
-  int                 num_nodes;        /**< Number of shared memory nodes. */
-  int                 node_num;         /**< Zero-based node number. */
-  int                 node_frank;       /**< Rank within forest communicator
-                                             of first rank on this node. */
-  int                *node_sizes;       /**< For each node, number of its ranks. */
-  int                *node_offsets;     /**< For each node and one beyond, the
-                                             number of ranks before it. */
-  int                 is_split_comm;    /**< MPI sharined memory enable/disable
+  int                 shared;           /**< MPI sharined memory enable/disable
                                              indicator. */
+  sc3_mpienv_t       *split_info;       /**<  Pointer to a relevant MPI
+                                              processes split related
+                                              information. */
 
   /* variables populated during p4est3_setup: partition related */
   sc3_MPI_Win_t       gftreewin;        /**< Array of (\ref mpisize + 1) \ref
@@ -140,7 +123,6 @@ struct p4est3
   p4est3_gloidx      *goffset;          /**< Pointer to \ref goffsetwin's memory. */
   p4est3_topidx      *gftree;           /**< Pointer to \ref gftreewin's memory. */
   char               *gfpos;            /**< Pointer to \ref gfposwin's memory. */
-  p4est3_setup_mode_t setup_mode;       /**< Choose the method of quadrant creation*/
 
   /* variables populated during p4est3_setup: tree and quadrant storage */
   sc3_MPI_Win_t       quadwin;          /**< Shared memory stores the quadrants
@@ -161,6 +143,9 @@ struct p4est3
                                      or -2 if process holds no quadrants. */
   p4est3_topidx       nltrees;  /**< Number of trees with local quadrants. */
 
+  /* functions set before p4est3_setup */
+  p4est3_refine_callback_t crefine; /**< Refinemet callback function */
+  p4est3_coarse_callback_t ccoarse; /**< Coarsening  callback function */
 };
 
 #ifdef __cplusplus
@@ -192,6 +177,7 @@ sc3_error_t        *p4est3_internal_setup_cut (p4est3_t * p3,
 sc3_error_t        *p4est3_internal_setup_tree (p4est3_t * p3,
                                                 p4est3_gloidx num_uniform);
 sc3_error_t        *p4est3_internal_setup_quadrants (p4est3_t * p3);
+sc3_error_t        *p4est3_internal_setup_from_source (p4est3_t * p3);
 /** \endcond */
 
 #ifdef __cplusplus

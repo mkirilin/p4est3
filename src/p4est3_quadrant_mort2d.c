@@ -116,6 +116,42 @@ p4est3_quadrant_mort_coords (const p4est3_quadrant_mort_t * q,
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_quadrant_mort_quadrant (const p4est_qcoord_t * c, int l,
+                               p4est3_quadrant_mort_t * q)
+{
+  int                 i;
+  p4est_qcoord_t      x, y;
+#ifdef P4_TO_P8
+  p4est_qcoord_t      z;
+#endif
+  const int           d = P4EST3_REF_MAXLEVEL - P4EST3_MORT_MAXLEVEL;
+  SC3A_CHECK (c != NULL);
+  SC3A_CHECK (q != NULL);
+  SC3A_CHECK (0 <= l && l <= P4EST3_MORT_MAXLEVEL);
+  /* Since the coordinates are normalized by the P4EST3_REF_MAXLEVEL,
+     we shift them according to qvt maxlevel */
+  x = (c[0] >> d) >> (P4EST3_MORT_MAXLEVEL - l);
+  y = (c[1] >> d) >> (P4EST3_MORT_MAXLEVEL - l);
+#ifdef P4_TO_P8
+  z = (c[2] >> d) >> (P4EST3_MORT_MAXLEVEL - l);
+#endif
+  q->coords = 0;
+  for (i = 0; i < l + 2; ++i) {
+    q->coords |= ((x & ((p4est_qcoord_t) 1 << i)) << ((P4EST_DIM - 1) * i));
+    q->coords |=
+      ((y & ((p4est_qcoord_t) 1 << i)) << ((P4EST_DIM - 1) * i + 1));
+#ifdef P4_TO_P8
+    q->coords |=
+      ((z & ((p4est_qcoord_t) 1 << i)) << ((P4EST_DIM - 1) * i + 2));
+#endif
+  }
+  q->level = l;
+  q->coords = P4EST3_QUADRANT_MORT_LEN (q->coords, l);
+  SC3A_IS (p4est3_quadrant_mort_is_valid, q);
+  return NULL;
+}
+
 #if 0
 
 static              p4est_qcoord_t
@@ -495,7 +531,7 @@ static sc3_error_t *
 p4est3_quadrant_mort_last_descendant (const p4est3_quadrant_mort_t * q,
                                       int level, p4est3_quadrant_mort_t * ld)
 {
-  p4est_qcoord_t      shift;
+  uint64_t            shift;
 
   SC3A_IS (p4est3_quadrant_mort_is_valid, q);
   SC3A_CHECK ((int) q->level <= level && level <= P4EST3_MORT_QMAXLEVEL);
@@ -633,6 +669,9 @@ p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_coordinates =
     (p4est3_quadrant_in_i_out_t) p4est3_quadrant_mort_coords;
+
+  qvt->quadrant_quadrant =
+    (p4est3_quadrant_quadrant_t) p4est3_quadrant_mort_quadrant;
 
   qvt->quadrant_compare =
     (p4est3_quadrant_compare_t) p4est3_quadrant_mort_compare;

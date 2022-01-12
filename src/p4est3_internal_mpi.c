@@ -22,6 +22,8 @@
 */
 
 #include <p4est3_internal.h>
+//#include <p4est3_refine.h>
+#include <p4est3_refine_translate.h>
 #include <sc3_omp.h>
 
 #ifndef P4EST_ENABLE_OPENMP
@@ -31,100 +33,22 @@
 sc3_error_t        *
 p4est3_internal_setup_comm (p4est3_t * p3)
 {
-  int                 headsize, headrank;
-  int                 p, next, *ofs;
-  int                 dispunit;
-  int                *nodesizemem;
-  sc3_MPI_Aint_t      nodeabytes;
-
   /* this is a special-purpose function to simplify p4est3_setup */
   SC3A_CHECK (p3 != NULL);
+
+  /* make a new default mpi environment object */
+  SC3E (sc3_mpienv_new (p3->alloc, &p3->split_info));
+
+  /* set the same mpi environment's members as the current p4est has */
+  SC3E (sc3_mpienv_set_comm (p3->split_info, p3->mpicomm, 0));
+  SC3E (sc3_mpienv_set_shared (p3->split_info, p3->shared));
 
   /* query input communicator */
   SC3E (sc3_MPI_Comm_size (p3->mpicomm, &p3->mpisize));
   SC3E (sc3_MPI_Comm_rank (p3->mpicomm, &p3->mpirank));
 
-  /* create one communicator on each shared-memory node */
-  if (p3->is_split_comm == 1) {
-    SC3E (sc3_MPI_Comm_split_type (p3->mpicomm, SC3_MPI_COMM_TYPE_SHARED,
-                                   0, SC3_MPI_INFO_NULL, &p3->nodecomm));
-  }
-  else {
-    p3->nodecomm = SC3_MPI_COMM_SELF;
-  }
-  SC3E (sc3_MPI_Comm_size (p3->nodecomm, &p3->nodesize));
-  SC3E (sc3_MPI_Comm_rank (p3->nodecomm, &p3->noderank));
-
-  if (p3->is_split_comm == 1) {
-    /* create communicator that contains the first rank on each node */
-    SC3E (sc3_MPI_Comm_split (p3->mpicomm, p3->noderank == 0 ? 0 :
-                              SC3_MPI_UNDEFINED, 0, &p3->headcomm));
-  }
-  else {
-    p3->headcomm = p3->mpicomm;
-  }
-  SC3A_CHECK ((p3->noderank != 0) == (p3->headcomm == SC3_MPI_COMM_NULL));
-  if (p3->noderank == 0) {
-    SC3E (sc3_MPI_Comm_size (p3->headcomm, &headsize));
-    SC3E (sc3_MPI_Comm_rank (p3->headcomm, &headrank));
-    nodeabytes = (2 + 2 * headsize + 1) * sizeof (int);
-  }
-  else {
-    headsize = headrank = 0;
-    nodeabytes = 0;
-  }
-
-  /* create info structure to allow for per-rank allocation */
-  SC3E (sc3_MPI_Info_create (&p3->info_noncontig));
-  SC3E (sc3_MPI_Info_set
-        (p3->info_noncontig, "alloc_shared_noncontig", "true"));
-
-  /* allocate shared memory for information on node and head communicators */
-  SC3E (sc3_MPI_Win_allocate_shared
-        (nodeabytes, sizeof (int),
-         p3->info_noncontig, p3->nodecomm, &nodesizemem, &p3->nodesizewin));
-  if (p3->noderank == 0) {
-    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, 0, SC3_MPI_MODE_NOCHECK,
-                            p3->nodesizewin));
-    nodesizemem[0] = p3->num_nodes = headsize;
-    nodesizemem[1] = p3->node_num = headrank;
-    p3->node_sizes = &nodesizemem[2];
-    p3->node_frank = p3->mpirank;
-
-    /* allgather information about all nodes and compute offsets */
-    SC3E (sc3_MPI_Allgather (&p3->nodesize, 1, SC3_MPI_INT,
-                             p3->node_sizes, 1, SC3_MPI_INT, p3->headcomm));
-    *(ofs = p3->node_offsets = &nodesizemem[2 + headsize]) = 0;
-    for (p = 0; p < headsize; ++p) {
-      next = *ofs + p3->node_sizes[p];
-      *++ofs = next;
-    }
-    SC3A_CHECK (p3->node_offsets[headrank] == p3->mpirank);
-    SC3A_CHECK (p3->node_offsets[headsize] == p3->mpisize);
-
-    /* make sure shared memory contents are consistent */
-    SC3E (sc3_MPI_Win_unlock (0, p3->nodesizewin));
-    SC3E (sc3_MPI_Barrier (p3->nodecomm));
-  }
-  else {
-    SC3E (sc3_MPI_Win_shared_query (p3->nodesizewin, 0,
-                                    &nodeabytes, &dispunit, &nodesizemem));
-    SC3A_CHECK (nodeabytes >= (sc3_MPI_Aint_t) sizeof (int));
-    SC3A_CHECK (dispunit == (int) sizeof (int));
-    SC3A_CHECK (nodesizemem != NULL);
-
-    /* access shared memory written by other process */
-    SC3E (sc3_MPI_Barrier (p3->nodecomm));
-    p3->num_nodes = nodesizemem[0];
-    SC3A_CHECK (nodeabytes >=
-                (sc3_MPI_Aint_t) ((2 + 2 * p3->num_nodes + 1) *
-                                  sizeof (int)));
-    p3->node_num = nodesizemem[1];
-    p3->node_sizes = &nodesizemem[2];
-    p3->node_offsets = &nodesizemem[2 + p3->num_nodes];
-  }
-  SC3A_CHECK (p3->node_frank == p3->node_offsets[p3->node_num]);
-
+  /* make calculations and setup mpi environment */
+  SC3E (sc3_mpienv_setup (p3->split_info));
   return NULL;
 }
 
@@ -135,35 +59,44 @@ p4est3_internal_setup_cut (p4est3_t * p3,
 #ifdef P4EST_ENABLE_DEBUG
   int                 dp;
 #endif
+  int                 noderank, nodesize;
   int                 beginr, endr;
   int                 dispunit;
   char               *gfposmem;
   p4est3_topidx      *gftreemem;
   p4est3_gloidx      *goffsetmem, num_global;
   sc3_MPI_Aint_t      gftreebytes, gfposbytes, goffsetbytes, tempbytes;
+  sc3_MPI_Comm_t      nodecomm;
+  sc3_MPI_Info_t      info_noncontig;
   sc3_omp_esync_t     esync, *s = &esync;
+
+  SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
+  SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
 
   /* this is a special-purpose function to simplify p4est3_setup */
   SC3A_CHECK (p3 != NULL);
   SC3A_CHECK (0 <= p3->mpirank && p3->mpirank < p3->mpisize);
-  SC3A_CHECK (0 <= p3->noderank && p3->noderank < p3->nodesize);
+  SC3A_CHECK (0 <= noderank && noderank < nodesize);
   SC3A_CHECK (num_uniform > 0);
   SC3A_CHECK (qsize > 0);
+
+  SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
+  SC3E (sc3_mpienv_get_info_noncont (p3->split_info, &info_noncontig));
 
   /* create shared partition arrays */
   gftreebytes = (p3->mpisize + 1) * sizeof (p4est3_topidx);
   SC3E (sc3_MPI_Win_allocate_shared
-        (p3->noderank == 0 ? gftreebytes : 0, sizeof (p4est3_topidx),
-         p3->info_noncontig, p3->nodecomm, &gftreemem, &p3->gftreewin));
+        (noderank == 0 ? gftreebytes : 0, sizeof (p4est3_topidx),
+         info_noncontig, nodecomm, &gftreemem, &p3->gftreewin));
   gfposbytes = (p3->mpisize + 1) * qsize;
   SC3E (sc3_MPI_Win_allocate_shared
-        (p3->noderank == 0 ? gfposbytes : 0, qsize,
-         p3->info_noncontig, p3->nodecomm, &gfposmem, &p3->gfposwin));
+        (noderank == 0 ? gfposbytes : 0, qsize,
+         info_noncontig, nodecomm, &gfposmem, &p3->gfposwin));
   goffsetbytes = (p3->mpisize + 1) * sizeof (p4est3_gloidx);
   SC3E (sc3_MPI_Win_allocate_shared
-        (p3->noderank == 0 ? goffsetbytes : 0, sizeof (p4est3_gloidx),
-         p3->info_noncontig, p3->nodecomm, &goffsetmem, &p3->goffsetwin));
-  if (p3->noderank > 0) {
+        (noderank == 0 ? goffsetbytes : 0, sizeof (p4est3_gloidx),
+         info_noncontig, nodecomm, &goffsetmem, &p3->goffsetwin));
+  if (noderank > 0) {
     SC3E (sc3_MPI_Win_shared_query (p3->gftreewin, 0,
                                     &tempbytes, &dispunit, &gftreemem));
     SC3A_CHECK (tempbytes >= gftreebytes);
@@ -189,8 +122,8 @@ p4est3_internal_setup_cut (p4est3_t * p3,
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsetwin));
   num_global = p3->num_trees * num_uniform;
-  beginr = sc3_intcut (p3->mpisize + 1, p3->nodesize, p3->noderank);
-  endr = sc3_intcut (p3->mpisize + 1, p3->nodesize, p3->noderank + 1);
+  beginr = sc3_intcut (p3->mpisize + 1, nodesize, noderank);
+  endr = sc3_intcut (p3->mpisize + 1, nodesize, noderank + 1);
   SC3E (sc3_omp_esync_init (s));
 #pragma omp parallel
   {
@@ -222,7 +155,7 @@ p4est3_internal_setup_cut (p4est3_t * p3,
   SC3E (sc3_MPI_Win_unlock (0, p3->gftreewin));
   SC3E (sc3_MPI_Win_unlock (0, p3->gfposwin));
   SC3E (sc3_MPI_Win_unlock (0, p3->goffsetwin));
-  SC3E (sc3_MPI_Barrier (p3->nodecomm));
+  SC3E (sc3_MPI_Barrier (nodecomm));
 #ifdef P4EST_ENABLE_DEBUG
   for (dp = 0; dp <= p3->mpisize; ++dp) {
     SC3A_CHECK (gftreemem[dp] == goffsetmem[dp] / num_uniform);
@@ -262,16 +195,30 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
 {
   int                 n;
   int                 dispunit;
+  int                 nodesize;
+#ifdef P4EST_ENABLE_DEBUG
+  int                 noderank, node_frank;
+#endif
   char               *quadmem, *nqmem;
   p4est3_topidx       tt;
   p4est3_gloidx       first_quad, end_quad, tt_offset, next_offset;
   p4est3_tree_t      *tree;
   sc3_MPI_Aint_t      quadbytes, tempbytes;
+  sc3_MPI_Comm_t      nodecomm;
+  sc3_MPI_Info_t      info_noncontig;
 
+#ifdef P4EST_ENABLE_DEBUG
+  SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
+  SC3E (sc3_mpienv_get_node_frank (p3->split_info, &node_frank));
+#endif
+  SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
   /* this is a special-purpose function to simplify p4est3_setup */
   SC3A_CHECK (p3 != NULL);
   SC3A_CHECK (0 <= p3->mpirank && p3->mpirank < p3->mpisize);
-  SC3A_CHECK (0 <= p3->noderank && p3->noderank < p3->nodesize);
+  SC3A_CHECK (0 <= noderank && noderank < nodesize);
+
+  SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
+  SC3E (sc3_mpienv_get_info_noncont (p3->split_info, &info_noncontig));
 
   /* determine local trees */
   first_quad = p3->goffset[p3->mpirank];
@@ -291,24 +238,24 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   }
 
   /* create shared quadrant storage */
-  SC3E (sc3_allocator_malloc (p3->alloc, p3->nodesize * sizeof (char *),
+  SC3E (sc3_allocator_malloc (p3->alloc, nodesize * sizeof (char *),
                               &p3->nodequads));
   quadbytes = (sc3_MPI_Aint_t) p3->local_num_quads * p3->qsize;
   SC3E (sc3_MPI_Win_allocate_shared
         (quadbytes, p3->qsize,
-         p3->info_noncontig, p3->nodecomm, &quadmem, &p3->quadwin));
-  for (n = 0; n < p3->nodesize; ++n) {
+         info_noncontig, nodecomm, &quadmem, &p3->quadwin));
+  for (n = 0; n < nodesize; ++n) {
     SC3E (sc3_MPI_Win_shared_query (p3->quadwin, n,
                                     &tempbytes, &dispunit, &nqmem));
     SC3A_CHECK (tempbytes >= (sc3_MPI_Aint_t)
-                ((p3->goffset[p3->node_frank + n + 1] -
-                  p3->goffset[p3->node_frank + n]) * p3->qsize));
+                ((p3->goffset[node_frank + n + 1] -
+                  p3->goffset[node_frank + n]) * p3->qsize));
     SC3A_CHECK (dispunit == p3->qsize);
     SC3A_CHECK (nqmem != NULL || tempbytes == 0);
     p3->nodequads[n] = nqmem;
   }
   p3->quads = quadmem;
-  SC3A_CHECK (p3->nodequads[p3->noderank] == p3->quads);
+  SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
 
   /* populate tree metadata */
   SC3E (sc3_array_new (p3->alloc, &p3->trees));
@@ -765,15 +712,20 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
 {
   sc3_omp_esync_t     esync, *s = &esync;
   int                 tcount;
+  int                 noderank, nodesize;
   sc3_allocator_t    *malloc;
+  sc3_MPI_Comm_t      nodecomm;
+
+  SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
+  SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
 
   /* this is a special-purpose function to simplify p4est3_setup */
   SC3A_CHECK (p3 != NULL && p3->quads != NULL);
   SC3A_CHECK (0 <= p3->mpirank && p3->mpirank < p3->mpisize);
-  SC3A_CHECK (0 <= p3->noderank && p3->noderank < p3->nodesize);
+  SC3A_CHECK (0 <= noderank && noderank < nodesize);
 
   /* we work on the process-local window onte the quadrants */
-  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, p3->noderank,
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, noderank,
                           SC3_MPI_MODE_NOCHECK, p3->quadwin));
   SC3E (sc3_omp_esync_init (s));
 #pragma omp parallel
@@ -869,7 +821,206 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
     }
     SC3E (sc3_array_destroy (&p3->talloc));
   }
-  SC3E (sc3_MPI_Win_unlock (p3->noderank, p3->quadwin));
-  SC3E (sc3_MPI_Barrier (p3->nodecomm));
+  SC3E (sc3_MPI_Win_unlock (noderank, p3->quadwin));
+  SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
+  SC3E (sc3_MPI_Barrier (nodecomm));
+  return NULL;
+}
+
+/* Where to put this function for the best? */
+static sc3_error_t *
+p4est3_internal_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
+                                    p4est3_quadrant_vtable_t * qvt_new,
+                                    const void *qin, void *qout,
+                                    int32_t * c, int level)
+{
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_old);
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_new);
+  SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_old, qin);
+  SC3A_CHECK (qvt_old->dim == qvt_new->dim);
+
+  if (qvt_old == qvt_new) {
+    /* just hardcopy the quadrant */
+    SC3E (p4est3_quadrant_copy (qvt_old, qin, qout));
+  }
+  else {
+    SC3A_CHECK (level <= qvt_new->max_level);
+    SC3E (p4est3_quadrant_coordinates (qvt_old, qin, qvt_old->dim, c));
+    SC3E (p4est3_quadrant_quadrant (qvt_new, c, level, qout));
+  }
+
+  SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_new, qout);
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_internal_setup_from_source (p4est3_t * p3)
+{
+  int                 i, nodesize, noderank;
+  int                 dispunit, beginr, endr;
+  int32_t            *coords;
+  p4est3_t           *old = p3->old;
+  sc3_MPI_Aint_t      gftreebytes, tempbytes, gfposbytes;
+  sc3_MPI_Info_t      info_noncontig;
+  sc3_MPI_Comm_t      nodecomm;
+  p4est3_refine_callback_t crefine;
+  p4est3_coarse_callback_t ccoarse;
+
+  SC3A_IS (p4est3_is_new, p3);
+  SC3A_CHECK (p3->old != NULL);
+  SC3A_IS (p4est3_is_setup, p3->old);
+
+  /* variables of internal state used during the whole lifetime */
+  /* or is it == 0? */
+  p3->accessed_conn = old->accessed_conn;
+
+  /* virtual implementation variables */
+  if (old->slf != NULL) {
+    /** TODO: decide what to do if a virtual implementation exists */
+  }
+  /* variables set before p4est3_setup */
+  /* this call also sets p4est3_t::commdup */
+  SC3E (p4est3_set_comm (p3, old->mpicomm, 1));
+
+  /* this call also sets p4est3_t::num_trees */
+  SC3E (p4est3_set_connectivity (p3, old->conn));
+
+  /* inherit qvt only if we didn't set it up visibly */
+  if (p3->qvt == NULL) {
+    /* this call also sets p4est3_t::sqvt */
+    SC3E (p4est3_set_quadrant_vtable (p3, old->qvt));
+  }
+  /* the next two calls are not necessary,
+     but leave them here for completeness */
+  SC3E (p4est3_set_level (p3, old->level));
+  SC3E (p4est3_set_setup_mode (p3, old->setup_mode));
+
+  /* variables populated during p4est3_setup: communicator related */
+  SC3E (p4est3_set_shared (p3, old->shared));
+
+  /* variables populated during p4est3_setup: partition related */
+ /** TODO: why is it int type while p4est3_quadrant_size returs size_t? */
+  p3->qsize = (int) p4est3_quadrant_size (p3->qvt);
+  p3->qmaxlevel = p3->qvt->max_level;
+  p3->num_children = old->num_children;
+  p3->max_threads = old->max_threads;
+
+  SC3E (sc3_mpienv_get_noderank (old->split_info, &noderank));
+  SC3E (sc3_mpienv_get_info_noncont (old->split_info, &info_noncontig));
+  SC3E (sc3_mpienv_get_nodecomm (old->split_info, &nodecomm));
+
+  gftreebytes = (old->mpisize + 1) * sizeof (p4est3_topidx);
+  SC3E (sc3_MPI_Win_allocate_shared
+        (noderank == 0 ? gftreebytes : 0, sizeof (p4est3_topidx),
+         info_noncontig, nodecomm, &p3->gftree, &p3->gftreewin));
+  gfposbytes = (old->mpisize + 1) * p3->qsize;
+  SC3E (sc3_MPI_Win_allocate_shared
+        (noderank == 0 ? gfposbytes : 0, p3->qsize,
+         info_noncontig, nodecomm, &p3->gfpos, &p3->gfposwin));
+
+  if (noderank > 0) {
+    SC3E (sc3_MPI_Win_shared_query (p3->gftreewin, 0,
+                                    &tempbytes, &dispunit, &p3->gftree));
+    SC3A_CHECK (tempbytes >= gftreebytes);
+    SC3A_CHECK (dispunit == sizeof (p4est3_topidx));
+    SC3A_CHECK (p3->gftree != NULL);
+    SC3E (sc3_MPI_Win_shared_query (p3->gfposwin, 0,
+                                    &tempbytes, &dispunit, &p3->gfpos));
+    SC3A_CHECK (tempbytes >= gfposbytes);
+    SC3A_CHECK (dispunit == p3->qsize);
+    SC3A_CHECK (p3->gfpos != NULL);
+  }
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gftreewin));
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gfposwin));
+
+  /* We make a hardcopy (with allocating new shared memory)
+     of p4est3_t::gftreewin and p4est3_t::gfposwin so far.
+     In the future we will introduce reference interface for them since they
+     stay the same in a new tree. */
+  SC3E (sc3_mpienv_get_nodesize (old->split_info, &nodesize));
+  beginr = sc3_intcut (old->mpisize + 1, nodesize, noderank);
+  endr = sc3_intcut (old->mpisize + 1, nodesize, noderank + 1);
+  SC3E (sc3_allocator_calloc
+        (p3->alloc, p3->qvt->dim, sizeof (int32_t), &coords));
+  for (i = 0; i < endr - beginr; ++i) {
+    p3->gftree[i] = old->gftree[i];
+    SC3E (p4est3_internal_translate_quadrant
+          (old->qvt, p3->qvt, (void *) (old->gfpos + i * old->qsize),
+           (void *) (p3->gfpos + i * p3->qsize), coords, p3->qvt->max_level));
+  }
+  SC3E (sc3_allocator_free (p3->alloc, coords));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gftreewin));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gfposwin));
+
+  SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),
+                              &p3->temp_quad));
+  for (i = 0; i < p3->max_threads; ++i) {
+    SC3E (sc3_allocator_malloc (p3->alloc, p3->qsize, &p3->temp_quad[i]));
+  }
+  /* variables populated during p4est3_setup: tree and quadrant storage */
+  p3->fltree = old->fltree;
+  p3->lltree = old->lltree;
+  p3->nltrees = old->nltrees;
+
+  /* functions set before p4est3_setup */
+  crefine = old->crefine;
+  ccoarse = old->ccoarse;
+  switch (p3->source_setup_mode) {
+  case P4EST3_SRC_REFINE:
+    if (p3->crefine == NULL) {
+      SC3A_CHECK (crefine != NULL);
+      SC3E (p4est3_set_refine (p3, crefine));
+    }
+    else {
+      /* adjust new forest's callback to the old one
+         to iterate over the old forest */
+      old->crefine = p3->crefine;
+    }
+    break;
+
+  case P4EST3_SRC_COARSE:
+    if (p3->ccoarse == NULL) {
+      SC3A_CHECK (ccoarse != NULL);
+      SC3E (p4est3_set_coarse (p3, ccoarse));
+    }
+    else {
+      /* adjust new forest's callback to the old one
+         to iterate over the old forest */
+      old->ccoarse = p3->ccoarse;
+    }
+    break;
+
+  case P4EST3_SRC_COPY:
+    break;
+
+  default:
+    SC3E_UNREACH ("Wrong setup from sourse mode");
+  }
+
+  p3->mpisize = old->mpisize;
+  p3->mpirank = old->mpirank;
+  /* p3->split_info == NULL at the current code state,
+     but we check it just in case of future development */
+  if (p3->split_info != NULL) {
+    SC3E (sc3_mpienv_unref (&p3->split_info));
+  }
+  SC3A_CHECK (p3->split_info == NULL);
+  p3->split_info = old->split_info;
+  SC3E (sc3_mpienv_ref (p3->split_info));
+
+  /** We set inside all the values left, namely:
+   * p4est3_t::nodequads, local_num_quads, quadwin,
+   * quads, trees, goffsetwin, goffset and global_num_quads.
+  */
+  p3->setup = 1;
+  //SC3E (p4est3_fill_from_source (p3));
+  SC3E (p4est3_fill_from_source_translate (p3));
+
+  /* restore refinement and coarsening callback of the old forest */
+  old->crefine = crefine;
+  old->ccoarse = ccoarse;
+  SC3A_IS (p4est3_is_setup, p3);
   return NULL;
 }
