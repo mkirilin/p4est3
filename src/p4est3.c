@@ -300,6 +300,13 @@ p4est3_set_shared (p4est3_t * p3, int shared)
 }
 
 sc3_error_t        *
+p4est3_set_user_data (p4est3_t * p3, void *user_data)
+{
+  p3->user_data = user_data;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_setup (p4est3_t * p3)
 {
   int                 cdim;
@@ -515,6 +522,18 @@ p4est3_get_local_num_trees (const p4est3_t * p3,
     *last_local_tree = p3->lltree;
     return NULL;
   }
+}
+
+sc3_error_t        *
+p4est3_get_user_data (const p4est3_t * p3, void ** user_data)
+{
+  SC3E_RETVAL (user_data, NULL);
+
+  if (p3->user_data != NULL) {
+    *user_data = p3->user_data;
+  }
+
+  return NULL;
 }
 
 sc3_error_t        *

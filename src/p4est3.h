@@ -298,8 +298,18 @@ sc3_error_t        *p4est3_set_coarse (p4est3_t * p3,
  * \param [in] shared       The value 1 indicating enabling,
  *                          while 1 is for disabling of MPI shared memory.
  *                          Defauld value is 1.
+ * \return                  NULL on success, error object otherwise.
 */
 sc3_error_t        *p4est3_set_shared (p4est3_t * p3, int shared);
+
+/** Enable/disable use of MPI shared memory
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] user_data    Assign user_data for the forest.
+ *                          The data might be assigned at any forest's stage.
+ *                          The pointer might be NULL.
+ * \return                  NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_set_user_data (p4est3_t * p3, void *user_data);
 
 /** Finalize construction of a forest.
  * Afterwards, no more \c p4est3_set_* functions may be called.
@@ -369,6 +379,16 @@ sc3_error_t        *p4est3_get_local_num_trees (const p4est3_t * p3,
                                                 first_local_tree,
                                                 p4est3_topidx *
                                                 last_local_tree);
+
+/** Query the pointer to the user_data of this forest.
+ * \param [in] p3                   Initialized, valid forest.
+ * \param [out] user_data   Pointer to the user_data. Might returns NULL.
+ *                          The data might be accessed at any forest's stage.
+ *                          Pointer to this output variable must not be NULL.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_user_data (const p4est3_t * p3,
+                                          void ** user_data);
 
 /*----------------------- accessing quadrants ------------------------*/
 
