@@ -147,8 +147,11 @@ struct p4est3
   p4est3_refine_callback_t crefine; /**< Refinemet callback function */
   p4est3_coarse_callback_t ccoarse; /**< Coarsening  callback function */
 
-  void *user_data;                  /**< Pointer to user data.
-                                         This pointer might be NULL*/
+  /* pointers to user data, p4est does not touch them */
+  void               *refine_user_data;
+                                 /**< Pointer to refinement user data. */
+  void               *coarse_user_data;
+                                 /**< Pointer to coarsening user data. */
 };
 
 #ifdef __cplusplus

@@ -278,20 +278,24 @@ sc3_error_t        *p4est3_set_setup_source_mode (p4est3_t * p3,
  * \param [in] crefine      Callback function prototype to decide
  *                          for refinement. NULL value is possible,
  *                          in this case refinement decision is always false.
+ * \param [in] user_data    Pointer to refenement user data. Might be NULL.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_set_refine (p4est3_t * p3,
-                                       p4est3_refine_callback_t crefine);
+                                       p4est3_refine_callback_t crefine,
+                                       void *user_data);
 
 /** Provide a function to be used as coarsening contition.
  * \param [in,out] p3       Forest object under construction.
  * \param [in] ccoarse      Callback function prototype to decide
  *                          for coarsening. NULL value is possible,
  *                          in this case coarsening decision is always false.
+ * \param [in] user_data    Pointer to coarsening user data. Might be NULL.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_set_coarse (p4est3_t * p3,
-                                       p4est3_coarse_callback_t ccoarse);
+                                       p4est3_coarse_callback_t ccoarse,
+                                       void *user_data);
 
 /** Enable/disable use of MPI shared memory
  * \param [in,out] p3       The forest must not have been setup.
@@ -380,15 +384,25 @@ sc3_error_t        *p4est3_get_local_num_trees (const p4est3_t * p3,
                                                 p4est3_topidx *
                                                 last_local_tree);
 
-/** Query the pointer to the user_data of this forest.
- * \param [in] p3                   Initialized, valid forest.
- * \param [out] user_data   Pointer to the user_data. Might returns NULL.
- *                          The data might be accessed at any forest's stage.
+/** Query the pointer to the refinement user data of this forest.
+ * \param [in] p3           Initialized, valid forest.
+ * \param [out] user_data   Pointer to the refinement user_data.
  *                          Pointer to this output variable must not be NULL.
+ *                          Output might returns NULL.
  * \return                  NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_get_user_data (const p4est3_t * p3,
-                                          void ** user_data);
+sc3_error_t        *p4est3_get_refine_data (const p4est3_t * p3,
+                                            void **user_data);
+
+/** Query the pointer to the coarsening user data of this forest.
+ * \param [in] p3           Initialized, valid forest.
+ * \param [out] user_data   Pointer to the user_data. Might returns NULL.
+ *                          Pointer to this output variable must not be NULL.
+ *                          Output might be NULL.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_coarse_data (const p4est3_t * p3,
+                                            void **user_data);
 
 /*----------------------- accessing quadrants ------------------------*/
 

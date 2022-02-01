@@ -272,19 +272,23 @@ p4est3_set_setup_source_mode (p4est3_t * p3, p4est3_source_setup_t mode)
 }
 
 sc3_error_t        *
-p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine)
+p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine,
+                   void *user_data)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->crefine = crefine;
+  p3->refine_user_data = user_data;
 
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_set_coarse (p4est3_t * p3, p4est3_coarse_callback_t ccoarse)
+p4est3_set_coarse (p4est3_t * p3, p4est3_coarse_callback_t ccoarse,
+                   void *user_data)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->ccoarse = ccoarse;
+  p3->coarse_user_data = user_data;
 
   return NULL;
 }
@@ -296,13 +300,6 @@ p4est3_set_shared (p4est3_t * p3, int shared)
   SC3A_CHECK (shared == 0 || shared == 1);
 
   p3->shared = shared;
-  return NULL;
-}
-
-sc3_error_t        *
-p4est3_set_user_data (p4est3_t * p3, void *user_data)
-{
-  p3->user_data = user_data;
   return NULL;
 }
 
@@ -525,14 +522,24 @@ p4est3_get_local_num_trees (const p4est3_t * p3,
 }
 
 sc3_error_t        *
-p4est3_get_user_data (const p4est3_t * p3, void ** user_data)
+p4est3_get_refine_data (const p4est3_t * p3, void **user_data)
 {
   SC3E_RETVAL (user_data, NULL);
 
-  if (p3->user_data != NULL) {
-    *user_data = p3->user_data;
+  if (p3->refine_user_data != NULL) {
+    *user_data = p3->refine_user_data;
   }
+  return NULL;
+}
 
+sc3_error_t        *
+p4est3_get_coarse_data (const p4est3_t * p3, void **user_data)
+{
+  SC3E_RETVAL (user_data, NULL);
+
+  if (p3->coarse_user_data != NULL) {
+    *user_data = p3->coarse_user_data;
+  }
   return NULL;
 }
 

@@ -971,7 +971,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   case P4EST3_SRC_REFINE:
     if (p3->crefine == NULL) {
       SC3A_CHECK (crefine != NULL);
-      SC3E (p4est3_set_refine (p3, crefine));
+      SC3E (p4est3_set_refine (p3, crefine, old->refine_user_data));
     }
     else {
       /* adjust new forest's callback to the old one
@@ -983,7 +983,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   case P4EST3_SRC_COARSE:
     if (p3->ccoarse == NULL) {
       SC3A_CHECK (ccoarse != NULL);
-      SC3E (p4est3_set_coarse (p3, ccoarse));
+      SC3E (p4est3_set_coarse (p3, ccoarse, old->coarse_user_data));
     }
     else {
       /* adjust new forest's callback to the old one
