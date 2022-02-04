@@ -386,23 +386,21 @@ sc3_error_t        *p4est3_get_local_num_trees (const p4est3_t * p3,
 
 /** Query the pointer to the refinement user data of this forest.
  * \param [in] p3           Initialized, valid forest.
- * \param [out] user_data   Pointer to the refinement user_data.
+ * \param [out] ptr         Address of a pointer to the refinement user_data.
  *                          Pointer to this output variable must not be NULL.
  *                          Output might returns NULL.
  * \return                  NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_get_refine_data (const p4est3_t * p3,
-                                            void **user_data);
+sc3_error_t        *p4est3_get_refine_data (const p4est3_t * p3, void *ptr);
 
 /** Query the pointer to the coarsening user data of this forest.
  * \param [in] p3           Initialized, valid forest.
- * \param [out] user_data   Pointer to the user_data. Might returns NULL.
+ * \param [out] ptr         Address of a pointer to the coarsening user_data.
  *                          Pointer to this output variable must not be NULL.
  *                          Output might be NULL.
  * \return                  NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_get_coarse_data (const p4est3_t * p3,
-                                            void **user_data);
+sc3_error_t        *p4est3_get_coarse_data (const p4est3_t * p3, void *ptr);
 
 /*----------------------- accessing quadrants ------------------------*/
 

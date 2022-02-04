@@ -522,23 +522,25 @@ p4est3_get_local_num_trees (const p4est3_t * p3,
 }
 
 sc3_error_t        *
-p4est3_get_refine_data (const p4est3_t * p3, void **user_data)
+p4est3_get_refine_data (const p4est3_t * p3, void *ptr)
 {
-  SC3E_RETVAL (user_data, NULL);
-
+  if (ptr != NULL) {
+    *(void **) ptr = NULL;
+  }
   if (p3->refine_user_data != NULL) {
-    *user_data = p3->refine_user_data;
+    *(void **)ptr = p3->refine_user_data;
   }
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_get_coarse_data (const p4est3_t * p3, void **user_data)
+p4est3_get_coarse_data (const p4est3_t * p3, void *ptr)
 {
-  SC3E_RETVAL (user_data, NULL);
-
+  if (ptr != NULL) {
+    *(void **) ptr = NULL;
+  }
   if (p3->coarse_user_data != NULL) {
-    *user_data = p3->coarse_user_data;
+    *(void **)ptr = p3->coarse_user_data;
   }
   return NULL;
 }
