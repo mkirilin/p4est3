@@ -44,7 +44,7 @@ refine_callback_data_t;
 typedef struct coarse_callback_data
 {
   int                 counter;
-  sc3_array_t        *family;
+  sc3_array_t        *family; /**< Array of pointers to quadrants*/
   sc3_array_t        *pattern;
   int                 nsiblings;
 }
