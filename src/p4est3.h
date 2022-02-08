@@ -248,13 +248,18 @@ sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
 sc3_error_t        *p4est3_set_setup_mode (p4est3_t * p3,
                                            p4est3_setup_mode_t mode);
 
-/** Provide a forest to be used in setting up a new one.
+/** Provide a forest to be used in setting up a new one
+ * and a mode to get this forest.
  * \param [in,out] p3       Forest object under construction.
  * \param [in] old          Source forest object that data will be used on
  *                          the setting up stage.
+ * \param [in] mode         See \ref p4est3_source_setup_t type for
+ *                          available options. Default value is
+ *                          P4EST3_COPY_MODE.
  * \return                  NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old);
+sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old,
+                                       p4est3_source_setup_t mode);
 
 /** Unref and unset a source forest that must not be NULL.
  * \param [in,out] p3       Forest object under construction.
@@ -262,18 +267,8 @@ sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old);
  */
 sc3_error_t        *p4est3_unset_source (p4est3_t * p3);
 
-/**
- * Set a way that populates a new forest according to a source
- * in a setup p4est3 phase.
- * \param [in,out] p3       The forest must not have been setup.
- * \param [in] mode         See \ref p4est3_source_setup_t type for
- *                          available options. Default value is
- *                          P4EST3_COPY_MODE.
-*/
-sc3_error_t        *p4est3_set_setup_source_mode (p4est3_t * p3,
-                                                  p4est3_source_setup_t mode);
-
-/** Provide a function to be used as refinement contition.
+/** Provide a function and data to be used as refinement contition.
+ * Must be assign to the source forest.
  * \param [in,out] p3       Forest object under construction.
  * \param [in] crefine      Callback function prototype to decide
  *                          for refinement. NULL value is possible,
@@ -285,7 +280,8 @@ sc3_error_t        *p4est3_set_refine (p4est3_t * p3,
                                        p4est3_refine_callback_t crefine,
                                        void *user_data);
 
-/** Provide a function to be used as coarsening contition.
+/** Provide a function and data to be used as coarsening contition.
+ * Must be assign to the source forest.
  * \param [in,out] p3       Forest object under construction.
  * \param [in] ccoarse      Callback function prototype to decide
  *                          for coarsening. NULL value is possible,

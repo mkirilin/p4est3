@@ -235,17 +235,19 @@ p4est3_set_setup_mode (p4est3_t * p3, p4est3_setup_mode_t mode)
 }
 
 sc3_error_t        *
-p4est3_set_source (p4est3_t * p3, p4est3_t * old)
+p4est3_set_source (p4est3_t * p3, p4est3_t * old, p4est3_source_setup_t mode)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_IS (p4est3_is_setup, old);
   SC3A_CHECK (p3 != old);
+  SC3A_CHECK (0 <= mode && mode < P4EST3_SRC_MODE_LAST);
 
   if (p3->old != NULL) {
     SC3E (p4est3_unref (p3->old));
   }
   p3->old = old;
   SC3E (p4est3_ref (p3->old));
+  p3->source_setup_mode = mode;
 
   return NULL;
 }
@@ -258,16 +260,6 @@ p4est3_unset_source (p4est3_t * p3)
 
   SC3E (p4est3_unref (p3->old));
   p3->old = NULL;
-  return NULL;
-}
-
-sc3_error_t        *
-p4est3_set_setup_source_mode (p4est3_t * p3, p4est3_source_setup_t mode)
-{
-  SC3A_IS (p4est3_is_new, p3);
-  SC3A_CHECK (0 <= mode && mode < P4EST3_SRC_MODE_LAST);
-
-  p3->source_setup_mode = mode;
   return NULL;
 }
 
