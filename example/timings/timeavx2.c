@@ -224,21 +224,25 @@ report_errors (sc3_error_t ** pe)
 
 #endif
 
-typedef struct timeavx2
+typedef struct time
 {
   int                 mpirank;
-  p4est3_locidx       n_quads;
+  int max_level;
+  int mpisize;
+  int nquads_init;
+  int max_cpu_ref;
 
   sc3_allocator_t    *alloc;
   sc3_array_t        *qarr;
   sc3_array_t        *qarr_avx;
-  const p4est3_quadrant_vtable_t *qvt;
-  const p4est3_quadrant_vtable_t *qvt_avx;
+  p4est3_quadrant_vtable_t sqvt, *qvt;
+  p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx;
+  p4est3_quadrant_vtable_t sqvt_mort, *qvt_mort;
 }
-timeavx2_t;
+time_t;
 
 static sc3_error_t *
-timeavx2_prepare (timeavx2_t * t, int *retval)
+time_prepare (time_t * t, int *retval)
 {
   void               *p;
 
@@ -277,7 +281,7 @@ timeavx2_prepare (timeavx2_t * t, int *retval)
 }
 
 static sc3_error_t *
-timeavx2_measure (timeavx2_t * t)
+timeavx2_measure (time_t * t)
 {
   SC3A_CHECK (t != NULL);
   SC3A_CHECK (t->n_quads > 0);
@@ -293,7 +297,7 @@ timeavx2_measure (timeavx2_t * t)
 }
 
 static sc3_error_t *
-timeavx2_cleanup (timeavx2_t * t)
+timeavx2_cleanup (time_t * t)
 {
   SC3A_CHECK (t != NULL);
   SC3A_CHECK (t->n_quads > 0);
@@ -304,86 +308,58 @@ timeavx2_cleanup (timeavx2_t * t)
   return NULL;
 }
 
+static sc3_error_t *
+interpret_command_line (const int argc, const char **argv, time_t *t)
+{
+  int scale;
+  SC3E (sc3_MPI_Comm_size (SC3_MPI_COMM_WORLD, &t->mpisize));
+  if (argc == 1) {
+    printf ("Execution without parameters. "
+            "Default parameters are applied.\n"
+            "Parameter's format: "
+            "<MAX CPU REF> <SCALE> <MAX LEVEL>\n");
+    t->max_cpu_ref = t->mpisize;
+    t->max_level = 1;
+    t->nquads_init = t->max_cpu_ref / t->mpisize;
+  }
+  if (argc >= 2){
+    t->max_cpu_ref = atoi (argv[2]);
+    SC3E_DEMAND (t->max_cpu_ref != 0, "MAX CPU REF is interpreted wrong");
+  }
+  if (argc >= 3){
+    scale = atoi(argv[3]);
+    SC3E_DEMAND (scale != 0, "SCALE is interpreted wrong");
+    t->max_cpu_ref *= scale;
+  }
+  if (argc >= 4){
+    t->max_level = atoi(argv[4]);
+    SC3E_DEMAND (t->max_level != 0, "MAX LEVEL is interpreted wrong");
+  }
+  return NULL;
+}
+
 int
 main (int argc, char **argv)
 {
   int                 retval;
   p4est3_locidx       n_quads;
-#if 0
-  p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx = &sqvt_avx;
-  p4est3_quadrant_vtable_t sqvt, *qvt = &sqvt;
-  sc3_error_t        *e;
-  sc3_array_t        *qarr_avx, *qarr;
-  void               *p;
-#endif
-  timeavx2_t          st, *t = &st;
+  time_t          st, *t = &st;
 
   /* MPI_Init comes first in a program.  We abort should this go wrong. */
   SC3X (sc3_MPI_Init (&argc, &argv));
   SC3X (sc3_MPI_Comm_rank (SC3_MPI_COMM_WORLD, &t->mpirank));
 
-  /* interpret command line arguments */
-  if (argc == 1) {
-    n_quads = 0;
-    for (int i = 0; i < 10; ++i) {
-      n_quads += (1 << (i * P4EST_DIM));
-    }
-  }
-  else {
-    n_quads = atoll (argv[1]);
-  }
-  t->n_quads = n_quads = SC3_MAX (n_quads, 1);
+  SC3X (interpret_command_line (argc, argv, t));
 
   /* choose virtual tables and initialize resources */
-  SC3X (timeavx2_prepare (t, &retval));
-
-#if 0
-  /* TODO create a dedicated allocator for this program */
-  SC3E_NULL_SET (e, p4est3_quadrant_array_new (sc3_allocator_nocount (),
-                                               qvt_avx, n_quads, &qarr_avx));
-  SC3E_NULL_SET (e, p4est3_quadrant_array_new (sc3_allocator_nocount (),
-                                               qvt, n_quads, &qarr));
-
-  SC3E_NULL_SET (e, sc3_array_index (qarr_avx, 0, &p));
-  SC3E_NULL_SET (e, p4est3_quadrant_root (qvt_avx, p));
-
-  SC3E_NULL_SET (e, sc3_array_index (qarr, 0, &p));
-  SC3E_NULL_SET (e, p4est3_quadrant_root (qvt, p));
-#endif
+  SC3X (time_prepare (t, &retval));
 
   if (!retval) {
     if (t->mpirank == 0) {
       SC3X (timeavx2_measure (t));
     }
-
-#if 0
-    if (e == NULL) {
-      printf ("Executing time: \n");
-      SC3E_SET (e, measure_child (qarr_avx, qarr, qvt_avx, qvt, n_quads));
-      report_errors (&e);
-
-      SC3E_SET (e, measure_parent (qarr_avx, qarr, qvt_avx, qvt, n_quads));
-      report_errors (&e);
-
-      SC3E_SET (e, measure_compare (qarr_avx, qarr, qvt_avx, qvt, n_quads));
-      report_errors (&e);
-
-      SC3E_SET (e, measure_successor (qarr_avx, qarr, qvt_avx, qvt, n_quads));
-      report_errors (&e);
-    }
-#endif
-
     SC3X (timeavx2_cleanup (t));
   }
-
-#if 0
-  SC3E_NULL_SET (e, sc3_array_destroy (&qarr_avx));
-  SC3E_NULL_SET (e, sc3_array_destroy (&qarr));
-
-  /* A program is not guaranteed to exist beyond MPI_Finalize. */
-  report_errors (&e);
-#endif
-
   /* MPI_Finalize comes last in a program.  We abort should this go wrong. */
   SC3X (sc3_MPI_Finalize ());
   return 0;
