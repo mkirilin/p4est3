@@ -229,12 +229,13 @@ typedef struct time
   int                 mpirank;
   int max_level;
   int mpisize;
-  int nquads_init;
+  int ninit_quads;
   int max_cpu_ref;
 
   sc3_allocator_t    *alloc;
   sc3_array_t        *qarr;
   sc3_array_t        *qarr_avx;
+  sc3_array_t        *qarr_mort;
   p4est3_quadrant_vtable_t sqvt, *qvt;
   p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx;
   p4est3_quadrant_vtable_t sqvt_mort, *qvt_mort;
@@ -242,18 +243,43 @@ typedef struct time
 time_t;
 
 static sc3_error_t *
+time_fill_test_array (const p4est3_locidx n_quads,
+                      sc3_array_t *a, p4est3_quadrant_vtable_t *qvt)
+{
+  int i;
+  p4est3_locidx quad, child_place;
+  void *cp, *q;
+
+  for (quad = 0, child_place = 1; child_place < n_quads;
+       ++quad, child_place += P4EST_CHILDREN) {
+    for (i = 0; i < P4EST_CHILDREN; ++i) {
+      SC3E (sc3_array_index (a, quad, &q));
+      SC3E (sc3_array_index (a, child_place + i, &cp));
+      SC3E (p4est3_quadrant_child (qvt, q, i, cp));
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
 time_prepare (time_t * t, int *retval)
 {
   void               *p;
+  sc3_error_t        *e;
+  p4est3_locidx n_quads = 0;
 
   SC3E_RETVAL (retval, -1);
   SC3A_CHECK (t != NULL);
-  SC3A_CHECK (t->n_quads > 0);
+
+  /* static initializers */
+  t->qvt = &t->sqvt;
+  t->qvt_avx = &t->sqvt_avx;
+  t->qvt_mort = &t->sqvt_mort;
 
   /* the standard p4est2 virtual table always exists */
-  SC3E (p4est3_quadrant_vtable_p4est (&t->qvt));
-  SC3E_DEMAND (t->qvt != NULL, "standard qvt: "
-               "p4est is not build neither in 2D nor 3D");
+  SC3E (p4est3_quadrant_vtable_p4est (t->qvt, 0));
+  /* as well as Morton vtable */
+  SC3E (p4est3_quadrant_mort2d_vtable (t->qvt_mort));
 
   /* the AVX virtual table can only be set with hardware support */
   SC3E (p4est3_quadrant_yx_vtable (&t->qvt_avx));
@@ -264,16 +290,26 @@ time_prepare (time_t * t, int *retval)
   SC3E (sc3_allocator_new (sc3_allocator_nocount (), &t->alloc));
   SC3E (sc3_allocator_setup (t->alloc));
 
-  /* allocate quadrant arrays */
-  SC3E (p4est3_quadrant_array_new (t->alloc, t->qvt, t->n_quads, &t->qarr));
-  SC3E (p4est3_quadrant_array_new (t->alloc,
-                                   t->qvt_avx, t->n_quads, &t->qarr_avx));
+  /* allocate array of test quadrants */
+  for (int i = 0; i <= t->max_level; ++i) {
+    n_quads += (1 << (i * P4EST_DIM));
+  }
+  SC3E (p4est3_quadrant_array_new (t->alloc, t->qvt, n_quads, &t->qarr));
+  SC3E (p4est3_quadrant_array_new (t->alloc, t->qvt_avx, n_quads, &t->qarr_avx));
+  SC3E (p4est3_quadrant_array_new (t->alloc, t->qvt_mort, n_quads, &t->qarr_mort));
 
   /* initialize first element */
   SC3E (sc3_array_index (t->qarr, 0, &p));
   SC3E (p4est3_quadrant_root (t->qvt, p));
   SC3E (sc3_array_index (t->qarr_avx, 0, &p));
   SC3E (p4est3_quadrant_root (t->qvt_avx, p));
+  SC3E (sc3_array_index (t->qarr_mort, 0, &p));
+  SC3E (p4est3_quadrant_root (t->qvt_mort, p));
+
+  /* fill in test arrays */
+  SC3E (time_fill_test_array (n_quads, t->qarr, t->qvt));
+  SC3E (time_fill_test_array (n_quads, t->qarr_avx, t->qvt_avx));
+  SC3E (time_fill_test_array (n_quads, t->qarr_mort, t->qvt_mort));
 
   /* clean and successful return */
   *retval = 0;
@@ -320,7 +356,7 @@ interpret_command_line (const int argc, const char **argv, time_t *t)
             "<MAX CPU REF> <SCALE> <MAX LEVEL>\n");
     t->max_cpu_ref = t->mpisize;
     t->max_level = 1;
-    t->nquads_init = t->max_cpu_ref / t->mpisize;
+    t->ninit_quads = t->max_cpu_ref / t->mpisize;
   }
   if (argc >= 2){
     t->max_cpu_ref = atoi (argv[2]);
