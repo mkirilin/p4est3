@@ -277,6 +277,15 @@ p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
+p4est3_quadrant_sibling (p4est3_quadrant_vtable_t * qvt,
+                         const void *q, int i, void *r)
+{
+  SC3A_CHECK (qvt != NULL && qvt->quadrant_sibling != NULL);
+  SC3E (qvt->quadrant_sibling (q, i, r));
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t * qvt,
                                const void *q, int i, void *r)
 {
