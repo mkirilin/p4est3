@@ -714,6 +714,9 @@ p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
   qvt->quadrant_parent =
     (p4est3_quadrant_parent_t) p4est3_quadrant_mort_parent;
 
+  qvt->quadrant_sibling =
+    (p4est3_quadrant_sibling_t) p4est3_quadrant_mort_sibling;
+
   qvt->quadrant_face_neighbor =
     (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_mort_face_neighbor;
 

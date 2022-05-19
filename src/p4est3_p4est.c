@@ -428,6 +428,14 @@ p4est_quadrant_vtable_parent (const void *q, void *r)
 }
 
 static sc3_error_t *
+p4est_quadrant_vtable_sibling (const void *q, int i, void *r)
+{
+  p4est_quadrant_sibling
+    ((const p4est_quadrant_t*) q, (p4est_quadrant_t *) r, i);
+  return NULL;
+}
+
+static sc3_error_t *
 p4est_quadrant_vtable_face_neighbor (const void *q, int face, void *r)
 {
   p4est_quadrant_face_neighbor
@@ -567,6 +575,7 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->quadrant_root = p4est_quadrant_vtable_root;
   qvt->quadrant_copy = p4est_quadrant_vtable_copy;
   qvt->quadrant_parent = p4est_quadrant_vtable_parent;
+  qvt->quadrant_sibling = p4est_quadrant_vtable_sibling;
   qvt->quadrant_face_neighbor = p4est_quadrant_vtable_face_neighbor;
   qvt->quadrant_tree_face_neighbor =
     p4est3_quadrant_vtable_tree_face_neighbor;

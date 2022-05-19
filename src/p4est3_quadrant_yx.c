@@ -561,7 +561,7 @@ p4est3_quadrant_zyx_ancestor (const __m128i * q, int level, __m128i * r)
 }
 
 static sc3_error_t *
-p4est3_quadrant_zyx_sibling (const __m128i * q, __m128i * r, int sibling_id)
+p4est3_quadrant_zyx_sibling (const __m128i * q, int sibling_id, __m128i * r)
 {
   const p4est_qcoord_t q_level = _mm_extract_epi32 (*q, 0);
   const p4est_qcoord_t shift = P4EST3_YX_QUADRANT_LEN (q_level);
@@ -698,7 +698,7 @@ p4est3_quadrant_zyx_successor (const __m128i * q, __m128i * r)
 /* *INDENT-ON* */
   }
   else {
-    SC3E (p4est3_quadrant_zyx_sibling (q, r, successor_id));
+    SC3E (p4est3_quadrant_zyx_sibling (q, successor_id, r));
   }
   SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
   return NULL;
@@ -747,7 +747,7 @@ p4est3_quadrant_zyx_predecessor (const __m128i * q, __m128i * r)
 /* *INDENT-ON* */
   }
   else {
-    SC3E (p4est3_quadrant_zyx_sibling (q, r, predecessor_id));
+    SC3E (p4est3_quadrant_zyx_sibling (q, predecessor_id, r));
   }
   SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
   return NULL;
@@ -930,6 +930,9 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 
   qvt->quadrant_parent =
     (p4est3_quadrant_parent_t) p4est3_quadrant_zyx_parent;
+
+  qvt->quadrant_sibling =
+    (p4est3_quadrant_sibling_t) p4est3_quadrant_zyx_sibling;
 
   qvt->quadrant_face_neighbor =
     (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_zyx_face_neighbor;
