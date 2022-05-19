@@ -431,7 +431,7 @@ static sc3_error_t *
 p4est_quadrant_vtable_sibling (const void *q, int i, void *r)
 {
   p4est_quadrant_sibling
-    ((const p4est_quadrant_t*) q, (p4est_quadrant_t *) r, i);
+    ((const p4est_quadrant_t *) q, (p4est_quadrant_t *) r, i);
   return NULL;
 }
 
