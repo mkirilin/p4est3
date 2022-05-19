@@ -516,6 +516,29 @@ p4est3_quadrant_mort_ancestor (const p4est3_quadrant_mort_t * q,
 }
 
 static sc3_error_t *
+p4est3_quadrant_mort_sibling (const p4est3_quadrant_mort_t *q,
+                              p4est3_quadrant_mort_t *r, int sibling_id)
+{
+  const int level = P4EST3_MORT_EXT_LEVEL(*q);
+  int mask;
+
+  SC3A_IS (p4est3_quadrant_mort_is_valid, q);
+  SC3A_CHECK (level > 0);
+  SC3A_CHECK (sibling_id >= 0 && sibling_id < P4EST_CHILDREN);
+
+#ifdef P4_TO_P8
+  mask = 0x07;
+#else
+  mask = 0x03;
+#endif
+
+  *r = *q & ~P4EST3_QUADRANT_MORT_LEN(mask, level);
+  *r |= (P4EST3_QUADRANT_MORT_LEN(sibling_id, level));
+  SC3A_IS (p4est3_quadrant_mort_is_valid, r);
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_quadrant_mort_first_descendant (const p4est3_quadrant_mort_t * q,
                                        int32_t level,
                                        p4est3_quadrant_mort_t * fd)
