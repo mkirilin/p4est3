@@ -68,48 +68,83 @@ typedef struct p4est3_time
 }
 p4est3_time_t;
 
-static sc3_error_t *
-test_child (sc3_array_t * a, p4est3_quadrant_vtable_t * qvt)
+char               *
+set_heading (int argc, char **argv)
 {
-  p4est3_locidx       quad, n_quads;
-  void               *q, *tmp;
-
-  SC3E (sc3_array_get_elem_count (a, &n_quads));
-  SC3E (sc3_array_index (a, 0, &tmp));
-  for (quad = 1; quad < n_quads; ++quad) {
-    SC3E (sc3_array_index (a, quad, &q));
-    SC3E (p4est3_quadrant_child (qvt, q, quad % P4EST_CHILDREN, tmp));
+  char               *heading;
+  if (argc > 2) {
+    heading = (char *) malloc (strlen (argv[1]) + 1 + strlen (argv[2]) + 1);
+    strcpy (heading, argv[1]);
+    strcat (heading, " ");
+    strcat (heading, argv[2]);
   }
-  return NULL;
+  else {
+    heading = (char *) malloc (1);
+    strcpy (heading, "-");
+  }
+  return heading;
 }
 
 static sc3_error_t *
-test_parent (sc3_array_t * a, p4est3_quadrant_vtable_t * qvt)
+interpret_command_line (const int argc, char **argv, p4est3_time_t * t)
 {
-  p4est3_locidx       quad, n_quads;
-  void               *q, *tmp;
-
-  SC3E (sc3_array_get_elem_count (a, &n_quads));
-  SC3E (sc3_array_index (a, 0, &tmp));
-  for (quad = 1; quad < n_quads; ++quad) {
-    SC3E (sc3_array_index (a, quad, &q));
-    SC3E (p4est3_quadrant_parent (qvt, q, tmp));
+  int                 scale;
+  SC3E (sc3_MPI_Comm_size (SC3_MPI_COMM_WORLD, &t->mpisize));
+  t->func = CHILD;
+  t->qtype = STANDARD;
+  t->max_cpu_ref = t->mpisize;
+  t->max_level = 1;
+  t->ninit_quads = t->max_cpu_ref / t->mpisize;
+  if (argc < 5) {
+    printf ("Execution without some parameters. "
+            "Default parameters are applied.\n"
+            "Parameter's format: "
+            "<FUNCTION> <QUADRANT TYPE> <MAX CPU REF> <SCALE> <MAX LEVEL>\n");
   }
-  return NULL;
-}
-
-static sc3_error_t *
-test_sibling (sc3_array_t * a, p4est3_quadrant_vtable_t * qvt)
-{
-  p4est3_locidx       quad, n_quads;
-  void               *q, *tmp;
-
-  SC3E (sc3_array_get_elem_count (a, &n_quads));
-  SC3E (sc3_array_index (a, 0, &tmp));
-  for (quad = 1; quad < n_quads; ++quad) {
-    SC3E (sc3_array_index (a, quad, &q));
-    SC3E (p4est3_quadrant_sibling (qvt, q, quad % P4EST_CHILDREN, tmp));
+  if (argc >= 2) {
+    t->func = LAST_FUNC;
+    if (strcmp (argv[1], "CHILD") == 0) {
+      t->func = CHILD;
+    }
+    else if (strcmp (argv[1], "PARENT") == 0) {
+      t->func = PARENT;
+    }
+    else if (strcmp (argv[1], "SIBLING") == 0) {
+      t->func = SIBLING;
+    }
+    SC3E_DEMAND (t->func != LAST_FUNC, "Wrong name of the test function");
   }
+  if (argc >= 3) {
+    t->qtype = LAST_QTYPE;
+    if (strcmp (argv[2], "STANDARD") == 0) {
+      t->qtype = STANDARD;
+    }
+    else if (strcmp (argv[2], "AVX") == 0) {
+      t->qtype = AVX;
+    }
+    else if (strcmp (argv[2], "MORTON") == 0) {
+      t->qtype = MORTON;
+    }
+    SC3E_DEMAND (t->qtype != LAST_QTYPE, "Wrong name of the quadrant type");
+  }
+  if (argc >= 4) {
+    t->max_cpu_ref = atoi (argv[3]);
+    SC3E_DEMAND (t->max_cpu_ref != 0,
+                 "MAX CPU REF is interpreted wrong or == 0");
+    t->ninit_quads = t->max_cpu_ref / t->mpisize;
+  }
+  if (argc >= 5) {
+    scale = atoi (argv[4]);
+    SC3E_DEMAND (scale != 0, "SCALE is interpreted wrong or == 0");
+    t->max_cpu_ref *= scale;
+    t->ninit_quads = t->max_cpu_ref / t->mpisize;
+  }
+  if (argc >= 6) {
+    t->max_level = atoi (argv[5]);
+    SC3E_DEMAND (t->max_level != 0, "MAX LEVEL is interpreted wrong or == 0");
+  }
+
+  t->heading = set_heading (argc, argv);
   return NULL;
 }
 
@@ -130,23 +165,6 @@ time_fill_test_array (sc3_array_t * a, p4est3_quadrant_vtable_t * qvt)
     }
   }
   return NULL;
-}
-
-char               *
-set_heading (int argc, char **argv)
-{
-  char               *heading;
-  if (argc > 2) {
-    heading = (char *) malloc (strlen (argv[1]) + 1 + strlen (argv[2]) + 1);
-    strcpy (heading, argv[1]);
-    strcat (heading, " ");
-    strcat (heading, argv[2]);
-  }
-  else {
-    heading = (char *) malloc (1);
-    strcpy (heading, "-");
-  }
-  return heading;
 }
 
 static sc3_error_t *
@@ -218,6 +236,63 @@ time_prepare (p4est3_time_t * t, int *retval)
 }
 
 static sc3_error_t *
+test_child (const int ninit_quads, sc3_array_t * a,
+            p4est3_quadrant_vtable_t * qvt)
+{
+  p4est3_locidx       quad, n_quads;
+  void               *q, *tmp;
+  int i;
+
+  SC3E (sc3_array_get_elem_count (a, &n_quads));
+  SC3E (sc3_array_index (a, 0, &tmp));
+  for (i = 0; i < ninit_quads; ++i) {
+    for (quad = 1; quad < n_quads; ++quad) {
+      SC3E (sc3_array_index (a, quad, &q));
+      SC3E (p4est3_quadrant_child (qvt, q, quad % P4EST_CHILDREN, tmp));
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+test_parent (const int ninit_quads, sc3_array_t * a,
+             p4est3_quadrant_vtable_t * qvt)
+{
+  p4est3_locidx       quad, n_quads;
+  void               *q, *tmp;
+  int i;
+
+  SC3E (sc3_array_get_elem_count (a, &n_quads));
+  SC3E (sc3_array_index (a, 0, &tmp));
+  for (i = 0; i < ninit_quads; ++i) {
+    for (quad = 1; quad < n_quads; ++quad) {
+      SC3E (sc3_array_index (a, quad, &q));
+      SC3E (p4est3_quadrant_parent (qvt, q, tmp));
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+test_sibling (const int ninit_quads, sc3_array_t * a,
+              p4est3_quadrant_vtable_t * qvt)
+{
+  p4est3_locidx       quad, n_quads;
+  void               *q, *tmp;
+  int i;
+
+  SC3E (sc3_array_get_elem_count (a, &n_quads));
+  SC3E (sc3_array_index (a, 0, &tmp));
+  for (i = 0; i < ninit_quads; ++i) {
+    for (quad = 1; quad < n_quads; ++quad) {
+      SC3E (sc3_array_index (a, quad, &q));
+      SC3E (p4est3_quadrant_sibling (qvt, q, quad % P4EST_CHILDREN, tmp));
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
 timeavx2_measure (p4est3_time_t * t)
 {
   sc_flopinfo_t       fi, snapshot;
@@ -225,19 +300,19 @@ timeavx2_measure (p4est3_time_t * t)
   switch (t->func) {
   case CHILD:
     sc_flops_snap (&fi, &snapshot);
-    SC3E (test_child (t->qarr, t->qvt));
+    SC3E (test_child (t->ninit_quads, t->qarr, t->qvt));
     sc_flops_shot (&fi, &snapshot);
     break;
 
   case PARENT:
     sc_flops_snap (&fi, &snapshot);
-    SC3E (test_parent (t->qarr, t->qvt));
+    SC3E (test_parent (t->ninit_quads, t->qarr, t->qvt));
     sc_flops_shot (&fi, &snapshot);
     break;
 
   case SIBLING:
     sc_flops_snap (&fi, &snapshot);
-    SC3E (test_sibling (t->qarr, t->qvt));
+    SC3E (test_sibling (t->ninit_quads, t->qarr, t->qvt));
     sc_flops_shot (&fi, &snapshot);
     break;
 
@@ -247,7 +322,9 @@ timeavx2_measure (p4est3_time_t * t)
   }
   sc_stats_set1 (&stats, snapshot.iwtime, t->heading);
   sc_stats_compute (SC3_MPI_COMM_WORLD, 1, &stats);
-  sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+  if (t->mpirank == 0) {
+    sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+  }
   return NULL;
 }
 
@@ -259,67 +336,6 @@ timeavx2_cleanup (p4est3_time_t * t)
   free (t->heading);
   SC3E (sc3_array_destroy (&t->qarr));
   SC3E (sc3_allocator_destroy (&t->alloc));
-  return NULL;
-}
-
-static sc3_error_t *
-interpret_command_line (const int argc, char **argv, p4est3_time_t * t)
-{
-  int                 scale;
-  SC3E (sc3_MPI_Comm_size (SC3_MPI_COMM_WORLD, &t->mpisize));
-  t->func = CHILD;
-  t->qtype = STANDARD;
-  t->max_cpu_ref = t->mpisize;
-  t->max_level = 1;
-  t->ninit_quads = t->max_cpu_ref / t->mpisize;
-  if (argc < 5) {
-    printf ("Execution without some parameters. "
-            "Default parameters are applied.\n"
-            "Parameter's format: "
-            "<FUNCTION> <QUADRANT TYPE> <MAX CPU REF> <SCALE> <MAX LEVEL>\n");
-  }
-  if (argc >= 2) {
-    t->func = LAST_FUNC;
-    if (strcmp (argv[1], "CHILD") == 0) {
-      t->func = CHILD;
-    }
-    else if (strcmp (argv[1], "PARENT") == 0) {
-      t->func = PARENT;
-    }
-    else if (strcmp (argv[1], "SIBLING") == 0) {
-      t->func = SIBLING;
-    }
-    SC3E_DEMAND (t->func != LAST_FUNC, "Wrong name of the test function");
-  }
-  if (argc >= 3) {
-    t->qtype = LAST_QTYPE;
-    if (strcmp (argv[2], "STANDARD") == 0) {
-      t->qtype = STANDARD;
-    }
-    else if (strcmp (argv[2], "AVX") == 0) {
-      t->qtype = AVX;
-    }
-    else if (strcmp (argv[2], "MORTON") == 0) {
-      t->qtype = MORTON;
-    }
-    SC3E_DEMAND (t->qtype != LAST_QTYPE, "Wrong name of the quadrant type");
-  }
-  if (argc >= 4) {
-    t->max_cpu_ref = atoi (argv[3]);
-    SC3E_DEMAND (t->max_cpu_ref != 0,
-                 "MAX CPU REF is interpreted wrong or == 0");
-  }
-  if (argc >= 5) {
-    scale = atoi (argv[4]);
-    SC3E_DEMAND (scale != 0, "SCALE is interpreted wrong or == 0");
-    t->max_cpu_ref *= scale;
-  }
-  if (argc >= 6) {
-    t->max_level = atoi (argv[5]);
-    SC3E_DEMAND (t->max_level != 0, "MAX LEVEL is interpreted wrong or == 0");
-  }
-
-  t->heading = set_heading (argc, argv);
   return NULL;
 }
 
@@ -339,9 +355,7 @@ main (int argc, char **argv)
   SC3X (time_prepare (t, &retval));
 
   if (!retval) {
-    if (t->mpirank == 0) {
-      SC3X (timeavx2_measure (t));
-    }
+    SC3X (timeavx2_measure (t));
     SC3X (timeavx2_cleanup (t));
   }
   /* MPI_Finalize comes last in a program.  We abort should this go wrong. */
