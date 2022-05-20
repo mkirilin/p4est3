@@ -34,11 +34,15 @@
 #include <sc_statistics.h>
 #include <sc_flops.h>
 
+static const int neighbor_order2d[4] = {1, 3, 0, 2};
+static const int neighbor_order3d[8] = {1, 3, 6, 2, 0, 4, 7, 5};
+
 typedef enum time_function
 {
   CHILD,
   PARENT,
   SIBLING,
+  FNEIGBOR,
   LAST_FUNC
 }
 time_function_t;
@@ -111,6 +115,9 @@ interpret_command_line (const int argc, char **argv, p4est3_time_t * t)
     }
     else if (strcmp (argv[1], "SIBLING") == 0) {
       t->func = SIBLING;
+    }
+    else if (strcmp (argv[1], "FNEIGHBOR") == 0) {
+      t->func = FNEIGBOR;
     }
     SC3E_DEMAND (t->func != LAST_FUNC, "Wrong name of the test function");
   }
@@ -293,6 +300,33 @@ test_sibling (const int ninit_quads, sc3_array_t * a,
 }
 
 static sc3_error_t *
+test_face_neighbor (const int ninit_nquads, sc3_array_t * a,
+                    p4est3_quadrant_vtable_t * qvt)
+{
+  p4est3_locidx quad, n_quads;
+  void *q, *tmp;
+  int i;
+  int *order
+#ifdef P4_TO_P8
+  = neighbor_order3d
+#else
+  = neighbor_order2d
+#endif
+  ;
+
+  SC3E (sc3_array_get_elem_count (a, &n_quads));
+  SC3E (sc3_array_index (a, 0, &tmp));
+  for (i = 0; i < ninit_nquads; ++i) {
+    for (quad = 1; quad < n_quads; ++quad) {
+      SC3E (sc3_array_index (a, quad, &q));
+      SC3E (p4est3_quadrant_face_neighbor
+            (qvt, q, order[quad % P4EST_CHILDREN], tmp));
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
 timeavx2_measure (p4est3_time_t * t)
 {
   sc_flopinfo_t       fi, snapshot;
@@ -315,6 +349,11 @@ timeavx2_measure (p4est3_time_t * t)
     SC3E (test_sibling (t->ninit_quads, t->qarr, t->qvt));
     sc_flops_shot (&fi, &snapshot);
     break;
+
+  case FNEIGBOR:
+    sc_flops_snap (&fi, &snapshot);
+    SC3E (test_face_neighbor (t->ninit_quads, t->qarr, t->qvt));
+    sc_flops_shot (&fi, &snapshot);
 
   default:
     SC3E_UNREACH ("Wrong function to test");
