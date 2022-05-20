@@ -280,42 +280,42 @@ interpret_command_line (const int argc, char **argv, p4est3_time_t * t)
   }
   if (argc >= 2) {
     t->func = LAST_FUNC;
-    if (strcmp (argv[2], "CHILD") == 0) {
+    if (strcmp (argv[1], "CHILD") == 0) {
       t->func = CHILD;
     }
-    else if (strcmp (argv[2], "PARENT") == 0) {
+    else if (strcmp (argv[1], "PARENT") == 0) {
       t->func = PARENT;
     }
-    else if (strcmp (argv[2], "SIBLING") == 0) {
+    else if (strcmp (argv[1], "SIBLING") == 0) {
       t->func = SIBLING;
     }
     SC3E_DEMAND (t->func != LAST_FUNC, "Wrong name of the test function");
   }
   if (argc >= 3) {
     t->qtype = LAST_QTYPE;
-    if (strcmp (argv[3], "STANDARD") == 0) {
+    if (strcmp (argv[2], "STANDARD") == 0) {
       t->qtype = STANDARD;
     }
-    else if (strcmp (argv[3], "AVX") == 0) {
+    else if (strcmp (argv[2], "AVX") == 0) {
       t->qtype = AVX;
     }
-    else if (strcmp (argv[3], "MORTON") == 0) {
+    else if (strcmp (argv[2], "MORTON") == 0) {
       t->qtype = MORTON;
     }
     SC3E_DEMAND (t->qtype != LAST_QTYPE, "Wrong name of the quadrant type");
   }
   if (argc >= 4) {
-    t->max_cpu_ref = atoi (argv[4]);
+    t->max_cpu_ref = atoi (argv[3]);
     SC3E_DEMAND (t->max_cpu_ref != 0,
                  "MAX CPU REF is interpreted wrong or == 0");
   }
   if (argc >= 5) {
-    scale = atoi (argv[5]);
+    scale = atoi (argv[4]);
     SC3E_DEMAND (scale != 0, "SCALE is interpreted wrong or == 0");
     t->max_cpu_ref *= scale;
   }
   if (argc >= 6) {
-    t->max_level = atoi (argv[6]);
+    t->max_level = atoi (argv[5]);
     SC3E_DEMAND (t->max_level != 0, "MAX LEVEL is interpreted wrong or == 0");
   }
 
