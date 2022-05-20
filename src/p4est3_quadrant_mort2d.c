@@ -514,7 +514,7 @@ p4est3_quadrant_mort_ancestor (const p4est3_quadrant_mort_t * q,
 
 static sc3_error_t *
 p4est3_quadrant_mort_sibling (const p4est3_quadrant_mort_t * q,
-                              p4est3_quadrant_mort_t * r, int sibling_id)
+                              int sibling_id, p4est3_quadrant_mort_t * r)
 {
   const int           level = P4EST3_MORT_EXT_LEVEL (*q);
   int                 mask;
