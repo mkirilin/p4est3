@@ -34,8 +34,11 @@
 #include <sc_statistics.h>
 #include <sc_flops.h>
 
-static const int neighbor_order2d[4] = {1, 3, 0, 2};
-static const int neighbor_order3d[8] = {1, 3, 6, 2, 0, 4, 7, 5};
+#ifdef P4_TO_P8
+static const int neighbor_order3d[8] = {2, 1, 3, 5, 0, 4, 0, 1};
+#else
+static const int neighbor_order2d[4] = {0, 1, 3, 2};
+#endif
 
 typedef enum time_function
 {
@@ -306,7 +309,7 @@ test_face_neighbor (const int ninit_nquads, sc3_array_t * a,
   p4est3_locidx quad, n_quads;
   void *q, *tmp;
   int i;
-  int *order
+  const int *order
 #ifdef P4_TO_P8
   = neighbor_order3d
 #else
@@ -354,6 +357,7 @@ timeavx2_measure (p4est3_time_t * t)
     sc_flops_snap (&fi, &snapshot);
     SC3E (test_face_neighbor (t->ninit_quads, t->qarr, t->qvt));
     sc_flops_shot (&fi, &snapshot);
+    break;
 
   default:
     SC3E_UNREACH ("Wrong function to test");
