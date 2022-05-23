@@ -46,6 +46,7 @@ typedef enum time_function
   PARENT,
   SIBLING,
   FNEIGBOR,
+  TBOUND,
   LAST_FUNC
 }
 time_function_t;
@@ -74,6 +75,22 @@ typedef struct p4est3_time
   p4est3_quadrant_vtable_t sqvt, *qvt;
 }
 p4est3_time_t;
+
+static sc3_error_t *
+time_array_new (sc3_allocator_t * alloc, size_t esize,
+                p4est3_locidx n, sc3_array_t ** arr)
+{
+  SC3E_RETVAL (arr, NULL);
+  SC3A_IS (sc3_allocator_is_setup, alloc);
+  SC3A_CHECK (n >= 0);
+
+  SC3E (sc3_array_new (alloc, arr));
+  SC3E (sc3_array_set_elem_size (*arr, esize));
+  SC3E (sc3_array_set_elem_count (*arr, n));
+  SC3E (sc3_array_setup (*arr));
+
+  return NULL;
+}
 
 char               *
 set_heading (int argc, char **argv)
@@ -121,6 +138,9 @@ interpret_command_line (const int argc, char **argv, p4est3_time_t * t)
     }
     else if (strcmp (argv[1], "FNEIGHBOR") == 0) {
       t->func = FNEIGBOR;
+    }
+    else if (strcmp (argv[1], "TBOUND") == 0) {
+      t->func = TBOUND;
     }
     SC3E_DEMAND (t->func != LAST_FUNC, "Wrong name of the test function");
   }
@@ -330,10 +350,29 @@ test_face_neighbor (const int ninit_nquads, sc3_array_t * a,
 }
 
 static sc3_error_t *
+test_tree_boundaries (const int ninit_nquads, sc3_array_t * a,
+                      p4est3_quadrant_vtable_t * qvt, sc3_array_t * tmp)
+{
+  p4est3_locidx quad, n_quads;
+  void *q;
+  int i;
+
+  SC3E (sc3_array_get_elem_count (a, &n_quads));
+  for (i = 0; i < ninit_nquads; ++i) {
+    for (quad = 1; quad < n_quads; ++quad) {
+      SC3E (sc3_array_index (a, quad, &q));
+      SC3E (p4est3_quadrant_tree_boundaries (qvt, q, tmp));
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
 timeavx2_measure (p4est3_time_t * t)
 {
   sc_flopinfo_t       fi, snapshot;
   sc_statinfo_t       stats;
+  sc3_array_t *tmp;
   switch (t->func) {
   case CHILD:
     sc_flops_snap (&fi, &snapshot);
@@ -357,6 +396,14 @@ timeavx2_measure (p4est3_time_t * t)
     sc_flops_snap (&fi, &snapshot);
     SC3E (test_face_neighbor (t->ninit_quads, t->qarr, t->qvt));
     sc_flops_shot (&fi, &snapshot);
+    break;
+
+  case TBOUND:
+    SC3E (time_array_new (t->alloc, sizeof (int), P4EST_DIM, &tmp));
+    sc_flops_snap (&fi, &snapshot);
+    SC3E (test_tree_boundaries (t->ninit_quads, t->qarr, t->qvt, tmp));
+    sc_flops_shot (&fi, &snapshot);
+    SC3E (sc3_array_unref (&tmp));
     break;
 
   default:
