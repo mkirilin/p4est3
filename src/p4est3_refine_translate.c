@@ -44,7 +44,7 @@ refine_callback_data_t;
 typedef struct coarse_callback_data
 {
   int                 counter;
-  sc3_array_t        *family;
+  sc3_array_t        *family; /**< Array of pointers to quadrants*/
   sc3_array_t        *pattern;
   int                 nsiblings;
 }
@@ -345,6 +345,7 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
      generation of a new forest's mesh */
   switch (p3->source_setup_mode) {
   case P4EST3_SRC_REFINE:
+    SC3A_CHECK (p3->old->crefine != NULL);
     rdata->counter = 0;
     rdata->n_new = 0;
     rdata->pattern = pattern;
@@ -354,6 +355,7 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
     break;
 
   case P4EST3_SRC_COARSE:
+    SC3A_CHECK (p3->old->ccoarse != NULL);
     cdata->counter = 0;
     cdata->pattern = pattern;
     SC3E (p4est3_refine_array_new

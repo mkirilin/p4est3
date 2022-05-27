@@ -235,17 +235,19 @@ p4est3_set_setup_mode (p4est3_t * p3, p4est3_setup_mode_t mode)
 }
 
 sc3_error_t        *
-p4est3_set_source (p4est3_t * p3, p4est3_t * old)
+p4est3_set_source (p4est3_t * p3, p4est3_t * old, p4est3_source_setup_t mode)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_IS (p4est3_is_setup, old);
   SC3A_CHECK (p3 != old);
+  SC3A_CHECK (0 <= mode && mode < P4EST3_SRC_MODE_LAST);
 
   if (p3->old != NULL) {
     SC3E (p4est3_unref (p3->old));
   }
   p3->old = old;
   SC3E (p4est3_ref (p3->old));
+  p3->source_setup_mode = mode;
 
   return NULL;
 }
@@ -262,29 +264,23 @@ p4est3_unset_source (p4est3_t * p3)
 }
 
 sc3_error_t        *
-p4est3_set_setup_source_mode (p4est3_t * p3, p4est3_source_setup_t mode)
-{
-  SC3A_IS (p4est3_is_new, p3);
-  SC3A_CHECK (0 <= mode && mode < P4EST3_SRC_MODE_LAST);
-
-  p3->source_setup_mode = mode;
-  return NULL;
-}
-
-sc3_error_t        *
-p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine)
+p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine,
+                   void *user_data)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->crefine = crefine;
+  p3->refine_user_data = user_data;
 
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_set_coarse (p4est3_t * p3, p4est3_coarse_callback_t ccoarse)
+p4est3_set_coarse (p4est3_t * p3, p4est3_coarse_callback_t ccoarse,
+                   void *user_data)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->ccoarse = ccoarse;
+  p3->coarse_user_data = user_data;
 
   return NULL;
 }
@@ -515,6 +511,30 @@ p4est3_get_local_num_trees (const p4est3_t * p3,
     *last_local_tree = p3->lltree;
     return NULL;
   }
+}
+
+sc3_error_t        *
+p4est3_get_refine_data (const p4est3_t * p3, void *ptr)
+{
+  if (ptr != NULL) {
+    *(void **) ptr = NULL;
+  }
+  if (p3->refine_user_data != NULL) {
+    *(void **)ptr = p3->refine_user_data;
+  }
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_get_coarse_data (const p4est3_t * p3, void *ptr)
+{
+  if (ptr != NULL) {
+    *(void **) ptr = NULL;
+  }
+  if (p3->coarse_user_data != NULL) {
+    *(void **)ptr = p3->coarse_user_data;
+  }
+  return NULL;
 }
 
 sc3_error_t        *

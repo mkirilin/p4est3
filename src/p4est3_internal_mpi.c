@@ -863,8 +863,6 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   sc3_MPI_Aint_t      gftreebytes, tempbytes, gfposbytes;
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Comm_t      nodecomm;
-  p4est3_refine_callback_t crefine;
-  p4est3_coarse_callback_t ccoarse;
 
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (p3->old != NULL);
@@ -965,38 +963,13 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   p3->nltrees = old->nltrees;
 
   /* functions set before p4est3_setup */
-  crefine = old->crefine;
-  ccoarse = old->ccoarse;
-  switch (p3->source_setup_mode) {
-  case P4EST3_SRC_REFINE:
-    if (p3->crefine == NULL) {
-      SC3A_CHECK (crefine != NULL);
-      SC3E (p4est3_set_refine (p3, crefine));
-    }
-    else {
-      /* adjust new forest's callback to the old one
-         to iterate over the old forest */
-      old->crefine = p3->crefine;
-    }
-    break;
-
-  case P4EST3_SRC_COARSE:
-    if (p3->ccoarse == NULL) {
-      SC3A_CHECK (ccoarse != NULL);
-      SC3E (p4est3_set_coarse (p3, ccoarse));
-    }
-    else {
-      /* adjust new forest's callback to the old one
-         to iterate over the old forest */
-      old->ccoarse = p3->ccoarse;
-    }
-    break;
-
-  case P4EST3_SRC_COPY:
-    break;
-
-  default:
-    SC3E_UNREACH ("Wrong setup from sourse mode");
+  p3->crefine = p3->crefine == NULL ? old->crefine : p3->crefine;
+  p3->ccoarse = p3->ccoarse == NULL ? old->ccoarse : p3->ccoarse;
+  if (p3->refine_user_data == NULL) {
+    p3->refine_user_data = old->refine_user_data;
+  }
+  if (p3->coarse_user_data == NULL) {
+    p3->coarse_user_data = old->coarse_user_data;
   }
 
   p3->mpisize = old->mpisize;
@@ -1018,9 +991,6 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   //SC3E (p4est3_fill_from_source (p3));
   SC3E (p4est3_fill_from_source_translate (p3));
 
-  /* restore refinement and coarsening callback of the old forest */
-  old->crefine = crefine;
-  old->ccoarse = ccoarse;
   SC3A_IS (p4est3_is_setup, p3);
   return NULL;
 }
