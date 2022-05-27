@@ -526,7 +526,7 @@ p4est3_quadrant_zyx_quadrant (const p4est_qcoord_t * c, int l, __m128i * q)
   _mm_srli_epi32 (
 #ifdef P4_TO_P8
     _mm_set_epi32 (c[0], c[1], c[2], 0)
-#else 
+#else
     _mm_set_epi32 (c[0], c[1], 0, 0)
 #endif
   , d
@@ -797,7 +797,7 @@ p4est3_quadrant_zyx_morton (int level, p4est3_gloidx id, __m128i * quadrant)
 
 /* *INDENT-OFF* */
   for (i = 0; i < level; ++i) {
-    coords_id = 
+    coords_id =
     _mm256_srlv_epi64 (
       _mm256_and_si256 (
         _mm256_set1_epi64x (id)
