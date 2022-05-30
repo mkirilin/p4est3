@@ -332,7 +332,6 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
     SC3E (p4est3_setup (p3refined));
 
     if (i != 0) {
-      SC3E (p4est3_unset_source (p3refined));
       SC3E (p4est3_destroy (&p3ptr));
     }
     p3ptr = p3refined;
@@ -347,7 +346,6 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
     SC3E (p4est3_set_source (p3refined, p3ptr, P4EST3_SRC_COARSE));
     SC3E (p4est3_setup (p3refined));
 
-    SC3E (p4est3_unset_source (p3refined));
     SC3E (p4est3_destroy (&p3ptr));
     p3ptr = p3refined;
   }

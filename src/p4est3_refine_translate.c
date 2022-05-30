@@ -491,6 +491,9 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
   sc3_MPI_Barrier (p3->mpicomm);
   p3->global_num_quads = p3->goffset[p3->mpisize];
 
+  SC3A_CHECK (p3->old != NULL);
+  SC3E (p4est3_unref (p3->old));
+  p3->old = NULL;
   return NULL;
 }
 

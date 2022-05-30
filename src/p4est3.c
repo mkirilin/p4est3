@@ -253,17 +253,6 @@ p4est3_set_source (p4est3_t * p3, p4est3_t * old, p4est3_source_setup_t mode)
 }
 
 sc3_error_t        *
-p4est3_unset_source (p4est3_t * p3)
-{
-  SC3A_IS (p4est3_is_valid, p3);
-  SC3A_CHECK (p3->old != NULL);
-
-  SC3E (p4est3_unref (p3->old));
-  p3->old = NULL;
-  return NULL;
-}
-
-sc3_error_t        *
 p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine,
                    void *user_data)
 {
@@ -511,30 +500,6 @@ p4est3_get_local_num_trees (const p4est3_t * p3,
     *last_local_tree = p3->lltree;
     return NULL;
   }
-}
-
-sc3_error_t        *
-p4est3_get_refine_data (const p4est3_t * p3, void *ptr)
-{
-  if (ptr != NULL) {
-    *(void **) ptr = NULL;
-  }
-  if (p3->refine_user_data != NULL) {
-    *(void **) ptr = p3->refine_user_data;
-  }
-  return NULL;
-}
-
-sc3_error_t        *
-p4est3_get_coarsen_data (const p4est3_t * p3, void *ptr)
-{
-  if (ptr != NULL) {
-    *(void **) ptr = NULL;
-  }
-  if (p3->coarsen_user_data != NULL) {
-    *(void **) ptr = p3->coarsen_user_data;
-  }
-  return NULL;
 }
 
 sc3_error_t        *
