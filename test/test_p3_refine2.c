@@ -83,8 +83,8 @@ refine_normal_fn (p4est_t * p4est, p4est_topidx_t which_tree,
 }
 
 static int
-coarse_normal_fn (p4est_t * p4est, p4est_topidx_t which_tree,
-                  p4est_quadrant_t * quadrants[])
+coarsen_normal_fn (p4est_t * p4est, p4est_topidx_t which_tree,
+                   p4est_quadrant_t * quadrants[])
 {
   const int           condition = refine_level - 2 < 1 ? 1 : refine_level - 2;
   if ((int) quadrants[0]->level > condition) {
@@ -126,7 +126,7 @@ refine_p3_normal_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
 }
 
 static sc3_error_t *
-coarse_p3_normal_fn (p4est3_coarse_callback_info_t * ci, int *is_coarse)
+coarsen_p3_normal_fn (p4est3_coarsen_callback_info_t * ci, int *is_coarse)
 {
   const int           condition = refine_level - 2 < 1 ? 1 : refine_level - 2;
   int                 level;
@@ -212,7 +212,7 @@ make_new_p4est3 (p4est3_t ** p3, setup_t * t, p4est3_quadrant_vtable_t * qvt)
   SC3E (p4est3_set_quadrant_vtable (*p3, qvt));
   SC3E (p4est3_set_level (*p3, FOREST_START_LEVEL));
   SC3E (p4est3_set_refine (*p3, refine_p3_normal_fn, NULL));
-  SC3E (p4est3_set_coarse (*p3, coarse_p3_normal_fn, NULL));
+  SC3E (p4est3_set_coarsen (*p3, coarsen_p3_normal_fn, NULL));
   SC3E (p4est3_setup (*p3));
 
   return NULL;
@@ -339,7 +339,7 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
   }
   SC3E (compare_results (t, p3ptr, p, qvt));
 
-  p4est_coarsen (p, 1, coarse_normal_fn, NULL);
+  p4est_coarsen (p, 1, coarsen_normal_fn, NULL);
   for (i = 0; i < refine_level; ++i) {
     SC3E (p4est3_new (t->alloc, &p3refined));
     SC3E (set_qvt (qvt, i % 3));

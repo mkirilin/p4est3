@@ -968,8 +968,8 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   if (p3->refine_user_data == NULL) {
     p3->refine_user_data = old->refine_user_data;
   }
-  if (p3->coarse_user_data == NULL) {
-    p3->coarse_user_data = old->coarse_user_data;
+  if (p3->coarsen_user_data == NULL) {
+    p3->coarsen_user_data = old->coarsen_user_data;
   }
 
   p3->mpisize = old->mpisize;

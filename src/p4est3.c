@@ -275,12 +275,12 @@ p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine,
 }
 
 sc3_error_t        *
-p4est3_set_coarse (p4est3_t * p3, p4est3_coarse_callback_t ccoarse,
-                   void *user_data)
+p4est3_set_coarsen (p4est3_t * p3, p4est3_coarsen_callback_t ccoarse,
+                    void *user_data)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->ccoarse = ccoarse;
-  p3->coarse_user_data = user_data;
+  p3->coarsen_user_data = user_data;
 
   return NULL;
 }
@@ -520,19 +520,19 @@ p4est3_get_refine_data (const p4est3_t * p3, void *ptr)
     *(void **) ptr = NULL;
   }
   if (p3->refine_user_data != NULL) {
-    *(void **)ptr = p3->refine_user_data;
+    *(void **) ptr = p3->refine_user_data;
   }
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_get_coarse_data (const p4est3_t * p3, void *ptr)
+p4est3_get_coarsen_data (const p4est3_t * p3, void *ptr)
 {
   if (ptr != NULL) {
     *(void **) ptr = NULL;
   }
-  if (p3->coarse_user_data != NULL) {
-    *(void **)ptr = p3->coarse_user_data;
+  if (p3->coarsen_user_data != NULL) {
+    *(void **) ptr = p3->coarsen_user_data;
   }
   return NULL;
 }

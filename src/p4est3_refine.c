@@ -33,13 +33,13 @@ extern              "C"
 #endif
 #endif
 
-typedef struct coarse_callback_data
+typedef struct coarsen_callback_data
 {
   sc3_array_t        *family;
   sc3_array_t        *pattern;
   int                 nsiblings;
 }
-coarse_callback_data_t;
+coarsen_callback_data_t;
 
 /* A trivial callback that copies volumes' level into levels array */
 static sc3_error_t *
@@ -63,9 +63,15 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
   SC3A_CHECK (vi->p3->crefine != NULL);
   int                 is_refine, level, i;
   int                *pattern_it;
+
   /* pack data for refinement callback input */
-  p4est3_refine_callback_info_t ri =
-    { vi->p3, vi->ntree, vi->quadrant, vi->p3->qvt };
+  p4est3_refine_callback_info_t ri;
+  ri.p3 = vi->p3;
+  ri.ntree = vi->ntree;
+  ri.quadrant = vi->quadrant;
+  ri.qvt = vi->p3->qvt;
+  ri.refine_user_data = vi->p3->refine_user_data;
+
   SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
 
   SC3E (vi->p3->crefine (&ri, &is_refine));
@@ -87,14 +93,14 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
    callback and returns (with user_data) population pattern
    (see coarsining documentation) */
 static sc3_error_t *
-p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
+p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
 {
   SC3A_CHECK (vi->p3->ccoarse != NULL);
   int                 is_coarse, level, i, child_id;
   int                *pattern_it;
   void               *quad;
-  coarse_callback_data_t *cdata = (coarse_callback_data_t *) vi->user_data;
-  p4est3_coarse_callback_info_t ci;     /* = { vi->p3, vi->ntree, vi->quadrant }; */
+  coarsen_callback_data_t *cdata = (coarsen_callback_data_t *) vi->user_data;
+  p4est3_coarsen_callback_info_t ci;    /* = { vi->p3, vi->ntree, vi->quadrant }; */
 
   /* Decide if we call coarse callback.
      We do this only if we find a whole family. */
@@ -128,6 +134,7 @@ p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
     ci.family = cdata->family;
     ci.qvt = vi->p3->qvt;
     SC3E (vi->p3->ccoarse (&ci, &is_coarse));
+    ci.coarsen_user_data = vi->p3->coarsen_user_data;
     cdata->nsiblings = 0;
   }
   else {
@@ -300,7 +307,7 @@ p4est3_fill_from_source (p4est3_t * p3)
   sc3_array_t        *pattern; /**< Array of patterns that we will use
                               to run top-down forest creation */
   sc3_array_t        *levelq;
-  coarse_callback_data_t scdata, *cdata = &scdata;
+  coarsen_callback_data_t scdata, *cdata = &scdata;
 #ifdef P4EST_ENABLE_DEBUG
   int                *level;
 #endif
@@ -346,7 +353,7 @@ p4est3_fill_from_source (p4est3_t * p3)
            p3->qvt->max_children, &cdata->family));
     cdata->nsiblings = 0;
     SC3E (p4est3_iterate_volume
-          (p3->old, p4est3_coarse_volume_callback, cdata));
+          (p3->old, p4est3_coarsen_volume_callback, cdata));
     break;
 
   case P4EST3_SRC_COPY:

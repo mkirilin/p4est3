@@ -41,14 +41,14 @@ typedef struct refine_callback_data
 }
 refine_callback_data_t;
 
-typedef struct coarse_callback_data
+typedef struct coarsen_callback_data
 {
   int                 counter;
   sc3_array_t        *family; /**< Array of pointers to quadrants*/
   sc3_array_t        *pattern;
   int                 nsiblings;
 }
-coarse_callback_data_t;
+coarsen_callback_data_t;
 
 static sc3_error_t *
 p4est3_refine_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
@@ -82,9 +82,15 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
   int                 is_refine;
   refine_callback_data_t *cdata = (refine_callback_data_t *) vi->user_data;
   char               *pattern_it;
+
   /* pack data for refinement callback input */
-  p4est3_refine_callback_info_t ri =
-    { vi->p3, vi->ntree, vi->quadrant, vi->p3->qvt };
+  p4est3_refine_callback_info_t ri;
+  ri.p3 = vi->p3;
+  ri.ntree = vi->ntree;
+  ri.quadrant = vi->quadrant;
+  ri.qvt = vi->p3->qvt;
+  ri.refine_user_data = vi->p3->refine_user_data;
+
   SC3E (vi->p3->crefine (&ri, &is_refine));
   SC3E (sc3_array_index (cdata->pattern, cdata->n_new, &pattern_it));
   if (!is_refine) {
@@ -107,15 +113,15 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
    num_children means creating the parent for the next num_children
    corresponding quadrants and inserting them into a new forest.*/
 static sc3_error_t *
-p4est3_coarse_volume_callback (p4est3_iterate_volume_info_t * vi)
+p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
 {
   SC3A_CHECK (vi->p3->ccoarse != NULL);
   int                 is_coarse, i, child_id;
   char               *pattern_it;
   void              **quad;
   p4est3_tree_t      *tree;
-  coarse_callback_data_t *cdata = (coarse_callback_data_t *) vi->user_data;
-  p4est3_coarse_callback_info_t ci;     /* = { vi->p3, vi->ntree, vi->quadrant }; */
+  coarsen_callback_data_t *cdata = (coarsen_callback_data_t *) vi->user_data;
+  p4est3_coarsen_callback_info_t ci;    /* = { vi->p3, vi->ntree, vi->quadrant }; */
 
   /* Decide if we call coarse callback.
      We do this only if we find a whole family. */
@@ -316,7 +322,7 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
   p4est3_tree_t      *tree;
   sc3_array_t        *pattern;
 
-  coarse_callback_data_t scdata, *cdata = &scdata;
+  coarsen_callback_data_t scdata, *cdata = &scdata;
   refine_callback_data_t srdata, *rdata = &srdata;
 
   /* We suppose to call this function after setting up routine */
@@ -363,7 +369,7 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
            p3->qvt->max_children, &cdata->family));
     cdata->nsiblings = 0;
     SC3E (p4est3_iterate_volume
-          (p3->old, p4est3_coarse_volume_callback, cdata));
+          (p3->old, p4est3_coarsen_volume_callback, cdata));
     p3->local_num_quads = cdata->counter;
     break;
 
