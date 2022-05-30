@@ -328,7 +328,7 @@ p4est3_connectivity_get_face_transform (const p4est3_connectivity_t * c,
     iter[7] = 0;
     iter[8] = 2 * (iface & 1) + (iface_neighbor & 1);
   }
-  else if (c->dim == 3) {
+  else {
     int                 reverse;
 
 #ifdef P4EST_ENABLE_DEBUG
@@ -336,6 +336,8 @@ p4est3_connectivity_get_face_transform (const p4est3_connectivity_t * c,
     int                *my_axis;
     int                *target_axis;
 #endif
+
+    SC3A_CHECK (c->dim == 3);
 
     iter[0] = iface < 2 ? 1 : 0;
     iter[1] = iface < 4 ? 2 : 1;
@@ -384,6 +386,7 @@ p4est3_connectivity_get_face_child_id (const p4est3_connectivity_t * c,
     *childid = face_corners_2d[nface][fcorner];
   }
   else {
+    SC3A_CHECK (c->dim == 3);
     *childid = face_corners_3d[nface][fcorner];
   }
 
@@ -406,14 +409,13 @@ p4est3_connectivity_get_neighbor_face_corner (const p4est3_connectivity_t * c,
   if (c->dim == 2) {
     *fc = *fc ^ o;
   }
-  else if (c->dim == 3) {
+  else {
+    SC3A_CHECK (c->dim == 3);
     pref = face_permutation_refs[f][nf];
     pset = face_permutation_sets[pref][o];
     *fc = face_permutations[pset][*fc];
   }
-  else {
-    SC3E_UNREACH ("wrong dimension");
-  }
+
   SC3A_CHECK (0 <= *fc && *fc < c->half_children);
   return NULL;
 }

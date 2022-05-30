@@ -67,9 +67,9 @@ typedef sc3_error_t *(*p4est3_connectivity_inout_t) (void *slf);
  * TODO: Add to documentation.
  * Only for a tree connection the output arguments need to be updated.
  */
-typedef             sc3_error_t
-  * (*p4est3_connectivity_get_face_t) (void *slf, p4est3_topidx * which_tree,
-                                       int *nface, int *orient);
+typedef sc3_error_t *
+  (*p4est3_connectivity_get_face_t) (void *slf, p4est3_topidx * which_tree,
+                                     int *nface, int *orient);
 
 /** One way to create a connectivity is to provide a virtual table with state.
  * The members of this table must be set before passing it to \ref
@@ -236,9 +236,11 @@ sc3_error_t        *p4est3_connectivity_get_face
    p4est3_topidx * which_tree, int *nface, int *orient);
 
 /** Fill an array with the axis combination of a face neighbor transform.
- * \param [in] iface        The number of the originating tree's face.
- * \param [in, out]  itree  On input, the number of the originating tree.
- *                          On output, the face neighbor tree if it exists, -1 otherwise.
+ * \param [in] nface        The number of the originating tree's face.
+ * \param [in] c            Connectivity must be setup.
+ * \param [in, out] ntree   On input, the number of the originating tree.
+ *                          On output, the face neighbor tree if it exists,
+                            -1 otherwise.
  * \param [in,out] ftransform  This array holds 9 integers.
  *                          For 3D:
  *              [0]..[2]    The coordinate axis sequence of the origin face.
@@ -253,7 +255,7 @@ sc3_error_t        *p4est3_connectivity_get_face
  */
 sc3_error_t        *p4est3_connectivity_get_face_transform
   (const p4est3_connectivity_t * c,
-   int32_t iface, int *itree, sc3_array_t * transform);
+   int32_t nface, int *ntree, sc3_array_t * ftransform);
 
 /** Query index of a child that touches a face at some its corner.
  * \param [in] c            Connectivity must be setup.
@@ -270,16 +272,17 @@ sc3_error_t        *p4est3_connectivity_get_face_child_id
 /** Transform a face corner across one of the adjacent faces into a neighbor tree.
  * This version expects the neighbor face and orientation separately.
  * \param [in] c            Connectivity must be setup.
- * \param [in] f     A face that the face corner \a fc is relative to.
- * \param [in] nf    A neighbor face that is on the other side of \f.
- * \param [in] o     The orientation between tree boundary faces \a f and \nf.
- * \param [in,out] fc       On input, a face corner number in 0..3.
- *                          On output, the face corner number relative
- *                          to the neighbor's face.
+ * \param [in] iface        A face that the face corner \a fcorner is relative to.
+ * \param [in] nface        A neighbor face that is on the other side of \a iface.
+ * \param [in] orient       The orientation between tree faces \a iface and \a nface.
+ * \param [in,out] fcorner  On input, a face corner in 0..1 (2D) or  0..3 (3D).
+ *                          On output, the face corner relative to the
+ *                          neighbor's face.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_connectivity_get_neighbor_face_corner
-  (const p4est3_connectivity_t * c, int f, int nf, int o, int *fc);
+  (const p4est3_connectivity_t * c, int iface, int nface,
+   int orient, int *fcorner);
 
 /** Create a connectivity readily setup to represent the 2D unit square.
  * \param [in,out] alloc   Allocator must be setup.  It is referenced
