@@ -63,6 +63,7 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
   else {
     SC3E_TEST (p3->accessed_conn >= 0, reason);
     SC3E_IS (sc3_mpienv_is_valid, p3->split_info, reason);
+    SC3E_TEST (p3->old == NULL);
   }
 
   /* TODO check communicator and connectivity members */
@@ -124,7 +125,7 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   p3->mpicomm = SC3_MPI_COMM_WORLD;
   p3->setup_mode = P4EST3_NEW_MORTON;
   p3->source_setup_mode = P4EST3_SRC_COPY;
-  p3->shared = 1;
+  p3->shared = 0;
   SC3A_IS (p4est3_is_new, p3);
 
   *pp3 = p3;
@@ -235,7 +236,7 @@ p4est3_set_setup_mode (p4est3_t * p3, p4est3_setup_mode_t mode)
 }
 
 sc3_error_t        *
-p4est3_set_source (p4est3_t * p3, p4est3_t * old, p4est3_source_setup_t mode)
+p4est3_set_source (p4est3_t * p3, p4est3_t * old)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_IS (p4est3_is_setup, old);
@@ -247,7 +248,6 @@ p4est3_set_source (p4est3_t * p3, p4est3_t * old, p4est3_source_setup_t mode)
   }
   p3->old = old;
   SC3E (p4est3_ref (p3->old));
-  p3->source_setup_mode = mode;
 
   return NULL;
 }
@@ -278,8 +278,6 @@ sc3_error_t        *
 p4est3_set_shared (p4est3_t * p3, int shared)
 {
   SC3A_IS (p4est3_is_new, p3);
-  SC3A_CHECK (shared == 0 || shared == 1);
-
   p3->shared = shared;
   return NULL;
 }
@@ -319,6 +317,7 @@ p4est3_setup (p4est3_t * p3)
   }
   if (p3->old != NULL) {
     SC3E (p4est3_internal_setup_from_source (p3));
+    /* TODO unref source here and set ->old = NULL */
   }
   else {
     /* query input communicator and populate node and head communicators */
@@ -448,6 +447,8 @@ p4est3_destroy (p4est3_t ** pp3)
     if (p3->old != NULL) {
       SC3E (p4est3_unref (p3->old));
     }
+
+    /* TODO: think about freeing all setup data also for virtual forest */
   }
 
   /* remove allocation */

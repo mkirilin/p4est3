@@ -40,6 +40,28 @@
 #include <sc3_mpienv.h>
 #include <p4est3.h>
 
+/* Use to choose a way of filling a tree with quadrants.*/
+typedef enum p4est3_setup_mode
+{
+  P4EST3_NEW_MORTON,    /**< Set every quadrant by its Morton index */
+  P4EST3_NEW_SUCCESSOR, /**< Set every quadrant by the previous one */
+  P4EST3_NEW_RECURSIVE, /**< Recursive calling the child function */
+  P4EST3_NEW_RECURSIVE_CHILD,
+  P4EST3_NEW_RECURSIVE_REGION,
+  P4EST3_NEW_MODE_LAST  /**< Unused bounding value */
+}
+p4est3_setup_mode_t;
+
+/* Use to choose a way of filling a forest based on another one. */
+typedef enum p4est3_source_setup
+{
+  P4EST3_SRC_COPY,     /**< Setup by a simple copying quadrants */
+  P4EST3_SRC_REFINE,   /**< Setup with refinement where necessary */
+  P4EST3_SRC_COARSE,   /**< Setup with coarsening where necessary */
+  P4EST3_SRC_MODE_LAST  /**< Unused bounding value */
+}
+p4est3_source_setup_t;
+
 /** Internal data for a process-local tree and the quadrants it contains. */
 typedef struct p4est3_tree
 {
@@ -185,6 +207,17 @@ sc3_error_t        *p4est3_internal_setup_tree (p4est3_t * p3,
 sc3_error_t        *p4est3_internal_setup_quadrants (p4est3_t * p3);
 sc3_error_t        *p4est3_internal_setup_from_source (p4est3_t * p3);
 /** \endcond */
+
+/* TODO: document default value for all _set_ */
+/** Set a way that creates quadrants in a tree in a setup p4est3 phase.
+ * TODO: possibly rename function
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] mode         See \ref p4est3_setup_mode_t type for
+ *                          available options. Default value is
+ *                          P4EST3_NEW_MORTON.
+ */
+sc3_error_t        *p4est3_set_setup_mode (p4est3_t * p3,
+                                           p4est3_setup_mode_t mode);
 
 #ifdef __cplusplus
 #if 0

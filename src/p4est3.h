@@ -84,28 +84,6 @@ typedef struct p4est3_vtable
 }
 p4est3_vtable_t;
 
-/* Use to choose a way of filling a tree with quadrants.*/
-typedef enum p4est3_setup_mode
-{
-  P4EST3_NEW_MORTON,    /**< Set every quadrant by its Morton index */
-  P4EST3_NEW_SUCCESSOR, /**< Set every quadrant by the previous one */
-  P4EST3_NEW_RECURSIVE, /**< Recursive calling the child function */
-  P4EST3_NEW_RECURSIVE_CHILD,
-  P4EST3_NEW_RECURSIVE_REGION,
-  P4EST3_NEW_MODE_LAST  /**< Unused bounding value */
-}
-p4est3_setup_mode_t;
-
-/* Use to choose a way of filling a forest based on another one. */
-typedef enum p4est3_source_setup
-{
-  P4EST3_SRC_COPY,     /**< Setup by a simple copying quadrants */
-  P4EST3_SRC_REFINE,   /**< Setup with refinement where necessary */
-  P4EST3_SRC_COARSE,   /**< Setup with coarsening where necessary */
-  P4EST3_SRC_MODE_LAST  /**< Unused bounding value */
-}
-p4est3_source_setup_t;
-
 /* p4est construction parameters: connectivity, uniform level, etc. */
 /* While we're not ready defining the connectivity, use abstract trees. */
 
@@ -124,26 +102,32 @@ typedef struct p4est3 p4est3_t;
 /** Pass context information about a local element to decide for refinement. */
 typedef struct p4est3_refine_callback_info
 {
+  /* these variables stay the same during the refine process */
   p4est3_t           *p3;               /**< Pointer to the forest */
+  p4est3_quadrant_vtable_t *qvt;        /**< Pointer to the quadrant virtual
+                                             table of current implementation */
+  void               *user_data;        /**< For convenience, the user data */
+
+  /* these variables are specific to each quadrant asked for refinement */
   p4est3_topidx       ntree;            /**< Number of tree of quadrant */
   void               *quadrant;         /**< Pointer to the quadrant that
                                              may be refined */
-  p4est3_quadrant_vtable_t *qvt;        /**< Pointer to a quadrant virtual
-                                             table at current implementation */
-  void               *refine_user_data; /**< Previously passed to set_refine */
 }
 p4est3_refine_callback_info_t;
 
 /** Document this. */
 typedef struct p4est3_coarsen_callback_info
 {
+  /* these variables stay the same during the refine process */
   p4est3_t           *p3;               /**< Pointer to the forest */
-  p4est3_topidx       ntree;            /**< Number of tree of family */
-  sc3_array_t        *family;           /**< Array of quadrant that
-                                             represent a family. */
-  p4est3_quadrant_vtable_t *qvt;        /**< Pointer to a quadrant virtual
-                                             table at current implementation */
-  void               *coarsen_user_data; /**< Previously passed to set_coarsen */
+  p4est3_quadrant_vtable_t *qvt;        /**< Pointer to the quadrant virtual
+                                             table of current implementation */
+  void               *user_data;        /**< For convenience, the user data */
+
+  /* these variables are specific to each quadrant asked for refinement */
+  p4est3_topidx       ntree;            /**< Number of tree of quadrant family */
+  sc3_array_t        *family;           /**< Array of quadrants that represent
+                                             a family that may be coarsened */
 }
 p4est3_coarsen_callback_info_t;
 
@@ -209,12 +193,22 @@ sc3_error_t        *p4est3_set_vtable (p4est3_t * p3,
  * \param [in,out] p3       The forest must not have been setup.
  * \param [in] comm         This communicator replaces any previous one.
  *                          If it is dupd, we also set it to return errors.
+ *                          We free a previous communicator when dupd.
  * \param [in] dup          If true, the input communicator is dupd
- *                          and set to return errors.
+ *                          right here and set to return errors.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_set_comm (p4est3_t * p3,
                                      sc3_MPI_Comm_t comm, int dup);
+
+/** Enable/disable use of MPI shared memory.
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] shared       True value indicates enabling, while false
+ *                          is for disabling of MPI-3 shared memory.
+ *                          Default value is false.
+ * \return                  NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_set_shared (p4est3_t * p3, int shared);
 
 /** Provide a connectivity to be used in creating the forest.
  * TODO: set 2D unit square as default.
@@ -246,19 +240,9 @@ sc3_error_t        *p4est3_set_quadrant_vtable (p4est3_t * p3,
  */
 sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
 
-/* TODO: document default value for all _set_ */
-/** Set a way that creates quadrants in a tree in a setup p4est3 phase.
- * \param [in,out] p3       The forest must not have been setup.
- * \param [in] mode         See \ref p4est3_setup_mode_t type for
- *                          available options. Default value is
- *                          P4EST3_NEW_MORTON.
- */
-sc3_error_t        *p4est3_set_setup_mode (p4est3_t * p3,
-                                           p4est3_setup_mode_t mode);
-
 /** Provide a forest to be used in setting up a new one
  * and a mode to get this forest.
- * \param [in,out] p3       Forest object under construction.
+ * \param [in,out] p3       New forest object under construction.
  * \param [in] old          Source forest object that data will be used on
  *                          the setting up stage.
  * \param [in] mode         See \ref p4est3_source_setup_t type for
@@ -266,43 +250,35 @@ sc3_error_t        *p4est3_set_setup_mode (p4est3_t * p3,
  *                          P4EST3_COPY_MODE.
  * \return                  NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old,
-                                       p4est3_source_setup_t mode);
+sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old);
 
 /** Provide a function and data to be used as refinement contition.
  * Must be assign to the source forest.
- * \param [in,out] p3       Forest object under construction.
+ * \param [in,out] p3       New forest object under construction.
  * \param [in] crefine      Callback function prototype to decide
- *                          for refinement. NULL value is possible,
+ *                          for refinement.  NULL value is possible,
  *                          in this case refinement decision is always false.
- * \param [in] user_data    Pointer to refenement user data. Might be NULL.
+ * \param [in] user_data    Pointer passed to refine callback context as is.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_set_refine (p4est3_t * p3,
-                                       p4est3_refine_callback_t crefine,
-                                       void *user_data);
+                                       p4est3_refine_callback_t crefine);
 
 /** Provide a function and data to be used as coarsening contition.
- * Must be assign to the source forest.
- * \param [in,out] p3       Forest object under construction.
+ * Must be assigned to the source forest.
+ * \param [in,out] p3       New forest object under construction.
  * \param [in] ccoarse      Callback function prototype to decide
- *                          for coarsening. NULL value is possible,
+ *                          for coarsening.  NULL value is possible,
  *                          in this case coarsening decision is always false.
- * \param [in] user_data    Pointer to coarsening user data. Might be NULL.
+ * \param [in] user_data    Pointer passed to coarsen callback context as is.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_set_coarsen (p4est3_t * p3,
-                                        p4est3_coarsen_callback_t ccoarse,
-                                        void *user_data);
+                                        p4est3_coarsen_callback_t ccoarse);
 
-/** Enable/disable use of MPI shared memory.
- * \param [in,out] p3       The forest must not have been setup.
- * \param [in] shared       The value 1 indicating enabling,
- *                          while 1 is for disabling of MPI shared memory.
- *                          Defauld value is 1.
- * \return                  NULL on success, error object otherwise.
-*/
-sc3_error_t        *p4est3_set_shared (p4est3_t * p3, int shared);
+/** TODO document */
+sc3_error_t        *p4est3_set_user_data (p4est3_t * p3,
+                                          void *user_data);
 
 /** Finalize construction of a forest.
  * Afterwards, no more \c p4est3_set_* functions may be called.
@@ -383,27 +359,13 @@ sc3_error_t        *p4est3_get_global_num_quads (const p4est3_t * p3,
 sc3_error_t        *p4est3_get_local_num_quads (const p4est3_t * p3,
                                                 p4est3_locidx * n);
 
-#if 0
+sc3_error_t        *p4est3_get_user_data (p4est3_t * p3,
+                                          void **user_data);
 
-p4est3_quadrant_t  *p4est3_quadrant_range (p4est3_t * p3,
-                                           p4est3_topidx_t tbegin,
-                                           p4est3_topidx_t tend,
-                                           p4est3_locidx_t qbegin,
-                                           p4est3_locidx_t qend);
-void                p4est3_quadrant_restore (p4est3_t * p3,
-                                             p4est3_quadrant_t * q3,
-                                             p4est3_topidx_t tbegin,
-                                             p4est3_topidx_t tend,
-                                             p4est3_locidx_t qbegin,
-                                             p4est3_locidx_t qend);
+#if 0
 
 typedef struct p4est3_access_attr p4est3_access_attr_t;
 typedef struct p4est3_access p4est3_access_t;
-
-p4est3_access_t    *p4est3_iter_new (p4est3_t * p3,
-                                     p4est3_access_attr_t * ia);
-p4est3_quadrant_t  *p4est3_iter_end (p4est3_access_t * pi);
-void                p4est3_iter_inc (p4est3_access_t * pi);
 
 p4est3_access_t    *p4est3_access_new (p4est3_t * p3,
                                        p4est3_access_attr_t * ia);

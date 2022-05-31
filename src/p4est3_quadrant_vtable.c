@@ -144,6 +144,7 @@ sc3_error_t        *
 p4est3_quadrant_get_tree_boundary (p4est3_quadrant_vtable_t * qvt,
                                    const void *q, int i, int *j)
 {
+  /* TODO: either require both get_tree_boundary and tree_boundaries or none */
   SC3A_CHECK (qvt != NULL);
   if (qvt->quadrant_get_tree_boundary != NULL) {
     SC3E (qvt->quadrant_get_tree_boundary (q, i, j));
@@ -155,7 +156,7 @@ sc3_error_t        *
 p4est3_quadrant_tree_boundaries (p4est3_quadrant_vtable_t * qvt,
                                  const void *q, sc3_array_t * nf)
 {
-  SC3A_CHECK (qvt != NULL);
+  SC3A_CHECK (qvt != NULL && qvt->quadrant_tree_boundaries != NULL);
   SC3E (qvt->quadrant_tree_boundaries (q, nf));
   return NULL;
 }
@@ -163,13 +164,8 @@ p4est3_quadrant_tree_boundaries (p4est3_quadrant_vtable_t * qvt,
 sc3_error_t        *
 p4est3_quadrant_level (p4est3_quadrant_vtable_t * qvt, const void *q, int *l)
 {
-  SC3A_CHECK (qvt != NULL);
-  if (qvt->quadrant_level != NULL) {
-    SC3E (qvt->quadrant_level (q, l));
-  }
-  else {
-    *l = qvt->max_level;
-  }
+  SC3A_CHECK (qvt != NULL && qvt->quadrant_level != NULL);
+  SC3E (qvt->quadrant_level (q, l));
   return NULL;
 }
 
