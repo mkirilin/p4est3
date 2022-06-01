@@ -63,7 +63,8 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
   else {
     SC3E_TEST (p3->accessed_conn >= 0, reason);
     SC3E_IS (sc3_mpienv_is_valid, p3->split_info, reason);
-    SC3E_TEST (p3->old == NULL);
+    SC3E_TEST (p3->old == NULL, reason);
+    SC3E_TEST (p3->crefine == NULL && p3->ccoarse == NULL, reason);
   }
 
   /* TODO check communicator and connectivity members */
@@ -77,7 +78,6 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
     SC3E_TEST (p3->mpicomm != SC3_MPI_COMM_NULL, reason);
     SC3E_TEST (p3->level >= 0, reason);
     SC3E_TEST (p3->setup_mode < P4EST3_NEW_MODE_LAST, reason);
-    SC3E_TEST (p3->source_setup_mode < P4EST3_SRC_MODE_LAST, reason);
 
     if (!p3->setup) {
       SC3E_TEST (p3->mpisize == 0 && p3->mpirank == 0, reason);
@@ -124,7 +124,6 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   p3->alloc = alloc;
   p3->mpicomm = SC3_MPI_COMM_WORLD;
   p3->setup_mode = P4EST3_NEW_MORTON;
-  p3->source_setup_mode = P4EST3_SRC_COPY;
   p3->shared = 0;
   SC3A_IS (p4est3_is_new, p3);
 
@@ -241,7 +240,6 @@ p4est3_set_source (p4est3_t * p3, p4est3_t * old)
   SC3A_IS (p4est3_is_new, p3);
   SC3A_IS (p4est3_is_setup, old);
   SC3A_CHECK (p3 != old);
-  SC3A_CHECK (0 <= mode && mode < P4EST3_SRC_MODE_LAST);
 
   if (p3->old != NULL) {
     SC3E (p4est3_unref (p3->old));
@@ -253,23 +251,19 @@ p4est3_set_source (p4est3_t * p3, p4est3_t * old)
 }
 
 sc3_error_t        *
-p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine,
-                   void *user_data)
+p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->crefine = crefine;
-  p3->refine_user_data = user_data;
 
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_set_coarsen (p4est3_t * p3, p4est3_coarsen_callback_t ccoarse,
-                    void *user_data)
+p4est3_set_coarsen (p4est3_t * p3, p4est3_coarsen_callback_t ccoarse)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->ccoarse = ccoarse;
-  p3->coarsen_user_data = user_data;
 
   return NULL;
 }
@@ -317,7 +311,10 @@ p4est3_setup (p4est3_t * p3)
   }
   if (p3->old != NULL) {
     SC3E (p4est3_internal_setup_from_source (p3));
-    /* TODO unref source here and set ->old = NULL */
+    SC3E (p4est3_unref (p3->old));
+    p3->old = NULL;
+    p3->crefine = NULL;
+    p3->ccoarse = NULL;
   }
   else {
     /* query input communicator and populate node and head communicators */

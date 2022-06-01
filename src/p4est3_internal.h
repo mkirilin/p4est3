@@ -115,7 +115,6 @@ struct p4est3
                                      index space, may be reduced during
                                      \ref p4est3_setup. */
   p4est3_setup_mode_t setup_mode;       /**< Choose the method of quadrant creation*/
-  p4est3_source_setup_t source_setup_mode; /** Choose the method of setting up from source */
   p4est3_t           *old;      /**< Pointer to the setup forest */
 
   /* variables populated during p4est3_setup: communicator related */
@@ -169,11 +168,8 @@ struct p4est3
   p4est3_refine_callback_t crefine; /**< Refinemet callback function */
   p4est3_coarsen_callback_t ccoarse; /**< Coarsening  callback function */
 
-  /* pointers to user data, p4est does not touch them */
-  void               *refine_user_data;
-                                 /**< Pointer to refinement user data. */
-  void               *coarsen_user_data;
-                                 /**< Pointer to coarsening user data. */
+  /* pointer to user data, p4est does not touch them */
+  void               *user_data;
 };
 
 #ifdef __cplusplus

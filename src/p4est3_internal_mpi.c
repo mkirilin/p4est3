@@ -963,13 +963,8 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   p3->nltrees = old->nltrees;
 
   /* functions set before p4est3_setup */
-  p3->crefine = p3->crefine == NULL ? old->crefine : p3->crefine;
-  p3->ccoarse = p3->ccoarse == NULL ? old->ccoarse : p3->ccoarse;
-  if (p3->refine_user_data == NULL) {
-    p3->refine_user_data = old->refine_user_data;
-  }
-  if (p3->coarsen_user_data == NULL) {
-    p3->coarsen_user_data = old->coarsen_user_data;
+  if (p3->user_data == NULL) {
+    p3->user_data = old->user_data;
   }
 
   p3->mpisize = old->mpisize;
@@ -990,7 +985,5 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   p3->setup = 1;
   //SC3E (p4est3_fill_from_source (p3));
   SC3E (p4est3_fill_from_source_translate (p3));
-
-  SC3A_IS (p4est3_is_setup, p3);
   return NULL;
 }

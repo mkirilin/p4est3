@@ -38,6 +38,7 @@ typedef struct refine_callback_data
   int                 counter;
   int                 n_new;
   sc3_array_t        *pattern;
+  p4est3_refine_callback_t crefine;
 }
 refine_callback_data_t;
 
@@ -47,6 +48,7 @@ typedef struct coarsen_callback_data
   sc3_array_t        *family; /**< Array of pointers to quadrants*/
   sc3_array_t        *pattern;
   int                 nsiblings;
+  p4est3_coarsen_callback_t ccoarse;
 }
 coarsen_callback_data_t;
 
@@ -78,7 +80,6 @@ p4est3_refine_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 static sc3_error_t *
 p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
 {
-  SC3A_CHECK (vi->p3->crefine != NULL);
   int                 is_refine;
   refine_callback_data_t *cdata = (refine_callback_data_t *) vi->user_data;
   char               *pattern_it;
@@ -89,9 +90,10 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
   ri.ntree = vi->ntree;
   ri.quadrant = vi->quadrant;
   ri.qvt = vi->p3->qvt;
-  ri.refine_user_data = vi->p3->refine_user_data;
+  ri.user_data = vi->p3->user_data;
 
-  SC3E (vi->p3->crefine (&ri, &is_refine));
+  SC3A_CHECK (cdata->crefine != NULL);
+  SC3E (cdata->crefine (&ri, &is_refine));
   SC3E (sc3_array_index (cdata->pattern, cdata->n_new, &pattern_it));
   if (!is_refine) {
     *pattern_it = 1;
@@ -115,7 +117,6 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
 static sc3_error_t *
 p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
 {
-  SC3A_CHECK (vi->p3->ccoarse != NULL);
   int                 is_coarse, i, child_id;
   char               *pattern_it;
   void              **quad;
@@ -170,7 +171,9 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
     ci.ntree = vi->ntree;
     ci.family = cdata->family;
     ci.qvt = vi->p3->qvt;
-    SC3E (vi->p3->ccoarse (&ci, &is_coarse));
+    ci.user_data = vi->p3->user_data;
+    SC3A_CHECK (cdata->ccoarse != NULL);
+    SC3E (cdata->ccoarse (&ci, &is_coarse));
     cdata->nsiblings = 0;
   }
   else {
@@ -349,37 +352,30 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
   /* All the preparations are done. Begin with the algorithm. */
   /* A call to fill in level information, that is necessary for
      generation of a new forest's mesh */
-  switch (p3->source_setup_mode) {
-  case P4EST3_SRC_REFINE:
-    SC3A_CHECK (p3->old->crefine != NULL);
+  if (p3->crefine != NULL) {
     rdata->counter = 0;
     rdata->n_new = 0;
     rdata->pattern = pattern;
+    rdata->crefine = p3->crefine;
     SC3E (p4est3_iterate_volume
           (p3->old, p4est3_refine_volume_callback, rdata));
     p3->local_num_quads = rdata->counter;
-    break;
-
-  case P4EST3_SRC_COARSE:
-    SC3A_CHECK (p3->old->ccoarse != NULL);
+  }
+  else if (p3->ccoarse != NULL) {
     cdata->counter = 0;
     cdata->pattern = pattern;
     SC3E (p4est3_refine_array_new
           (p3->alloc, sizeof (void *), p3->qvt->max_children,
            p3->qvt->max_children, &cdata->family));
     cdata->nsiblings = 0;
+    cdata->ccoarse = p3->ccoarse;
     SC3E (p4est3_iterate_volume
           (p3->old, p4est3_coarsen_volume_callback, cdata));
     p3->local_num_quads = cdata->counter;
-    break;
-
-    /*case P4EST3_SRC_COPY:
-       SC3E (p4est3_iterate_volume
-       (p3->old, p4est3_copy_volume_callback, pattern));
-       break; */
-
-  default:
-    SC3E_UNREACH ("wrong setup from source mode");
+  }
+  else {
+    /*SC3E (p4est3_iterate_volume
+    (p3->old, p4est3_copy_volume_callback, pattern));*/
   }
 
   /* Here we allocate shared p4est3_t::quadwin and p4est3_t::nodequads.
@@ -423,22 +419,16 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
     tree->treeid = i;
     tree->quad_offset = lt_offset;
     tree->tquads = p3->quads + p3->qsize * tree->quad_offset;
-    switch (p3->source_setup_mode) {
-    case P4EST3_SRC_REFINE:
+    if (p3->crefine != NULL) {
       SC3E (p4est3_pattern_populate_tree_ref
             (p3, tree, rdata->pattern, &lt_offset, coords));
-      break;
-
-    case P4EST3_SRC_COARSE:
+    }
+    else if (p3->ccoarse != NULL) {
       SC3E (p4est3_pattern_populate_tree_coarse
             (p3, tree, cdata->pattern, &lt_offset, coords));
-      break;
-
-      /*case P4EST3_SRC_COPY:
-         break; */
-
-    default:
-      SC3E_UNREACH ("wrong setup from source mode");
+    }
+    else {
+      /*something with copying*/
     }
     tree->num_quads = lt_offset - tree->quad_offset;
     tree->first_tquad = 0;
@@ -485,15 +475,11 @@ p4est3_fill_from_source_translate (p4est3_t * p3)
   SC3E (sc3_allocator_free (p3->alloc, local_num_quads));
   SC3E (sc3_allocator_free (p3->alloc, first_tree_quads));
   SC3E (sc3_allocator_free (p3->alloc, coords));
-  if (p3->source_setup_mode == P4EST3_SRC_COARSE) {
+  if (p3->crefine == NULL && p3->ccoarse != NULL) {
     SC3E (sc3_array_destroy (&cdata->family));
   }
   sc3_MPI_Barrier (p3->mpicomm);
   p3->global_num_quads = p3->goffset[p3->mpisize];
-
-  SC3A_CHECK (p3->old != NULL);
-  SC3E (p4est3_unref (p3->old));
-  p3->old = NULL;
   return NULL;
 }
 
