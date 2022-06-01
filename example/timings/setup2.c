@@ -33,6 +33,9 @@
 #include <p8est_extended.h>
 #endif
 
+/* Generally speaking, it is not allowed to use _internal headers in
+ applications. We use it only in exceptional cases as timings and tests. */
+#include <p4est3_internal.h>
 #include <sc_statistics.h>
 #include <sc_flops.h>
 
