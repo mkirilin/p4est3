@@ -26,7 +26,6 @@
  *
  * \ingroup p4est3
  */
-
 #ifndef P4EST3_REFINE_H
 #define P4EST3_REFINE_H
 
@@ -40,7 +39,10 @@ extern              "C"
 #endif
 #endif
 
-/* Refine forest */
+/* Refine forest. If the forest's data and settings (including
+  refinement/coarsening callbacks and data) ware not set up manually, they,
+  rather than quadrant related, will be inherited from the sourse forest.
+ */
 /* Warning: this functions does not support multithreading */
 sc3_error_t        *p4est3_fill_from_source (p4est3_t * p3);
 

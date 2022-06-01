@@ -33,130 +33,24 @@ extern              "C"
 #endif
 #endif
 
+typedef struct refine_callback_data
+{
+  int                 counter;
+  int                 n_new;
+  sc3_array_t        *pattern;
+  p4est3_refine_callback_t crefine;
+}
+refine_callback_data_t;
+
 typedef struct coarsen_callback_data
 {
-  sc3_array_t        *family;
+  int                 counter;
+  sc3_array_t        *family; /**< Array of pointers to quadrants*/
   sc3_array_t        *pattern;
   int                 nsiblings;
+  p4est3_coarsen_callback_t ccoarse;
 }
 coarsen_callback_data_t;
-
-/* A trivial callback that copies volumes' level into levels array */
-static sc3_error_t *
-p4est3_copy_volume_callback (p4est3_iterate_volume_info_t * vi)
-{
-  int                 level;
-  int                *pattern_it;
-
-  SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
-  SC3E (sc3_array_push ((sc3_array_t *) vi->user_data, &pattern_it));
-  *pattern_it = level;
-  return NULL;
-}
-
-/* Specific volume iterator callback that processes volume info by refinement
-   callback and returns (with user_data) population pattern
-   (see refinement documentation) */
-static sc3_error_t *
-p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
-{
-  SC3A_CHECK (vi->p3->crefine != NULL);
-  int                 is_refine, level, i;
-  int                *pattern_it;
-
-  /* pack data for refinement callback input */
-  p4est3_refine_callback_info_t ri;
-  ri.p3 = vi->p3;
-  ri.ntree = vi->ntree;
-  ri.quadrant = vi->quadrant;
-  ri.qvt = vi->p3->qvt;
-  ri.refine_user_data = vi->p3->refine_user_data;
-
-  SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
-
-  SC3E (vi->p3->crefine (&ri, &is_refine));
-  if (!is_refine) {
-    SC3E (sc3_array_push ((sc3_array_t *) vi->user_data, &pattern_it));
-    *pattern_it = level;
-  }
-  else {
-    for (i = 0; i < vi->p3->num_children; ++i) {
-      SC3E (sc3_array_push ((sc3_array_t *) vi->user_data, &pattern_it));
-      SC3A_CHECK (level + 1 <= vi->p3->qmaxlevel);
-      *pattern_it = level + 1;
-    }
-  }
-  return NULL;
-}
-
-/* Specific volume iterator callback that processes volume info by coarsining
-   callback and returns (with user_data) population pattern
-   (see coarsining documentation) */
-static sc3_error_t *
-p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
-{
-  SC3A_CHECK (vi->p3->ccoarse != NULL);
-  int                 is_coarse, level, i, child_id;
-  int                *pattern_it;
-  void               *quad;
-  coarsen_callback_data_t *cdata = (coarsen_callback_data_t *) vi->user_data;
-  p4est3_coarsen_callback_info_t ci;    /* = { vi->p3, vi->ntree, vi->quadrant }; */
-
-  /* Decide if we call coarse callback.
-     We do this only if we find a whole family. */
-  SC3E (p4est3_quadrant_child_id (vi->p3->qvt, vi->quadrant, &child_id));
-  if (cdata->nsiblings != child_id) {
-    /* possibly the benning of a new family */
-    if (child_id == 0) {
-      /* the beginning indeed, start the family */
-      SC3E (sc3_array_index (cdata->family, 0, &quad));
-      quad = vi->quadrant;
-      cdata->nsiblings = 1;
-    }
-    else {
-      /* cannot be a part of a complete family */
-      SC3E (sc3_array_push ((sc3_array_t *) vi->user_data, &pattern_it));
-      SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
-      *pattern_it = level;
-    }
-    return NULL;
-  }
-
-  /* cdata->nsiblings == child_id: the volume is a part of the family */
-  SC3E (sc3_array_index (cdata->family, cdata->nsiblings, &quad));
-  quad = vi->quadrant;
-  cdata->nsiblings++;
-
-  if (cdata->nsiblings == vi->p3->num_children) {
-    /* we have complete family, pack data and call coarsening */
-    ci.p3 = vi->p3;
-    ci.ntree = vi->ntree;
-    ci.family = cdata->family;
-    ci.qvt = vi->p3->qvt;
-    SC3E (vi->p3->ccoarse (&ci, &is_coarse));
-    ci.coarsen_user_data = vi->p3->coarsen_user_data;
-    cdata->nsiblings = 0;
-  }
-  else {
-    /* nothing left to do here, go to the next volume */
-    return NULL;
-  }
-
-  /* fill in the level information */
-  SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
-  if (is_coarse) {
-    SC3E (sc3_array_push ((sc3_array_t *) vi->user_data, &pattern_it));
-    SC3A_CHECK (level - 1 >= 0);
-    *pattern_it = level - 1;
-  }
-  else {
-    for (i = 0; i < vi->p3->num_children; ++i) {
-      SC3E (sc3_array_push ((sc3_array_t *) vi->user_data, &pattern_it));
-      *pattern_it = level;
-    }
-  }
-  return NULL;
-}
 
 static sc3_error_t *
 p4est3_refine_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
@@ -176,117 +70,241 @@ p4est3_refine_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
   return NULL;
 }
 
+/* Specific volume iterator callback that processes volume info by refinement
+   callback and returns (with user_data) population pattern
+   (see refinement documentation).
+   The pattern consists of possible values: 1 and num_children.
+   1 means a simple copying (probably, with translation);
+   num_children means creating all the children of the corresponding quadrant
+   and inserting them into a new forest.*/
 static sc3_error_t *
-p4est3_lowest_children_pattern (p4est3_t * p3, p4est3_tree_t * tree,
-                                const void *q, sc3_array_t * levelq,
-                                sc3_array_t * pattern, int *deep_idx)
+p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
 {
-  int                *deep;
-  void               *child;
-  int                 i, level;
-  int                 ecount;
+  int                 is_refine;
+  refine_callback_data_t *cdata = (refine_callback_data_t *) vi->user_data;
+  char               *pattern_it;
 
-  SC3E (p4est3_quadrant_level (p3->qvt, q, &level));
-  SC3E (sc3_array_get_elem_count (pattern, &ecount));
-  if (ecount <= *deep_idx) {
-    return NULL;
-  }
-  SC3E (sc3_array_index (pattern, *deep_idx, &deep));
-  SC3A_CHECK (level <= *deep && *deep <= p3->qmaxlevel);
-  if (level < *deep) {
-    SC3E (sc3_array_index (levelq, level + 1, &child));
-    for (i = 0; i < p3->num_children; ++i) {
-      SC3E (p4est3_quadrant_child (p3->qvt, q, i, child));
-      SC3E (p4est3_lowest_children_pattern
-            (p3, tree, child, levelq, pattern, deep_idx));
-    }
+  /* pack data for refinement callback input */
+  p4est3_refine_callback_info_t ri;
+  ri.p3 = vi->p3;
+  ri.ntree = vi->ntree;
+  ri.quadrant = vi->quadrant;
+  ri.qvt = vi->p3->qvt;
+  ri.user_data = vi->p3->user_data;
+
+  SC3A_CHECK (cdata->crefine != NULL);
+  SC3E (cdata->crefine (&ri, &is_refine));
+  SC3E (sc3_array_index (cdata->pattern, cdata->n_new, &pattern_it));
+  if (!is_refine) {
+    *pattern_it = 1;
+    cdata->counter++;
   }
   else {
-    SC3E (p4est3_quadrant_copy
-          (p3->qvt, q, p3->quads + *deep_idx * p3->qsize));
-    (*deep_idx)++;
+    *pattern_it = vi->p3->num_children;
+    cdata->counter += vi->p3->num_children;
+  }
+  cdata->n_new++;
+  return NULL;
+}
+
+/* Specific volume iterator callback that processes volume info by coarsining
+   callback and returns (with user_data) population pattern
+   (see coarsining documentation).
+   The pattern consists of possible values: 1 and num_children.
+   1 means a simple copying (probably, with translation);
+   num_children means creating the parent for the next num_children
+   corresponding quadrants and inserting them into a new forest.*/
+static sc3_error_t *
+p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
+{
+  int                 is_coarse, i, child_id;
+  char               *pattern_it;
+  void              **quad;
+  p4est3_tree_t      *tree;
+  coarsen_callback_data_t *cdata = (coarsen_callback_data_t *) vi->user_data;
+  p4est3_coarsen_callback_info_t ci;    /* = { vi->p3, vi->ntree, vi->quadrant }; */
+
+  /* Decide if we call coarse callback.
+     We do this only if we find a whole family. */
+  SC3E (p4est3_quadrant_child_id (vi->p3->qvt, vi->quadrant, &child_id));
+  if (child_id == 0) {
+    /* the beginning of a new family,
+       process previous (part of the) family */
+    for (i = 0; i < cdata->nsiblings; ++i) {
+      SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
+      *pattern_it = 1;
+      cdata->counter++;
+    }
+    SC3E (sc3_array_index (cdata->family, 0, &quad));
+    *quad = vi->quadrant;
+    cdata->nsiblings = 1;
+    /* Check if it is the last quadrant in a forest.
+       If so, process quadrants in current family. */
+    SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
+    if (vi->nquad - tree->first_tquad + tree->quad_offset + 1 ==
+        vi->p3->local_num_quads) {
+      for (i = 0; i < cdata->nsiblings; ++i) {
+        SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
+        *pattern_it = 1;
+        cdata->counter++;
+      }
+    }
+    return NULL;
+  }
+  if (cdata->nsiblings != child_id) {
+    /* cannot be a part of a complete family */
+    SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
+    *pattern_it = 1;
+    cdata->counter++;
+
+    return NULL;
+  }
+
+  /* cdata->nsiblings == child_id: the volume is a part of the family */
+  SC3E (sc3_array_index (cdata->family, cdata->nsiblings, &quad));
+  *quad = vi->quadrant;
+  cdata->nsiblings++;
+
+  if (cdata->nsiblings == vi->p3->num_children) {
+    /* we have complete family, pack data and call coarsening */
+    ci.p3 = vi->p3;
+    ci.ntree = vi->ntree;
+    ci.family = cdata->family;
+    ci.qvt = vi->p3->qvt;
+    ci.user_data = vi->p3->user_data;
+    SC3A_CHECK (cdata->ccoarse != NULL);
+    SC3E (cdata->ccoarse (&ci, &is_coarse));
+    cdata->nsiblings = 0;
+  }
+  else {
+    /* Check if it is the last quadrant in a forest.
+       If so, process quadrants in current family. */
+    SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
+    if (vi->nquad - tree->first_tquad + tree->quad_offset + 1 ==
+        vi->p3->local_num_quads) {
+      for (i = 0; i < cdata->nsiblings; ++i) {
+        SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
+        *pattern_it = 1;
+        cdata->counter++;
+      }
+    }
+    /* nothing left to do here, go to the next volume */
+    return NULL;
+  }
+
+  /* fill in the level information */
+  if (is_coarse) {
+    SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
+    *pattern_it = vi->p3->num_children;
+    cdata->counter++;
+  }
+  else {
+    for (i = 0; i < vi->p3->num_children; ++i) {
+      SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
+      *pattern_it = 1;
+      cdata->counter++;
+    }
   }
   return NULL;
 }
 
-/** This functions does not support multithreading
-   Initial value for variables level and deep_idx here must be 0.
-   Initial values for range_begin and _end are 0
-   and the number of quads at level of p3->qmaxlevel respectively.
-   tree->first_tquad, last_tquad and end_tquad are supposed to
-   consider uniform mesh of possible reached level of the forest.
-   That means, that these values must be previously recalculated
-   if necessary (i.e. via first_ last_descendat) */
 static sc3_error_t *
-p4est3_pattern_populate_tree_rec (p4est3_t * p3, int level,
-                                  p4est3_tree_t * tree,
-                                  sc3_array_t * pattern,
-                                  sc3_array_t * levelq,
-                                  p4est3_gloidx range_begin,
-                                  p4est3_gloidx range_end, int *deep_idx)
+p4est3_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
+                           p4est3_quadrant_vtable_t * qvt_new,
+                           const void *qin, void *qout, int32_t * c)
 {
-  void               *q, *child;
-  int                 i;
-  p4est3_gloidx       n_lowerq;
+  int                 level;
 
-  if (range_begin >= tree->first_tquad && range_end <= tree->end_tquad) {
-    SC3E (sc3_array_index (levelq, level, &q));
-    SC3E (p4est3_lowest_children_pattern
-          (p3, tree, q, levelq, pattern, deep_idx));
-  }
-  else if (range_begin > tree->last_tquad || range_end <= tree->first_tquad) {
-    return NULL;
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_old);
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_new);
+  SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_old, qin);
+  SC3A_CHECK (qvt_old->dim == qvt_new->dim);
+
+  if (qvt_old == qvt_new) {
+    /* just hardcopy the quadrant */
+    SC3E (p4est3_quadrant_copy (qvt_old, qin, qout));
   }
   else {
-    n_lowerq = (range_end - range_begin) / p3->num_children;
-    range_end = range_begin + n_lowerq;
-    for (i = 0; i < p3->num_children; ++i,
-         range_begin += n_lowerq, range_end += n_lowerq) {
-      SC3A_CHECK (level <= p3->qmaxlevel);
-      SC3E (sc3_array_index (levelq, level, &q));
-      SC3E (sc3_array_index (levelq, level + 1, &child));
-      SC3E (p4est3_quadrant_child (p3->qvt, q, i, child));
-      SC3E (p4est3_pattern_populate_tree_rec
-            (p3, level + 1, tree, pattern, levelq,
-             range_begin, range_end, deep_idx));
-    }
+    SC3E (p4est3_quadrant_level (qvt_old, qin, &level));
+    SC3A_CHECK (level <= qvt_new->max_level);
+    SC3E (p4est3_quadrant_coordinates (qvt_old, qin, qvt_old->dim, c));
+    SC3E (p4est3_quadrant_quadrant (qvt_new, c, level, qout));
   }
+
+  SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_new, qout);
   return NULL;
 }
 
 static sc3_error_t *
-p4est3_pattern_populate_tree (p4est3_t * p3, p4est3_tree_t * tree,
-                              sc3_array_t * pattern, sc3_array_t * levelq,
-                              int *deep_idx)
+p4est3_pattern_populate_tree_coarse (p4est3_t * p3, p4est3_tree_t * tree,
+                                     sc3_array_t * pattern, int *lt_offset,
+                                     int32_t * c)
 {
-  void               *quad;
-  p4est3_gloidx       range_end;
+  int                 i = 0, n_new_quads = 0;
+  char               *n_insert;
+  void               *quad_old, *quad_new;
   p4est3_tree_t      *oldtree;
 
-  /* Prepare some temporaty values of the tree here */
   SC3E (p4est3_tree_index (p3->old, tree->treeid, &oldtree));
-  quad = (void *) oldtree->tquads;
-  SC3E (p4est3_quadrant_first_descendant
-        (p3->old->qvt, quad, p3->old->qmaxlevel, p3->old->temp_quad[0]));
-  SC3E (p4est3_quadrant_linear_id
-        (p3->old->qvt, p3->old->temp_quad[0],
-         p3->old->qmaxlevel, &tree->first_tquad));
+  while (i < oldtree->num_quads) {
+    SC3E (sc3_array_index (pattern, *lt_offset + n_new_quads, &n_insert));
+    SC3A_CHECK ((int) *n_insert == 1
+                || (int) *n_insert == p3->old->num_children);
+    quad_old = (void *) (oldtree->tquads + i * p3->old->qsize);
+    if ((int) *n_insert == 1) {
+      quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
+      SC3E (p4est3_translate_quadrant
+            (p3->old->qvt, p3->qvt, quad_old, quad_new, c));
+      n_new_quads++;
+      i++;
+    }
+    else {
+      SC3E (p4est3_translate_quadrant
+            (p3->old->qvt, p3->qvt, quad_old, p3->temp_quad[0], c));
+      quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
+      SC3E (p4est3_quadrant_parent (p3->qvt, p3->temp_quad[0], quad_new));
+      n_new_quads++;
+      i += p3->num_children;
+    }
+  }
+  *lt_offset += n_new_quads;
+  return NULL;
+}
 
-  quad =
-    (void *) (oldtree->tquads + p3->old->qsize * (oldtree->num_quads - 1));
-  SC3E (p4est3_quadrant_last_descendant
-        (p3->old->qvt, quad, p3->old->qmaxlevel, p3->old->temp_quad[0]));
-  SC3E (p4est3_quadrant_linear_id
-        (p3->old->qvt, p3->old->temp_quad[0], p3->old->qmaxlevel,
-         &tree->last_tquad));
-  tree->end_tquad = tree->last_tquad + 1;
-  range_end = p4est3_quadrant_num_uniform (p3->qvt, p3->old->qmaxlevel);
+static sc3_error_t *
+p4est3_pattern_populate_tree_ref (p4est3_t * p3, p4est3_tree_t * tree,
+                                  sc3_array_t * pattern, int *lt_offset,
+                                  int32_t * c)
+{
+  int                 i, nch, n_new_quads = 0;
+  char               *n_insert;
+  void               *quad_old, *quad_new;
+  p4est3_tree_t      *oldtree;
 
-  /* populate the tree */
-  SC3A_IS (p4est3_is_valid, p3);
-  SC3E (p4est3_pattern_populate_tree_rec
-        (p3, 0, tree, pattern, levelq, 0, range_end, deep_idx));
-
+  SC3E (p4est3_tree_index (p3->old, tree->treeid, &oldtree));
+  for (i = 0; i < oldtree->num_quads; ++i) {
+    SC3E (sc3_array_index (pattern, oldtree->quad_offset + i, &n_insert));
+    SC3A_CHECK ((int) *n_insert == 1
+                || (int) *n_insert == p3->old->num_children);
+    quad_old = (void *) (oldtree->tquads + i * p3->old->qsize);
+    if ((int) *n_insert == 1) {
+      quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
+      SC3E (p4est3_translate_quadrant
+            (p3->old->qvt, p3->qvt, quad_old, quad_new, c));
+      n_new_quads++;
+    }
+    else {
+      SC3E (p4est3_translate_quadrant
+            (p3->old->qvt, p3->qvt, quad_old, p3->temp_quad[0], c));
+      for (nch = 0; nch < p3->num_children; ++nch) {
+        quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
+        SC3E (p4est3_quadrant_child
+              (p3->qvt, p3->temp_quad[0], nch, quad_new));
+        n_new_quads++;
+      }
+    }
+  }
+  *lt_offset += n_new_quads;
   return NULL;
 }
 
@@ -297,6 +315,7 @@ p4est3_fill_from_source (p4est3_t * p3)
   int                 dispunit;
   int                 noderank;
   char               *quadmem, *nqmem;
+  int32_t            *coords;
   p4est3_locidx       lt_offset, num_quads = 0;
   p4est3_locidx      *local_num_quads;  /**< Array of the numbers of quadrants at every rank */
   p4est3_locidx      *first_tree_quads; /**< Array of the numbers of quadrants at the first local tree */
@@ -304,13 +323,10 @@ p4est3_fill_from_source (p4est3_t * p3)
   sc3_MPI_Comm_t      nodecomm;
   sc3_MPI_Aint_t      tempbytes, goffsetbytes;
   p4est3_tree_t      *tree;
-  sc3_array_t        *pattern; /**< Array of patterns that we will use
-                              to run top-down forest creation */
-  sc3_array_t        *levelq;
+  sc3_array_t        *pattern;
+
   coarsen_callback_data_t scdata, *cdata = &scdata;
-#ifdef P4EST_ENABLE_DEBUG
-  int                *level;
-#endif
+  refine_callback_data_t srdata, *rdata = &srdata;
 
   /* We suppose to call this function after setting up routine */
   SC3A_CHECK (p3->crefine != NULL || p3->ccoarse != NULL);
@@ -328,11 +344,7 @@ p4est3_fill_from_source (p4est3_t * p3)
         (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &first_tree_quads));
 
   SC3E (p4est3_refine_array_new
-        (p3->alloc, sizeof (int),
-         p3->old->local_num_quads * p3->num_children, 0, &pattern));
-
-  SC3E (p4est3_refine_array_new (p3->alloc, p3->qsize, p3->qmaxlevel + 1,
-                                 p3->qmaxlevel + 1, &levelq));
+        (p3->alloc, sizeof (char), 0, p3->old->local_num_quads, &pattern));
 
   SC3E (p4est3_refine_array_new (p3->alloc, sizeof (p4est3_tree_t),
                                  p3->nltrees, p3->nltrees, &p3->trees));
@@ -340,40 +352,32 @@ p4est3_fill_from_source (p4est3_t * p3)
   /* All the preparations are done. Begin with the algorithm. */
   /* A call to fill in level information, that is necessary for
      generation of a new forest's mesh */
-  switch (p3->source_setup_mode) {
-  case P4EST3_SRC_REFINE:
+  if (p3->crefine != NULL) {
+    rdata->counter = 0;
+    rdata->n_new = 0;
+    rdata->pattern = pattern;
+    rdata->crefine = p3->crefine;
     SC3E (p4est3_iterate_volume
-          (p3->old, p4est3_refine_volume_callback, pattern));
-    break;
-
-  case P4EST3_SRC_COARSE:
+          (p3->old, p4est3_refine_volume_callback, rdata));
+    p3->local_num_quads = rdata->counter;
+  }
+  else if (p3->ccoarse != NULL) {
+    cdata->counter = 0;
     cdata->pattern = pattern;
     SC3E (p4est3_refine_array_new
-          (p3->alloc, p3->qsize, p3->qvt->max_children,
+          (p3->alloc, sizeof (void *), p3->qvt->max_children,
            p3->qvt->max_children, &cdata->family));
     cdata->nsiblings = 0;
+    cdata->ccoarse = p3->ccoarse;
     SC3E (p4est3_iterate_volume
           (p3->old, p4est3_coarsen_volume_callback, cdata));
-    break;
-
-  case P4EST3_SRC_COPY:
-    SC3E (p4est3_iterate_volume
-          (p3->old, p4est3_copy_volume_callback, pattern));
-    break;
-
-  default:
-    SC3E_UNREACH ("wrong setup from source mode");
+    p3->local_num_quads = cdata->counter;
   }
-  SC3E (sc3_array_get_elem_count (pattern, &p3->local_num_quads));
-
-#ifdef P4EST_ENABLE_DEBUG
-  for (i = 0; i < p3->local_num_quads; ++i) {
-    SC3E (sc3_array_index (pattern, i, &level));
-    /** TODO: Check on p3->qmaxlevel at populating stage and skip
-     * if it is impossible to split*/
-    SC3A_CHECK (*level <= p3->qmaxlevel);
+  else {
+    /*SC3E (p4est3_iterate_volume
+    (p3->old, p4est3_copy_volume_callback, pattern));*/
   }
-#endif
+
   /* Here we allocate shared p4est3_t::quadwin and p4est3_t::nodequads.
      We will fill in the latter later. */
   SC3E (sc3_allocator_malloc (p3->alloc, nodesize * sizeof (char *),
@@ -407,15 +411,25 @@ p4est3_fill_from_source (p4est3_t * p3)
      and set p4est3_tree_t:: treeid, quad_offset and num_quads.
      We also initialize p4est3_tree_t::first_tquad by 0.
      We work on the process-local window onto the quadrants */
-
+  SC3E (sc3_allocator_calloc
+        (p3->alloc, p3->qvt->dim, sizeof (int32_t), &coords));
   lt_offset = 0;
   for (i = p3->fltree; i <= p3->lltree; ++i) {
     SC3E (p4est3_tree_index (p3, i, &tree));
     tree->treeid = i;
     tree->quad_offset = lt_offset;
     tree->tquads = p3->quads + p3->qsize * tree->quad_offset;
-    SC3E (p4est3_pattern_populate_tree
-          (p3, tree, pattern, levelq, &lt_offset));
+    if (p3->crefine != NULL) {
+      SC3E (p4est3_pattern_populate_tree_ref
+            (p3, tree, rdata->pattern, &lt_offset, coords));
+    }
+    else if (p3->ccoarse != NULL) {
+      SC3E (p4est3_pattern_populate_tree_coarse
+            (p3, tree, cdata->pattern, &lt_offset, coords));
+    }
+    else {
+      /*something with copying*/
+    }
     tree->num_quads = lt_offset - tree->quad_offset;
     tree->first_tquad = 0;
   }
@@ -458,15 +472,14 @@ p4est3_fill_from_source (p4est3_t * p3)
   }
 
   SC3E (sc3_array_destroy (&pattern));
-  SC3E (sc3_array_destroy (&levelq));
   SC3E (sc3_allocator_free (p3->alloc, local_num_quads));
   SC3E (sc3_allocator_free (p3->alloc, first_tree_quads));
-  if (p3->source_setup_mode == P4EST3_SRC_COARSE) {
+  SC3E (sc3_allocator_free (p3->alloc, coords));
+  if (p3->crefine == NULL && p3->ccoarse != NULL) {
     SC3E (sc3_array_destroy (&cdata->family));
   }
   sc3_MPI_Barrier (p3->mpicomm);
   p3->global_num_quads = p3->goffset[p3->mpisize];
-
   return NULL;
 }
 
