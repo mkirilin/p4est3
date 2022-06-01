@@ -31,6 +31,10 @@
 #include <p4est3_p8est.h>
 #endif
 
+/* Generally speaking, it is not allowed to use _internal headers in
+ applications. We use it only in exceptional cases as timings and tests. */
+#include <p4est3_internal.h>
+
 #define MAX_TEST_LEVEL 5
 #define MAX_TEST_TREES 5
 
