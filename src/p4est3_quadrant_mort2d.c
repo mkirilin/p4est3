@@ -677,7 +677,6 @@ p4est3_quadrant_mort2d_vtable (p4est3_quadrant_vtable_t * qvt)
  || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
   qvt->dim = P4EST_DIM;
   qvt->max_level = P4EST3_MORT_MAXLEVEL;
-  qvt->max_children = P4EST_CHILDREN;
   qvt->quadrant_size = sizeof (p4est3_quadrant_mort_t);
 
   qvt->quadrant_num_uniform = p4est3_quadrant_mort_num_uniform;

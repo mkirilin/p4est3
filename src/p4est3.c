@@ -333,7 +333,7 @@ p4est3_setup (p4est3_t * p3)
 
     /* with number of children determine number of elements per tree */
     /* TODO use uniform_level function and consider variable num_children */
-    p3->num_children = p4est3_quadrant_max_children (p3->qvt);
+    p3->num_children = p4est3_quadrant_num_children (p3->qvt);
     SC3A_CHECK (p3->num_children > 0);
     high_uniform = P4EST3_GLOIDX_MAX / p3->num_children;
     for (num_uniform = 1, lev = 0;

@@ -374,12 +374,15 @@ iterate_unimesh_inner_face_compl (setup_t * t, p4est3_quadrant_vtable_t * qvt,
   int                 is_tree_boundary = 0, orientation = 0;
   int                 face_predef, face_neighbor_predef, bound_dir;
   int                *start_ids, *bound_coords, *coords;
+  int                 num_children;
 
   SC3A_CHECK (qvt->dim == 2 || qvt->dim == 3);
   SC3E (sc3_allocator_calloc (t->alloc, nfaces, sizeof (int), &start_ids));
   SC3E (sc3_allocator_calloc
         (t->alloc, qvt->dim, sizeof (int), &bound_coords));
   SC3E (sc3_allocator_calloc (t->alloc, qvt->dim, sizeof (int), &coords));
+
+  num_children = p4est3_quadrant_num_children (qvt);
 
   if (qvt->dim == 2) {
     start_ids[0] = start_id;
@@ -403,7 +406,7 @@ iterate_unimesh_inner_face_compl (setup_t * t, p4est3_quadrant_vtable_t * qvt,
   }
 
   bound_id =
-    start_id + nquads_per_next_level / (p4est3_gloidx) qvt->max_children;
+    start_id + nquads_per_next_level / (p4est3_gloidx) num_children;
 
   SC3E (p4est3_quadrant_morton (qvt, t->level, bound_id - 1, q));
   SC3E (p4est3_quadrant_coordinates (qvt, q, qvt->dim, bound_coords));
@@ -510,13 +513,17 @@ iterate_unimesh_face (setup_t * t, p4est3_t * p3,
   p4est3_gloidx       nquads_compl;
   p4est3_topidx       ntree;
   p4est3_tree_t      *tree;
+  int                 num_children;
   int                 level;
   int                *level2nchildren;  /*how many processed quads of level level */
   void               *q, *r;
+
   SC3E (sc3_allocator_calloc
         (t->alloc, t->level + 1, sizeof (int), &level2nchildren));
   SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &q));
   SC3E (sc3_allocator_calloc_one (t->alloc, qvt->quadrant_size, &r));
+
+  num_children = p4est3_quadrant_num_children (qvt);
 
   for (ntree = p3->fltree; ntree <= p3->lltree; ++ntree) {
     level = 0;
@@ -524,12 +531,12 @@ iterate_unimesh_face (setup_t * t, p4est3_t * p3,
     memset (level2nchildren, 0, t->level * sizeof (int));
     SC3E (p4est3_tree_index (p3, ntree, &tree));
     while (level < t->level) {
-      SC3A_CHECK (level2nchildren[level] <= qvt->max_children);
-      if (level2nchildren[level] == qvt->max_children) {
+      SC3A_CHECK (level2nchildren[level] <= num_children);
+      if (level2nchildren[level] == num_children) {
         if (level == 0) {
           SC3E (iterate_unimesh_inner_simple_children
                 (t, p3, qvt, nquads_compl, tree, fpredef));
-          nquads_compl += qvt->max_children;
+          nquads_compl += num_children;
         }
         else {
           SC3E (iterate_unimesh_inner_face_compl
@@ -540,7 +547,7 @@ iterate_unimesh_face (setup_t * t, p4est3_t * p3,
       }
       else {
         level = 0;
-        level2nchildren[level] += qvt->max_children;
+        level2nchildren[level] += num_children;
       }
     }
     SC3E (iterate_unimesh_tree_boundary_face

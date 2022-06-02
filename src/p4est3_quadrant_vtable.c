@@ -32,7 +32,6 @@ p4est3_quadrant_vtable_is_valid (p4est3_quadrant_vtable_t * qvt, char *reason)
   /*** test member variables ***/
   SC3E_TEST (0 < qvt->dim && qvt->dim <= 3, reason);
   SC3E_TEST (0 < qvt->max_level, reason);
-  SC3E_TEST (0 < qvt->max_children, reason);
 
   /*** test member functions ***/
   SC3E_TEST (qvt->quadrant_tree_boundaries != NULL, reason);
@@ -89,12 +88,12 @@ p4est3_quadrant_max_level (p4est3_quadrant_vtable_t * qvt)
 }
 
 int
-p4est3_quadrant_max_children (p4est3_quadrant_vtable_t * qvt)
+p4est3_quadrant_num_children (p4est3_quadrant_vtable_t * qvt)
 {
-  if (qvt == NULL || qvt->max_children <= 0) {
+  if (qvt == NULL || (qvt->dim <= 1 || qvt->dim > 3)) {
     return -1;
   }
-  return qvt->max_children;
+  return 1 << qvt->dim;
 }
 
 size_t
@@ -202,20 +201,6 @@ p4est3_quadrant_quadrant (p4est3_quadrant_vtable_t * qvt,
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_quadrant != NULL);
   SC3E (qvt->quadrant_quadrant (c, l, q));
-  return NULL;
-}
-
-sc3_error_t        *
-p4est3_quadrant_num_children (p4est3_quadrant_vtable_t * qvt,
-                              const void *q, int *n)
-{
-  SC3A_CHECK (qvt != NULL);
-  if (qvt->quadrant_num_children != NULL) {
-    SC3E (qvt->quadrant_num_children (q, n));
-  }
-  else {
-    *n = qvt->max_children;
-  }
   return NULL;
 }
 

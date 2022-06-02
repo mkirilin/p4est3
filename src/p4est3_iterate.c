@@ -58,7 +58,7 @@ typedef struct p4est3_search_area
   int                *level2nchildren;  /* Array specifing the number n
                                            of children processed on
                                            the particular level; n can't be
-                                           greater than p3->qvt->max_children */
+                                           greater than p3->num_children */
   sc3_array_t        *idx_vol_stack;    /* 2D stack storing arrays of indices,
                                            that are output of split_array */
   p4est3_iterate_volume_info_t *vinfo;
@@ -172,11 +172,11 @@ static sc3_error_t *
 p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
                        void *user_data)
 {
-  const int           ntypes = p3->qvt->max_children + 1;
+  const int           ntypes = p3->num_children + 1;
   int                 i, side;
   void               *arr;
   /*set general section of sa */
-  sa->max_children = p3->qvt->max_children;
+  sa->max_children = p3->num_children;
   sa->nfaces = 2 * p3->qvt->dim;
   sa->start_level = 0;
   SC3E (p4est3_set_children_face_neighbors (p3, sa));
@@ -359,7 +359,7 @@ p4est3_quadrant_array_split (p4est3_quadrant_vtable_t * qvt,
   level++;
   data.quadrant_ancestor_id = qvt->quadrant_ancestor_id;
   data.level = &level;
-  SC3E (sc3_array_split (array, indices, qvt->max_children,
+  SC3E (sc3_array_split (array, indices, p4est3_quadrant_num_children (qvt),
                          p4est3_array_split_ancestor_id, &data));
   return NULL;
 }
@@ -469,7 +469,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
                               p4est3_iterate_codim_t ccodim,
                               p4est3_search_area_t * search_area)
 {
-  const int           max_children = p3->qvt->max_children;
+  const int           max_children = p3->num_children;
   const int           half_ch = max_children / 2;
   p4est3_tree_t     **trees = search_area->tree_face;
   p4est3_locidx     **b_f = search_area->begin_face;
@@ -690,7 +690,7 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
   void               *stack_it;
   p4est3_locidx      *arr_it;
 
-  const int           max_children = p3->qvt->max_children;
+  const int           max_children = p3->num_children;
   int                *l2nch = search_area->level2nchildren;
   int                *Level = &search_area->Level;
   const p4est3_locidx begin = *(search_area->begin);

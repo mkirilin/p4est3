@@ -121,8 +121,6 @@ typedef p4est3_quadrant_in_j_t p4est3_quadrant_level_t;
 typedef p4est3_quadrant_in_j_t p4est3_quadrant_child_id_t;
 /** Prototype to query the ancestor id of a quadrant. */
 typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_ancestor_id_t;
-/** Prototype to query the number of children of a quadrant. */
-typedef p4est3_quadrant_in_j_t p4est3_quadrant_num_children_t;
 /** Prototype to compare two quadrants by linear index. */
 typedef p4est3_quadrant_in2_j_t p4est3_quadrant_compare_t;
 /** Prototype to query the one quadrant is ancetor of another. */
@@ -176,11 +174,20 @@ typedef struct p4est3_quadrant_vtable
   int                 id;       /**< User-defined identifier of implementation. */
   int                 dim;      /**< Spatial dimension. */
   int                 max_level;        /**< Maximum level to be reached. */
-  int                 max_children;     /**< Maximum taken over all quadrants. */
   size_t              quadrant_size;    /**< Quadrant object size in bytes. */
 
-  /* More complex queries implemented as functions. */
+  /* functions that are independent of any quadrant input argument */
+
   p4est3_quadrant_num_uniform_t quadrant_num_uniform;   /**< Quadrants per level. */
+
+  /* functions that create a quadrant from equivalent information */
+
+  p4est3_quadrant_root_t quadrant_root; /**< Generate root quadrant. */
+  p4est3_quadrant_morton_t quadrant_morton;     /**< Generate by linear index. */
+  p4est3_quadrant_quadrant_t quadrant_quadrant; /**< Generate from coordinates. */
+
+  /* functions that take one (constant) quadrant input argument */
+
   /** Examine validity.  Pointer may be NULL, in which case validity is true. */
   p4est3_quadrant_is_t quadrant_is_valid;
   /** Examine equality.
@@ -193,12 +200,7 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_child_id_t quadrant_child_id;         /**< Query child id. */
   p4est3_quadrant_ancestor_id_t quadrant_ancestor_id;   /**< Query ancestor id. */
   p4est3_quadrant_in_i_out_t quadrant_coordinates;      /**< Query coordinates. */
-  /** Number of distinct children a quadrant can have.
-   * This pointer may be NULL, in which case we return \ref max_children. */
-  p4est3_quadrant_num_children_t quadrant_num_children;
-  p4est3_quadrant_compare_t quadrant_compare;   /**< Compare linear indices. */
 
-  p4est3_quadrant_root_t quadrant_root; /**< Generate root quadrant. */
   /** Deep copy one quadrant to another.
    * This pointer may be NULL, in which case we memcpy (3) the quadrant. */
   p4est3_quadrant_copy_t quadrant_copy;
@@ -215,13 +217,14 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_first_descendant_t quadrant_first_descendant;
   /** Generate last smallest descendant of a quadrant at \a max_level. */
   p4est3_quadrant_last_descendant_t quadrant_last_descendant;
-  p4est3_quadrant_quadrant_t quadrant_quadrant;
-  p4est3_quadrant_morton_t quadrant_morton;     /**< Generate by linear index. */
-  /**< Generate a common nearest ancestor of a quadrant. */
-  p4est3_nearest_common_ancestor_t nearest_common_ancestor;
-  p4est3_quadrant_linear_id_t quadrant_linear_id;   /**< Generate by Morton index. */
+  p4est3_quadrant_linear_id_t quadrant_linear_id;   /**< Generate a Morton index. */
   /**< Query if a quadrant is a ancestor of another. */
   p4est3_quadrant_is_ancestor_t quadrant_is_ancestor;
+
+  /* functions that take two (constant) quadrant input arguments */
+
+  p4est3_quadrant_compare_t quadrant_compare;   /**< Compare linear indices. */
+  p4est3_nearest_common_ancestor_t nearest_common_ancestor;
 }
 p4est3_quadrant_vtable_t;
 
@@ -253,12 +256,12 @@ int                 p4est3_quadrant_dim (p4est3_quadrant_vtable_t * qvt);
 int                 p4est3_quadrant_max_level (p4est3_quadrant_vtable_t *
                                                qvt);
 
-/** Return maximum number of children in this implementation.
+/** Return number of children of a quadrant in this implementation.
  * \param [in] qvt  Valid virtual quadrant table.
- * \return          Maximum number of children if \a qvt valid,
+ * \return          Number of children if \a qvt valid,
  *                  negative number otherwise.
  */
-int                 p4est3_quadrant_max_children (p4est3_quadrant_vtable_t *
+int                 p4est3_quadrant_num_children (p4est3_quadrant_vtable_t *
                                                   qvt);
 
 /** Return memory size in bytes of a quadrant in this implementation.
@@ -380,15 +383,6 @@ sc3_error_t        *p4est3_quadrant_coordinates (p4est3_quadrant_vtable_t *
 */
 sc3_error_t        *p4est3_quadrant_quadrant (p4est3_quadrant_vtable_t * qvt,
                                               const void *c, int l, void *q);
-
-/** Query the number of distinct children a quadrant can have.
- * \param [in] qvt      Valid virtual quadrant table.
- * \param [in] q        Valid quadrant in this implementation.
- * \param [out] n       Non-NULL reference assigned number of children on output.
- * \return              NULL on success, error object otherwise.
- */
-sc3_error_t        *p4est3_quadrant_num_children (p4est3_quadrant_vtable_t *
-                                                  qvt, const void *q, int *n);
 
 /** Compare two quadrants by linear index.
  * \param [in] qvt      Valid virtual quadrant table.

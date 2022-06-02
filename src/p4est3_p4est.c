@@ -556,7 +556,6 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->id = id;
   qvt->dim = P4EST_DIM;
   qvt->max_level = P4EST_QMAXLEVEL;
-  qvt->max_children = P4EST_CHILDREN;
   qvt->quadrant_size = sizeof (p4est_quadrant_t);
 
   /* populate member functions */
@@ -570,7 +569,6 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
   qvt->quadrant_ancestor_id = p4est_quadrant_vtable_ancestor_id;
   qvt->quadrant_coordinates = p4est_quadrant_vtable_coordinates;
   qvt->quadrant_quadrant = p4est_quadrant_vtable_quadrant;
-  /* quadrant_num_children is not necessary */
   qvt->quadrant_compare = p4est_quadrant_vtable_compare;
   qvt->quadrant_root = p4est_quadrant_vtable_root;
   qvt->quadrant_copy = p4est_quadrant_vtable_copy;

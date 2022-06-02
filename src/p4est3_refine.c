@@ -365,8 +365,8 @@ p4est3_fill_from_source (p4est3_t * p3)
     cdata->counter = 0;
     cdata->pattern = pattern;
     SC3E (p4est3_refine_array_new
-          (p3->alloc, sizeof (void *), p3->qvt->max_children,
-           p3->qvt->max_children, &cdata->family));
+          (p3->alloc, sizeof (void *),
+           p3->num_children, p3->num_children, &cdata->family));
     cdata->nsiblings = 0;
     cdata->ccoarse = p3->ccoarse;
     SC3E (p4est3_iterate_volume

@@ -893,7 +893,6 @@ p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
 #ifdef P4EST_ENABLE_AVX2
   qvt->dim = P4EST_DIM;
   qvt->max_level = P4EST3_YX_MAXLEVEL;
-  qvt->max_children = P4EST_CHILDREN;
   qvt->quadrant_size = sizeof (__m128i);
 
   qvt->quadrant_num_uniform = p4est3_quadrant_zyx_num_uniform;
