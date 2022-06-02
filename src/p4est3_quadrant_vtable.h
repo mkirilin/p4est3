@@ -242,8 +242,7 @@ p4est3_quadrant_vtable_t;
  *                      or, as applicable, the reason for not being valid.
  * \return              True if valid, false otherwise.
  */
-int                 p4est3_quadrant_vtable_is_valid (p4est3_quadrant_vtable_t
-                                                     * qvt, char *reason);
+int                 p4est3_quadrant_vtable_is_valid (const p4est3_quadrant_vtable_t * qvt, char *reason);
 
 /** Return user-defined id of the implementation.
  * \param [in] qvt  Valid virtual quadrant table.

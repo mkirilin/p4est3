@@ -553,7 +553,7 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
 #if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
  || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
   /* populate scalar members */
-  qvt->id = id;
+  qvt->name = P4EST_STRING"_quadrant_vtable_p4est";
   qvt->dim = P4EST_DIM;
   qvt->max_level = P4EST_QMAXLEVEL;
   qvt->quadrant_size = sizeof (p4est_quadrant_t);

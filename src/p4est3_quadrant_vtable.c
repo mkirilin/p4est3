@@ -24,7 +24,7 @@
 #include <p4est3_quadrant_vtable.h>
 
 int
-p4est3_quadrant_vtable_is_valid (p4est3_quadrant_vtable_t * qvt, char *reason)
+p4est3_quadrant_vtable_is_valid (const p4est3_quadrant_vtable_t * qvt, char *reason)
 {
   /* arguments */
   SC3E_TEST (qvt != NULL, reason);

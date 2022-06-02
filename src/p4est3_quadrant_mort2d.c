@@ -667,82 +667,42 @@ p4est3_quadrant_mort_root (p4est3_quadrant_mort_t * r)
   return NULL;
 }
 
-static const p4est3_quadrant_vtable_t *quadrant_vtable_mort =
+static const p4est3_quadrant_vtable_t quadrant_vtable_mort =
 #if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
  || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
 {
-  P4EST_STRING "_quadrant_vtable_morton",
+  P4EST_STRING"_quadrant_vtable_morton",
   P4EST_DIM,
   P4EST3_MORT_MAXLEVEL,
   sizeof (p4est3_quadrant_mort_t),
 
-  p4est3_quadrant_mort_num_uniform,
+  (p4est3_quadrant_num_uniform_t) p4est3_quadrant_mort_num_uniform,
   (p4est3_quadrant_root_t) p4est3_quadrant_mort_root,
+  (p4est3_quadrant_morton_t) p4est3_quadrant_mort_morton,
   (p4est3_quadrant_quadrant_t) p4est3_quadrant_mort_quadrant,
-
   (p4est3_quadrant_is_t) p4est3_quadrant_mort_is_valid,
-  NULL, /*< use generic implementation */
-
-  qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_mort_level;
-
-  qvt->quadrant_child_id =
-    (p4est3_quadrant_child_id_t) p4est3_quadrant_mort_child_id;
-
-  qvt->quadrant_ancestor_id =
-    (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_mort_ancestor_id;
-
-  qvt->quadrant_get_tree_boundary = (p4est3_quadrant_get_tree_boundary_t)
-    p4est3_quadrant_mort_get_tree_boundary;
-
-  qvt->quadrant_tree_boundaries =
-    (p4est3_quadrant_tree_boundaries_t) p4est3_quadrant_mort_tree_boundaries;
-
-  qvt->quadrant_coordinates =
-    (p4est3_quadrant_in_i_out_t) p4est3_quadrant_mort_coords;
-
-  qvt->quadrant_compare =
-    (p4est3_quadrant_compare_t) p4est3_quadrant_mort_compare;
-
-  qvt->quadrant_copy = (p4est3_quadrant_copy_t) p4est3_quadrant_mort_copy;
-
-  qvt->quadrant_parent =
-    (p4est3_quadrant_parent_t) p4est3_quadrant_mort_parent;
-
-  qvt->quadrant_sibling =
-    (p4est3_quadrant_sibling_t) p4est3_quadrant_mort_sibling;
-
-  qvt->quadrant_face_neighbor =
-    (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_mort_face_neighbor;
-
-  qvt->quadrant_tree_face_neighbor = (p4est3_quadrant_tree_face_neighbor_t)
-    p4est3_quadrant_mort_tree_face_neighbor;
-
-  qvt->quadrant_face_neighbor =
-    (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_mort_face_neighbor;
-
-  qvt->quadrant_predecessor =
-    (p4est3_quadrant_predecessor_t) p4est3_quadrant_mort_predecessor;
-
-  qvt->quadrant_successor =
-    (p4est3_quadrant_successor_t) p4est3_quadrant_mort_successor;
-
-  qvt->quadrant_child = (p4est3_quadrant_child_t) p4est3_quadrant_mort_child;
-
-  qvt->quadrant_ancestor =
-    (p4est3_quadrant_ancestor_t) p4est3_quadrant_mort_ancestor;
-
-  qvt->quadrant_first_descendant = (p4est3_quadrant_first_descendant_t)
-    p4est3_quadrant_mort_first_descendant;
-
-  qvt->quadrant_last_descendant =
-    (p4est3_quadrant_last_descendant_t) p4est3_quadrant_mort_last_descendant;
-
-  qvt->quadrant_morton =
-    (p4est3_quadrant_morton_t) p4est3_quadrant_mort_morton;
-
-  (p4est3_nearest_common_ancestor_t) p4est3_mort_nearest_common_ancestor,
+  (p4est3_quadrant_level_t) p4est3_quadrant_mort_level,
+  (p4est3_quadrant_child_id_t) p4est3_quadrant_mort_child_id,
+  (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_mort_ancestor_id,
+  (p4est3_quadrant_in_i_out_t) p4est3_quadrant_mort_coords,
   (p4est3_quadrant_linear_id_t) p4est3_quadrant_mort_linear_id,
-  p4est3_quadrant_mort_is_ancestor
+  (p4est3_quadrant_get_tree_boundary_t) p4est3_quadrant_mort_get_tree_boundary,
+  (p4est3_quadrant_tree_boundaries_t) p4est3_quadrant_mort_tree_boundaries,
+  (p4est3_quadrant_copy_t) p4est3_quadrant_mort_copy,
+  (p4est3_quadrant_child_t) p4est3_quadrant_mort_child,
+  (p4est3_quadrant_sibling_t) p4est3_quadrant_mort_sibling,
+  (p4est3_quadrant_parent_t) p4est3_quadrant_mort_parent,
+  (p4est3_quadrant_ancestor_t) p4est3_quadrant_mort_ancestor,
+  (p4est3_quadrant_predecessor_t) p4est3_quadrant_mort_predecessor,
+  (p4est3_quadrant_successor_t) p4est3_quadrant_mort_successor,
+  (p4est3_quadrant_first_descendant_t) p4est3_quadrant_mort_first_descendant,
+  (p4est3_quadrant_last_descendant_t) p4est3_quadrant_mort_last_descendant,
+  (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_mort_face_neighbor,
+  (p4est3_quadrant_tree_face_neighbor_t) p4est3_quadrant_mort_tree_face_neighbor,
+  (p4est3_quadrant_compare_t) p4est3_quadrant_mort_compare,
+  NULL, /*< use generic implementation */
+  (p4est3_quadrant_is_ancestor_t) p4est3_quadrant_mort_is_ancestor,
+  (p4est3_nearest_common_ancestor_t) p4est3_mort_nearest_common_ancestor
 }
 #else
   NULL
@@ -755,13 +715,11 @@ p4est3_quadrant_mort2d_vtable (const p4est3_quadrant_vtable_t ** qvt)
   SC3A_CHECK (qvt != NULL);
 
   *qvt = NULL;
-  if (quadrant_vtable_mort != NULL) {
-    /* verify correctness */
-    SC3A_IS (p4est3_quadrant_vtable_is_valid, quadrant_vtable_mort);
+  /* verify correctness */
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, &quadrant_vtable_mort);
 
-    /* pass internally constructed virtual table to the outside */
-    *qvt = quadrant_vtable_mort;
-  }
+  /* pass internally constructed virtual table to the outside */
+  *qvt = &quadrant_vtable_mort;
 
   return NULL;
 }

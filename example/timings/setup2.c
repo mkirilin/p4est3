@@ -155,7 +155,7 @@ check_setup_mode (int argc, char **argv, p4est3_setup_mode_t *mode,
 
 void
 check_quadrant_type (int argc, char **argv,
-                     p4est3_quadrant_vtable_t *qvt,
+                     const p4est3_quadrant_vtable_t *qvt,
                      int mpirank, sc3_MPI_Comm_t mpicomm)
 {
   if (argc <= 2) {
@@ -171,7 +171,7 @@ check_quadrant_type (int argc, char **argv,
     p4est3_quadrant_yx_vtable (qvt);
   }
   else if (strcmp (argv[2], "MORT_ORD") == 0) {
-    p4est3_quadrant_mort2d_vtable (qvt);
+    p4est3_quadrant_mort2d_vtable (&qvt);
   }
   else {
     if (mpirank == 0) {
