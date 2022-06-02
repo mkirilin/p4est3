@@ -171,7 +171,7 @@ typedef p4est3_quadrant_in_i_out_t p4est3_quadrant_face_neighbor_t;
 typedef struct p4est3_quadrant_vtable
 {
   /* Constant numbers are defined as integers for simplicity. */
-  int                 id;       /**< User-defined identifier of implementation. */
+  const char         *name;     /**< String identifier of implementation. */
   int                 dim;      /**< Spatial dimension. */
   int                 max_level;        /**< Maximum level to be reached. */
   size_t              quadrant_size;    /**< Quadrant object size in bytes. */
@@ -190,40 +190,48 @@ typedef struct p4est3_quadrant_vtable
 
   /** Examine validity.  Pointer may be NULL, in which case validity is true. */
   p4est3_quadrant_is_t quadrant_is_valid;
-  /** Examine equality.
-   * Pointer may be NULL, in which case we memcmp (3) the contents. */
-  p4est3_quadrant_is2_t quadrant_is_equal;
-  /** Query tree boundary in a specific direction */
-  p4est3_quadrant_get_tree_boundary_t quadrant_get_tree_boundary;
-  p4est3_quadrant_in_arr_t quadrant_tree_boundaries; /**< Query tree boundary */
+
+  /* information about quadrants */
   p4est3_quadrant_level_t quadrant_level;               /**< Query the level. */
   p4est3_quadrant_child_id_t quadrant_child_id;         /**< Query child id. */
   p4est3_quadrant_ancestor_id_t quadrant_ancestor_id;   /**< Query ancestor id. */
   p4est3_quadrant_in_i_out_t quadrant_coordinates;      /**< Query coordinates. */
+  p4est3_quadrant_linear_id_t quadrant_linear_id;       /**< Query Morton index. */
+
+  /** Query tree boundary in a specific direction. */
+  p4est3_quadrant_get_tree_boundary_t quadrant_get_tree_boundary;
+  p4est3_quadrant_in_arr_t quadrant_tree_boundaries;    /**< Query tree boundary. */
 
   /** Deep copy one quadrant to another.
    * This pointer may be NULL, in which case we memcpy (3) the quadrant. */
   p4est3_quadrant_copy_t quadrant_copy;
+  p4est3_quadrant_child_t quadrant_child;       /**< Generate a child by number. */
+  p4est3_quadrant_sibling_t quadrant_sibling;   /**< Generate sibling */
   p4est3_quadrant_parent_t quadrant_parent;     /**< Generate parent. */
-  p4est3_quadrant_sibling_t quadrant_sibling; /**< Generate sibling */
-  p4est3_quadrant_face_neighbor_t quadrant_face_neighbor; /**< Generate face neighbor */
-  /** Generate face neighbor across a tree boundary*/
-  p4est3_quadrant_tree_face_neighbor_t quadrant_tree_face_neighbor;
+  p4est3_quadrant_ancestor_t quadrant_ancestor; /**< Generate ancestor by level. */
   p4est3_quadrant_predecessor_t quadrant_predecessor;   /**< Generate predecessor. */
   p4est3_quadrant_successor_t quadrant_successor;       /**< Generate successor. */
-  p4est3_quadrant_child_t quadrant_child;       /**< Generate a child by number. */
-  p4est3_quadrant_ancestor_t quadrant_ancestor; /**< Generate ancestor by level. */
+
   /** Generate first smallest descendant of a quadrant at \a max_level. */
   p4est3_quadrant_first_descendant_t quadrant_first_descendant;
   /** Generate last smallest descendant of a quadrant at \a max_level. */
   p4est3_quadrant_last_descendant_t quadrant_last_descendant;
-  p4est3_quadrant_linear_id_t quadrant_linear_id;   /**< Generate a Morton index. */
-  /**< Query if a quadrant is a ancestor of another. */
-  p4est3_quadrant_is_ancestor_t quadrant_is_ancestor;
+
+  p4est3_quadrant_face_neighbor_t quadrant_face_neighbor; /**< Generate face neighbor */
+  /** Generate face neighbor across a tree boundary*/
+  p4est3_quadrant_tree_face_neighbor_t quadrant_tree_face_neighbor;
 
   /* functions that take two (constant) quadrant input arguments */
 
   p4est3_quadrant_compare_t quadrant_compare;   /**< Compare linear indices. */
+
+  /** Examine equality.
+   * Pointer may be NULL, in which case we memcmp (3) the contents. */
+  p4est3_quadrant_is2_t quadrant_is_equal;
+
+  /**< Query if a quadrant is a ancestor of another. */
+  p4est3_quadrant_is_ancestor_t quadrant_is_ancestor;
+
   p4est3_nearest_common_ancestor_t nearest_common_ancestor;
 }
 p4est3_quadrant_vtable_t;
@@ -576,6 +584,7 @@ sc3_error_t        *p4est3_quadrant_linear_id (p4est3_quadrant_vtable_t * qvt,
 sc3_error_t        *p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t
                                                  * qvt, const void *q1,
                                                  const void *q2, int *j);
+
 /************************ convenience functions **************************/
 
 /** Create an array of given length intended to store quadrants.

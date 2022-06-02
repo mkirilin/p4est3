@@ -60,13 +60,13 @@ p4est3_quadrant_vtable_is_valid (p4est3_quadrant_vtable_t * qvt, char *reason)
   SC3E_YES (reason);
 }
 
-int
-p4est3_quadrant_id (p4est3_quadrant_vtable_t * qvt)
+const char *
+p4est3_quadrant_name (p4est3_quadrant_vtable_t * qvt)
 {
-  if (qvt == NULL || qvt->id < 0) {
-    return -1;
+  if (qvt == NULL) {
+    return NULL;
   }
-  return qvt->id;
+  return qvt->name;
 }
 
 int
@@ -87,15 +87,6 @@ p4est3_quadrant_max_level (p4est3_quadrant_vtable_t * qvt)
   return qvt->max_level;
 }
 
-int
-p4est3_quadrant_num_children (p4est3_quadrant_vtable_t * qvt)
-{
-  if (qvt == NULL || (qvt->dim <= 1 || qvt->dim > 3)) {
-    return -1;
-  }
-  return 1 << qvt->dim;
-}
-
 size_t
 p4est3_quadrant_size (p4est3_quadrant_vtable_t * qvt)
 {
@@ -103,6 +94,15 @@ p4est3_quadrant_size (p4est3_quadrant_vtable_t * qvt)
     return 0;
   }
   return qvt->quadrant_size;
+}
+
+int
+p4est3_quadrant_num_children (p4est3_quadrant_vtable_t * qvt)
+{
+  if (qvt == NULL || (qvt->dim <= 1 || qvt->dim > 3)) {
+    return -1;
+  }
+  return 1 << qvt->dim;
 }
 
 p4est3_gloidx
