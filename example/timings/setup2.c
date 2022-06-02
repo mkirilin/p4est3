@@ -165,13 +165,13 @@ check_quadrant_type (int argc, char **argv,
     return;
   }
   if (strcmp (argv[2], "STANDART") == 0) {
-    p4est3_quadrant_vtable_p4est (qvt, 0);
+    //p4est3_quadrant_vtable_p4est (qvt, 0);
   }
   else if (strcmp (argv[2], "AVX") == 0) {
-    p4est3_quadrant_yx_vtable (qvt);
+    //p4est3_quadrant_yx_vtable (qvt);
   }
   else if (strcmp (argv[2], "MORT_ORD") == 0) {
-    p4est3_quadrant_mort2d_vtable (&qvt);
+    p4est3_quadrant_mort2d_vtable (qvt);
   }
   else {
     if (mpirank == 0) {
@@ -218,7 +218,7 @@ main (int argc, char **argv)
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e;
   sc3_MPI_Comm_t      mpicomm;
-  p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
+  p4est3_quadrant_vtable_t *qvt;
   p4est3_t           *p3;
   p4est_t            *p;
   p4est3_connectivity_t *conn;
@@ -237,7 +237,7 @@ main (int argc, char **argv)
 
   /* default parameters */
   p4est3_setup_mode_t mode = P4EST3_NEW_MORTON;
-  p4est3_quadrant_vtable_p4est (qvt, 0);
+  //p4est3_quadrant_vtable_p4est (qvt, 0);
   level = 1;
   num_trees = 2;
 
@@ -251,7 +251,7 @@ main (int argc, char **argv)
             "<SETUP MODE> <QUADRANT TYPE> <#levels> <#trees>\n");
   }
   check_setup_mode (argc, argv, &mode, mpirank, mpicomm);
-  check_quadrant_type (argc, argv, qvt, mpirank, mpicomm);
+  check_quadrant_type (argc, argv, &qvt, mpirank, mpicomm);
   if (argc > 3) {
     level = atoi (argv[3]);
     if (level == 0 && mpirank == 0) {

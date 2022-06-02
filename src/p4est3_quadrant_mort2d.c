@@ -668,8 +668,6 @@ p4est3_quadrant_mort_root (p4est3_quadrant_mort_t * r)
 }
 
 static const p4est3_quadrant_vtable_t quadrant_vtable_mort =
-#if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
- || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
 {
   P4EST_STRING"_quadrant_vtable_morton",
   P4EST_DIM,
@@ -703,7 +701,12 @@ static const p4est3_quadrant_vtable_t quadrant_vtable_mort =
   NULL, /*< use generic implementation */
   (p4est3_quadrant_is_ancestor_t) p4est3_quadrant_mort_is_ancestor,
   (p4est3_nearest_common_ancestor_t) p4est3_mort_nearest_common_ancestor
-}
+};
+
+static const p4est3_quadrant_vtable_t * qvt_mort = 
+#if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
+ || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
+  &quadrant_vtable_mort
 #else
   NULL
 #endif
@@ -714,12 +717,15 @@ p4est3_quadrant_mort2d_vtable (const p4est3_quadrant_vtable_t ** qvt)
 {
   SC3A_CHECK (qvt != NULL);
 
-  *qvt = NULL;
-  /* verify correctness */
-  SC3A_IS (p4est3_quadrant_vtable_is_valid, &quadrant_vtable_mort);
+  if (qvt_mort != NULL) {
+    /* verify correctness */
+    SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_mort);
 
-  /* pass internally constructed virtual table to the outside */
-  *qvt = &quadrant_vtable_mort;
-
+    /* pass internally constructed virtual table to the outside */
+    *qvt = qvt_mort;
+  }
+  else {
+    *qvt = NULL;
+  }
   return NULL;
 }
