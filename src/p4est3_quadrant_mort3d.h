@@ -36,8 +36,9 @@ extern              "C"
 #endif
 
 /** Return pointer to quadrant virtual table for the 56 + 8 bit version */
-sc3_error_t        *
-p4est3_quadrant_mort3d_vtable (const p4est3_quadrant_vtable_t ** qvt);
+sc3_error_t        *p4est3_quadrant_mort3d_vtable
+  (const p4est3_quadrant_vtable_t ** qvt);
+
 #ifdef __cplusplus
 #if 0
 {

@@ -362,6 +362,13 @@ sc3_error_t        *p4est3_get_local_num_quads (const p4est3_t * p3,
 sc3_error_t        *p4est3_get_user_data (p4est3_t * p3,
                                           void **user_data);
 
+/*-------------------- working with quadrants ------------------------*/
+
+/* TODO: move quadrant functions into a new file p4est3_quadrant.{c,h} */
+
+int                 p4est3_quadrant_is2_valid (p4est3_t * p3,
+                                               const void *q, char *reason);
+
 #if 0
 
 typedef struct p4est3_access_attr p4est3_access_attr_t;

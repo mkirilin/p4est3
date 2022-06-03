@@ -292,8 +292,8 @@ p4est3_gloidx       p4est3_quadrant_num_uniform (p4est3_quadrant_vtable_t *
  *                      or, as applicable, the reason for not being valid.
  * \return              True if the quadrant \a q is valid, false otherwise.
  */
-int                 p4est3_quadrant_is2_valid (p4est3_quadrant_vtable_t * qvt,
-                                               const void *q, char *reason);
+int                 p4est3_quadrant_vtable_is2_valid
+  (const p4est3_quadrant_vtable_t * qvt, const void *q, char *reason);
 
 /** Query equality of two quadrants in the style of \c sc3_<object>_is3_valid.
  * \param [in] qvt      NULL is allowed and considered not equal.
