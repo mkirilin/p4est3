@@ -233,15 +233,15 @@ typedef struct timeavx2
   sc3_array_t        *qarr;
   sc3_array_t        *qarr_avx;
   p4est3_quadrant_vtable_t sqvt, *qvt;
-  p4est3_quadrant_vtable_t sqvt_avx, *qvt_avx;
+  p4est3_quadrant_vtable_t *qvt_avx;
 }
 timeavx2_t;
 
 static sc3_error_t *
-timeavx2_prepare (timeavx2_t * t, int *retval)
+timeavx2_prepare (const p4est3_quadrant_vtable_t * qvt_avx,
+                  timeavx2_t * t, int *retval)
 {
   void               *p;
-  sc3_error_t        *e;
 
   SC3E_RETVAL (retval, -1);
   SC3A_CHECK (t != NULL);
@@ -249,26 +249,23 @@ timeavx2_prepare (timeavx2_t * t, int *retval)
 
   /* static initializers */
   t->qvt = &t->sqvt;
-  t->qvt_avx = &t->sqvt_avx;
 
   /* the standard p4est2 virtual table always exists */
   p4est3_quadrant_vtable_p4est (t->qvt, 0);
 
   /* the AVX virtual table can only be set with hardware support */
-  SC3F (p4est3_quadrant_yx_vtable (t->qvt_avx), e);
-  if (sc3_error_is2_kind (e, SC3_ERROR_RUNTIME, NULL)) {
-    /* AVX is not supported by hardware */
+  SC3E (p4est3_quadrant_yx_vtable (&qvt_avx));
+  if (qvt_avx == NULL) {
+    /* AVX is not supported by hardware
+      or p4est is not build neither in 2D nor 3D*/
     if (t->mpirank == 0) {
-      char                buffer[SC3_BUFSIZE];
-      SC3E (sc3_error_copy_text (e, -1, 1, buffer, SC3_BUFSIZE));
-      fprintf (stderr, "%s\nWill not proceed\n", buffer);
+      fprintf (stderr, "%s\nWill not proceed\n",
+      "AVX is not supported by hardware "
+      "or p4est is not build neither in 2D nor 3D\n");
     }
-    SC3E (sc3_error_unref (&e));
-
     /* return value has been initialized to failure above */
     return NULL;
   }
-  SC3A_CHECK (e == NULL);
 
   /* create a toplevel allocator */
   SC3E (sc3_allocator_new (sc3_allocator_nocount (), &t->alloc));
@@ -349,7 +346,7 @@ main (int argc, char **argv)
   t->n_quads = n_quads = SC3_MAX (n_quads, 1);
 
   /* choose virtual tables and initialize resources */
-  SC3X (timeavx2_prepare (t, &retval));
+  SC3X (timeavx2_prepare (t->qvt_avx, t, &retval));
 
 #if 0
   /* TODO create a dedicated allocator for this program */

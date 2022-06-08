@@ -879,105 +879,68 @@ p4est3_quadrant_zyx_root (__m128i * r)
   return NULL;
 }
 
+
+static const p4est3_quadrant_vtable_t quadrant_vtable_yx =
+{
+  P4EST_STRING"_quadrant_vtable_zyx",
+  P4EST_DIM,
+  P4EST3_YX_MAXLEVEL,
+  sizeof (__m128i),
+
+  (p4est3_quadrant_num_uniform_t) p4est3_quadrant_zyx_num_uniform,
+  (p4est3_quadrant_root_t) p4est3_quadrant_zyx_root,
+  (p4est3_quadrant_morton_t) p4est3_quadrant_zyx_morton,
+  (p4est3_quadrant_quadrant_t) p4est3_quadrant_zyx_quadrant,
+  (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_valid,
+  (p4est3_quadrant_level_t) p4est3_quadrant_zyx_level,
+  (p4est3_quadrant_child_id_t) p4est3_quadrant_zyx_child_id,
+  (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_zyx_ancestor_id,
+  (p4est3_quadrant_in_i_out_t) p4est3_quadrant_zyx_coordinates,
+  (p4est3_quadrant_linear_id_t) p4est3_quadrant_zyx_linear_id,
+  (p4est3_quadrant_get_tree_boundary_t) p4est3_quadrant_zyx_get_tree_boundary,
+  (p4est3_quadrant_tree_boundaries_t) p4est3_quadrant_zyx_tree_boundaries,
+  (p4est3_quadrant_copy_t) p4est3_quadrant_zyx_copy,
+  (p4est3_quadrant_child_t) p4est3_quadrant_zyx_child,
+  (p4est3_quadrant_sibling_t) p4est3_quadrant_zyx_sibling,
+  (p4est3_quadrant_parent_t) p4est3_quadrant_zyx_parent,
+  (p4est3_quadrant_ancestor_t) p4est3_quadrant_zyx_ancestor,
+  (p4est3_quadrant_predecessor_t) p4est3_quadrant_zyx_predecessor,
+  (p4est3_quadrant_successor_t) p4est3_quadrant_zyx_successor,
+  (p4est3_quadrant_first_descendant_t) p4est3_quadrant_zyx_first_descendant,
+  (p4est3_quadrant_last_descendant_t) p4est3_quadrant_zyx_last_descendant,
+  (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_zyx_face_neighbor,
+  (p4est3_quadrant_tree_face_neighbor_t) p4est3_quadrant_zyx_tree_face_neighbor,
+  (p4est3_quadrant_compare_t) p4est3_quadrant_zyx_compare,
+  NULL, /*< use generic implementation */
+  (p4est3_quadrant_is_ancestor_t) p4est3_quadrant_zyx_is_ancestor,
+  (p4est3_nearest_common_ancestor_t) p4est3_zyx_nearest_common_ancestor
+};
 #endif /* P4EST_ENABLE_AVX2 */
 
+static const p4est3_quadrant_vtable_t * qvt_yx =
+#if ((P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
+ || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))) \
+ && defined(P4EST_ENABLE_AVX2)
+  &quadrant_vtable_yx
+#else
+  NULL
+#endif
+;
+
 sc3_error_t        *
-p4est3_quadrant_yx_vtable (p4est3_quadrant_vtable_t * qvt)
+p4est3_quadrant_yx_vtable (const p4est3_quadrant_vtable_t ** qvt)
 {
   SC3A_CHECK (qvt != NULL);
-  memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
 
-#if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
- || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
+  if (qvt_yx != NULL) {
+    /* verify correctness */
+    SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_yx);
 
-#ifdef P4EST_ENABLE_AVX2
-  qvt->dim = P4EST_DIM;
-  qvt->max_level = P4EST3_YX_MAXLEVEL;
-  qvt->quadrant_size = sizeof (__m128i);
-
-  qvt->quadrant_num_uniform = p4est3_quadrant_zyx_num_uniform;
-
-  qvt->quadrant_is_valid =
-    (p4est3_quadrant_is_t) p4est3_quadrant_zyx_is_valid;
-
-  qvt->quadrant_get_tree_boundary = (p4est3_quadrant_get_tree_boundary_t)
-    p4est3_quadrant_zyx_get_tree_boundary;
-
-  qvt->quadrant_tree_boundaries =
-    (p4est3_quadrant_tree_boundaries_t) p4est3_quadrant_zyx_tree_boundaries;
-
-  qvt->quadrant_level = (p4est3_quadrant_level_t) p4est3_quadrant_zyx_level;
-
-  qvt->quadrant_child_id =
-    (p4est3_quadrant_child_id_t) p4est3_quadrant_zyx_child_id;
-
-  qvt->quadrant_ancestor_id =
-    (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_zyx_ancestor_id;
-
-  qvt->quadrant_coordinates =
-    (p4est3_quadrant_in_i_out_t) p4est3_quadrant_zyx_coordinates;
-
-  qvt->quadrant_quadrant =
-    (p4est3_quadrant_quadrant_t) p4est3_quadrant_zyx_quadrant;
-
-  qvt->quadrant_compare =
-    (p4est3_quadrant_compare_t) p4est3_quadrant_zyx_compare;
-
-  qvt->quadrant_root = (p4est3_quadrant_root_t) p4est3_quadrant_zyx_root;
-
-  qvt->quadrant_copy = (p4est3_quadrant_copy_t) p4est3_quadrant_zyx_copy;
-
-  qvt->quadrant_parent =
-    (p4est3_quadrant_parent_t) p4est3_quadrant_zyx_parent;
-
-  qvt->quadrant_sibling =
-    (p4est3_quadrant_sibling_t) p4est3_quadrant_zyx_sibling;
-
-  qvt->quadrant_face_neighbor =
-    (p4est3_quadrant_face_neighbor_t) p4est3_quadrant_zyx_face_neighbor;
-
-  qvt->quadrant_tree_face_neighbor = (p4est3_quadrant_tree_face_neighbor_t)
-    p4est3_quadrant_zyx_tree_face_neighbor;
-
-  qvt->quadrant_predecessor =
-    (p4est3_quadrant_predecessor_t) p4est3_quadrant_zyx_predecessor;
-
-  qvt->quadrant_successor =
-    (p4est3_quadrant_successor_t) p4est3_quadrant_zyx_successor;
-
-  qvt->quadrant_child = (p4est3_quadrant_child_t) p4est3_quadrant_zyx_child;
-
-  qvt->quadrant_ancestor =
-    (p4est3_quadrant_ancestor_t) p4est3_quadrant_zyx_ancestor;
-
-  qvt->quadrant_first_descendant =
-    (p4est3_quadrant_first_descendant_t) p4est3_quadrant_zyx_first_descendant;
-
-  qvt->quadrant_last_descendant =
-    (p4est3_quadrant_last_descendant_t) p4est3_quadrant_zyx_last_descendant;
-
-  qvt->quadrant_morton =
-    (p4est3_quadrant_morton_t) p4est3_quadrant_zyx_morton;
-
-  qvt->nearest_common_ancestor =
-    (p4est3_nearest_common_ancestor_t) p4est3_zyx_nearest_common_ancestor;
-
-  qvt->quadrant_linear_id =
-    (p4est3_quadrant_linear_id_t) p4est3_quadrant_zyx_linear_id;
-
-  qvt->quadrant_is_ancestor =
-    (p4est3_quadrant_is_ancestor_t) p4est3_quadrant_zyx_is_ancestor;
-
-  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt);
+    /* pass internally constructed virtual table to the outside */
+    *qvt = qvt_yx;
+  }
+  else {
+    *qvt = NULL;
+  }
   return NULL;
-#else
-  return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
-                             " of AVX2-based virtual table is denied since AVX2"
-                             " is disabled or not found working");
-#endif /* !P4EST_ENABLE_AVX2 */
-
-  return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
-                             " of AVX-based virtual table is denied since"
-                             " this dimension is disabled or not supported");
-#endif /* !(P4EST_DIM == ? && defined(P4EST_ENABLE_BUILD_?D)) */
 }

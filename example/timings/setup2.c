@@ -165,10 +165,10 @@ check_quadrant_type (int argc, char **argv,
     return;
   }
   if (strcmp (argv[2], "STANDART") == 0) {
-    //p4est3_quadrant_vtable_p4est (qvt, 0);
+    p4est3_quadrant_vtable_p4est (qvt, 0);
   }
   else if (strcmp (argv[2], "AVX") == 0) {
-    //p4est3_quadrant_yx_vtable (qvt);
+    p4est3_quadrant_yx_vtable (qvt);
   }
   else if (strcmp (argv[2], "MORT_ORD") == 0) {
     p4est3_quadrant_mort2d_vtable (qvt);
