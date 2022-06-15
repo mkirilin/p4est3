@@ -232,7 +232,7 @@ typedef struct timeavx2
   sc3_allocator_t    *alloc;
   sc3_array_t        *qarr;
   sc3_array_t        *qarr_avx;
-  p4est3_quadrant_vtable_t sqvt, *qvt;
+  const p4est3_quadrant_vtable_t *qvt;
   const p4est3_quadrant_vtable_t *qvt_avx;
 }
 timeavx2_t;
@@ -246,11 +246,8 @@ timeavx2_prepare (timeavx2_t * t, int *retval)
   SC3A_CHECK (t != NULL);
   SC3A_CHECK (t->n_quads > 0);
 
-  /* static initializers */
-  t->qvt = &t->sqvt;
-
   /* the standard p4est2 virtual table always exists */
-  p4est3_quadrant_vtable_p4est (t->qvt, 0);
+  SC3E (p4est3_quadrant_vtable_p4est (&t->qvt));
 
   /* the AVX virtual table can only be set with hardware support */
   SC3E (p4est3_quadrant_yx_vtable (&t->qvt_avx));

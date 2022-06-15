@@ -208,7 +208,6 @@ p4est3_new_p4est (sc3_allocator_t * alloc, p4est3_t ** pp3,
   p4est3_p4est_self_t *slf;
   p4est3_t           *p3;
   p4est3_vtable_t     spvt, *pvt = &spvt;
-  p4est3_quadrant_vtable_t sqvt;
 
   /* verify arguments */
   SC3E_RETVAL (pp3, NULL);
@@ -228,8 +227,7 @@ p4est3_new_p4est (sc3_allocator_t * alloc, p4est3_t ** pp3,
   pvt->dim = P4EST_DIM;
   pvt->mpicomm = p4->mpicomm;
   pvt->c3 = slf->c3;
-  pvt->qvt = &sqvt;
-  SC3E (p4est3_quadrant_vtable_p4est (pvt->qvt, 0));
+  SC3E (p4est3_quadrant_vtable_p4est (&pvt->qvt));
   pvt->get_local_num_trees = p4est3_p4est_get_local_num_trees;
   pvt->destroy = p4est3_p4est_destroy;
 
@@ -542,61 +540,65 @@ p4est_quadrant_vtable_is_ancestor (const void *q1, const void *q2, int *j)
   return NULL;
 }
 
-sc3_error_t        *
-p4est3_quadrant_vtable_p4est (const p4est3_quadrant_vtable_t * qvt, int id)
+static const p4est3_quadrant_vtable_t quadrant_vtable_p4est =
 {
-#if 0
-  /* check arguments */
-  SC3A_CHECK (qvt != NULL);
-  SC3A_CHECK (id >= 0);
-  memset (qvt, 0, sizeof (p4est3_quadrant_vtable_t));
+  P4EST_STRING"quadrant_vtable_p4est",
+  P4EST_DIM,
+  P4EST_QMAXLEVEL,
+  sizeof (p4est_quadrant_t),
 
+  (p4est3_quadrant_num_uniform_t) p4est_quadrant_vtable_num_uniform,
+  (p4est3_quadrant_root_t) p4est_quadrant_vtable_root,
+  (p4est3_quadrant_morton_t) p4est_quadrant_vtable_morton,
+  (p4est3_quadrant_quadrant_t) p4est_quadrant_vtable_quadrant,
+  (p4est3_quadrant_is_t) p4est_quadrant_vtable_is_valid,
+  (p4est3_quadrant_level_t) p4est_quadrant_vtable_level,
+  (p4est3_quadrant_child_id_t) p4est_quadrant_vtable_child_id,
+  (p4est3_quadrant_ancestor_id_t) p4est_quadrant_vtable_ancestor_id,
+  (p4est3_quadrant_in_i_out_t) p4est_quadrant_vtable_coordinates,
+  (p4est3_quadrant_linear_id_t) p4est_quadrant_vtable_linear_id,
+  (p4est3_quadrant_get_tree_boundary_t) p4est_quadrant_vtable_get_tree_boundary,
+  (p4est3_quadrant_tree_boundaries_t) p4est_quadrant_vtable_tree_boundaries,
+  (p4est3_quadrant_copy_t) p4est_quadrant_vtable_copy,
+  (p4est3_quadrant_child_t) p4est_quadrant_vtable_child,
+  (p4est3_quadrant_sibling_t) p4est_quadrant_vtable_sibling,
+  (p4est3_quadrant_parent_t) p4est_quadrant_vtable_parent,
+  (p4est3_quadrant_ancestor_t) p4est_quadrant_vtable_ancestor,
+  (p4est3_quadrant_predecessor_t) p4est_quadrant_vtable_predecessor,
+  (p4est3_quadrant_successor_t) p4est_quadrant_vtable_successor,
+  (p4est3_quadrant_first_descendant_t) p4est_quadrant_vtable_first_descendant,
+  (p4est3_quadrant_last_descendant_t) p4est_quadrant_vtable_last_descendant,
+  (p4est3_quadrant_face_neighbor_t) p4est_quadrant_vtable_face_neighbor,
+  (p4est3_quadrant_tree_face_neighbor_t) p4est3_quadrant_vtable_tree_face_neighbor,
+  (p4est3_quadrant_compare_t) p4est_quadrant_vtable_compare,
+  (p4est3_quadrant_is2_t) p4est_quadrant_vtable_is_equal,
+  (p4est3_quadrant_is_ancestor_t) p4est_quadrant_vtable_is_ancestor,
+  (p4est3_nearest_common_ancestor_t) p4est_vtable_nearest_common_ancestor
+};
+
+static const p4est3_quadrant_vtable_t * qvt_p4est =
 #if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
  || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
-  /* populate scalar members */
-  qvt->name = P4EST_STRING"_quadrant_vtable_p4est";
-  qvt->dim = P4EST_DIM;
-  qvt->max_level = P4EST_QMAXLEVEL;
-  qvt->quadrant_size = sizeof (p4est_quadrant_t);
-
-  /* populate member functions */
-  qvt->quadrant_is_valid = p4est_quadrant_vtable_is_valid;
-  qvt->quadrant_is_equal = p4est_quadrant_vtable_is_equal;
-  qvt->quadrant_get_tree_boundary = p4est_quadrant_vtable_get_tree_boundary;
-  qvt->quadrant_tree_boundaries = p4est_quadrant_vtable_tree_boundaries;
-  qvt->quadrant_num_uniform = p4est_quadrant_vtable_num_uniform;
-  qvt->quadrant_level = p4est_quadrant_vtable_level;
-  qvt->quadrant_child_id = p4est_quadrant_vtable_child_id;
-  qvt->quadrant_ancestor_id = p4est_quadrant_vtable_ancestor_id;
-  qvt->quadrant_coordinates = p4est_quadrant_vtable_coordinates;
-  qvt->quadrant_quadrant = p4est_quadrant_vtable_quadrant;
-  qvt->quadrant_compare = p4est_quadrant_vtable_compare;
-  qvt->quadrant_root = p4est_quadrant_vtable_root;
-  qvt->quadrant_copy = p4est_quadrant_vtable_copy;
-  qvt->quadrant_parent = p4est_quadrant_vtable_parent;
-  qvt->quadrant_sibling = p4est_quadrant_vtable_sibling;
-  qvt->quadrant_face_neighbor = p4est_quadrant_vtable_face_neighbor;
-  qvt->quadrant_tree_face_neighbor =
-    p4est3_quadrant_vtable_tree_face_neighbor;
-  qvt->quadrant_predecessor = p4est_quadrant_vtable_predecessor;
-  qvt->quadrant_successor = p4est_quadrant_vtable_successor;
-  qvt->quadrant_child = p4est_quadrant_vtable_child;
-  qvt->quadrant_ancestor = p4est_quadrant_vtable_ancestor;
-  qvt->quadrant_first_descendant = p4est_quadrant_vtable_first_descendant;
-  qvt->quadrant_last_descendant = p4est_quadrant_vtable_last_descendant;
-  qvt->quadrant_morton = p4est_quadrant_vtable_morton;
-  qvt->nearest_common_ancestor = p4est_vtable_nearest_common_ancestor;
-  qvt->quadrant_linear_id = p4est_quadrant_vtable_linear_id;
-  qvt->quadrant_is_ancestor = p4est_quadrant_vtable_is_ancestor;
-
-  /* verify correctness */
-  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt);
-  return NULL;
+  &quadrant_vtable_p4est
 #else
-  return sc3_error_new_kind (SC3_ERROR_RUNTIME, __FILE__, __LINE__, "Creation"
-                             " of virtual table is denied since"
-                             " this dimension is disabled or not supported");
-#endif /* !(P4EST_DIM == ? && defined(P4EST_ENABLE_BUILD_?D)) */
+  NULL
 #endif
+;
+
+sc3_error_t        *
+p4est3_quadrant_vtable_p4est (const p4est3_quadrant_vtable_t ** qvt)
+{
+  SC3A_CHECK (qvt != NULL);
+
+  if (qvt_p4est != NULL) {
+    /* verify correctness */
+    SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_p4est);
+
+    /* pass internally constructed virtual table to the outside */
+    *qvt = qvt_p4est;
+  }
+  else {
+    *qvt = NULL;
+  }
   return NULL;
 }

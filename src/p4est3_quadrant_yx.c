@@ -879,7 +879,6 @@ p4est3_quadrant_zyx_root (__m128i * r)
   return NULL;
 }
 
-
 static const p4est3_quadrant_vtable_t quadrant_vtable_yx =
 {
   P4EST_STRING"_quadrant_vtable_zyx",

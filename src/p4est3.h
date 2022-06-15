@@ -73,7 +73,7 @@ typedef struct p4est3_vtable
   sc3_MPI_Comm_t      mpicomm;  /**< Valid MPI communicator. */
   p4est3_connectivity_t *c3;    /**< This connectivity must match the virtual
                                      forest to create.  It must be setup. */
-  p4est3_quadrant_vtable_t *qvt;        /**< Quadrant table must match forest.
+  const p4est3_quadrant_vtable_t *qvt;  /**< Quadrant table must match forest.
                                              We make a shallow copy. */
 
   /** Query functions */

@@ -165,7 +165,7 @@ check_quadrant_type (int argc, char **argv,
     return NULL;
   }
   if (strcmp (argv[2], "STANDART") == 0) {
-    p4est3_quadrant_vtable_p4est (qvt, 0);
+    SC3E (p4est3_quadrant_vtable_p4est (qvt));
   }
   else if (strcmp (argv[2], "AVX") == 0) {
     SC3E (p4est3_quadrant_yx_vtable (qvt));
@@ -238,7 +238,7 @@ main (int argc, char **argv)
 
   /* default parameters */
   p4est3_setup_mode_t mode = P4EST3_NEW_MORTON;
-  p4est3_quadrant_vtable_p4est (qvt, 0);
+  SC3E_NULL_SET (e, p4est3_quadrant_vtable_p4est (&qvt));
   level = 1;
   num_trees = 2;
 

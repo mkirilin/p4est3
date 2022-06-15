@@ -201,7 +201,7 @@ typedef struct v3basics
   sc3_MPI_Comm_t      mpicomm;
   int                 mpirank;
   sc3_allocator_t    *alloc;
-  p4est3_quadrant_vtable_t sqvt_legacy, *qvt_legacy;
+  p4est3_quadrant_vtable_t *qvt_legacy;
 
 }
 v3basics_t;
@@ -213,7 +213,6 @@ v3basics_prepare (v3basics_t * t)
   SC3A_CHECK (t != NULL);
 
   /* initialize global data */
-  t->qvt_legacy = &t->sqvt_legacy;
   t->mpicomm = SC3_MPI_COMM_WORLD;
   SC3E (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
   SC3E (sc3_MPI_Comm_set_errhandler (t->mpicomm, SC3_MPI_ERRORS_RETURN));
@@ -224,7 +223,7 @@ v3basics_prepare (v3basics_t * t)
   p4est_init (NULL, SC_LP_DEFAULT);
 
   /* legacy wrapping for p4est quadrants */
-  SC3E (p4est3_quadrant_vtable_p4est (t->qvt_legacy, 0));
+  SC3E (p4est3_quadrant_vtable_p4est (&t->qvt_legacy));
 
   /* perspectively make one allocator for each thread */
   SC3E (make_allocator (sc3_allocator_nothread (), &t->alloc));

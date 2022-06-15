@@ -91,13 +91,9 @@ sc3_error_t        *p4est3_new_p4est (sc3_allocator_t * alloc,
                                       p4est3_t ** forest,
                                       p4est_t * p4, int autodestroy);
 
-/** Populate a quadrant virtual table to use standard 2D p4est quadrants.
- * \param [out] qvt     Pointer to a virtual table that will be populated.
- * \param [in] id       This user-defined id is put into the virtual table.
- * \return              NULL on success, error object otherwise.
- */
+/** Return pointer to quadrant virtual table for the standard version */
 sc3_error_t        *p4est3_quadrant_vtable_p4est
-  (p4est3_quadrant_vtable_t * qvt, int id);
+  (const p4est3_quadrant_vtable_t ** qvt);
 
 #ifdef __cplusplus
 #if 0
