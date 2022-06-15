@@ -285,7 +285,7 @@ p4est3_destroy_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
 
 #ifdef P4EST_ENABLE_DEBUG
 static sc3_error_t *
-p4est3_array_is_sorted (const void *q1, const void *q2, void *qvt, int *j)
+p4est3_array_is_sorted (const void *q1, const void *q2, const void *qvt, int *j)
 {
   p4est3_quadrant_vtable_t *qvtable = (p4est3_quadrant_vtable_t *) qvt;
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvtable);
@@ -327,7 +327,7 @@ p4est3_array_split_ancestor_id (sc3_array_t * a, int index, void *data,
 }
 
 static sc3_error_t *
-p4est3_quadrant_array_split (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_array_split (const p4est3_quadrant_vtable_t * qvt,
                              sc3_array_t * array, int level,
                              sc3_array_t * indices)
 {

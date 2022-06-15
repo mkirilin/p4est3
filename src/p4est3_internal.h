@@ -107,7 +107,7 @@ struct p4est3
   int                 commdup;  /**< Boolean: communicator has been duped. */
   p4est3_connectivity_t *conn;  /**< Pointer to the relevant connectivity. */
   p4est3_topidx       num_trees;        /**< Number of trees in \ref conn. */
-  const p4est3_quadrant_vtable_t *qvt;        /**< Always points to \ref sqvt. */
+  const p4est3_quadrant_vtable_t *qvt;        /**< Always points to static qvt */
   int                 level;    /**< Configuration variable for initial level.
                                      Depending on the available memory and
                                      index space, may be reduced during

@@ -85,7 +85,7 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
     else {
       SC3E_IS (p4est3_connectivity_is_setup, p3->conn, reason);
       SC3E_TEST (p3->num_trees > 0, reason);
-      SC3E_TEST (p3->qvt == &p3->sqvt, reason);
+      SC3E_TEST (p3->qvt != NULL, reason);
 
       /* TODO thoroughly test all member variables */
     }
@@ -195,13 +195,13 @@ p4est3_set_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
 }
 
 sc3_error_t        *
-p4est3_set_quadrant_vtable (p4est3_t * p3, p4est3_quadrant_vtable_t * qvt)
+p4est3_set_quadrant_vtable (p4est3_t * p3, const p4est3_quadrant_vtable_t * qvt)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (qvt != NULL);
 
   /* make shallow copy of virtual table */
-  *(p3->qvt = &p3->sqvt) = *qvt;
+  p3->qvt = qvt;
   return NULL;
 }
 
@@ -298,7 +298,7 @@ p4est3_setup (p4est3_t * p3)
      Note that p4est3_set_vtable sets connectivity and quadrant vtable. */
   if (p3->old == NULL) {
     SC3E_DEMAND (p3->conn != NULL, "Connectivity must be set");
-    SC3E_DEMAND (p3->qvt == &p3->sqvt, "Quadrant virtual table must be set");
+    SC3E_DEMAND (p3->qvt != NULL, "Quadrant virtual table must be set");
     SC3E (p4est3_connectivity_get_dim (p3->conn, &cdim));
     SC3E_DEMAND (cdim == p3->qvt->dim,
                  "Dimensions of connectivity and quadrant vtable must match");

@@ -543,8 +543,9 @@ p4est_quadrant_vtable_is_ancestor (const void *q1, const void *q2, int *j)
 }
 
 sc3_error_t        *
-p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
+p4est3_quadrant_vtable_p4est (const p4est3_quadrant_vtable_t * qvt, int id)
 {
+#if 0
   /* check arguments */
   SC3A_CHECK (qvt != NULL);
   SC3A_CHECK (id >= 0);
@@ -596,4 +597,6 @@ p4est3_quadrant_vtable_p4est (p4est3_quadrant_vtable_t * qvt, int id)
                              " of virtual table is denied since"
                              " this dimension is disabled or not supported");
 #endif /* !(P4EST_DIM == ? && defined(P4EST_ENABLE_BUILD_?D)) */
+#endif
+  return NULL;
 }

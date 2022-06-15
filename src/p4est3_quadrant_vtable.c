@@ -61,7 +61,7 @@ p4est3_quadrant_vtable_is_valid (const p4est3_quadrant_vtable_t * qvt, char *rea
 }
 
 const char *
-p4est3_quadrant_name (p4est3_quadrant_vtable_t * qvt)
+p4est3_quadrant_name (const p4est3_quadrant_vtable_t * qvt)
 {
   if (qvt == NULL) {
     return NULL;
@@ -70,7 +70,7 @@ p4est3_quadrant_name (p4est3_quadrant_vtable_t * qvt)
 }
 
 int
-p4est3_quadrant_dim (p4est3_quadrant_vtable_t * qvt)
+p4est3_quadrant_dim (const p4est3_quadrant_vtable_t * qvt)
 {
   if (qvt == NULL || qvt->dim <= 0 || qvt->dim > 3) {
     return -1;
@@ -79,7 +79,7 @@ p4est3_quadrant_dim (p4est3_quadrant_vtable_t * qvt)
 }
 
 int
-p4est3_quadrant_max_level (p4est3_quadrant_vtable_t * qvt)
+p4est3_quadrant_max_level (const p4est3_quadrant_vtable_t * qvt)
 {
   if (qvt == NULL || qvt->max_level < 0) {
     return -1;
@@ -88,7 +88,7 @@ p4est3_quadrant_max_level (p4est3_quadrant_vtable_t * qvt)
 }
 
 size_t
-p4est3_quadrant_size (p4est3_quadrant_vtable_t * qvt)
+p4est3_quadrant_size (const p4est3_quadrant_vtable_t * qvt)
 {
   if (qvt == NULL) {
     return 0;
@@ -97,7 +97,7 @@ p4est3_quadrant_size (p4est3_quadrant_vtable_t * qvt)
 }
 
 int
-p4est3_quadrant_num_children (p4est3_quadrant_vtable_t * qvt)
+p4est3_quadrant_num_children (const p4est3_quadrant_vtable_t * qvt)
 {
   if (qvt == NULL || (qvt->dim <= 1 || qvt->dim > 3)) {
     return -1;
@@ -106,7 +106,7 @@ p4est3_quadrant_num_children (p4est3_quadrant_vtable_t * qvt)
 }
 
 p4est3_gloidx
-p4est3_quadrant_num_uniform (p4est3_quadrant_vtable_t * qvt, int level)
+p4est3_quadrant_num_uniform (const p4est3_quadrant_vtable_t * qvt, int level)
 {
   if (qvt == NULL || qvt->quadrant_num_uniform == NULL) {
     return -1;
@@ -115,8 +115,8 @@ p4est3_quadrant_num_uniform (p4est3_quadrant_vtable_t * qvt, int level)
 }
 
 int
-p4est3_quadrant_is2_valid (p4est3_quadrant_vtable_t * qvt,
-                           const void *q, char *reason)
+p4est3_quadrant_vtable_is2_valid (const p4est3_quadrant_vtable_t * qvt,
+                                  const void *q, char *reason)
 {
   SC3E_TEST (qvt != NULL, reason);
   if (qvt->quadrant_is_valid != NULL) {
@@ -126,7 +126,7 @@ p4est3_quadrant_is2_valid (p4est3_quadrant_vtable_t * qvt,
 }
 
 int
-p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_is3_equal (const p4est3_quadrant_vtable_t * qvt,
                            const void *q1, const void *q2, char *reason)
 {
   SC3E_TEST (qvt != NULL, reason);
@@ -140,7 +140,7 @@ p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_get_tree_boundary (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_get_tree_boundary (const p4est3_quadrant_vtable_t * qvt,
                                    const void *q, int i, int *j)
 {
   /* TODO: either require both get_tree_boundary and tree_boundaries or none */
@@ -152,7 +152,7 @@ p4est3_quadrant_get_tree_boundary (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_tree_boundaries (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_tree_boundaries (const p4est3_quadrant_vtable_t * qvt,
                                  const void *q, sc3_array_t * nf)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_tree_boundaries != NULL);
@@ -161,7 +161,7 @@ p4est3_quadrant_tree_boundaries (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_level (p4est3_quadrant_vtable_t * qvt, const void *q, int *l)
+p4est3_quadrant_level (const p4est3_quadrant_vtable_t * qvt, const void *q, int *l)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_level != NULL);
   SC3E (qvt->quadrant_level (q, l));
@@ -169,7 +169,7 @@ p4est3_quadrant_level (p4est3_quadrant_vtable_t * qvt, const void *q, int *l)
 }
 
 sc3_error_t        *
-p4est3_quadrant_child_id (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_child_id (const p4est3_quadrant_vtable_t * qvt,
                           const void *q, int *j)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_child_id != NULL);
@@ -178,7 +178,7 @@ p4est3_quadrant_child_id (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_ancestor_id (const p4est3_quadrant_vtable_t * qvt,
                              const void *q, int l, int *j)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_ancestor_id != NULL);
@@ -187,7 +187,7 @@ p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_coordinates (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_coordinates (const p4est3_quadrant_vtable_t * qvt,
                              const void *q, int n, void *j)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_coordinates != NULL);
@@ -196,7 +196,7 @@ p4est3_quadrant_coordinates (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_quadrant (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_quadrant (const p4est3_quadrant_vtable_t * qvt,
                           const void *c, int l, void *q)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_quadrant != NULL);
@@ -205,7 +205,7 @@ p4est3_quadrant_quadrant (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_compare (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_compare (const p4est3_quadrant_vtable_t * qvt,
                          const void *q1, const void *q2, int *j)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_compare != NULL);
@@ -214,7 +214,7 @@ p4est3_quadrant_compare (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt, void *r)
+p4est3_quadrant_root (const p4est3_quadrant_vtable_t * qvt, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_root != NULL);
   SC3E (qvt->quadrant_root (r));
@@ -222,7 +222,7 @@ p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt, void *r)
 }
 
 sc3_error_t        *
-p4est3_quadrant_copy (p4est3_quadrant_vtable_t * qvt, const void *q, void *r)
+p4est3_quadrant_copy (const p4est3_quadrant_vtable_t * qvt, const void *q, void *r)
 {
   SC3A_CHECK (qvt != NULL);
 
@@ -236,7 +236,7 @@ p4est3_quadrant_copy (p4est3_quadrant_vtable_t * qvt, const void *q, void *r)
 }
 
 sc3_error_t        *
-p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_parent (const p4est3_quadrant_vtable_t * qvt,
                         const void *q, void *r)
 {
   SC3A_CHECK (qvt != NULL);
@@ -258,7 +258,7 @@ p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_sibling (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_sibling (const p4est3_quadrant_vtable_t * qvt,
                          const void *q, int i, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_sibling != NULL);
@@ -267,7 +267,7 @@ p4est3_quadrant_sibling (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_face_neighbor (const p4est3_quadrant_vtable_t * qvt,
                                const void *q, int i, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_face_neighbor != NULL);
@@ -283,7 +283,7 @@ p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_tree_face_neighbor (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_tree_face_neighbor (const p4est3_quadrant_vtable_t * qvt,
                                     const void *q, sc3_array_t * transform,
                                     int i, void *r)
 {
@@ -301,7 +301,7 @@ p4est3_quadrant_tree_face_neighbor (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_predecessor (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_predecessor (const p4est3_quadrant_vtable_t * qvt,
                              const void *q, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_predecessor != NULL);
@@ -310,7 +310,7 @@ p4est3_quadrant_predecessor (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_successor (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_successor (const p4est3_quadrant_vtable_t * qvt,
                            const void *q, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_successor != NULL);
@@ -319,7 +319,7 @@ p4est3_quadrant_successor (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_child (const p4est3_quadrant_vtable_t * qvt,
                        const void *q, int i, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_child != NULL);
@@ -328,7 +328,7 @@ p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_ancestor (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_ancestor (const p4est3_quadrant_vtable_t * qvt,
                           const void *q, int l, void *r)
 {
   SC3A_CHECK (qvt != NULL);
@@ -355,7 +355,7 @@ p4est3_quadrant_ancestor (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_first_descendant (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_first_descendant (const p4est3_quadrant_vtable_t * qvt,
                                   const void *q, int l, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_first_descendant != NULL);
@@ -364,7 +364,7 @@ p4est3_quadrant_first_descendant (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_last_descendant (const p4est3_quadrant_vtable_t * qvt,
                                  const void *q, int l, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_last_descendant != NULL);
@@ -373,7 +373,7 @@ p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_morton (const p4est3_quadrant_vtable_t * qvt,
                         int level, p4est3_gloidx id, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_morton != NULL);
@@ -382,7 +382,7 @@ p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t * qvt,
+p4est3_nearest_common_ancestor (const p4est3_quadrant_vtable_t * qvt,
                                 const void *q1, const void *q2, void *r)
 {
   SC3A_CHECK (qvt != NULL && qvt->nearest_common_ancestor != NULL);
@@ -391,7 +391,7 @@ p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_linear_id (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_linear_id (const p4est3_quadrant_vtable_t * qvt,
                            const void *q, int l, p4est3_gloidx * id)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_linear_id != NULL);
@@ -400,7 +400,7 @@ p4est3_quadrant_linear_id (p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
-p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t * qvt,
+p4est3_quadrant_is_ancestor (const p4est3_quadrant_vtable_t * qvt,
                              const void *q1, const void *q2, int *j)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_is_ancestor != NULL);
@@ -410,7 +410,7 @@ p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t * qvt,
 
 sc3_error_t        *
 p4est3_quadrant_array_new (sc3_allocator_t * alloc,
-                           p4est3_quadrant_vtable_t * qvt,
+                           const p4est3_quadrant_vtable_t * qvt,
                            p4est3_locidx n, sc3_array_t ** arr)
 {
   SC3E_RETVAL (arr, NULL);

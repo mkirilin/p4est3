@@ -234,7 +234,7 @@ typedef struct p4est3_quadrant_vtable
 
   p4est3_nearest_common_ancestor_t nearest_common_ancestor;
 }
-p4est3_quadrant_vtable_t;
+const p4est3_quadrant_vtable_t;
 
 /** Query validity of a quadrant virtual table.
  * \param [in] qvt      NULL is allowed and considered not valid.
@@ -248,19 +248,19 @@ int                 p4est3_quadrant_vtable_is_valid (const p4est3_quadrant_vtabl
  * \param [in] qvt  Valid virtual quadrant table.
  * \return          User-defined id if \a qvt valid, negative number otherwise.
  */
-int                 p4est3_quadrant_id (p4est3_quadrant_vtable_t * qvt);
+int                 p4est3_quadrant_id (const p4est3_quadrant_vtable_t * qvt);
 
 /** Return spatial dimension of the implementation.
  * \param [in] qvt  Valid virtual quadrant table.
  * \return          Dimension if \a qvt valid, negative number otherwise.
  */
-int                 p4est3_quadrant_dim (p4est3_quadrant_vtable_t * qvt);
+int                 p4est3_quadrant_dim (const p4est3_quadrant_vtable_t * qvt);
 
 /** Return maximum refinement level of the implementation.
  * \param [in] qvt  Valid virtual quadrant table.
  * \return          Maximum level if \a qvt valid, negative number otherwise.
  */
-int                 p4est3_quadrant_max_level (p4est3_quadrant_vtable_t *
+int                 p4est3_quadrant_max_level (const p4est3_quadrant_vtable_t *
                                                qvt);
 
 /** Return number of children of a quadrant in this implementation.
@@ -268,21 +268,21 @@ int                 p4est3_quadrant_max_level (p4est3_quadrant_vtable_t *
  * \return          Number of children if \a qvt valid,
  *                  negative number otherwise.
  */
-int                 p4est3_quadrant_num_children (p4est3_quadrant_vtable_t *
+int                 p4est3_quadrant_num_children (const p4est3_quadrant_vtable_t *
                                                   qvt);
 
 /** Return memory size in bytes of a quadrant in this implementation.
  * \param [in] qvt  Valid virtual quadrant table.
  * \return          Memory size if \a qvt valid, zero otherwise.
  */
-size_t              p4est3_quadrant_size (p4est3_quadrant_vtable_t * qvt);
+size_t              p4est3_quadrant_size (const p4est3_quadrant_vtable_t * qvt);
 
 /** Query number of quadrants for a uniform refinement at a given level.
  * \param [in] qvt      Valid virtual quadrant table.
  * \param [in] level    Valid level for this implementation.
  * \return              0 if \a qvt or \a level invalid, positive result otherwise.
  */
-p4est3_gloidx       p4est3_quadrant_num_uniform (p4est3_quadrant_vtable_t *
+p4est3_gloidx       p4est3_quadrant_num_uniform (const p4est3_quadrant_vtable_t *
                                                  qvt, int level);
 
 /** Query validity of a quadrant in the style of \c sc3_<object>_is2_valid.
@@ -304,7 +304,7 @@ int                 p4est3_quadrant_vtable_is2_valid
  * \return              True if the quadrant objects pointed to by \a q1 and
  *                      \a q2 are equal, false otherwise.
  */
-int                 p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
+int                 p4est3_quadrant_is3_equal (const p4est3_quadrant_vtable_t * qvt,
                                                const void *q1, const void *q2,
                                                char *reason);
 
@@ -320,7 +320,7 @@ int                 p4est3_quadrant_is3_equal (p4est3_quadrant_vtable_t * qvt,
 * \return               NULL on success, error object otherwise.
  */
 sc3_error_t
-  * p4est3_quadrant_get_tree_boundary (p4est3_quadrant_vtable_t * qvt,
+  * p4est3_quadrant_get_tree_boundary (const p4est3_quadrant_vtable_t * qvt,
                                        const void *q, int i, int *j);
 
 /** Query if a quadrant touches a tree face boundaries and which if so 
@@ -335,7 +335,7 @@ sc3_error_t
  *                      the whole tree), then the entry is filled by -2.
  * \return              NULL on success, error object otherwise.
 */
-sc3_error_t        *p4est3_quadrant_tree_boundaries (p4est3_quadrant_vtable_t
+sc3_error_t        *p4est3_quadrant_tree_boundaries (const p4est3_quadrant_vtable_t
                                                      * qvt, const void *q,
                                                      sc3_array_t * nf);
 
@@ -345,7 +345,7 @@ sc3_error_t        *p4est3_quadrant_tree_boundaries (p4est3_quadrant_vtable_t
  * \param [out] l       Non-NULL reference assigned level on output.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_level (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_level (const p4est3_quadrant_vtable_t * qvt,
                                            const void *q, int *l);
 
 /** Query the child id of a quadrant relative to its parent.
@@ -354,7 +354,7 @@ sc3_error_t        *p4est3_quadrant_level (p4est3_quadrant_vtable_t * qvt,
  * \param [out] j       Non-NULL reference assigned child id on output.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_child_id (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_child_id (const p4est3_quadrant_vtable_t * qvt,
                                               const void *q, int *j);
 
 /** Query the child id of a quadrant relative to a given ancestor.
@@ -364,7 +364,7 @@ sc3_error_t        *p4est3_quadrant_child_id (p4est3_quadrant_vtable_t * qvt,
  * \param [out] j       Non-NULL reference assigned ancestor id on output.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t *
+sc3_error_t        *p4est3_quadrant_ancestor_id (const p4est3_quadrant_vtable_t *
                                                  qvt, const void *q, int l,
                                                  int *j);
 
@@ -377,7 +377,7 @@ sc3_error_t        *p4est3_quadrant_ancestor_id (p4est3_quadrant_vtable_t *
  *                      We assume that the number of bits in an int suffices.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_coordinates (p4est3_quadrant_vtable_t *
+sc3_error_t        *p4est3_quadrant_coordinates (const p4est3_quadrant_vtable_t *
                                                  qvt, const void *q, int n,
                                                  void *j);
 
@@ -388,7 +388,7 @@ sc3_error_t        *p4est3_quadrant_coordinates (p4est3_quadrant_vtable_t *
  * \param [in] l        Desired level of the quadrant.
  * \param [in] q        Constructed quadrant is placed here.
 */
-sc3_error_t        *p4est3_quadrant_quadrant (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_quadrant (const p4est3_quadrant_vtable_t * qvt,
                                               const void *c, int l, void *q);
 
 /** Compare two quadrants by linear index.
@@ -401,7 +401,7 @@ sc3_error_t        *p4est3_quadrant_quadrant (p4est3_quadrant_vtable_t * qvt,
  *                      zero otherwise (on equality).
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_compare (p4est3_quadrant_vtable_t *
+sc3_error_t        *p4est3_quadrant_compare (const p4est3_quadrant_vtable_t *
                                              qvt, const void *q1,
                                              const void *q2, int *j);
 
@@ -410,7 +410,7 @@ sc3_error_t        *p4est3_quadrant_compare (p4est3_quadrant_vtable_t *
  * \param [out] r       The root quadrant is placed here.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_root (const p4est3_quadrant_vtable_t * qvt,
                                           void *r);
 
 /** Deep copy one quadrant into another.
@@ -419,7 +419,7 @@ sc3_error_t        *p4est3_quadrant_root (p4est3_quadrant_vtable_t * qvt,
  * \param [out] r       The copied quadrant is placed here.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_copy (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_copy (const p4est3_quadrant_vtable_t * qvt,
                                           const void *q, void *r);
 
 /** Generate the parent quadrant.
@@ -428,7 +428,7 @@ sc3_error_t        *p4est3_quadrant_copy (p4est3_quadrant_vtable_t * qvt,
  * \param [out] r       The parent quadrant is placed here.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_parent (const p4est3_quadrant_vtable_t * qvt,
                                             const void *q, void *r);
 
 /** Generate the sibling quadrant.
@@ -438,7 +438,7 @@ sc3_error_t        *p4est3_quadrant_parent (p4est3_quadrant_vtable_t * qvt,
  * \param [in] r        The i-th sibling of the quadrant q will be placed here.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_sibling (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_sibling (const p4est3_quadrant_vtable_t * qvt,
                                              const void *q, int i, void *r);
 
 /** Generate the face neighbor quadrant within the same tree.
@@ -448,7 +448,7 @@ sc3_error_t        *p4est3_quadrant_sibling (p4est3_quadrant_vtable_t * qvt,
  * \param [out] r       The neighbor quadrant is placed here in existing memory.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t *
+sc3_error_t        *p4est3_quadrant_face_neighbor (const p4est3_quadrant_vtable_t *
                                                    qvt, const void *q, int i,
                                                    void *r);
 
@@ -470,7 +470,7 @@ sc3_error_t        *p4est3_quadrant_face_neighbor (p4est3_quadrant_vtable_t *
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t
-  * p4est3_quadrant_tree_face_neighbor (p4est3_quadrant_vtable_t * qvt,
+  * p4est3_quadrant_tree_face_neighbor (const p4est3_quadrant_vtable_t * qvt,
                                         const void *q,
                                         sc3_array_t * transform, int i,
                                         void *r);
@@ -482,7 +482,7 @@ sc3_error_t
  * \param [out] r       The predecessor by linear index is placed here.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_predecessor (p4est3_quadrant_vtable_t *
+sc3_error_t        *p4est3_quadrant_predecessor (const p4est3_quadrant_vtable_t *
                                                  qvt, const void *q, void *r);
 
 /** Generate the successor quadrant.
@@ -492,7 +492,7 @@ sc3_error_t        *p4est3_quadrant_predecessor (p4est3_quadrant_vtable_t *
  * \param [out] r       The successor by linear index is placed here.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_successor (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_successor (const p4est3_quadrant_vtable_t * qvt,
                                                const void *q, void *r);
 
 /** Generate a child quadrant specified by child id.
@@ -503,7 +503,7 @@ sc3_error_t        *p4est3_quadrant_successor (p4est3_quadrant_vtable_t * qvt,
  * \param [out] r       The i-th child of \a q is placed here.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_child (const p4est3_quadrant_vtable_t * qvt,
                                            const void *q, int i, void *r);
 
 /** Generate an ancestor quadrant specified by ancestor level.
@@ -513,7 +513,7 @@ sc3_error_t        *p4est3_quadrant_child (p4est3_quadrant_vtable_t * qvt,
  * \param [out] r       The ancestor of \a q on level \a l is placed here.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_ancestor (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_ancestor (const p4est3_quadrant_vtable_t * qvt,
                                               const void *q, int l, void *r);
 
 /** Generate the first descendant quadrant on a specified level.
@@ -523,7 +523,7 @@ sc3_error_t        *p4est3_quadrant_ancestor (p4est3_quadrant_vtable_t * qvt,
  * \param [out] r       First descendant of \a q on level \a l is placed here.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_first_descendant (p4est3_quadrant_vtable_t
+sc3_error_t        *p4est3_quadrant_first_descendant (const p4est3_quadrant_vtable_t
                                                       * qvt, const void *q,
                                                       int l, void *r);
 
@@ -534,7 +534,7 @@ sc3_error_t        *p4est3_quadrant_first_descendant (p4est3_quadrant_vtable_t
  * \param [out] r       Last descendant of \a q on level \a l is placed here.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t
+sc3_error_t        *p4est3_quadrant_last_descendant (const p4est3_quadrant_vtable_t
                                                      * qvt, const void *q,
                                                      int l, void *r);
 
@@ -546,7 +546,7 @@ sc3_error_t        *p4est3_quadrant_last_descendant (p4est3_quadrant_vtable_t
  * \param [out] r       Quadrant of given linear index is placed here.
  * \return              NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_morton (const p4est3_quadrant_vtable_t * qvt,
                                             int l, p4est3_gloidx id, void *r);
 
 /** Generate a common nearest ancestor of two quadrants. 
@@ -556,7 +556,7 @@ sc3_error_t        *p4est3_quadrant_morton (p4est3_quadrant_vtable_t * qvt,
  * \param [out] r       Quadrant, common nearest ancestor of q1 and q2.
  * \return              NULL on success, error object otherwise.
 */
-sc3_error_t        *p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t
+sc3_error_t        *p4est3_nearest_common_ancestor (const p4est3_quadrant_vtable_t
                                                     * qvt, const void *q1,
                                                     const void *q2, void *r);
 
@@ -569,7 +569,7 @@ sc3_error_t        *p4est3_nearest_common_ancestor (p4est3_quadrant_vtable_t
  * \param [out] id      Linear index of given quadrant is placed here.
  * \return              NULL on success, error object otherwise.
 */
-sc3_error_t        *p4est3_quadrant_linear_id (p4est3_quadrant_vtable_t * qvt,
+sc3_error_t        *p4est3_quadrant_linear_id (const p4est3_quadrant_vtable_t * qvt,
                                                const void *q, int l,
                                                p4est3_gloidx * id);
 
@@ -580,7 +580,7 @@ sc3_error_t        *p4est3_quadrant_linear_id (p4est3_quadrant_vtable_t * qvt,
  * \param [out] j       True if q1 is ancestor of q2, false otherwise.
  * \return              NULL on success, error object otherwise.
 */
-sc3_error_t        *p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t
+sc3_error_t        *p4est3_quadrant_is_ancestor (const p4est3_quadrant_vtable_t
                                                  * qvt, const void *q1,
                                                  const void *q2, int *j);
 
@@ -594,7 +594,7 @@ sc3_error_t        *p4est3_quadrant_is_ancestor (p4est3_quadrant_vtable_t
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_quadrant_array_new (sc3_allocator_t * alloc,
-                                               p4est3_quadrant_vtable_t * qvt,
+                                               const p4est3_quadrant_vtable_t * qvt,
                                                p4est3_locidx n,
                                                sc3_array_t ** arr);
 

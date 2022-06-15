@@ -209,15 +209,15 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
 }
 
 static sc3_error_t *
-p4est3_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
-                           p4est3_quadrant_vtable_t * qvt_new,
+p4est3_translate_quadrant (const p4est3_quadrant_vtable_t * qvt_old,
+                           const p4est3_quadrant_vtable_t * qvt_new,
                            const void *qin, void *qout, int32_t * c)
 {
   int                 level;
 
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_old);
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_new);
-  SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_old, qin);
+  SC3A_IS2 (p4est3_quadrant_vtable_is2_valid, qvt_old, qin);
   SC3A_CHECK (qvt_old->dim == qvt_new->dim);
 
   if (qvt_old == qvt_new) {
@@ -231,7 +231,7 @@ p4est3_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
     SC3E (p4est3_quadrant_quadrant (qvt_new, c, level, qout));
   }
 
-  SC3A_IS2 (p4est3_quadrant_is2_valid, qvt_new, qout);
+  SC3A_IS2 (p4est3_quadrant_vtable_is2_valid, qvt_new, qout);
   return NULL;
 }
 

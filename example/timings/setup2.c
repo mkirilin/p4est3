@@ -153,25 +153,25 @@ check_setup_mode (int argc, char **argv, p4est3_setup_mode_t *mode,
   }
 }
 
-void
+static sc3_error_t *
 check_quadrant_type (int argc, char **argv,
-                     const p4est3_quadrant_vtable_t *qvt,
+                     const p4est3_quadrant_vtable_t **qvt,
                      int mpirank, sc3_MPI_Comm_t mpicomm)
 {
   if (argc <= 2) {
-    return;
+    return NULL;
   }
   if (strcmp (argv[1], "P4EST2") == 0) {
-    return;
+    return NULL;
   }
   if (strcmp (argv[2], "STANDART") == 0) {
     p4est3_quadrant_vtable_p4est (qvt, 0);
   }
   else if (strcmp (argv[2], "AVX") == 0) {
-    p4est3_quadrant_yx_vtable (qvt);
+    SC3E (p4est3_quadrant_yx_vtable (qvt));
   }
   else if (strcmp (argv[2], "MORT_ORD") == 0) {
-    p4est3_quadrant_mort2d_vtable (qvt);
+    SC3E (p4est3_quadrant_mort2d_vtable (qvt));
   }
   else {
     if (mpirank == 0) {
@@ -179,6 +179,7 @@ check_quadrant_type (int argc, char **argv,
       sc_MPI_Abort (mpicomm, -1);
     }
   }
+  return NULL;
 }
 
 char *
@@ -214,11 +215,11 @@ set_heading (int argc, char **argv, sc3_MPI_Comm_t mpicomm)
 int
 main (int argc, char **argv)
 {
+  const p4est3_quadrant_vtable_t *qvt;
   p4est3_topidx       num_trees;
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e;
   sc3_MPI_Comm_t      mpicomm;
-  p4est3_quadrant_vtable_t *qvt;
   p4est3_t           *p3;
   p4est_t            *p;
   p4est3_connectivity_t *conn;
@@ -237,7 +238,7 @@ main (int argc, char **argv)
 
   /* default parameters */
   p4est3_setup_mode_t mode = P4EST3_NEW_MORTON;
-  //p4est3_quadrant_vtable_p4est (qvt, 0);
+  p4est3_quadrant_vtable_p4est (qvt, 0);
   level = 1;
   num_trees = 2;
 
@@ -251,7 +252,7 @@ main (int argc, char **argv)
             "<SETUP MODE> <QUADRANT TYPE> <#levels> <#trees>\n");
   }
   check_setup_mode (argc, argv, &mode, mpirank, mpicomm);
-  check_quadrant_type (argc, argv, &qvt, mpirank, mpicomm);
+  SC3E_NULL_SET (e, check_quadrant_type (argc, argv, &qvt, mpirank, mpicomm));
   if (argc > 3) {
     level = atoi (argv[3]);
     if (level == 0 && mpirank == 0) {

@@ -233,13 +233,12 @@ typedef struct timeavx2
   sc3_array_t        *qarr;
   sc3_array_t        *qarr_avx;
   p4est3_quadrant_vtable_t sqvt, *qvt;
-  p4est3_quadrant_vtable_t *qvt_avx;
+  const p4est3_quadrant_vtable_t *qvt_avx;
 }
 timeavx2_t;
 
 static sc3_error_t *
-timeavx2_prepare (const p4est3_quadrant_vtable_t * qvt_avx,
-                  timeavx2_t * t, int *retval)
+timeavx2_prepare (timeavx2_t * t, int *retval)
 {
   void               *p;
 
@@ -254,8 +253,8 @@ timeavx2_prepare (const p4est3_quadrant_vtable_t * qvt_avx,
   p4est3_quadrant_vtable_p4est (t->qvt, 0);
 
   /* the AVX virtual table can only be set with hardware support */
-  SC3E (p4est3_quadrant_yx_vtable (&qvt_avx));
-  if (qvt_avx == NULL) {
+  SC3E (p4est3_quadrant_yx_vtable (&t->qvt_avx));
+  if (t->qvt_avx == NULL) {
     /* AVX is not supported by hardware
       or p4est is not build neither in 2D nor 3D*/
     if (t->mpirank == 0) {
@@ -346,7 +345,7 @@ main (int argc, char **argv)
   t->n_quads = n_quads = SC3_MAX (n_quads, 1);
 
   /* choose virtual tables and initialize resources */
-  SC3X (timeavx2_prepare (t->qvt_avx, t, &retval));
+  SC3X (timeavx2_prepare (t, &retval));
 
 #if 0
   /* TODO create a dedicated allocator for this program */
