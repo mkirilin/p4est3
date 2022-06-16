@@ -228,6 +228,7 @@ p4est3_new_p4est (sc3_allocator_t * alloc, p4est3_t ** pp3,
   pvt->mpicomm = p4->mpicomm;
   pvt->c3 = slf->c3;
   SC3E (p4est3_quadrant_vtable_p4est (&pvt->qvt));
+  SC3E_DEMAND (pvt->qvt != NULL, "p4est is not build neither in 2D nor 3D");
   pvt->get_local_num_trees = p4est3_p4est_get_local_num_trees;
   pvt->destroy = p4est3_p4est_destroy;
 

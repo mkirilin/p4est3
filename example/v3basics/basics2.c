@@ -87,7 +87,7 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
 
 static sc3_error_t *
 test_p4est_new (sc3_allocator_t * alloc,
-                sc3_MPI_Comm_t mpicomm, p4est3_quadrant_vtable_t * qvt,
+                sc3_MPI_Comm_t mpicomm, const p4est3_quadrant_vtable_t * qvt,
                 p4est3_topidx num_trees, int level)
 {
   int                 i, j;
@@ -201,7 +201,7 @@ typedef struct v3basics
   sc3_MPI_Comm_t      mpicomm;
   int                 mpirank;
   sc3_allocator_t    *alloc;
-  p4est3_quadrant_vtable_t *qvt_legacy;
+  const p4est3_quadrant_vtable_t *qvt_legacy;
 
 }
 v3basics_t;
@@ -224,7 +224,7 @@ v3basics_prepare (v3basics_t * t)
 
   /* legacy wrapping for p4est quadrants */
   SC3E (p4est3_quadrant_vtable_p4est (&t->qvt_legacy));
-
+  SC3E_DEMAND (t->qvt_legacy != NULL, "p4est is not build neither in 2D nor 3D");
   /* perspectively make one allocator for each thread */
   SC3E (make_allocator (sc3_allocator_nothread (), &t->alloc));
   return NULL;

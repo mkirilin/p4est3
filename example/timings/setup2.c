@@ -179,6 +179,8 @@ check_quadrant_type (int argc, char **argv,
       sc_MPI_Abort (mpicomm, -1);
     }
   }
+  SC3E_DEMAND (*qvt != NULL, "AVX is not supported by hardware "
+               "p4est is not build neither in 2D nor 3D");
   return NULL;
 }
 

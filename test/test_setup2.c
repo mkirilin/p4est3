@@ -51,13 +51,18 @@ typedef struct setup
 setup_t;
 
 static sc3_error_t *
-set_vtables (p4est3_quadrant_vtable_t * q, p4est3_quadrant_vtable_t * qmort,
-             p4est3_quadrant_vtable_t * qavx, sc3_error_t ** e)
+set_vtables (const p4est3_quadrant_vtable_t ** q,
+             const p4est3_quadrant_vtable_t ** qmort,
+             const p4est3_quadrant_vtable_t ** qavx)
 {
-  SC3X (p4est3_quadrant_vtable_p4est (q, 0));
+  SC3X (p4est3_quadrant_vtable_p4est (q));
   SC3X (p4est3_quadrant_mort2d_vtable (qmort));
+  SC3E_DEMAND (*q != NULL && *qmort != NULL,
+               "p4est is not build neither in 2D nor 3D");
   /* the AVX virtual table can only be set with hardware support */
-  SC3F (p4est3_quadrant_yx_vtable (qavx), *e);
+  SC3E (p4est3_quadrant_yx_vtable (qavx));
+  SC3E_DEMAND (*qavx != NULL, "AVX is not supported by hardware "
+               "p4est is not build neither in 2D nor 3D");
 
   return NULL;
 }
@@ -86,7 +91,7 @@ make_connectivity (setup_t * t)
 static sc3_error_t *
 make_new_p4est3 (p4est3_t ** p3, sc3_allocator_t * alloc,
                  p4est3_connectivity_t * conn, sc3_MPI_Comm_t mpicomm,
-                 p4est3_quadrant_vtable_t * qvt, int level,
+                 const p4est3_quadrant_vtable_t * qvt, int level,
                  p4est3_setup_mode_t mode)
 {
   SC3A_IS (sc3_allocator_is_setup, alloc);
@@ -104,7 +109,7 @@ make_new_p4est3 (p4est3_t ** p3, sc3_allocator_t * alloc,
 }
 
 static sc3_error_t *
-setup_forests (setup_t * t, p4est3_quadrant_vtable_t * q,
+setup_forests (setup_t * t, const p4est3_quadrant_vtable_t * q,
                p4est3_t ** m, p4est3_t ** s, p4est3_t ** rc)
 {
   SC3E (make_new_p4est3 (m, t->alloc, t->conn, t->mpicomm, q, t->level,
@@ -119,8 +124,8 @@ setup_forests (setup_t * t, p4est3_quadrant_vtable_t * q,
 
 static sc3_error_t *
 compare_p4est3_quadrants (const p4est3_t * lhs, const p4est3_t * rhs,
-                          p4est3_quadrant_vtable_t * lqvt,
-                          p4est3_quadrant_vtable_t * rqvt)
+                          const p4est3_quadrant_vtable_t * lqvt,
+                          const p4est3_quadrant_vtable_t * rqvt)
 {
   p4est3_gloidx       i;
   p4est3_gloidx       gln, grn;
@@ -163,8 +168,8 @@ compare_p4est3_quadrants (const p4est3_t * lhs, const p4est3_t * rhs,
 static sc3_error_t *
 perform_test_old (setup_t * t,
                   p4est3_t ** m, p4est3_t ** s, p4est3_t ** rc,
-                  p4est3_quadrant_vtable_t * qref,
-                  p4est3_quadrant_vtable_t * q)
+                  const p4est3_quadrant_vtable_t * qref,
+                  const p4est3_quadrant_vtable_t * q)
 {
   SC3E (setup_forests (t, q, m, s, rc));
   SC3E (compare_p4est3_quadrants (*m, *s, q, q));
@@ -180,7 +185,8 @@ perform_test_old (setup_t * t,
 static sc3_error_t *
 perform_test (setup_t * t,
               p4est3_t * ref, p4est3_t ** m, p4est3_t ** s, p4est3_t ** rc,
-              p4est3_quadrant_vtable_t * qref, p4est3_quadrant_vtable_t * q)
+              const p4est3_quadrant_vtable_t * qref,
+              const p4est3_quadrant_vtable_t * q)
 {
   SC3E (setup_forests (t, q, m, s, rc));
   SC3E (compare_p4est3_quadrants (ref, *m, qref, q));
@@ -205,11 +211,8 @@ free_allocator (sc3_allocator_t ** alloc)
 int
 main (int argc, char **argv)
 {
+  const p4est3_quadrant_vtable_t *qvt, *qvtavx, *qvtmort;
   setup_t             st, *t = &st;
-  sc3_error_t        *e_avx;
-  p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
-  p4est3_quadrant_vtable_t vtavx, *qvtavx = &vtavx;
-  p4est3_quadrant_vtable_t vtmort, *qvtmort = &vtmort;
   p4est3_t           *p3m, *p3s, *p3rc;
   p4est3_t           *p3m_avx, *p3s_avx, *p3rc_avx;
   p4est3_t           *p3m_mort, *p3s_mort, *p3rc_mort;
@@ -222,7 +225,7 @@ main (int argc, char **argv)
   t->mpicomm = SC3_MPI_COMM_WORLD;
   SC3X (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
 
-  SC3X (set_vtables (qvt, qvtmort, qvtavx, &e_avx));
+  SC3X (set_vtables (&qvt, &qvtmort, &qvtavx));
 
   SC3X (make_allocator (t));
   for (t->level = 1; t->level < MAX_TEST_LEVEL; ++(t->level)) {
@@ -251,22 +254,17 @@ main (int argc, char **argv)
       }
 #endif /* P4EST_ENABLE_DEBUG */
 
-      if (!sc3_error_is2_kind (e_avx, SC3_ERROR_RUNTIME, NULL)) {
-        SC3X (perform_test (t, p3m, &p3m_avx, &p3s_avx, &p3rc_avx, qvt, qvtavx));
+      SC3X (perform_test (t, p3m, &p3m_avx, &p3s_avx, &p3rc_avx, qvt, qvtavx));
 #ifdef P4EST_ENABLE_DEBUG
         if (t->mpirank == 0) {
           printf ("AVX-quadrants are equal for every setup option\n");
         }
 #endif /* P4EST_ENABLE_DEBUG */
-      }
 
       /*destroy forest, that was referenced for others*/
       SC3X (p4est3_destroy (&p3m));
       SC3X (p4est3_connectivity_destroy (&t->conn));
     }
-  }
-  if (e_avx != NULL) {
-    SC3X (sc3_error_unref (&e_avx));
   }
   SC3X (free_allocator (&t->alloc));
 

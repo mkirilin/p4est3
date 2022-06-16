@@ -248,20 +248,13 @@ timeavx2_prepare (timeavx2_t * t, int *retval)
 
   /* the standard p4est2 virtual table always exists */
   SC3E (p4est3_quadrant_vtable_p4est (&t->qvt));
+  SC3E_DEMAND (t->qvt != NULL, "standard qvt: "
+               "p4est is not build neither in 2D nor 3D");
 
   /* the AVX virtual table can only be set with hardware support */
   SC3E (p4est3_quadrant_yx_vtable (&t->qvt_avx));
-  if (t->qvt_avx == NULL) {
-    /* AVX is not supported by hardware
-      or p4est is not build neither in 2D nor 3D*/
-    if (t->mpirank == 0) {
-      fprintf (stderr, "%s\nWill not proceed\n",
-      "AVX is not supported by hardware "
+  SC3E_DEMAND (t->qvt_avx != NULL, "AVX is not supported by hardware "
       "or p4est is not build neither in 2D nor 3D\n");
-    }
-    /* return value has been initialized to failure above */
-    return NULL;
-  }
 
   /* create a toplevel allocator */
   SC3E (sc3_allocator_new (sc3_allocator_nocount (), &t->alloc));

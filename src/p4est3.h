@@ -228,9 +228,8 @@ sc3_error_t        *p4est3_set_connectivity (p4est3_t * p3,
  *                          It is thus safe if \c *qvt lives on the stack.
  * \return                  NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_set_quadrant_vtable (p4est3_t * p3,
-                                                p4est3_quadrant_vtable_t *
-                                                qvt);
+sc3_error_t        *p4est3_set_quadrant_vtable
+  (p4est3_t * p3, const p4est3_quadrant_vtable_t * qvt);
 
 /** Set minimum refinement level on creation of the forest.
  * The default after \ref p4est3_new is 0.

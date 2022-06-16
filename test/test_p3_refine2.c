@@ -183,11 +183,12 @@ array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 }
 
 static sc3_error_t *
-set_parameters (setup_t * t, p4est3_quadrant_vtable_t * qvt)
+set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
 {
   t->mainalloc = sc3_allocator_nothread ();
   SC3E (make_allocator (t));
-  SC3E (p4est3_quadrant_vtable_p4est (qvt, 0));
+  SC3E (p4est3_quadrant_vtable_p4est (qvt));
+  SC3E_DEMAND (*qvt != NULL, "p4est is not build neither in 2D nor 3D");
   return NULL;
 }
 
@@ -201,7 +202,7 @@ make_new_p4est (p4est_t ** p, setup_t * t)
 }
 
 static sc3_error_t *
-make_new_p4est3 (p4est3_t ** p3, setup_t * t, p4est3_quadrant_vtable_t * qvt)
+make_new_p4est3 (p4est3_t ** p3, setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
 {
   SC3A_IS (sc3_allocator_is_setup, t->alloc);
 
@@ -209,7 +210,7 @@ make_new_p4est3 (p4est3_t ** p3, setup_t * t, p4est3_quadrant_vtable_t * qvt)
   SC3E (p4est3_new (t->alloc, p3));
   SC3E (p4est3_set_comm (*p3, t->mpicomm, 1));
   SC3E (p4est3_set_connectivity (*p3, t->conn3));
-  SC3E (p4est3_set_quadrant_vtable (*p3, qvt));
+  SC3E (p4est3_set_quadrant_vtable (*p3, *qvt));
   SC3E (p4est3_set_level (*p3, FOREST_START_LEVEL));
   SC3E (p4est3_setup (*p3));
 
@@ -226,7 +227,7 @@ free_allocator (sc3_allocator_t ** alloc)
 
 static sc3_error_t *
 compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
-                 p4est3_quadrant_vtable_t * qvt)
+                 const p4est3_quadrant_vtable_t * qvt)
 {
 
   char               *q3;
@@ -293,12 +294,12 @@ compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
  * 2 - Morton
 */
 static sc3_error_t *
-set_qvt (p4est3_quadrant_vtable_t * qvt, int i)
+set_qvt (const p4est3_quadrant_vtable_t ** qvt, int i)
 {
   SC3A_CHECK (0 <= i && i <= 2);
   switch (i) {
   case 0:
-    SC3E (p4est3_quadrant_vtable_p4est (qvt, 0));
+    SC3E (p4est3_quadrant_vtable_p4est (qvt));
     break;
   case 1:
     SC3E (p4est3_quadrant_yx_vtable (qvt));
@@ -309,6 +310,8 @@ set_qvt (p4est3_quadrant_vtable_t * qvt, int i)
   default:
     SC3E_UNREACH ("wrong qvt mode");
   }
+  SC3E_DEMAND (*qvt != NULL, "AVX is not supported by hardware "
+               "p4est is not build neither in 2D nor 3D");
   return NULL;
 }
 
@@ -317,14 +320,14 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
 {
   int                 i;
   p4est3_t           *p3refined, *p3ptr = p3;
-  p4est3_quadrant_vtable_t sqvt, *qvt = &sqvt;
+  const p4est3_quadrant_vtable_t *qvt;
   /* refine the old forest */
   refine_level = t->level;
   p4est_refine (p, 1, refine_normal_fn, NULL);
 
   for (i = 0; i < refine_level; ++i) {
     SC3E (p4est3_new (t->alloc, &p3refined));
-    SC3E (set_qvt (qvt, i % 3));
+    SC3E (set_qvt (&qvt, i % 3));
     SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
     SC3E (p4est3_set_refine (p3refined, refine_p3_normal_fn));
     SC3E (p4est3_set_source (p3refined, p3ptr));
@@ -340,7 +343,7 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
   p4est_coarsen (p, 1, coarsen_normal_fn, NULL);
   for (i = 0; i < refine_level; ++i) {
     SC3E (p4est3_new (t->alloc, &p3refined));
-    SC3E (set_qvt (qvt, i % 3));
+    SC3E (set_qvt (&qvt, i % 3));
     SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
     SC3E (p4est3_set_coarsen (p3refined, coarsen_p3_normal_fn));
     SC3E (p4est3_set_source (p3refined, p3ptr));
@@ -356,7 +359,7 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
 }
 
 static sc3_error_t *
-perform_tests (setup_t * t, p4est3_quadrant_vtable_t * qvt)
+perform_tests (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
 {
   p4est_t            *p;
   p4est3_t           *p3;
@@ -368,7 +371,7 @@ perform_tests (setup_t * t, p4est3_quadrant_vtable_t * qvt)
         printf ("l = %d, t = %d\n", t->level, t->num_trees);
       }
 #endif /* P4EST_ENABLE_DEBUG */
-      SC3E (make_connectivity (t, qvt->dim));
+      SC3E (make_connectivity (t, (*qvt)->dim));
       SC3E (make_new_p4est (&p, t));
       SC3E (make_new_p4est3 (&p3, t, qvt));
 
@@ -390,7 +393,7 @@ int
 main (int argc, char **argv)
 {
   setup_t             st, *t = &st;
-  p4est3_quadrant_vtable_t vtable, *qvt = &vtable;
+  const p4est3_quadrant_vtable_t *qvt;
 
   SC3X (sc3_MPI_Init (&argc, &argv));
   t->mpicomm = SC3_MPI_COMM_WORLD;
@@ -398,8 +401,8 @@ main (int argc, char **argv)
   sc_init (t->mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
   p4est_init (NULL, SC_LP_DEFAULT);
 
-  SC3X (set_parameters (t, qvt));
-  SC3X (perform_tests (t, qvt));
+  SC3X (set_parameters (t, &qvt));
+  SC3X (perform_tests (t, &qvt));
   SC3X (free_allocator (&t->alloc));
   sc_finalize_noabort ();
   SC3X (sc3_MPI_Finalize ());
