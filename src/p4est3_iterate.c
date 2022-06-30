@@ -283,11 +283,16 @@ p4est3_destroy_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
   return NULL;
 }
 
+typedef struct p4est3_qvt_non_const_wrapper
+{
+  const p4est3_quadrant_vtable_t *qvt;
+} p4est3_qvt_non_const_wrapper_t;
+
 #ifdef P4EST_ENABLE_DEBUG
 static sc3_error_t *
-p4est3_array_is_sorted (const void *q1, const void *q2, const void *qvt, int *j)
+p4est3_array_is_sorted (const void *q1, const void *q2, void *qvt_wrapper, int *j)
 {
-  p4est3_quadrant_vtable_t *qvtable = (p4est3_quadrant_vtable_t *) qvt;
+  const p4est3_quadrant_vtable_t *qvtable = ((p4est3_qvt_non_const_wrapper_t *) qvt_wrapper)->qvt;
   SC3A_IS (p4est3_quadrant_vtable_is_valid, qvtable);
 
   SC3A_IS (qvtable->quadrant_is_valid, q1);
@@ -332,16 +337,18 @@ p4est3_quadrant_array_split (const p4est3_quadrant_vtable_t * qvt,
                              sc3_array_t * indices)
 {
   p4est3_array_split_data_t data;
+  p4est3_qvt_non_const_wrapper_t sqvtw, *qvtw = &sqvtw;
 #ifdef P4EST_ENABLE_DEBUG
   void               *q1, *q2;
   int                 l, count;
 #endif
 
+  qvtw->qvt = qvt;
   SC3A_IS (sc3_array_is_setup, array);
   SC3A_IS (sc3_array_is_setup, indices);
   SC3A_CHECK (qvt != NULL);
   SC3A_CHECK (0 <= level && level < qvt->max_level);
-  SC3A_IS3 (sc3_array_is_sorted, array, p4est3_array_is_sorted, qvt);
+  SC3A_IS3 (sc3_array_is_sorted, array, p4est3_array_is_sorted, qvtw);
 
 #ifdef P4EST_ENABLE_DEBUG
   SC3E (sc3_array_get_elem_count (array, &count));
