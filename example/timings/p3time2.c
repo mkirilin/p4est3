@@ -136,7 +136,7 @@ interpret_command_line (const int argc, char **argv, p4est3_time_t * t)
     else if (strcmp (argv[1], "SIBLING") == 0) {
       t->func = SIBLING;
     }
-    else if (strcmp (argv[1], "FNEIGHBOR") == 0) {
+    else if (strcmp (argv[1], "FNEIGBOR") == 0) {
       t->func = FNEIGBOR;
     }
     else if (strcmp (argv[1], "TBOUND") == 0) {
