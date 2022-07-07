@@ -669,7 +669,7 @@ p4est3_quadrant_mort_root (p4est3_quadrant_mort_t * r)
 
 static const p4est3_quadrant_vtable_t quadrant_vtable_mort =
 {
-  P4EST_STRING"_quadrant_vtable_morton",
+  P4EST_STRING "_quadrant_vtable_morton",
   P4EST_DIM,
   P4EST3_MORT_MAXLEVEL,
   sizeof (p4est3_quadrant_mort_t),

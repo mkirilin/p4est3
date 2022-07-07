@@ -543,7 +543,7 @@ p4est_quadrant_vtable_is_ancestor (const void *q1, const void *q2, int *j)
 
 static const p4est3_quadrant_vtable_t quadrant_vtable_p4est =
 {
-  P4EST_STRING"quadrant_vtable_p4est",
+  P4EST_STRING "quadrant_vtable_p4est",
   P4EST_DIM,
   P4EST_QMAXLEVEL,
   sizeof (p4est_quadrant_t),
