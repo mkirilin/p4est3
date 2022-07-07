@@ -104,7 +104,7 @@ wrong_input (const char *name, int n)
     break;
   case 2:
     printf ("Quadrant type %s is not valid\n"
-            "Valid quadrant types: " "STANDART, AVX, MORT_ORD\n", name);
+            "Valid quadrant types: " "STANDARD, AVX, MORT_ORD\n", name);
     break;
   case 3:
     printf ("The number of levels %s is not valid\n"
@@ -164,8 +164,8 @@ check_quadrant_type (int argc, char **argv,
   if (strcmp (argv[1], "P4EST2") == 0) {
     return NULL;
   }
-  if (strcmp (argv[2], "STANDART") == 0) {
-    SC3E (p4est3_quadrant_vtable_p4est (qvt));
+  if (strcmp (argv[2], "STANDARD") == 0) {
+    p4est3_quadrant_vtable_p4est (qvt, 0);
   }
   else if (strcmp (argv[2], "AVX") == 0) {
     SC3E (p4est3_quadrant_yx_vtable (qvt));
@@ -196,17 +196,17 @@ set_heading (int argc, char **argv, sc3_MPI_Comm_t mpicomm)
   }
   else if (argc == 2) {
     heading =
-      (char *) malloc (strlen (argv[1]) + 1 + strlen ("STANDART") + 1);
+      (char *) malloc (strlen (argv[1]) + 1 + strlen ("STANDARD") + 1);
     strcpy (heading, argv[1]);
     strcat (heading, " ");
-    strcat (heading, "STANDART");
+    strcat (heading, "STANDARD");
   }
   else {
     heading =
-      (char *) malloc (strlen ("MORTON") + 1 + strlen ("STANDART") + 1);
+      (char *) malloc (strlen ("MORTON") + 1 + strlen ("STANDARD") + 1);
     strcpy (heading, "MORTON");
     strcat (heading, " ");
-    strcat (heading, "STANDART");
+    strcat (heading, "STANDARD");
   }
   if (heading == NULL) {
     sc_MPI_Abort (mpicomm, -1);
