@@ -286,6 +286,7 @@ main (int argc, char **argv)
 #endif /* P4_TO_P8 */
   /* make the p4est3 style connectivity */
   SC3E_NULL_SET (e, p4est3_connectivity_new (alloc, &conn));
+  SC3E_NULL_SET (e, p4est3_connectivity_set_dim (conn, P4EST_DIM));
   SC3E_NULL_SET (e, p4est3_connectivity_set_num_trees (conn, num_trees));
   SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));
 
