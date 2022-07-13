@@ -271,14 +271,16 @@ test_child (const int ninit_quads, sc3_array_t * a,
 {
   p4est3_locidx       quad, n_quads;
   void               *q, *tmp;
-  int i;
+  int i, c;
 
   SC3E (sc3_array_get_elem_count (a, &n_quads));
   SC3E (sc3_array_index (a, 0, &tmp));
   for (i = 0; i < ninit_quads; ++i) {
-    for (quad = 1; quad < n_quads; ++quad) {
+    for (quad = 1; quad < n_quads; quad += P4EST_CHILDREN) {
       SC3E (sc3_array_index (a, quad, &q));
-      SC3E (p4est3_quadrant_child (qvt, q, quad % P4EST_CHILDREN, tmp));
+      for (c = 0; c < P4EST_CHILDREN; ++c) {
+        SC3E (p4est3_quadrant_child (qvt, q, c, tmp));
+      }
     }
   }
   return NULL;
@@ -309,14 +311,16 @@ test_sibling (const int ninit_quads, sc3_array_t * a,
 {
   p4est3_locidx       quad, n_quads;
   void               *q, *tmp;
-  int i;
+  int i, c;
 
   SC3E (sc3_array_get_elem_count (a, &n_quads));
   SC3E (sc3_array_index (a, 0, &tmp));
   for (i = 0; i < ninit_quads; ++i) {
     for (quad = 1; quad < n_quads; ++quad) {
       SC3E (sc3_array_index (a, quad, &q));
-      SC3E (p4est3_quadrant_sibling (qvt, q, quad % P4EST_CHILDREN, tmp));
+      for (c = 0; c < P4EST_CHILDREN; ++c) {
+        SC3E (p4est3_quadrant_sibling (qvt, q, c, tmp));
+      }
     }
   }
   return NULL;
@@ -328,7 +332,7 @@ test_face_neighbor (const int ninit_nquads, sc3_array_t * a,
 {
   p4est3_locidx quad, n_quads;
   void *q, *tmp;
-  int i;
+  int i, c;
   const int *order
 #ifdef P4_TO_P8
   = neighbor_order3d
@@ -342,8 +346,10 @@ test_face_neighbor (const int ninit_nquads, sc3_array_t * a,
   for (i = 0; i < ninit_nquads; ++i) {
     for (quad = 1; quad < n_quads; ++quad) {
       SC3E (sc3_array_index (a, quad, &q));
-      SC3E (p4est3_quadrant_face_neighbor
-            (qvt, q, order[quad % P4EST_CHILDREN], tmp));
+      for (c = 0; c < P4EST_CHILDREN; ++c) {
+        SC3E (p4est3_quadrant_face_neighbor
+              (qvt, q, order[c], tmp));
+      }
     }
   }
   return NULL;
