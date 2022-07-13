@@ -276,7 +276,7 @@ test_child (const int ninit_quads, sc3_array_t * a,
   SC3E (sc3_array_get_elem_count (a, &n_quads));
   SC3E (sc3_array_index (a, 0, &tmp));
   for (i = 0; i < ninit_quads; ++i) {
-    for (quad = 1; quad < n_quads; quad += P4EST_CHILDREN) {
+    for (quad = 1; quad < n_quads; ++quad) {
       SC3E (sc3_array_index (a, quad, &q));
       for (c = 0; c < P4EST_CHILDREN; ++c) {
         SC3E (p4est3_quadrant_child (qvt, q, c, tmp));
@@ -296,7 +296,7 @@ test_parent (const int ninit_quads, sc3_array_t * a,
 
   SC3E (sc3_array_get_elem_count (a, &n_quads));
   SC3E (sc3_array_index (a, 0, &tmp));
-  for (i = 0; i < ninit_quads; ++i) {
+  for (i = 0; i < ninit_quads * P4EST_CHILDREN; ++i) {
     for (quad = 1; quad < n_quads; ++quad) {
       SC3E (sc3_array_index (a, quad, &q));
       SC3E (p4est3_quadrant_parent (qvt, q, tmp));
@@ -364,7 +364,7 @@ test_tree_boundaries (const int ninit_nquads, sc3_array_t * a,
   int i;
 
   SC3E (sc3_array_get_elem_count (a, &n_quads));
-  for (i = 0; i < ninit_nquads; ++i) {
+  for (i = 0; i < ninit_nquads * P4EST_CHILDREN; ++i) {
     for (quad = 1; quad < n_quads; ++quad) {
       SC3E (sc3_array_index (a, quad, &q));
       SC3E (p4est3_quadrant_tree_boundaries (qvt, q, tmp));
