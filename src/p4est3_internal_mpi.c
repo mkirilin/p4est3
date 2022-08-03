@@ -384,7 +384,6 @@ p4est3_region (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
   p4est3_gloidx       aid, bid, cid;
   void               *c, *q;
   sc3_array_t        *testq, *buff;
-  sc3_allocator_t    *alloc;
 
   p4est3_quadrant_level (p3->qvt, a, &la);
   p4est3_quadrant_level (p3->qvt, b, &lb);
@@ -393,14 +392,12 @@ p4est3_region (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
   SC3E (p4est3_quadrant_linear_id (p3->qvt, a, p3->level, &aid));
   SC3E (p4est3_quadrant_linear_id (p3->qvt, b, p3->level, &bid));
 
-  SC3E (sc3_array_index
-        (p3->talloc, 0, (void **) &(alloc)));
-  SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &testq));
+  SC3E (sc3_array_new (p3->alloc, &testq));
   SC3E (sc3_array_set_elem_size (testq, p3->qsize));
   SC3E (sc3_array_set_resizable (testq, 1));
   SC3E (sc3_array_setup (testq));
 
-  SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &buff));
+  SC3E (sc3_array_new (p3->alloc, &buff));
   SC3E (sc3_array_set_elem_size (buff, p3->qsize));
   SC3E (sc3_array_set_elem_count (buff, 2));
   SC3E (sc3_array_setup (buff));
@@ -451,20 +448,17 @@ p4est3_region_end (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
   p4est3_gloidx       aid, cid;
   void               *c, *q;
   sc3_array_t        *testq, *buff;
-  sc3_allocator_t    *alloc;
 
   p4est3_quadrant_level (p3->qvt, a, &la);
 
   SC3E (p4est3_quadrant_linear_id (p3->qvt, a, p3->level, &aid));
 
-  SC3E (sc3_array_index
-        (p3->talloc, 0, (void **) &(alloc)));
-  SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &testq));
+  SC3E (sc3_array_new (p3->alloc, &testq));
   SC3E (sc3_array_set_elem_size (testq, p3->qsize));
   SC3E (sc3_array_set_resizable (testq, 1));
   SC3E (sc3_array_setup (testq));
 
-  SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &buff));
+  SC3E (sc3_array_new (p3->alloc, &buff));
   SC3E (sc3_array_set_elem_size (buff, p3->qsize));
   SC3E (sc3_array_set_elem_count (buff, 2));
   SC3E (sc3_array_setup (buff));
@@ -504,7 +498,6 @@ p4est3_recursive_partition_region (p4est3_t * p3, int is_region_end,
                                    p4est3_locidx mf, p4est3_locidx ml,
                                    sc3_array_t * levelq, char **threadq)
 {
-  sc3_allocator_t    *alloc;
   sc3_array_t        *region;
   void               *a, *b;
   char               *threadq_ptr;
@@ -521,9 +514,7 @@ p4est3_recursive_partition_region (p4est3_t * p3, int is_region_end,
     return NULL;
   }
 
-  SC3E (sc3_array_index
-        (p3->talloc, 0, (void **) &(alloc)));
-  SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &region));
+  SC3E (sc3_array_new (p3->alloc, &region));
   SC3E (sc3_array_set_elem_size (region, p3->qsize));
   SC3E (sc3_array_set_resizable (region, 1));
   SC3E (sc3_array_setup (region));
@@ -628,14 +619,11 @@ p4est3_internal_populate_recursive (p4est3_locidx tmine, p4est3_t * p3,
 {
   if (*tq < tmine) {
     sc3_array_t        *levelq;
-    sc3_allocator_t    *alloc;
     const p4est3_locidx rl = (1 << (p3->qvt->dim * p3->level)) - 1;
     const p4est3_locidx ml = *gq + (tmine - *tq) - 1;
 
     /* TODO: use per-thread allocotor here */
-    SC3E (sc3_array_index
-          (p3->talloc, 0, (void **) &(alloc)));
-    SC3E (sc3_array_new (*(sc3_allocator_t **) alloc, &levelq));
+    SC3E (sc3_array_new (p3->alloc, &levelq));
     SC3E (sc3_array_set_elem_size (levelq, p3->qsize));
     SC3E (sc3_array_set_elem_alloc (levelq, p3->level + 1));
     SC3E (sc3_array_set_elem_count (levelq, p3->level + 1));
@@ -694,9 +682,7 @@ p4est3_internal_populate (p4est3_locidx tmine, p4est3_t * p3,
 sc3_error_t        *
 p4est3_internal_setup_quadrants (p4est3_t * p3)
 {
-  int                 tcount;
   int                 noderank, nodesize;
-  sc3_allocator_t    *malloc;
   sc3_MPI_Comm_t      nodecomm;
 
   SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
@@ -715,7 +701,6 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
   p4est3_gloidx       gq, num_uniform;
   p4est3_tree_t      *tree;
   p4est3_topidx       treeid;
-  sc3_allocator_t    *alloc;
 
   /* TODO: if recursive mode is selected, create one allocator per thread
       derived from p3->alloc.
@@ -726,22 +711,6 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
 
   num_uniform = p4est3_quadrant_num_uniform (p3->qvt, p3->level);
   treeid = p3->goffset[p3->mpirank] / num_uniform;
-  if (p3->setup_mode == P4EST3_NEW_RECURSIVE
-      || p3->setup_mode == P4EST3_NEW_RECURSIVE_CHILD
-      || p3->setup_mode == P4EST3_NEW_RECURSIVE_REGION) {
-
-    SC3E (sc3_array_new (p3->alloc, &p3->talloc));
-    SC3E (sc3_array_set_elem_size (p3->talloc,
-                                    sizeof (sc3_allocator_t *)));
-    SC3E (sc3_array_set_elem_count (p3->talloc, 1));
-    SC3E (sc3_array_setup (p3->talloc));
-
-    SC3E (sc3_array_index (p3->talloc, 0, (void **) &(alloc)));
-    {
-      SC3E (sc3_allocator_new (p3->alloc, (sc3_allocator_t **) alloc));
-      SC3E (sc3_allocator_setup (*(sc3_allocator_t **) alloc));
-    }
-  }
   if (p3->fltree <= treeid && treeid <= p3->lltree) {
     tq = 0;
     SC3E (p4est3_tree_index (p3, treeid, &tree));
@@ -767,16 +736,6 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
       SC3E (p4est3_tree_index (p3, tree->treeid + 1, &tree));
       gq = 0;
     }
-  }
-  if (p3->setup_mode == P4EST3_NEW_RECURSIVE
-      || p3->setup_mode == P4EST3_NEW_RECURSIVE_CHILD
-      || p3->setup_mode == P4EST3_NEW_RECURSIVE_REGION) {
-    SC3E (sc3_array_get_elem_count (p3->talloc, &tcount));
-    for (int i = 0; i < tcount; ++i) {
-      SC3E (sc3_array_index (p3->talloc, i, (void **) &(malloc)));
-      SC3E (sc3_allocator_destroy ((sc3_allocator_t **) malloc));
-    }
-    SC3E (sc3_array_destroy (&p3->talloc));
   }
   SC3E (sc3_MPI_Win_unlock (noderank, p3->quadwin));
   SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
