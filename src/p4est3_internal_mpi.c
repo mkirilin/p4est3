@@ -54,11 +54,9 @@ sc3_error_t        *
 p4est3_internal_setup_cut (p4est3_t * p3,
                            p4est3_gloidx num_uniform, int qsize)
 {
-#ifdef P4EST_ENABLE_DEBUG
-  int                 dp;
-#endif
   int                 noderank, nodesize;
   int                 beginr, endr, p;
+  int                 nfamilies;
   int                 dispunit;
   char               *gfposmem, *qptr;
   char               *temp = p3->temp_quad[0];
@@ -125,10 +123,26 @@ p4est3_internal_setup_cut (p4est3_t * p3,
 
   /* parallelize process loop across threads */
   qptr = gfposmem + beginr * qsize;
+  nfamilies = num_global / p3->num_children;
   for (p = beginr; p < endr; ++p) {
-    gftreemem[p] =
-      (goffsetmem[p] =
-        p4est3_glocut (num_global, p3->mpisize, p)) / num_uniform;
+    goffsetmem[p] = p4est3_glocut (num_global, p3->mpisize, p);
+    if (p3->family && p3->level != 0) {
+      if (nfamilies < p3->mpisize) {
+        goffsetmem[p] = p4est3_glocut (num_global, nfamilies, p);
+      }
+      /*else if (p3->level == 1) {
+         
+        goffsetmem[p] =
+          nfamilies - p4est3_glocut (nfamilies, p3->mpisize, p3->mpisize - p);
+        goffsetmem[p] *= num_uniform;
+      }*/
+      else {
+        goffsetmem[p] -= (goffsetmem[p] % p3->num_children);
+        /*goffsetmem[p] = p4est3_glocut (nfamilies, p3->mpisize, p);
+        goffsetmem[p] *= p3->num_children;*/
+      }
+    }
+    gftreemem[p] = goffsetmem[p] / num_uniform;
     SC3E (p4est3_quadrant_morton
             (p3->qvt, p3->level,
             goffsetmem[p] - gftreemem[p] * num_uniform, temp));
@@ -140,15 +154,8 @@ p4est3_internal_setup_cut (p4est3_t * p3,
   SC3E (sc3_MPI_Win_unlock (0, p3->gfposwin));
   SC3E (sc3_MPI_Win_unlock (0, p3->goffsetwin));
   SC3E (sc3_MPI_Barrier (nodecomm));
-#ifdef P4EST_ENABLE_DEBUG
-  for (dp = 0; dp <= p3->mpisize; ++dp) {
-    SC3A_CHECK (gftreemem[dp] == goffsetmem[dp] / num_uniform);
-    SC3A_CHECK (goffsetmem[dp] ==
-                p4est3_glocut (num_global, p3->mpisize, dp));
-  }
   SC3A_CHECK (gftreemem[p3->mpisize] == p3->num_trees);
   SC3A_CHECK (goffsetmem[p3->mpisize] == num_global);
-#endif
 
   /* assign further object members */
   p3->qsize = qsize;

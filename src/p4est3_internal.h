@@ -135,6 +135,8 @@ struct p4est3
   int                 qmaxlevel;        /**< Maximum allowed refinement level. */
   int                 num_children;     /**< Number of children for a quadrant. */
   int                 max_threads;      /**< Max threads from querying openmp. */
+  int                 family;           /**< Indicator to store quadrant 
+                                             family within the same rank. */
   char              **temp_quad;        /**< Quadrant work space, one per thread. */
   p4est3_locidx       local_num_quads;  /**< Count process-local quadrants. */
   p4est3_gloidx       global_num_quads; /**< Count all quadrants globally. */

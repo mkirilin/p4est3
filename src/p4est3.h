@@ -275,6 +275,14 @@ sc3_error_t        *p4est3_set_refine (p4est3_t * p3,
 sc3_error_t        *p4est3_set_coarsen (p4est3_t * p3,
                                         p4est3_coarsen_callback_t ccoarse);
 
+/** Indicator to store quadrant's family within the same process.
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] is_family    True value indicates not splitting quadrant family
+ *                          between ranks. Default value is false.
+ * \return                  NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_set_family (p4est3_t * p3, int is_family);
+
 /** TODO document */
 sc3_error_t        *p4est3_set_user_data (p4est3_t * p3,
                                           void *user_data);
