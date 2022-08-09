@@ -109,27 +109,16 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
   return NULL;
 }
 
-/* Specific volume iterator callback that processes volume info by coarsining
-   callback and returns (with user_data) population pattern
-   (see coarsining documentation).
-   The pattern consists of possible values: 0 and 1.
-   0 means a simple copying (probably, with translation);
-   1 means creating the parent for the next num_children
-   corresponding quadrants and inserting them into a new forest.
-   We set 1 only for the first quadrant in a family. */
 static sc3_error_t *
-p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
+p4est3_coarsen_volume_zero (int child_id, coarsen_callback_data_t *cdata,
+                            p4est3_iterate_volume_info_t * vi, int *is_ret)
 {
-  int                 is_coarse, i, child_id;
-  char               *pattern_it;
+  int i;
+  char *pattern_it;
   void              **quad;
-  p4est3_tree_t      *tree;
-  coarsen_callback_data_t *cdata = (coarsen_callback_data_t *) vi->user_data;
-  p4est3_coarsen_callback_info_t ci;    /* = { vi->p3, vi->ntree, vi->quadrant }; */
+  p4est3_tree_t *tree;
 
-  /* Decide if we call coarse callback.
-     We do this only if we find a whole family. */
-  SC3E (p4est3_quadrant_child_id (vi->p3->qvt, vi->quadrant, &child_id));
+  SC3E_RETVAL (is_ret, 0);
   if (child_id == 0) {
     /* the beginning of a new family,
        process previous (part of the) family */
@@ -152,6 +141,94 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
         cdata->counter++;
       }
     }
+    *is_ret = 1;
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_coarsen_volume_complete (coarsen_callback_data_t *cdata,
+                                p4est3_iterate_volume_info_t * vi,
+                                int *is_coarsen, int *is_ret)
+{
+  int i;
+  char *pattern_it;
+  p4est3_coarsen_callback_info_t ci;
+  p4est3_tree_t *tree;
+  SC3E_RETVAL (is_coarsen, 0);
+  SC3E_RETVAL (is_ret, 0);
+
+  if (cdata->nsiblings == vi->p3->num_children) {
+    /* we have complete family, pack data and call coarsening */
+    ci.p3 = vi->p3;
+    ci.ntree = vi->ntree;
+    ci.family = cdata->family;
+    ci.qvt = vi->p3->qvt;
+    ci.user_data = vi->p3->user_data;
+    SC3A_CHECK (cdata->ccoarse != NULL);
+    SC3E (cdata->ccoarse (&ci, is_coarsen));
+    cdata->nsiblings = 0;
+  }
+  else {
+    /* Check if it is the last quadrant in a forest.
+       If so, process quadrants in current family. */
+    SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
+    if (vi->nquad - tree->first_tquad + tree->quad_offset + 1 ==
+        vi->p3->local_num_quads) {
+      for (i = 0; i < cdata->nsiblings; ++i) {
+        SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
+        *pattern_it = 0;
+        cdata->counter++;
+      }
+    }
+    /* nothing left to do here, go to the next volume */
+    *is_ret = 1;
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_coarsen_volume_fill (coarsen_callback_data_t *cdata, int is_coarsen, int num_children)
+{
+  int i;
+  char *pattern_it;
+  /* fill in the level information */
+  if (is_coarsen) {
+    SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
+    *pattern_it = 1;
+    cdata->counter++;
+  }
+  else {
+    for (i = 0; i < num_children; ++i) {
+      SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
+      *pattern_it = 0;
+      cdata->counter++;
+    }
+  }
+  return NULL;
+}
+
+/* Specific volume iterator callback that processes volume info by coarsining
+   callback and returns (with user_data) population pattern
+   (see coarsining documentation).
+   The pattern consists of possible values: 0 and 1.
+   0 means a simple copying (probably, with translation);
+   1 means creating the parent for the next num_children
+   corresponding quadrants and inserting them into a new forest.
+   We set 1 only for the first quadrant in a family. */
+static sc3_error_t *
+p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
+{
+  int                 is_coarsen, child_id, is_ret;
+  char               *pattern_it;
+  void              **quad;
+  coarsen_callback_data_t *cdata = (coarsen_callback_data_t *) vi->user_data;
+
+  /* Decide if we call coarse callback.
+     We do this only if we find a whole family. */
+  SC3E (p4est3_quadrant_child_id (vi->p3->qvt, vi->quadrant, &child_id));
+  SC3E (p4est3_coarsen_volume_zero (child_id, cdata, vi, &is_ret));
+  if (is_ret) {
     return NULL;
   }
   if (cdata->nsiblings != child_id) {
@@ -168,46 +245,12 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
   *quad = vi->quadrant;
   cdata->nsiblings++;
 
-  if (cdata->nsiblings == vi->p3->num_children) {
-    /* we have complete family, pack data and call coarsening */
-    ci.p3 = vi->p3;
-    ci.ntree = vi->ntree;
-    ci.family = cdata->family;
-    ci.qvt = vi->p3->qvt;
-    ci.user_data = vi->p3->user_data;
-    SC3A_CHECK (cdata->ccoarse != NULL);
-    SC3E (cdata->ccoarse (&ci, &is_coarse));
-    cdata->nsiblings = 0;
-  }
-  else {
-    /* Check if it is the last quadrant in a forest.
-       If so, process quadrants in current family. */
-    SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
-    if (vi->nquad - tree->first_tquad + tree->quad_offset + 1 ==
-        vi->p3->local_num_quads) {
-      for (i = 0; i < cdata->nsiblings; ++i) {
-        SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
-        *pattern_it = 0;
-        cdata->counter++;
-      }
-    }
-    /* nothing left to do here, go to the next volume */
+  SC3E (p4est3_coarsen_volume_complete (cdata, vi, &is_coarsen, &is_ret));
+  if (is_ret) {
     return NULL;
   }
 
-  /* fill in the level information */
-  if (is_coarse) {
-    SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
-    *pattern_it = 1;
-    cdata->counter++;
-  }
-  else {
-    for (i = 0; i < vi->p3->num_children; ++i) {
-      SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
-      *pattern_it = 0;
-      cdata->counter++;
-    }
-  }
+  SC3E (p4est3_coarsen_volume_fill (cdata, is_coarsen, vi->p3->num_children));
   return NULL;
 }
 
