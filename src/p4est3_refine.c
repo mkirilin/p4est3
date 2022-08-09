@@ -80,7 +80,7 @@ p4est3_refine_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 static sc3_error_t *
 p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
 {
-  int                 is_refine;
+  int                 is_refine, level;
   refine_callback_data_t *cdata = (refine_callback_data_t *) vi->user_data;
   char               *pattern_it;
 
@@ -95,6 +95,8 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
   SC3A_CHECK (cdata->crefine != NULL);
   SC3E (cdata->crefine (&ri, &is_refine));
   SC3E (sc3_array_index (cdata->pattern, cdata->n_new, &pattern_it));
+  SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
+  is_refine = level == vi->p3->qmaxlevel ? 0 : is_refine;
   if (!is_refine) {
     *pattern_it = 1;
     cdata->counter++;
