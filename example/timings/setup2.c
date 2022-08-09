@@ -165,7 +165,7 @@ check_quadrant_type (int argc, char **argv,
     return NULL;
   }
   if (strcmp (argv[2], "STANDARD") == 0) {
-    p4est3_quadrant_vtable_p4est (qvt, 0);
+    SC3E (p4est3_quadrant_vtable_p4est (qvt));
   }
   else if (strcmp (argv[2], "AVX") == 0) {
     SC3E (p4est3_quadrant_yx_vtable (qvt));
@@ -179,7 +179,7 @@ check_quadrant_type (int argc, char **argv,
       sc_MPI_Abort (mpicomm, -1);
     }
   }
-  SC3E_DEMAND (*qvt != NULL, "AVX is not supported by hardware "
+  SC3E_DEMAND (*qvt != NULL, "AVX is not supported by hardware or"
                "p4est is not build neither in 2D nor 3D");
   return NULL;
 }
