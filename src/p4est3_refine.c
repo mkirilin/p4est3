@@ -308,6 +308,25 @@ p4est3_pattern_populate_tree_ref (p4est3_t * p3, p4est3_tree_t * tree,
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_populate_tree_cpy (p4est3_t *p3, p4est3_tree_t * tree,
+                          int *lt_offset, int32_t *c)
+{
+  int i;
+  void *quad_old, *quad_new;
+  p4est3_tree_t *oldtree;
+
+  SC3E (p4est3_tree_index (p3->old, tree->treeid, &oldtree));
+  for (i = 0; i < oldtree->num_quads; ++i) {
+    quad_old = (void *) (oldtree->tquads + i * p3->old->qsize);
+    quad_new = (void *) (tree->tquads + i * p3->qsize);
+    SC3E (p4est3_translate_quadrant
+          (p3->old->qvt, p3->qvt, quad_old, quad_new, c));
+  }
+  *lt_offset += oldtree->num_quads;
+  return NULL;
+}
+
 sc3_error_t        *
 p4est3_fill_from_source (p4est3_t * p3)
 {
@@ -329,7 +348,6 @@ p4est3_fill_from_source (p4est3_t * p3)
   refine_callback_data_t srdata, *rdata = &srdata;
 
   /* We suppose to call this function after setting up routine */
-  SC3A_CHECK (p3->crefine != NULL || p3->ccoarse != NULL);
   SC3A_CHECK (p3->old != NULL);
   SC3A_IS (p4est3_is_setup, p3->old);
 
@@ -374,8 +392,8 @@ p4est3_fill_from_source (p4est3_t * p3)
     p3->local_num_quads = cdata->counter;
   }
   else {
-    /*SC3E (p4est3_iterate_volume
-    (p3->old, p4est3_copy_volume_callback, pattern));*/
+    /*in this case we will perform a simple quadrant copying with translation*/
+    p3->local_num_quads = p3->old->local_num_quads;
   }
 
   /* Here we allocate shared p4est3_t::quadwin and p4est3_t::nodequads.
@@ -428,7 +446,8 @@ p4est3_fill_from_source (p4est3_t * p3)
             (p3, tree, cdata->pattern, &lt_offset, coords));
     }
     else {
-      /*something with copying*/
+      /*simply copying*/
+      SC3E (p4est3_populate_tree_cpy (p3, tree, &lt_offset, coords));
     }
     tree->num_quads = lt_offset - tree->quad_offset;
     tree->first_tquad = 0;
