@@ -355,7 +355,7 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
   SC3E (compare_results (t, p3ptr, p, qvt));
 
   SC3E (p4est3_new (t->alloc, &p3refined));
-  SC3E (set_qvt (qvt, refine_level % 3));
+  SC3E (set_qvt (&qvt, refine_level % 3));
   SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
   SC3E (p4est3_set_source (p3refined, p3ptr));
   SC3E (p4est3_setup (p3refined));
