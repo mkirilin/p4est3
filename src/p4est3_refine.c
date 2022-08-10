@@ -35,8 +35,8 @@ extern              "C"
 
 typedef struct refine_callback_data
 {
-  int                 counter;
-  int                 n_new;
+  int                 counter; /**< Track position in the pattern array (= old forest)*/
+  int                 n_new; /**< Conuter for #quadrants in the new forest*/
   sc3_array_t        *pattern;
   p4est3_refine_callback_t crefine;
 }
@@ -44,7 +44,8 @@ refine_callback_data_t;
 
 typedef struct coarsen_callback_data
 {
-  int                 counter;
+  int                 counter; /**< Track position in the pattern array (= old forest)*/
+  int                 n_new; /**< Conuter for #quadrants in the new forest*/
   sc3_array_t        *family; /**< Array of pointers to quadrants*/
   sc3_array_t        *pattern;
   int                 nsiblings;
@@ -94,18 +95,18 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
 
   SC3A_CHECK (cdata->crefine != NULL);
   SC3E (cdata->crefine (&ri, &is_refine));
-  SC3E (sc3_array_index (cdata->pattern, cdata->n_new, &pattern_it));
+  SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
   SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
   is_refine = level == vi->p3->qmaxlevel ? 0 : is_refine;
   if (!is_refine) {
     *pattern_it = 0;
-    cdata->counter++;
+    cdata->n_new++;
   }
   else {
     *pattern_it = vi->p3->num_children;
-    cdata->counter += vi->p3->num_children;
+    cdata->n_new += vi->p3->num_children;
   }
-  cdata->n_new++;
+  cdata->counter++;
   return NULL;
 }
 
@@ -387,7 +388,7 @@ p4est3_fill_from_source (p4est3_t * p3)
   sc3_MPI_Comm_t      nodecomm;
   sc3_MPI_Aint_t      tempbytes, goffsetbytes;
   p4est3_tree_t      *tree;
-  sc3_array_t        *pattern;
+  sc3_array_t        *pattern; /**< Every number in this array encodes ref/coar behaviour */
 
   coarsen_callback_data_t scdata, *cdata = &scdata;
   refine_callback_data_t srdata, *rdata = &srdata;
@@ -422,7 +423,7 @@ p4est3_fill_from_source (p4est3_t * p3)
     rdata->crefine = p3->crefine;
     SC3E (p4est3_iterate_volume
           (p3->old, p4est3_refine_volume_callback, rdata));
-    p3->local_num_quads = rdata->counter;
+    p3->local_num_quads = rdata->n_new;
   }
   else if (p3->ccoarse != NULL) {
     cdata->counter = 0;
