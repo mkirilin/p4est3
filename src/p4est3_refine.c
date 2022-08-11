@@ -139,7 +139,7 @@ p4est3_coarsen_volume_complete (coarsen_callback_data_t *cdata,
     SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
     if (vi->nquad - tree->first_tquad + tree->quad_offset + 1 ==
         vi->p3->local_num_quads) {
-      cdata->counter += cdata->nsiblings;
+      cdata->n_new += cdata->nsiblings;
     }
     /* nothing left to do here, go to the next volume */
     *is_ret = 1;
@@ -154,12 +154,12 @@ p4est3_coarsen_volume_fill (coarsen_callback_data_t *cdata, int is_coarsen, int 
   char *pattern_it;
   /* fill in the level information */
   if (is_coarsen) {
-    SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
+    SC3E (sc3_array_index (cdata->pattern, cdata->n_new, &pattern_it));
     *pattern_it = 1;
-    cdata->counter++;
+    cdata->n_new++;
   }
   else {
-      cdata->counter += num_children;
+      cdata->n_new += num_children;
   }
   return NULL;
 }
@@ -184,8 +184,8 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
      We do this only if we find a whole family. */
   SC3E (p4est3_quadrant_child_id (vi->p3->qvt, vi->quadrant, &child_id));
   if (cdata->nsiblings != child_id) {
+    cdata->n_new++;
     /* cannot be a part of a complete family, skip it */
-    cdata->counter++;
     return NULL;
   }
 
@@ -375,6 +375,7 @@ p4est3_fill_from_source (p4est3_t * p3)
   }
   else if (p3->ccoarse != NULL) {
     cdata->counter = 0;
+    cdata->n_new = 0;
     cdata->pattern = pattern;
     SC3E (p4est3_refine_array_new
           (p3->alloc, sizeof (void *),
@@ -383,7 +384,7 @@ p4est3_fill_from_source (p4est3_t * p3)
     cdata->ccoarse = p3->ccoarse;
     SC3E (p4est3_iterate_volume
           (p3->old, p4est3_coarsen_volume_callback, cdata));
-    p3->local_num_quads = cdata->counter;
+    p3->local_num_quads = cdata->n_new;
   }
   else {
     /*in this case we will perform a simple quadrant copying with translation*/
