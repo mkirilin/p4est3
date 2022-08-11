@@ -81,28 +81,27 @@ p4est3_refine_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 static sc3_error_t *
 p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
 {
-  int                 is_refine, level;
+  int                 is_refine = 0, level;
   refine_callback_data_t *cdata = (refine_callback_data_t *) vi->user_data;
   char               *pattern_it;
-
   /* pack data for refinement callback input */
   p4est3_refine_callback_info_t ri;
-  ri.p3 = vi->p3;
-  ri.ntree = vi->ntree;
-  ri.quadrant = vi->quadrant;
-  ri.qvt = vi->p3->qvt;
-  ri.user_data = vi->p3->user_data;
 
   SC3A_CHECK (cdata->crefine != NULL);
-  SC3E (cdata->crefine (&ri, &is_refine));
-  SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
   SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &level));
-  is_refine = level == vi->p3->qmaxlevel ? 0 : is_refine;
+  if (level < vi->p3->qmaxlevel) {
+    ri.p3 = vi->p3;
+    ri.ntree = vi->ntree;
+    ri.quadrant = vi->quadrant;
+    ri.qvt = vi->p3->qvt;
+    ri.user_data = vi->p3->user_data;
+    SC3E (cdata->crefine (&ri, &is_refine));
+  }
   if (!is_refine) {
-    *pattern_it = 0;
     cdata->n_new++;
   }
   else {
+    SC3E (sc3_array_index (cdata->pattern, cdata->counter, &pattern_it));
     *pattern_it = vi->p3->num_children;
     cdata->n_new += vi->p3->num_children;
   }
@@ -126,7 +125,7 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
   void              **quad;
   coarsen_callback_data_t *cdata = (coarsen_callback_data_t *) vi->user_data;
   p4est3_coarsen_callback_info_t ci;
-  p4est3_tree_t *tree;
+  SC3A_CHECK (cdata->ccoarse != NULL);
 
   /* Decide if we call coarse callback.
      We do this only if we find a whole family. */
@@ -145,7 +144,6 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
       ci.family = cdata->family;
       ci.qvt = vi->p3->qvt;
       ci.user_data = vi->p3->user_data;
-      SC3A_CHECK (cdata->ccoarse != NULL);
       SC3E (cdata->ccoarse (&ci, &is_coarsen));
       cdata->nsiblings = 0;
 
