@@ -121,7 +121,7 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
 static sc3_error_t *
 p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
 {
-  int                 is_coarsen = 0, child_id, is_ret;
+  int                 is_coarsen = 0, child_id;
   char               *pattern_it;
   void              **quad;
   coarsen_callback_data_t *cdata = (coarsen_callback_data_t *) vi->user_data;
@@ -131,12 +131,9 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
   /* Decide if we call coarse callback.
      We do this only if we find a whole family. */
   SC3E (p4est3_quadrant_child_id (vi->p3->qvt, vi->quadrant, &child_id));
-  if (cdata->nsiblings != child_id) {
-    /* cannot be a part of a complete family, skip it */
-    cdata->n_new++;
-  }
-  else {
-    /* cdata->nsiblings == child_id: the volume is a part of the family */
+  cdata->n_new++;
+  if (cdata->nsiblings == child_id) {
+    /* the volume is a part of the family */
     SC3E (sc3_array_index (cdata->family, cdata->nsiblings, &quad));
     *quad = vi->quadrant;
     cdata->nsiblings++;
@@ -153,25 +150,13 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
       cdata->nsiblings = 0;
 
       if (is_coarsen) {
-        SC3E (sc3_array_index (cdata->pattern, cdata->counter - vi->p3->num_children + 1, &pattern_it));
+        SC3E (sc3_array_index (cdata->pattern, cdata->counter - (vi->p3->num_children - 1), &pattern_it));
         *pattern_it = 1;
-        cdata->n_new++;
+        cdata->n_new -= (vi->p3->num_children - 1);
       }
-      else {
-          cdata->n_new += vi->p3->num_children;
-      }
-    }
-    else {
-      /* Check if it is the last quadrant in a forest.
-        If so, process quadrants in current family. */
-      SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
-      if (vi->nquad - tree->first_tquad + tree->quad_offset + 1 ==
-          vi->p3->local_num_quads) {
-        cdata->n_new += cdata->nsiblings;
-      }
-      /* nothing left to do here, go to the next volume */
     }
   }
+  /*else: cannot be a part of a complete family, skip it */
   cdata->counter++;
   return NULL;
 }
