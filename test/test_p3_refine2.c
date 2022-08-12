@@ -71,11 +71,7 @@ refine_normal_fn (p4est_t * p4est, p4est_topidx_t which_tree,
   if (quadrant->level == 1 && p4est_quadrant_child_id (quadrant) == 3) {
     return 1;
   }
-  if (quadrant->x == TEST_LAST_OFFSET (2) &&
-      quadrant->y == TEST_LAST_OFFSET (2)) {
-    return 1;
-  }
-  if (quadrant->x >= TEST_QUADRANT_LEN (2)) {
+  if (quadrant->x > 0) {
     return 0;
   }
 
@@ -113,12 +109,7 @@ refine_p3_normal_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
 
   SC3E (p4est3_quadrant_coordinates
         (ri->qvt, ri->quadrant, ri->qvt->dim, coords));
-  if (coords[0] == TEST_LAST_OFFSET (2) && coords[1] == TEST_LAST_OFFSET (2)) {
-    *is_refine = 1;
-    return NULL;
-  }
-
-  if (coords[0] >= TEST_QUADRANT_LEN (2)) {
+  if (coords[0] > 0) {
     *is_refine = 0;
     return NULL;
   }
