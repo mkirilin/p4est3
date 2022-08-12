@@ -270,77 +270,6 @@ p4est3_translate_quadrant (const p4est3_quadrant_vtable_t * qvt_old,
 }
 
 static sc3_error_t *
-p4est3_pattern_populate_tree_coarse (p4est3_t * p3, p4est3_tree_t * tree,
-                                     sc3_array_t * pattern, int *lt_offset,
-                                     int32_t * c)
-{
-  int                 i = 0, n_new_quads = 0;
-  char               *n_insert;
-  void               *quad_old, *quad_new;
-  p4est3_tree_t      *oldtree;
-
-  SC3E (p4est3_tree_index (p3->old, tree->treeid, &oldtree));
-  while (i < oldtree->num_quads) {
-    SC3E (sc3_array_index (pattern, oldtree->quad_offset + i, &n_insert));
-    SC3A_CHECK ((int) *n_insert == 0 || (int) *n_insert == 1);
-    quad_old = (void *) (oldtree->tquads + i * p3->old->qsize);
-    if ((int) *n_insert == 0) {
-      quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
-      SC3E (p4est3_translate_quadrant
-            (p3->old->qvt, p3->qvt, quad_old, quad_new, c));
-      i++;
-    }
-    else {
-      SC3E (p4est3_translate_quadrant
-            (p3->old->qvt, p3->qvt, quad_old, p3->temp_quad[0], c));
-      quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
-      SC3E (p4est3_quadrant_parent (p3->qvt, p3->temp_quad[0], quad_new));
-      i += p3->num_children;
-    }
-    n_new_quads++;
-  }
-  *lt_offset += n_new_quads;
-  return NULL;
-}
-
-static sc3_error_t *
-p4est3_pattern_populate_tree_ref (p4est3_t * p3, p4est3_tree_t * tree,
-                                  sc3_array_t * pattern, int *lt_offset,
-                                  int32_t * c)
-{
-  int                 i, nch, n_new_quads = 0;
-  char               *n_insert;
-  void               *quad_old, *quad_new;
-  p4est3_tree_t      *oldtree;
-
-  SC3E (p4est3_tree_index (p3->old, tree->treeid, &oldtree));
-  for (i = 0; i < oldtree->num_quads; ++i) {
-    SC3E (sc3_array_index (pattern, oldtree->quad_offset + i, &n_insert));
-    SC3A_CHECK ((int) *n_insert == 0
-                || (int) *n_insert == p3->old->num_children);
-    quad_old = (void *) (oldtree->tquads + i * p3->old->qsize);
-    if ((int) *n_insert == 0) {
-      quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
-      SC3E (p4est3_translate_quadrant
-            (p3->old->qvt, p3->qvt, quad_old, quad_new, c));
-      n_new_quads++;
-    }
-    else {
-      SC3E (p4est3_translate_quadrant
-            (p3->old->qvt, p3->qvt, quad_old, p3->temp_quad[0], c));
-      for (nch = 0; nch < p3->num_children; ++nch) {
-        quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
-        SC3E (p4est3_quadrant_child
-              (p3->qvt, p3->temp_quad[0], nch, quad_new));
-        n_new_quads++;
-      }
-    }
-  }
-  *lt_offset += n_new_quads;
-  return NULL;
-}
-
-static sc3_error_t *
 p4est3_pattern_populate_tree_ref_coar (p4est3_t * p3, p4est3_tree_t * tree,
                                        sc3_array_t * pattern, int *lt_offset,
                                        int32_t * c)
@@ -532,17 +461,9 @@ p4est3_fill_from_source (p4est3_t * p3)
     tree->treeid = i;
     tree->quad_offset = lt_offset;
     tree->tquads = p3->quads + p3->qsize * tree->quad_offset;
-    if (p3->crefine != NULL && p3->ccoarse != NULL) {
+    if (p3->crefine != NULL || p3->ccoarse != NULL) {
       SC3E (p4est3_pattern_populate_tree_ref_coar
-            (p3, tree, rcdata->pattern, &lt_offset, coords));
-    }
-    else if (p3->crefine != NULL) {
-      SC3E (p4est3_pattern_populate_tree_ref
-            (p3, tree, rdata->pattern, &lt_offset, coords));
-    }
-    else if (p3->ccoarse != NULL) {
-      SC3E (p4est3_pattern_populate_tree_coarse
-            (p3, tree, cdata->pattern, &lt_offset, coords));
+            (p3, tree, pattern, &lt_offset, coords));
     }
     else {
       /*simply copying*/
