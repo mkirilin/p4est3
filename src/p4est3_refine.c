@@ -351,6 +351,7 @@ p4est3_fill_from_source (p4est3_t * p3)
   sc3_MPI_Aint_t      tempbytes, goffsetbytes;
   p4est3_tree_t      *tree;
   sc3_array_t        *pattern; /**< Every number in this array encodes ref/coar behaviour */
+  sc3_array_t        *family;
 
   coarsen_callback_data_t scdata, *cdata = &scdata;
   refine_callback_data_t srdata, *rdata = &srdata;
@@ -385,7 +386,8 @@ p4est3_fill_from_source (p4est3_t * p3)
     rcdata->pattern = pattern;
     SC3E (p4est3_refine_array_new
           (p3->alloc, sizeof (void *),
-           p3->num_children, p3->num_children, &rcdata->family));
+           p3->num_children, p3->num_children, &family));
+    rcdata->family = family;
     rcdata->nsiblings = 0;
     rcdata->crefine = p3->crefine;
     rcdata->ccoarse = p3->ccoarse;
@@ -408,7 +410,8 @@ p4est3_fill_from_source (p4est3_t * p3)
     cdata->pattern = pattern;
     SC3E (p4est3_refine_array_new
           (p3->alloc, sizeof (void *),
-           p3->num_children, p3->num_children, &cdata->family));
+           p3->num_children, p3->num_children, &family));
+    cdata->family = family;
     cdata->nsiblings = 0;
     cdata->ccoarse = p3->ccoarse;
     SC3E (p4est3_iterate_volume
@@ -514,8 +517,8 @@ p4est3_fill_from_source (p4est3_t * p3)
   SC3E (sc3_allocator_free (p3->alloc, local_num_quads));
   SC3E (sc3_allocator_free (p3->alloc, first_tree_quads));
   SC3E (sc3_allocator_free (p3->alloc, coords));
-  if (p3->crefine == NULL && p3->ccoarse != NULL) {
-    SC3E (sc3_array_destroy (&cdata->family));
+  if (p3->ccoarse != NULL) {
+    SC3E (sc3_array_destroy (&family));
   }
   sc3_MPI_Barrier (p3->mpicomm);
   p3->global_num_quads = p3->goffset[p3->mpisize];
