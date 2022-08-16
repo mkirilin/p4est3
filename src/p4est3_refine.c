@@ -55,10 +55,12 @@ coarsen_callback_data_t;
 
 typedef struct refine_coarsen_callback_data
 {
-  int counter; /**< Track position in the pattern array (= old forest)*/
-  int n_new; /**< Conuter for #quadrants in the new forest*/
+  int                 counter;
+               /**< Track position in the pattern array (= old forest)*/
+  int                 n_new;
+             /**< Conuter for #quadrants in the new forest*/
   sc3_array_t        *family; /**< Array of pointers to quadrants*/
-  sc3_array_t *pattern;
+  sc3_array_t        *pattern;
   int                 nsiblings;
   p4est3_refine_callback_t crefine;
   p4est3_coarsen_callback_t ccoarse;
@@ -160,7 +162,9 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
       cdata->nsiblings = 0;
 
       if (is_coarsen) {
-        SC3E (sc3_array_index (cdata->pattern, cdata->counter - (vi->p3->num_children - 1), &pattern_it));
+        SC3E (sc3_array_index
+              (cdata->pattern, cdata->counter - (vi->p3->num_children - 1),
+               &pattern_it));
         *pattern_it = 1;
         cdata->n_new -= (vi->p3->num_children - 1);
       }
@@ -186,7 +190,8 @@ p4est3_refine_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
 {
   int                 is_refine = 0, is_coarsen = 0, level, child_id;
   void              **quad;
-  refine_coarsen_callback_data_t *cdata = (refine_coarsen_callback_data_t *) vi->user_data;
+  refine_coarsen_callback_data_t *cdata =
+    (refine_coarsen_callback_data_t *) vi->user_data;
   char               *pattern_it;
   p4est3_coarsen_callback_info_t ci;
   p4est3_refine_callback_info_t ri;
@@ -204,8 +209,8 @@ p4est3_refine_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
     SC3E (cdata->crefine (&ri, &is_refine));
   }
   if (!is_refine) {
-  /* Decide if we call coarse callback.
-     We do this only if we find a whole family. */
+    /* Decide if we call coarse callback.
+       We do this only if we find a whole family. */
     SC3E (p4est3_quadrant_child_id (vi->p3->qvt, vi->quadrant, &child_id));
     cdata->n_new++;
     if (cdata->nsiblings == child_id) {
@@ -225,7 +230,9 @@ p4est3_refine_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
 
         cdata->nsiblings = 0;
         if (is_coarsen) {
-          SC3E (sc3_array_index (cdata->pattern, cdata->counter - (vi->p3->num_children - 1), &pattern_it));
+          SC3E (sc3_array_index
+                (cdata->pattern, cdata->counter - (vi->p3->num_children - 1),
+                 &pattern_it));
           *pattern_it = 1;
           cdata->n_new -= (vi->p3->num_children - 1);
         }
@@ -317,12 +324,12 @@ p4est3_pattern_populate_tree_ref_coar (p4est3_t * p3, p4est3_tree_t * tree,
 }
 
 static sc3_error_t *
-p4est3_populate_tree_cpy (p4est3_t *p3, p4est3_tree_t * tree,
-                          int *lt_offset, int32_t *c)
+p4est3_populate_tree_cpy (p4est3_t * p3, p4est3_tree_t * tree,
+                          int *lt_offset, int32_t * c)
 {
-  int i;
-  void *quad_old, *quad_new;
-  p4est3_tree_t *oldtree;
+  int                 i;
+  void               *quad_old, *quad_new;
+  p4est3_tree_t      *oldtree;
 
   SC3E (p4est3_tree_index (p3->old, tree->treeid, &oldtree));
   for (i = 0; i < oldtree->num_quads; ++i) {
@@ -391,7 +398,7 @@ p4est3_fill_from_source (p4est3_t * p3)
     rcdata->nsiblings = 0;
     rcdata->crefine = p3->crefine;
     rcdata->ccoarse = p3->ccoarse;
-    SC3E (p4est3_iterate_volume 
+    SC3E (p4est3_iterate_volume
           (p3->old, p4est3_refine_coarsen_volume_callback, rcdata));
     p3->local_num_quads = rcdata->n_new;
   }
@@ -419,7 +426,7 @@ p4est3_fill_from_source (p4est3_t * p3)
     p3->local_num_quads = cdata->n_new;
   }
   else {
-    /*in this case we will perform a simple quadrant copying with translation*/
+    /*in this case we will perform a simple quadrant copying with translation */
     p3->local_num_quads = p3->old->local_num_quads;
   }
 
@@ -469,7 +476,7 @@ p4est3_fill_from_source (p4est3_t * p3)
             (p3, tree, pattern, &lt_offset, coords));
     }
     else {
-      /*simply copying*/
+      /*simply copying */
       SC3E (p4est3_populate_tree_cpy (p3, tree, &lt_offset, coords));
     }
     tree->num_quads = lt_offset - tree->quad_offset;
