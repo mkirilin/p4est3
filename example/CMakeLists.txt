@@ -109,7 +109,7 @@ endif()
 
 if(P4EST_HAVE_GETOPT_H)
 
-foreach(n bricks setup timeavx timings)
+foreach(n bricks setup p3time timings)
   p4est_example(${n}2 timings/${n}2.c "" "")
   if(TARGET P4EST::P8EST)
     p8est_example(${n}3 timings/${n}3.c "" "")

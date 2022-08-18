@@ -779,73 +779,22 @@ p4est3_quadrant_zyx_linear_id (const __m128i * quadrant, int level,
   return NULL;
 }
 
-#ifdef P4_TO_P8
 static sc3_error_t *
 p4est3_quadrant_zyx_morton (int level, p4est3_gloidx id, __m128i * quadrant)
 {
   int                 i;
-  __m256i             coords_id, quadrant256;
 
   SC3A_CHECK (0 <= level && level <= P4EST3_YX_QMAXLEVEL);
-#ifdef P4EST_ENABLE_DEBUG
   if (level < P4EST3_YX_QMAXLEVEL) {
     SC3A_CHECK (id < (((p4est3_gloidx) 1) << P4EST_DIM * level));
   }
-#endif //P4EST_ENABLE_DEBUG
 
-  quadrant256 = _mm256_setzero_si256 ();
-
-/* *INDENT-OFF* */
-  for (i = 0; i < level; ++i) {
-    coords_id =
-    _mm256_srlv_epi64 (
-      _mm256_and_si256 (
-        _mm256_set1_epi64x (id)
-     ,  _mm256_sllv_epi64 (
-          _mm256_set1_epi64x (1ULL)
-        , _mm256_set_epi64x (P4EST_DIM * i
-                           , P4EST_DIM * i + 1
-                           , P4EST_DIM * i + 2
-                           , 0)
-        )
-      )
-    , _mm256_set_epi64x ((P4EST_DIM - 1) * i
-                       , (P4EST_DIM - 1) * i + 1
-                       , (P4EST_DIM - 1) * i + 2
-                       , 0)
-    );
-    quadrant256 = _mm256_or_si256 (quadrant256, coords_id);
-  }
-  quadrant256 = _mm256_slli_epi64 (quadrant256, P4EST3_YX_MAXLEVEL - level);
-  *quadrant = _mm_set_epi32 ((p4est_qcoord_t) _mm256_extract_epi64 (quadrant256, 3)
-                           , (p4est_qcoord_t) _mm256_extract_epi64 (quadrant256, 2)
-                           , (p4est_qcoord_t) _mm256_extract_epi64 (quadrant256, 1)
-                           , (p4est_qcoord_t) level);
-/* *INDENT-ON* */
-  SC3A_IS (p4est3_quadrant_zyx_is_valid, quadrant);
-  return NULL;
-}
-#else
-
-static sc3_error_t *
-p4est3_quadrant_zyx_morton (int level, p4est3_gloidx id, __m128i * quadrant)
-{
-  int                 i;
-  __m128i             coords_id, quadrant128;
-
-  SC3A_CHECK (0 <= level && level <= P4EST3_YX_QMAXLEVEL);
-#ifdef P4EST_ENABLE_DEBUG
-  if (level < P4EST3_YX_QMAXLEVEL) {
-    SC3A_CHECK (id < (((p4est3_gloidx) 1) << P4EST_DIM * level));
-  }
-#endif //P4EST_ENABLE_DEBUG
-
-  quadrant128 = _mm_setzero_si128 ();
+  *quadrant = _mm_setzero_si128 ();
 
   /* this may set the sign bit to create negative numbers */
-/* *INDENT-OFF* */
   for (i = 0; i < level; ++i) {
-    coords_id =
+/* *INDENT-OFF* */
+    __m128i xy_coord_id =
     _mm_srlv_epi64 (
       _mm_and_si128 (
         _mm_set1_epi64x (id)
@@ -858,19 +807,27 @@ p4est3_quadrant_zyx_morton (int level, p4est3_gloidx id, __m128i * quadrant)
     , _mm_set_epi64x ((P4EST_DIM - 1) * i
                     , (P4EST_DIM - 1) * i + 1)
     );
-    quadrant128 = _mm_or_si128 (quadrant128, coords_id);
+    *quadrant
+    = _mm_or_si128 (*quadrant
+                  , _mm_set_epi32 (
+                      (p4est_qcoord_t) _mm_extract_epi64 (xy_coord_id, 1)
+                    , (p4est_qcoord_t) _mm_extract_epi64 (xy_coord_id, 0)
+#ifdef P4_TO_P8
+                    , (p4est_qcoord_t) ((id & (1ULL << (P4EST_DIM * i + 2)))
+                        >> ((P4EST_DIM - 1) * i + 2))
+#else
+                    , 0
+#endif /* P4_TO_P8 */
+                    , 0
+                  ));
+/* *INDENT-ON* */
   }
 
-  quadrant128 = _mm_slli_epi64 (quadrant128, P4EST3_YX_MAXLEVEL - level);
-  *quadrant = _mm_set_epi32 ((p4est_qcoord_t) _mm_extract_epi64 (quadrant128, 1)
-                           , (p4est_qcoord_t) _mm_extract_epi64 (quadrant128, 0)
-                           , (p4est_qcoord_t) 0
-                           , (p4est_qcoord_t) level);
-/* *INDENT-ON* */
+  *quadrant = _mm_slli_epi32 (*quadrant, P4EST3_YX_MAXLEVEL - level);
+  *quadrant = _mm_insert_epi32 (*quadrant, level, 0);
   SC3A_IS (p4est3_quadrant_zyx_is_valid, quadrant);
   return NULL;
 }
-#endif
 
 static sc3_error_t *
 p4est3_quadrant_zyx_root (__m128i * r)
