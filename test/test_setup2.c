@@ -22,10 +22,14 @@
 */
 
 #ifndef P4_TO_P8
+#include <p4est_extended.h>
+#include <p4est_bits.h>
 #include <p4est3_quadrant_yx.h>
 #include <p4est3_quadrant_mort2d.h>
 #include <p4est3_p4est.h>
 #else
+#include <p8est_extended.h>
+#include <p8est_bits.h>
 #include <p4est3_quadrant_zyx.h>
 #include <p4est3_quadrant_mort3d.h>
 #include <p4est3_p8est.h>
@@ -46,6 +50,7 @@ typedef struct setup
   sc3_MPI_Comm_t      mpicomm;
   int                 mpirank;
   int                 level;
+  int                 family;
   p4est3_topidx       num_trees;
 }
 setup_t;
@@ -89,20 +94,20 @@ make_connectivity (setup_t * t)
 }
 
 static sc3_error_t *
-make_new_p4est3 (p4est3_t ** p3, sc3_allocator_t * alloc,
-                 p4est3_connectivity_t * conn, sc3_MPI_Comm_t mpicomm,
-                 const p4est3_quadrant_vtable_t * qvt, int level,
+make_new_p4est3 (p4est3_t ** p3, setup_t * t,
+                 const p4est3_quadrant_vtable_t * qvt,
                  p4est3_setup_mode_t mode)
 {
-  SC3A_IS (sc3_allocator_is_setup, alloc);
+  SC3A_IS (sc3_allocator_is_setup, t->alloc);
 
   /* create p4est object with connectivity */
-  SC3E (p4est3_new (alloc, p3));
-  SC3E (p4est3_set_comm (*p3, mpicomm, 1));
-  SC3E (p4est3_set_connectivity (*p3, conn));
+  SC3E (p4est3_new (t->alloc, p3));
+  SC3E (p4est3_set_comm (*p3, t->mpicomm, 1));
+  SC3E (p4est3_set_connectivity (*p3, t->conn));
   SC3E (p4est3_set_quadrant_vtable (*p3, qvt));
-  SC3E (p4est3_set_level (*p3, level));
+  SC3E (p4est3_set_level (*p3, t->level));
   SC3E (p4est3_set_setup_mode (*p3, mode));
+  SC3E (p4est3_set_family (*p3, t->family));
   SC3E (p4est3_setup (*p3));
 
   return NULL;
@@ -112,12 +117,9 @@ static sc3_error_t *
 setup_forests (setup_t * t, const p4est3_quadrant_vtable_t * q,
                p4est3_t ** m, p4est3_t ** s, p4est3_t ** rc)
 {
-  SC3E (make_new_p4est3 (m, t->alloc, t->conn, t->mpicomm, q, t->level,
-        P4EST3_NEW_MORTON));
-  SC3E (make_new_p4est3 (s, t->alloc, t->conn, t->mpicomm, q, t->level,
-      P4EST3_NEW_SUCCESSOR));
-  SC3E (make_new_p4est3 (rc, t->alloc, t->conn, t->mpicomm, q, t->level,
-      P4EST3_NEW_RECURSIVE_CHILD));
+  SC3E (make_new_p4est3 (m, t, q, P4EST3_NEW_MORTON));
+  SC3E (make_new_p4est3 (s, t, q, P4EST3_NEW_SUCCESSOR));
+  SC3E (make_new_p4est3 (rc, t, q, P4EST3_NEW_RECURSIVE_CHILD));
 
   return NULL;
 }
@@ -165,8 +167,101 @@ compare_p4est3_quadrants (const p4est3_t * lhs, const p4est3_t * rhs,
   return NULL;
 }
 
+#if 0
 static sc3_error_t *
-perform_test_old (setup_t * t,
+compare_levels (const p4est_t *p2, p4est3_t *p3)
+{
+  p4est_quadrant_t   *q2;
+  char               *q3;
+  size_t              nq;
+  p4est3_topidx       tt;
+  p4est3_topidx       fltree, lltree;
+  p4est3_gloidx       num_glo_quads;
+  p4est3_locidx       num_loc_quads;
+  p4est_tree_t       *tree2;
+  p4est3_tree_t      *tree3;
+  int level3;
+
+  if (p3->level < 2) {
+    return NULL;
+  }
+
+  SC3E (p4est3_get_local_num_trees (p3, &fltree, &lltree));
+  SC3E (p4est3_get_global_num_quads (p3, &num_glo_quads));
+  SC3E (p4est3_get_local_num_quads (p3, &num_loc_quads));
+
+  /*DEBUG*/
+  for (tt = fltree; tt <= lltree; ++tt) {
+    SC3E (p4est3_tree_index (p3, tt, &tree3));
+    for (nq = 0; nq < tree3->num_quads; ++nq) {
+      q3 = tree3->tquads + nq * p3->qvt->quadrant_size;
+      SC3E (p4est3_quadrant_level (p3->qvt, q3, &level3));
+      printf ("New: rank = %d, tree = %d, level = %d\n", p3->mpirank, tt, level3);
+    }
+  }
+
+  for (tt = p2->first_local_tree; tt <= p2->last_local_tree; ++tt) {
+    tree2 = p4est_tree_array_index (p2->trees, tt);
+    for (nq = 0; nq < tree2->quadrants.elem_count; ++nq) {
+      q2 = (p4est_quadrant_t *) sc_array_index (&tree2->quadrants, nq);
+      printf ("Old: rank = %d, tree = %d, level = %d\n", p3->mpirank, tt, q2->level);
+    }
+  }
+  /*DEBUG*/
+
+  SC3E_DEMAND (fltree == p2->first_local_tree && lltree == p2->last_local_tree,
+               "Different trees at processor");
+  SC3E_DEMAND (num_glo_quads == p2->global_num_quadrants,
+               "different #global quadrants");
+  SC3E_DEMAND (num_loc_quads == p2->local_num_quadrants,
+               "different #local quadrants");
+
+  for (tt = fltree; tt <= lltree; ++tt) {
+    tree2 = p4est_tree_array_index (p2->trees, tt);
+    SC3E (p4est3_tree_index (p3, tt, &tree3));
+    SC3E_DEMAND (tree2->quadrants.elem_count == (size_t) tree3->num_quads,
+                 "Different #quadrants in trees");
+    for (nq = 0; nq < tree2->quadrants.elem_count; ++nq) {
+      q2 = (p4est_quadrant_t *) sc_array_index (&tree2->quadrants, nq);
+      q3 = tree3->tquads + nq * p3->qvt->quadrant_size;
+      SC3E (p4est3_quadrant_level (p3->qvt, q3, &level3));
+      SC3E_DEMAND (level3 == q2->level, "Levels mismatch");
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+perform_test_p4est2 (setup_t * t, p4est3_t **p3,
+                     const p4est3_quadrant_vtable_t * q)
+{
+  p4est_t *p2;
+  p4est_connectivity_t *conn2;
+
+  conn2 =
+#ifdef P4_TO_P8
+    p8est_connectivity_new_brick (t->num_trees, 1, 1, 0, 0, 0);
+#else
+    p4est_connectivity_new_brick (t->num_trees, 1, 0, 0);
+#endif
+
+  p2 = p4est_new_ext (t->mpicomm, conn2, 0, t->level, 1, 0, NULL, NULL);
+  if (t->family) {
+    p4est_partition (p2, 1, NULL);
+  }
+  SC3E (make_new_p4est3 (p3, t, q, P4EST3_NEW_MORTON));
+  SC3E (compare_levels (p2, *p3));
+
+  p4est_destroy (p2);
+  p4est_connectivity_destroy (conn2);
+  SC3E (p4est3_destroy (p3));
+
+  return NULL;
+}
+#endif
+
+static sc3_error_t *
+perform_test_mort (setup_t * t,
                   p4est3_t ** m, p4est3_t ** s, p4est3_t ** rc,
                   const p4est3_quadrant_vtable_t * qref,
                   const p4est3_quadrant_vtable_t * q)
@@ -228,42 +323,28 @@ main (int argc, char **argv)
   SC3X (set_vtables (&qvt, &qvtmort, &qvtavx));
 
   SC3X (make_allocator (t));
-  for (t->level = 1; t->level < MAX_TEST_LEVEL; ++(t->level)) {
+  for (t->level = 0; t->level < MAX_TEST_LEVEL; ++(t->level)) {
     for (t->num_trees = 1; t->num_trees < MAX_TEST_TREES; ++(t->num_trees)) {
-
-#ifdef P4EST_ENABLE_DEBUG
-      if (t->mpirank == 0) {
-        printf ("l = %d, t = %d\n", t->level, t->num_trees);
-      }
-#endif /* P4EST_ENABLE_DEBUG */
-      SC3X (sc3_MPI_Barrier (t->mpicomm));
-      SC3X (make_connectivity (t));
-
-      SC3X (perform_test_old (t, &p3m, &p3s, &p3rc, qvt, qvt));
-#ifdef P4EST_ENABLE_DEBUG
-      if (t->mpirank == 0) {
-        printf ("Old-quadrants are equal for every setup option\n");
-      }
-#endif /* P4EST_ENABLE_DEBUG */
-
-      SC3X (perform_test (t, p3m, &p3m_mort, &p3s_mort, &p3rc_mort, qvt,
-                          qvtmort));
-#ifdef P4EST_ENABLE_DEBUG
-      if (t->mpirank == 0) {
-        printf ("Mort-quadrants are equal for every setup option\n");
-      }
-#endif /* P4EST_ENABLE_DEBUG */
-
-      SC3X (perform_test (t, p3m, &p3m_avx, &p3s_avx, &p3rc_avx, qvt, qvtavx));
+      for (t->family = 0; t->family < 2; ++(t->family)) {
 #ifdef P4EST_ENABLE_DEBUG
         if (t->mpirank == 0) {
-          printf ("AVX-quadrants are equal for every setup option\n");
+          printf ("l = %d, t = %d\n", t->level, t->num_trees);
         }
 #endif /* P4EST_ENABLE_DEBUG */
+        SC3X (sc3_MPI_Barrier (t->mpicomm));
+        SC3X (make_connectivity (t));
+#if 0
+        SC3X (perform_test_p4est2 (t, &p3m, qvt));
+#endif
+        SC3X (perform_test_mort (t, &p3m, &p3s, &p3rc, qvt, qvt));
+        SC3X (perform_test (t, p3m, &p3m_mort, &p3s_mort, &p3rc_mort, qvt,
+                            qvtmort));
+        SC3X (perform_test (t, p3m, &p3m_avx, &p3s_avx, &p3rc_avx, qvt, qvtavx));
 
-      /*destroy forest, that was referenced for others*/
-      SC3X (p4est3_destroy (&p3m));
-      SC3X (p4est3_connectivity_destroy (&t->conn));
+        /*destroy forest, that was referenced for others*/
+        SC3X (p4est3_destroy (&p3m));
+        SC3X (p4est3_connectivity_destroy (&t->conn));
+      }
     }
   }
   SC3X (free_allocator (&t->alloc));
