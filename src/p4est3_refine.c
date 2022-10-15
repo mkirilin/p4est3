@@ -446,20 +446,23 @@ p4est3_fill_from_source (p4est3_t * p3)
       SC3E (p4est3_populate_tree_cpy (p3, tree, &lt_offset));
     }
     tree->num_quads = lt_offset - tree->quad_offset;
+#ifdef P4EST_ENABLE_DEBUG
+    /* for empty tree it should be 0 */
+    if (tree->treeid == -1) {
+      SC3A_CHECK (tree->num_quads == 0);
+    }
+#endif
     tree->first_tquad = 0;
   }
 
   /* This check here is only to avoid creating a new mpi datatype. */
   SC3A_CHECK (sizeof (p4est3_locidx) == sizeof (int));
-  if (p3->fltree != -1) {
-    SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
-    num_quads = tree->num_quads;
-  }
+  SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
   SC3E (sc3_MPI_Allgather
         (&p3->local_num_quads, 1, SC3_MPI_INT,
          local_num_quads, 1, SC3_MPI_INT, p3->mpicomm));
   SC3E (sc3_MPI_Allgather
-        (&num_quads, 1, SC3_MPI_INT,
+        (&tree->num_quads, 1, SC3_MPI_INT,
          first_tree_quads, 1, SC3_MPI_INT, p3->mpicomm));
 
   SC3E (p4est3_get_goffsetwin (p3, &goffsetwin));
@@ -474,12 +477,11 @@ p4est3_fill_from_source (p4est3_t * p3)
   }
   SC3E (sc3_MPI_Win_unlock (0, goffsetwin));
 
-  if (p3->mpirank != 0) {
-    if (p3->fltree != -1) {
-      for (i = p3->gftree[p3->mpirank - 1]; i == p3->fltree; --i) {
-        tree->first_tquad += first_tree_quads[i];
-      }
+  for (i = p3->mpirank - 1; i >= 0; --i) {
+    if (p3->gftree[i] != p3->fltree) {
+      break;
     }
+    tree->first_tquad += first_tree_quads[p3->gftree[i]];
   }
   for (i = p3->fltree; i <= p3->lltree; ++i) {
     SC3E (p4est3_tree_index (p3, i, &tree));
