@@ -327,6 +327,7 @@ p4est3_fill_from_source (p4est3_t * p3)
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Comm_t      nodecomm;
   sc3_MPI_Aint_t      tempbytes, goffsetbytes;
+  sc3_MPI_Win_t       goffsetwin;
   p4est3_tree_t      *tree;
   sc3_array_t        *pattern; /**< Every number in this array encodes ref/coar behaviour */
   sc3_array_t        *family;
@@ -419,17 +420,13 @@ p4est3_fill_from_source (p4est3_t * p3)
   SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
 
   /* Allocate shared memory for global offsets */
+  SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
   goffsetbytes = (p3->mpisize + 1) * sizeof (p4est3_gloidx);
-  SC3E (sc3_MPI_Win_allocate_shared
-        (noderank == 0 ? goffsetbytes : 0, sizeof (p4est3_gloidx),
-         info_noncontig, nodecomm, &p3->goffset, &p3->goffsetwin));
-  if (noderank > 0) {
-    SC3E (sc3_MPI_Win_shared_query (p3->goffsetwin, 0,
-                                    &tempbytes, &dispunit, &p3->goffset));
-    SC3A_CHECK (tempbytes >= goffsetbytes);
-    SC3A_CHECK (dispunit == sizeof (p4est3_gloidx));
-    SC3A_CHECK (p3->goffset != NULL);
-  }
+  SC3E (p4est3_glopartition_set_mpienv
+        (NULL, NULL, p3->goffsets, p3->split_info));
+  SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets));
+  p3->goffset = p3->goffsets->goffset;
+
   /* We got a pattern of population, and now we populate it
      and set p4est3_tree_t:: treeid, quad_offset and num_quads.
      We also initialize p4est3_tree_t::first_tquad by 0.
@@ -464,8 +461,10 @@ p4est3_fill_from_source (p4est3_t * p3)
   SC3E (sc3_MPI_Allgather
         (&num_quads, 1, SC3_MPI_INT,
          first_tree_quads, 1, SC3_MPI_INT, p3->mpicomm));
+
+  SC3E (p4est3_get_goffsetwin (p3, &goffsetwin));
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->goffsetwin));
+                          goffsetwin));
   if (noderank == 0) {
     p3->goffset[0] = 0;
     for (i = 1; i < p3->mpisize + 1; ++i) {
@@ -473,7 +472,7 @@ p4est3_fill_from_source (p4est3_t * p3)
         + (p4est3_gloidx) local_num_quads[i - 1];
     }
   }
-  SC3E (sc3_MPI_Win_unlock (0, p3->goffsetwin));
+  SC3E (sc3_MPI_Win_unlock (0, goffsetwin));
 
   if (p3->mpirank != 0) {
     if (p3->fltree != -1) {
