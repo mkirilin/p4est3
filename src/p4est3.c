@@ -417,7 +417,6 @@ p4est3_destroy (p4est3_t ** pp3)
 {
   sc3_allocator_t    *alloc;
   p4est3_t           *p3;
-  sc3_MPI_Win_t       gftreewin, gfposwin, goffsetwin;
 
   SC3E_INULLP (pp3, p3);
   SC3A_IS (p4est3_is_valid, p3);

@@ -326,7 +326,7 @@ p4est3_fill_from_source (p4est3_t * p3)
   p4est3_locidx      *first_tree_quads; /**< Array of the numbers of quadrants at the first local tree */
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Comm_t      nodecomm;
-  sc3_MPI_Aint_t      tempbytes, goffsetbytes;
+  sc3_MPI_Aint_t      tempbytes;
   sc3_MPI_Win_t       goffsetwin;
   p4est3_tree_t      *tree;
   sc3_array_t        *pattern; /**< Every number in this array encodes ref/coar behaviour */
@@ -421,7 +421,6 @@ p4est3_fill_from_source (p4est3_t * p3)
 
   /* Allocate shared memory for global offsets */
   SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
-  goffsetbytes = (p3->mpisize + 1) * sizeof (p4est3_gloidx);
   SC3E (p4est3_glopartition_set_mpienv
         (NULL, NULL, p3->goffsets, p3->split_info));
   SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets));
