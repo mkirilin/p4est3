@@ -58,7 +58,6 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
 
   if (!p3->setup) {
     SC3E_TEST (p3->accessed_conn == 0, reason);
-    SC3E_TEST (p3->split_info == NULL, reason);
   }
   else {
     SC3E_TEST (p3->accessed_conn >= 0, reason);

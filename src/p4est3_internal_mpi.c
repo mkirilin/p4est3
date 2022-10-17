@@ -754,7 +754,6 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   p4est3_t           *old = p3->old;
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Comm_t      nodecomm;
-  sc3_MPI_Win_t       gfposwin;
 
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (p3->old != NULL);
@@ -821,9 +820,8 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
     SC3E (p4est3_glopartition_setup (NULL, p3->gposition, NULL));
     p3->gfpos = p3->gposition->gfpos;
 
-    SC3E (p4est3_get_gfposwin (p3, &gfposwin));
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                            gfposwin));
+                            p3->gposition->gfposwin));
 
     SC3E (sc3_mpienv_get_nodesize (old->split_info, &nodesize));
     beginr = sc3_intcut (old->mpisize + 1, nodesize, noderank);
@@ -836,7 +834,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
             (void *) (p3->gfpos + i * p3->qsize), coords, p3->qvt->max_level));
     }
     SC3E (sc3_allocator_free (p3->alloc, coords));
-    SC3E (sc3_MPI_Win_unlock (0, gfposwin));
+    SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
   }
 
   SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),
@@ -867,7 +865,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
    * p4est3_t::nodequads, local_num_quads, quadwin,
    * quads, trees, goffsetwin, goffset and global_num_quads.
   */
-  p3->setup = 1;
   SC3E (p4est3_fill_from_source (p3));
+  p3->setup = 1;
   return NULL;
 }
