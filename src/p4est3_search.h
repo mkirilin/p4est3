@@ -54,9 +54,9 @@
  * \param [out] end         The second offset such that
  *                          `my_end <= search_in[end]`.
  */
-sc3_error_t        *p4est3_find_partition (sc3_allocator_t * alloc,
+sc3_error_t        *p4est3_find_partition (const sc3_allocator_t * alloc,
                                            const int num_entities,
-                                           p4est3_gloidx * search_in,
+                                           const p4est3_gloidx * search_in,
                                            p4est3_gloidx my_begin,
                                            p4est3_gloidx my_end,
                                            p4est3_gloidx * begin,
