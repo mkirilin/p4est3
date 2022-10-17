@@ -560,33 +560,3 @@ p4est3_get_local_num_quads (const p4est3_t * p3, p4est3_locidx * n)
   }
   return NULL;
 }
-
-sc3_error_t        *
-p4est3_get_gftreewin (const p4est3_t * p3, sc3_MPI_Win_t * tw)
-{
-  SC3A_IS (p4est3_is_setup, p3);
-  SC3A_CHECK (tw != NULL);
-
-  *tw = p3->gtrees->gftreewin;
-  return NULL;
-}
-
-sc3_error_t        *
-p4est3_get_gfposwin (const p4est3_t * p3, sc3_MPI_Win_t * pw)
-{
-  SC3A_IS (p4est3_is_setup, p3);
-  SC3A_CHECK (pw != NULL);
-
-  *pw = p3->gposition->gfposwin;
-  return NULL;
-}
-
-sc3_error_t        *
-p4est3_get_goffsetwin (const p4est3_t * p3, sc3_MPI_Win_t * ow)
-{
-  SC3A_IS (p4est3_is_setup, p3);
-  SC3A_CHECK (ow != NULL);
-
-  *ow = p3->goffsets->goffsetwin;
-  return NULL;
-}
