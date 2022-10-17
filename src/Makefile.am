@@ -14,7 +14,7 @@ libp4est_compiled_sources = src/p4est_base.c \
         src/p4est3_connectivity.c \
         src/p4est3_quadrant_vtable.c src/p4est3.c \
         src/p4est3_internal_mpi.c src/p4est3_iterate.c \
-        src/p4est3_refine.c
+        src/p4est3_refine.c  src/p4est3_internal_global.c
 
 if P4EST_ENABLE_BUILD_2D
 libp4est_installed_headers += \
