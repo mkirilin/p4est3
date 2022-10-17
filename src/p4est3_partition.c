@@ -53,6 +53,7 @@ p4est3_part_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 sc3_error_t        *
 p4est3_partition (p4est3_t * p3)
 {
+  /* at this stage we have a completely setup refined forest */
   int p;
   int nodesize, noderank, node_num;
   int *node_sizes, *node_offsets;
@@ -72,31 +73,33 @@ p4est3_partition (p4est3_t * p3)
 
   if (p3->cweight == NULL) {
     /* Divide up the quadrants equally */
-    /*SC3E (p4est3_part_array_new
-          (p3->alloc, sizeof (p4est3_gloidx), nodesize + 1, nodesize + 1,
-           num_quadrants_in_proc));
-    for (p = 0, next_quadrant = 0; p < nodesize; ++p) {
-      prev_quadrant = next_quadrant;
-      next_quadrant = p4est3_glocut (p3->global_num_quads, p + 1, nodesize);
-      qcount = next_quadrant - prev_quadrant;
-      SC3A_CHECK (0 <= qcount && qcount <= (p4est3_gloidx) P4EST3_GLOIDX_MAX);
-      num_quadrants_in_proc[p] = (p4est3_locidx) (qcount);
-    }*/
-
     /* Find a new right border for the local partition */
     SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
     new_right_border
       = p4est3_glocut (p3->global_num_quads, noderank + 1, nodesize);
+#ifdef P4EST_ENABLE_DEBUG
+    if (p3->mpirank + 1 == p3->mpisize) {
+      SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                              p3->goffsets->goffsetwin));
+      SC3A_CHECK (p3->goffset[p3->mpirank] == new_right_border);
+      SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+    }
+#endif
     /* Find to which process belongs the new right border */
     SC3E (sc3_mpienv_get_node_num (p3->split_info, &node_num));
     SC3E (sc3_mpienv_get_node_sizes (p3->split_info, &node_sizes));
     SC3E (sc3_mpienv_get_node_offsets (p3->split_info, &node_offsets));
-    SC3E (p4est3_find_partition (p3->alloc, node_sizes[node_num], p3->goffset +,
-                                 new_right_border, new_right_border,
-                                 
-                                 ))
 
-
+    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                            p3->goffsets->goffsetwin));
+    p3->goffset[p3->mpirank + 1] = new_right_border;
+    SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+    p3->local_num_quads
+      = p3->goffset[p3->mpirank - 1] - p3->goffset[p3->mpirank];
+    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                            p3->gposition->gfposwin));
+    p3->gfpos[p3->mpirank + 1] /* = last descendant */;
+    SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
   }
 
 }
