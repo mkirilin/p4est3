@@ -100,7 +100,6 @@ p4est3_partition (p4est3_t * p3)
   }
   if (p3->cweight == NULL) {
     /* Divide up the quadrants equally */
-    /* Find a new right border for the local partition */
     SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
     SC3E (sc3_mpienv_get_node_num (p3->split_info, &node_num));
     SC3E (sc3_mpienv_get_node_offsets (p3->split_info, &node_offsets));
@@ -110,6 +109,7 @@ p4est3_partition (p4est3_t * p3)
     qcount_node = p3->goffset[node_offsets[node_num + 1]]
                   - p3->goffset[node_offsets[node_num]];
     SC3E (sc3_MPI_Barrier (nodecomm));
+    /* Find new left and right borders for the local partition */
     new_left_border = p4est3_glocut (qcount_node, noderank, nodesize);
     new_right_border = p4est3_glocut (qcount_node, noderank + 1, nodesize);
 
@@ -128,17 +128,20 @@ p4est3_partition (p4est3_t * p3)
       SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
     }
 #endif
-
+    /* Adjust quadrant partition information of the forest */
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                             p3->goffsets->goffsetwin));
     p3->goffset[p3->mpirank] = new_left_border;
     SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+
     p3->local_num_quads = new_right_border - new_left_border;
+
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                             p3->gposition->gfposwin));
     SC3E(p4est3_quadrant_first_descendant
           (p3->qvt, p3->nodequads[0] + p3->qsize * new_left_border,
            p3->qmaxlevel, p3->gfpos[p3->mpirank]));
+
     if (noderank == 0) {
       SC3E (sc3_allocator_calloc
             (p3->alloc, p3->qvt->dim, sizeof (int32_t), &coords));
@@ -147,8 +150,15 @@ p4est3_partition (p4est3_t * p3)
              p3->old->gfpos[node_offsets[node_num + 1]],
              p3->gfpos[node_offsets[node_num + 1]], coords));
       SC3E (sc3_allocator_free (p3->alloc, coords));
+    } else {
+      p3->nodequads[noderank] = p3->nodequads[0] + p3->qsize * new_left_border;
     }
     SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
+
+    p3->quads = p3->nodequads[noderank];
+
+    /* Adjust trees partition information of the forest */
+    
   }
 
 }
