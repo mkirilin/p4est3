@@ -52,11 +52,11 @@ p4est3_search_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 
 /** A callback function that describes the search window.
  *  The idea is to define the type of an array entry as type 1, if
- *  my_begin < array[i], my_end >= array[i] and as type 2, if the entry
- *  is not of type 1 and my_end < array[i]. The remaining cases are
- *  indicated by type 0. This function is passed into sc3_array_split by
- *  \ref p4est3_find_partition. Note that this function, as well as
- *  p4est3_find_partition, is dimension-independent; still we duplicate
+ *  my_begin <= array[i], my_end > array[i] and as type 2, if the entry
+ *  is not of type 1 and my_end <= array[i]. The remaining cases are
+ *  indicated by type 0. This function is passed into sc_array_split by
+ *  \ref p4est_find_partition. Note that this function, as well as
+ *  p4est_find_partition, is dimension-independent; still we duplicate
  *  it in 3D in the usual way.
  */
 static sc3_error_t *
@@ -69,13 +69,13 @@ type_fn_global_quad_index (sc3_array_t * array, size_t index,
   my_begin_end = (p4est3_gloidx *) data_array;
   SC3E (sc3_array_index (array, index, &entry));
 
-  if (*entry <= my_begin_end[0]) {
+  if (*entry < my_begin_end[0]) {
     *type = 0;
   }
-  else if ((my_begin_end[0] < *entry) && (my_begin_end[1] >= *entry)) {
+  else if ((my_begin_end[0] <= *entry) && (my_begin_end[1] > *entry)) {
     *type = 1;
   }
-  else if (my_begin_end[1] < *entry) {
+  else if (my_begin_end[1] <= *entry) {
     *type = 2;
   }
   else {
@@ -106,9 +106,6 @@ p4est3_find_partition (const sc3_allocator_t * alloc,
 
   SC3E (sc3_array_index (offsets, 1, &begin));
   SC3E (sc3_array_index (offsets, 2, &end));
-
-  (*begin)--;
-  *end = *end == num_entities ? num_entities + 1 : *end;
 
   sc3_array_destroy (&offsets);
   sc3_array_destroy (&view);

@@ -26,17 +26,17 @@
 
 #include <p4est3.h>
 
-/** CAUTION! The function might look similar to the corresponding p4est version 2,
- * but it is not. Please, read the documentation carefully.
- * Binary search of a subrange in an sorted in ascending order array.
- * Given two targets \a my_begin and \a my_end, defining the target range,
- * such that `my_begin <= my_end`, find indices of the array such that
- * `search_in[begin] <= my_begin`, `my_end <= search_in[end]`.
- * If more than one index satisfies the conditions, then the maximal index
- * for \a begin and minimal index for \a end is the result.
- * If \a my_begin is less than the smallest value of \a search_in
- * \a begin is set to -1 and if \a my_end is bigger than the largest
- * value of \a search_in \a end is set to `num_entities + 1`.
+/** Binary search of a subrange in an sorted in ascending order array.
+ * Given two targets \a my_begin and \a my_end, find offsets such that
+ * `search_in[begin] >= my_begin`, `my_end <= search_in[end]`.
+ * If more than one index satisfies the conditions, then the minimal index is the
+ * result. If there is no index that satisfies the conditions, then \a begin
+ * and \a end are tried to set equal such that `search_in[begin] >= my_end`.
+ * If \a my_begin is less or equal than the smallest value of \a search_in
+ * \a begin is set to 0 and if \a my_end is bigger or equal than the largest
+ * value of \a search_in \a end is set to \a num_procs - 1.
+ * If none of the above conditions is satisfied, the output is not well defined.
+ * We require `my_begin <= my_begin'.
  * \param [in] alloc        Valid allocator to setup temporary arrays.
  *                          Must be setup.
  * \param [in] num_entities Number of entities to get the length of
