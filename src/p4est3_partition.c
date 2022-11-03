@@ -79,19 +79,14 @@ p4est3_translate_quadrant (const p4est3_quadrant_vtable_t * qvt_old,
 
 /* p4est3::goffsets should be updated before calling this function */
 static sc3_error_t *
-p4est3_procs_recv_from (const p4est3_t * p3, int nodesize, int noderank,
-                        int node_num, int *node_offsets,
-                        p4est3_gloidx *last_goffsets,
+p4est3_procs_recv_from (const p4est3_t * p3, int node_num, int *node_offsets,
+                        const p4est3_gloidx *last_goffsets,
                         p4est3_locidx *num_recv_from,
-                        int *from_begin, int *from_end,
+                        p4est3_locidx *from_begin, p4est3_locidx *from_end,
                         int *num_proc_recv_from)
 {
-  int i, from_proc;
+  int from_proc;
   p4est3_gloidx my_begin, my_end, lower_bound;
-
-  for (i = 0; i < p3->mpisize; ++i) {
-    last_goffsets[i] = p3->old->goffset[i + 1] - 1;
-  }
 
   my_begin = p3->goffset[p3->mpirank];
   my_end = p3->goffset[p3->mpirank + 1] - 1;
@@ -133,16 +128,21 @@ sc3_error_t        *
 p4est3_partition (p4est3_t * p3)
 {
   /* at this stage we have a completely setup refined forest */
-  int p;
+  int i, p;
   int nodesize, noderank, node_num;
   int *node_sizes, *node_offsets;
+  p4est3_locidx from_begin, from_end;
+  p4est3_locidx from_begin_global_quad, from_end_global_quad;
+  int num_proc_recv_from;
   char               *temp = p3->temp_quad[0];
+  char **recv_buf;
   int32_t            *coords;
   p4est3_gloidx        prev_quadrant, next_quadrant, qcount_node;
   p4est3_gloidx        new_right_border, new_left_border;
   p4est3_gloidx *last_goffsets; /**< Offsets of last quadrant in a process */
   p4est3_locidx *num_recv_from; /**< Numbers of quadrants coming from the i-th process */
   sc3_MPI_Comm_t nodecomm;
+  MPI_Request recv_request;
 
   /* We suppose to call this function after setting up routine */
   SC3A_CHECK (p3->old != NULL);
@@ -216,6 +216,27 @@ p4est3_partition (p4est3_t * p3)
         (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &last_goffsets));
     SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (p4est3_locidx), &num_recv_from));
+
+    for (i = 0; i < p3->mpisize; ++i) {
+      last_goffsets[i] = p3->old->goffset[i + 1] - 1;
+    }
+    SC3E (p4est3_procs_recv_from
+          (p3, node_num, node_offsets, last_goffsets,
+            num_recv_from, &from_begin, &from_end, &num_proc_recv_from));
+
+    from_begin_global_quad = from_begin;
+    from_end_global_quad = from_end;
+    /* Post receives for the trees */
+    SC3E (sc3_allocator_malloc
+          (p3->alloc, p3->mpisize * sizeof (char *), &recv_buf));
+#ifdef P4EST_ENABLE_MPI
+    SC3E (sc3_allocator_malloc (p3->alloc,
+                                num_proc_recv_from * sizeof (MPI_Request),
+                                &recv_request));
+#endif
+
+    /* Allocate space for receiving trees */
+    
   }
 
 }
