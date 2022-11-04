@@ -131,7 +131,7 @@ sc3_error_t        *
 p4est3_partition (p4est3_t * p3)
 {
   /* at this stage we have a completely setup refined forest */
-  int i, p;
+  int i, p, from_proc, sk, mpiret;
   int nodesize, noderank, node_num;
   int *node_sizes, *node_offsets;
   p4est3_locidx from_begin, from_end;
@@ -139,13 +139,15 @@ p4est3_partition (p4est3_t * p3)
   int num_proc_recv_from;
   char               *temp = p3->temp_quad[0];
   char **recv_buf;
+  size_t recv_size;
   int32_t            *coords;
+  p4est3_topidx num_recv_trees;
   p4est3_gloidx        prev_quadrant, next_quadrant, qcount_node;
   p4est3_gloidx        new_right_border, new_left_border;
   p4est3_gloidx *last_goffsets; /**< Offsets of last quadrant in a process */
   p4est3_locidx *num_recv_from; /**< Numbers of quadrants coming from the i-th process */
   sc3_MPI_Comm_t nodecomm;
-  MPI_Request recv_request;
+  MPI_Request *recv_request;
 
   /* We suppose to call this function after setting up routine */
   SC3A_CHECK (p3->old != NULL);
@@ -239,7 +241,33 @@ p4est3_partition (p4est3_t * p3)
 #endif
 
     /* Allocate space for receiving trees */
-    
+    for (from_proc = from_begin_global_quad, sk = 0
+         ; from_proc <= from_end_global_quad; ++from_proc) {
+      if (from_proc != p3->mpirank && num_recv_from[from_proc]) {
+        num_recv_trees =
+          p3->gftree[from_proc + 1] - p3->gftree[from_proc] + 1;
+        /* We are going to recv p4est3_tree::num_quads for each received tree,
+           p4est3_tree::first_tquad for the first received tree and
+           p4est3_tree::last_tquad for the last received tee. */
+        recv_size = num_recv_trees * sizeof (p4est3_locidx)
+                    + 2 * sizeof (p4est3_gloidx);
+        SC3E (sc3_allocator_malloc
+              (p3->alloc, recv_size * sizeof (char), &recv_buf[from_proc]));
+        /* Post receives for the quadrants and their data */
+#ifdef P4EST_ENABLE_MPI
+        mpiret = MPI_Irecv (recv_buf[from_proc], (int) recv_size, MPI_BYTE,
+                            from_proc, 0, p3->mpicomm, recv_request + sk);
+        SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
+        ++sk;
+#endif
+      }
+    }
+#ifdef P4EST_ENABLE_MPI
+    for (; sk < num_proc_recv_from; ++sk) {
+      /* for empty processors in receiving range */
+      recv_request[sk] = MPI_REQUEST_NULL;
+    }
+#endif
   }
 
 }
