@@ -88,8 +88,11 @@ p4est3_procs_recv_from (const p4est3_t * p3, int node_num, int *node_offsets,
   int from_proc;
   p4est3_gloidx my_begin, my_end, lower_bound;
 
-  my_begin = p3->goffset[p3->mpirank];
-  my_end = p3->goffset[p3->mpirank + 1] - 1;
+  /* we limit the boundaries within one node so far */
+  my_begin = SC3_MAX (p3->goffset[p3->mpirank],
+                      p3->goffset[node_offsets[node_num]]);
+  my_end = SC3_MIN (p3->goffset[p3->mpirank + 1],
+                    p3->goffset[node_offsets[node_num + 1]]) - 1;
   *num_proc_recv_from = 0;
 
   if (my_begin > my_end) {
