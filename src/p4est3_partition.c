@@ -390,12 +390,46 @@ p4est3_partition (p4est3_t * p3)
                                 num_proc_send_to * sizeof (MPI_Request),
                                 &send_request));
 #endif
-    SC3E (sc3_allocator_calloc
-          (p3->alloc, num_send_trees,
-          sizeof (p4est3_locidx), &num_per_tree_local));
+    SC3E (sc3_allocator_malloc
+          (p3->alloc, num_send_trees * sizeof (p4est3_locidx),
+           &num_per_tree_local));
     /* Set the num_per_tree_local */
-    SC3E (p4est3_trees_send_to_loc
-          (p3, num_per_tree_local, begin_send_to, num_send_to));
+    SC3E (p4est3_trees_send_to
+          (p3, begin_send_to, num_send_to,
+           num_send_trees, p3->mpirank, num_per_tree_local));
+
+    for (to_proc = to_begin_global_quad, sk = 0
+         ; to_proc <= to_end_global_quad; ++to_proc) {
+      if (to_proc != p3->mpirank && num_send_to[to_proc]) {
+        /* We are going to send p4est3_tree::num_quads for each sent tree,
+           p4est3_tree::first_tquad for the first sent tree and
+           p4est3_tree::last_tquad for the last sent tree. */
+        send_size = num_recv_trees * sizeof (p4est3_locidx)
+                    + 2 * sizeof (p4est3_gloidx);
+        SC3E (sc3_allocator_malloc
+              (p3->alloc, send_size, &send_buf[to_proc]));
+        num_per_tree_send_buf = (p4est3_locidx *) send_buf[to_proc];
+        SC3E (p4est3_trees_send_to
+              (p3, begin_send_to, num_send_to,
+               num_send_trees, to_proc, num_per_tree_send_buf));
+        /* Post send operation for the quadrants and their data */
+#ifdef P4EST_ENABLE_MPI
+        mpiret = MPI_Isend (send_buf[to_proc], (int) send_size, MPI_BYTE,
+                            to_proc, 0, p3->mpicomm, send_request + sk);
+        SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
+        ++sk;
+#endif
+      }
+    }
+#ifdef P4EST_ENABLE_MPI
+  for (; sk < num_proc_send_to; ++sk) {
+    send_request[sk] = MPI_REQUEST_NULL;
+  }
+  /* Fill in forest */
+  mpiret =
+    MPI_Waitall (num_proc_recv_from, recv_request, MPI_STATUSES_IGNORE);
+    SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
+#endif
   }
 
 }
