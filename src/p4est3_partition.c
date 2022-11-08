@@ -77,6 +77,69 @@ p4est3_translate_quadrant (const p4est3_quadrant_vtable_t * qvt_old,
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_partition_allocations (const p4est3_t * p3,
+                              char ***precv_buf, char ***psend_buf,
+                              p4est3_locidx ** pnum_recv_from,
+                              p4est3_locidx ** pnum_send_to,
+                              p4est3_locidx ** pnum_per_tree_local,
+                              p4est3_gloidx ** plast_goffsets,
+                              p4est3_gloidx ** pbegin_send_to,
+                              p4est3_gloidx ** pnew_last_goffsets)
+{
+  const p4est3_topidx num_send_trees
+    = p3->gftree[p3->mpirank + 1] - p3->gftree[p3->mpirank] + 1;
+  char ** char_pprt;
+  p4est3_locidx * locidx_prt;
+  p4est3_gloidx * gloidx_prt;
+
+  SC3E_RETVAL (char_pprt, NULL);
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, p3->mpisize * sizeof (char *), &char_pprt));
+  *precv_buf = char_pprt;
+
+  SC3E_RETVAL (char_pprt, NULL);
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, p3->mpisize * sizeof (char *), &char_pprt));
+  *psend_buf = char_pprt;
+
+  SC3E_RETVAL (locidx_prt, NULL);
+  SC3E (sc3_allocator_calloc
+        (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &locidx_prt));
+  *pnum_recv_from = locidx_prt;
+
+  SC3E_RETVAL (locidx_prt, NULL);
+  SC3E (sc3_allocator_calloc
+        (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &locidx_prt));
+  *pnum_send_to = locidx_prt;
+
+  SC3E_RETVAL (locidx_prt, NULL);
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, num_send_trees * sizeof (p4est3_locidx), &locidx_prt));
+  *pnum_per_tree_local = locidx_prt;
+
+  SC3E_RETVAL (gloidx_prt, NULL);
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
+  *plast_goffsets = gloidx_prt;
+
+  SC3E_RETVAL (gloidx_prt, NULL);
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
+#ifdef P4EST_ENABLE_DEBUG
+    /* For checking the window of relevant processes. */
+    memset (gloidx_prt, -1, p3->mpisize * sizeof (p4est3_gloidx));
+#endif
+  *pbegin_send_to = gloidx_prt;
+
+  SC3E_RETVAL (gloidx_prt, NULL);
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
+  *pnew_last_goffsets = gloidx_prt;
+
+  return NULL;
+}
+
 /* p4est3::goffsets should be updated before calling this function */
 static sc3_error_t *
 p4est3_procs_recv_from (const p4est3_t * p3,
@@ -214,6 +277,13 @@ sc3_error_t        *
 p4est3_partition (p4est3_t * p3)
 {
   /* at this stage we have a completely setup refined forest */
+  const p4est3_topidx num_send_trees
+    = p3->gftree[p3->mpirank + 1] - p3->gftree[p3->mpirank] + 1;
+  /* We are going to send p4est3_tree::num_quads for each sent tree,
+     p4est3_tree::first_tquad for the first sent tree and
+     p4est3_tree::last_tquad for the last sent tree. */
+  const size_t send_size = num_send_trees * sizeof (p4est3_locidx)
+                            + 2 * sizeof (p4est3_gloidx);
   int i, p, from_proc, sk, mpiret, to_proc;
   int nodesize, noderank, node_num;
   int *node_sizes, *node_offsets;
@@ -235,11 +305,9 @@ p4est3_partition (p4est3_t * p3)
   p4est3_gloidx        prev_quadrant, next_quadrant, qcount_node;
   p4est3_gloidx        new_right_border, new_left_border;
   p4est3_gloidx *last_goffsets, *new_last_goffsets; /**< Offsets of last quadrant in a process */
-  size_t recv_size, send_size;
+  size_t recv_size;
   sc3_MPI_Comm_t nodecomm;
   MPI_Request *recv_request, *send_request;
-  const p4est3_topidx num_send_trees
-    = p3->gftree[p3->mpirank + 1] - p3->gftree[p3->mpirank] + 1;
 
   /* We suppose to call this function after setting up routine */
   SC3A_CHECK (p3->old != NULL);
@@ -309,10 +377,10 @@ p4est3_partition (p4est3_t * p3)
     p3->quads = p3->nodequads[noderank];
 
     /* Adjust trees partition information of the forest */
-    SC3E (sc3_allocator_malloc
-        (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &last_goffsets));
-    SC3E (sc3_allocator_calloc
-        (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &num_recv_from));
+    SC3E (p4est3_partition_allocations
+          (p3, &recv_buf, &send_buf, &num_recv_from, &num_send_to,
+           &num_per_tree_local, &last_goffsets, &begin_send_to,
+           &new_last_goffsets));
 
     for (i = 0; i < p3->mpisize; ++i) {
       last_goffsets[i] = p3->old->goffset[i + 1] - 1;
@@ -320,12 +388,7 @@ p4est3_partition (p4est3_t * p3)
     SC3E (p4est3_procs_recv_from
           (p3, last_goffsets, num_recv_from,
            &from_begin, &from_end, &num_proc_recv_from));
-
-    from_begin_global_quad = from_begin;
-    from_end_global_quad = from_end;
     /* Post receives for the trees */
-    SC3E (sc3_allocator_malloc
-          (p3->alloc, p3->mpisize * sizeof (char *), &recv_buf));
 #ifdef P4EST_ENABLE_MPI
     SC3E (sc3_allocator_malloc (p3->alloc,
                                 num_proc_recv_from * sizeof (MPI_Request),
@@ -333,8 +396,7 @@ p4est3_partition (p4est3_t * p3)
 #endif
 
     /* Allocate space for receiving trees */
-    for (from_proc = from_begin_global_quad, sk = 0
-         ; from_proc <= from_end_global_quad; ++from_proc) {
+    for (from_proc = from_begin, sk = 0; from_proc <= from_end; ++from_proc) {
       if (from_proc != p3->mpirank && num_recv_from[from_proc]) {
         num_recv_trees =
           p3->gftree[from_proc + 1] - p3->gftree[from_proc] + 1;
@@ -360,52 +422,27 @@ p4est3_partition (p4est3_t * p3)
       recv_request[sk] = MPI_REQUEST_NULL;
     }
 #endif
-
     /* For each processor calculate the number of quadrants sent */
-    SC3E (sc3_allocator_calloc
-          (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &num_send_to));
-    SC3E (sc3_allocator_malloc
-          (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &begin_send_to));
-    SC3E (sc3_allocator_malloc
-          (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &new_last_goffsets));
     for (i = 0; i < p3->mpisize; ++i) {
         new_last_goffsets[i] = p3->goffset[i + 1] - 1;
     }
-#ifdef P4EST_ENABLE_DEBUG
-    /* For checking the window of relevant processes. */
-    memset (begin_send_to, -1, p3->mpisize * sizeof (p4est3_gloidx));
-#endif
     SC3E (p4est3_procs_send_to
           (p3, new_last_goffsets, num_send_to,
            begin_send_to, &to_begin, &to_end, &num_proc_send_to));
 
-    to_begin_global_quad = to_begin;
-    to_end_global_quad = to_end;
-
     /* Communicate the trees */
-    SC3E (sc3_allocator_malloc
-          (p3->alloc, p3->mpisize * sizeof (char *), &send_buf));
 #ifdef P4EST_ENABLE_MPI
     SC3E (sc3_allocator_malloc (p3->alloc,
                                 num_proc_send_to * sizeof (MPI_Request),
                                 &send_request));
 #endif
-    SC3E (sc3_allocator_malloc
-          (p3->alloc, num_send_trees * sizeof (p4est3_locidx),
-           &num_per_tree_local));
     /* Set the num_per_tree_local */
     SC3E (p4est3_trees_send_to
           (p3, begin_send_to, num_send_to,
            num_send_trees, p3->mpirank, num_per_tree_local));
 
-    for (to_proc = to_begin_global_quad, sk = 0
-         ; to_proc <= to_end_global_quad; ++to_proc) {
+    for (to_proc = to_begin, sk = 0; to_proc <= to_end; ++to_proc) {
       if (to_proc != p3->mpirank && num_send_to[to_proc]) {
-        /* We are going to send p4est3_tree::num_quads for each sent tree,
-           p4est3_tree::first_tquad for the first sent tree and
-           p4est3_tree::last_tquad for the last sent tree. */
-        send_size = num_recv_trees * sizeof (p4est3_locidx)
-                    + 2 * sizeof (p4est3_gloidx);
         SC3E (sc3_allocator_malloc
               (p3->alloc, send_size, &send_buf[to_proc]));
         num_per_tree_send_buf = (p4est3_locidx *) send_buf[to_proc];
