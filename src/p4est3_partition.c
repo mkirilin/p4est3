@@ -166,41 +166,46 @@ p4est3_procs_send_to (const p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_trees_send_to_loc (const p4est3_t * p3,
-                          p4est3_locidx * num_per_tree_local,
-                          p4est3_gloidx * begin_send_to,
-                          p4est3_locidx * num_send_to)
+p4est3_trees_send_to (const p4est3_t * p3, const p4est3_gloidx *begin_send_to,
+                      const p4est3_locidx * num_send_to,
+                      p4est3_topidx num_send_trees, int to_proc,
+                      p4est3_locidx * num_per_tree_send_buf)
 {
-  int to_proc;
   p4est3_locidx num_copy;
-  p4est3_gloidx my_base, my_begin, my_end, from_begin,
-                from_end, tree_from_begin, tree_from_end,
-                num_copy_global;
+  p4est3_gloidx from_begin, from_end, my_base, my_begin, my_end,
+                tree_from_begin, tree_from_end, num_copy_global;
   p4est3_topidx which_tree;
   p4est3_tree_t *tree;
 
-  to_proc = p3->mpirank;
+  /* Pack in the data to be sent */
   my_base = p3->old->goffset[p3->mpirank];
   my_begin = begin_send_to[to_proc] - my_base;
   my_end = begin_send_to[to_proc]
             + (p4est3_gloidx) num_send_to[to_proc] - 1 - my_base;
-  for (which_tree = p3->fltree; which_tree <= p3->lltree;
-       ++which_tree) {
+
+  for (which_tree = p3->fltree; which_tree <= p3->lltree; ++which_tree) {
     SC3E (p4est3_tree_index (p3, which_tree, &tree));
     SC3A_CHECK (tree->num_quads >= 1);
-    from_begin = (which_tree == p3->fltree) ? 0 : (tree->quad_offset);
+    from_begin = (which_tree ==  p3->fltree) ? 0 : tree->quad_offset;
     from_end = tree->quad_offset + tree->num_quads - 1;
 
-    if (from_begin <= my_end && from_end >= my_begin) {
-      /* Need to copy from tree which_tree */
-      tree_from_begin = SC3_MAX (my_begin, from_begin) - from_begin;
-      tree_from_end = SC3_MIN (my_end, from_end) - from_begin;
-      num_copy_global = tree_from_end - tree_from_begin + 1;
-      SC3A_CHECK (num_copy_global >= 0);
-      SC3A_CHECK (num_copy_global <= (p4est3_gloidx) P4EST3_LOCIDX_MAX);
-      num_copy = (p4est3_locidx) num_copy_global;
-      num_per_tree_local[which_tree - p3->fltree] = num_copy;
+    if (from_begin > my_end || from_end < my_begin) {
+      continue;
     }
+    /* Need to copy from tree which_tree */
+    tree_from_begin = SC3_MAX (my_begin, from_begin) - from_begin;
+    tree_from_end = SC3_MIN (my_end, from_end) - from_begin;
+    num_copy_global = tree_from_end - tree_from_begin + 1;
+    SC3A_CHECK (num_copy_global >= 0);
+    SC3A_CHECK (num_copy_global <= (p4est3_gloidx) P4EST3_LOCIDX_MAX);
+    num_copy = (p4est3_locidx) num_copy_global;
+    num_per_tree_send_buf[which_tree - p3->fltree] = num_copy;
+
+    if (to_proc == p3->mpirank) {
+      continue;
+    }
+    /* move pointer to beginning of quads that need to be copied */
+    my_begin += num_copy;
   }
   return NULL;
 }
@@ -209,7 +214,7 @@ sc3_error_t        *
 p4est3_partition (p4est3_t * p3)
 {
   /* at this stage we have a completely setup refined forest */
-  int i, p, from_proc, sk, mpiret;
+  int i, p, from_proc, sk, mpiret, to_proc;
   int nodesize, noderank, node_num;
   int *node_sizes, *node_offsets;
   int num_proc_recv_from, num_proc_send_to;
@@ -220,6 +225,7 @@ p4est3_partition (p4est3_t * p3)
   p4est3_locidx from_begin, from_end, to_begin, to_end;
   p4est3_locidx from_begin_global_quad, from_end_global_quad;
   p4est3_locidx to_begin_global_quad, to_end_global_quad;
+  p4est3_locidx *num_per_tree_send_buf;
   p4est3_locidx *num_send_to;
   p4est3_locidx *num_recv_from; /**< Numbers of quadrants coming from the i-th process */
   p4est3_locidx *num_per_tree_local;
@@ -312,8 +318,8 @@ p4est3_partition (p4est3_t * p3)
       last_goffsets[i] = p3->old->goffset[i + 1] - 1;
     }
     SC3E (p4est3_procs_recv_from
-          (p3, node_num, node_offsets, last_goffsets,
-            num_recv_from, &from_begin, &from_end, &num_proc_recv_from));
+          (p3, last_goffsets, num_recv_from,
+           &from_begin, &from_end, &num_proc_recv_from));
 
     from_begin_global_quad = from_begin;
     from_end_global_quad = from_end;
@@ -334,7 +340,7 @@ p4est3_partition (p4est3_t * p3)
           p3->gftree[from_proc + 1] - p3->gftree[from_proc] + 1;
         /* We are going to recv p4est3_tree::num_quads for each received tree,
            p4est3_tree::first_tquad for the first received tree and
-           p4est3_tree::last_tquad for the last received tee. */
+           p4est3_tree::last_tquad for the last received tree. */
         recv_size = num_recv_trees * sizeof (p4est3_locidx)
                     + 2 * sizeof (p4est3_gloidx);
         SC3E (sc3_allocator_malloc
@@ -370,8 +376,8 @@ p4est3_partition (p4est3_t * p3)
     memset (begin_send_to, -1, p3->mpisize * sizeof (p4est3_gloidx));
 #endif
     SC3E (p4est3_procs_send_to
-          (p3, node_num, node_offsets, new_last_goffsets, num_send_to,
-          begin_send_to, &to_begin, &to_end, &num_proc_send_to));
+          (p3, new_last_goffsets, num_send_to,
+           begin_send_to, &to_begin, &to_end, &num_proc_send_to));
 
     to_begin_global_quad = to_begin;
     to_end_global_quad = to_end;
