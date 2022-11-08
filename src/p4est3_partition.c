@@ -79,7 +79,7 @@ p4est3_translate_quadrant (const p4est3_quadrant_vtable_t * qvt_old,
 
 /* p4est3::goffsets should be updated before calling this function */
 static sc3_error_t *
-p4est3_procs_recv_from (const p4est3_t * p3, int node_num, int *node_offsets,
+p4est3_procs_recv_from (const p4est3_t * p3,
                         const p4est3_gloidx *last_goffsets,
                         p4est3_locidx *num_recv_from,
                         p4est3_locidx *from_begin, p4est3_locidx *from_end,
@@ -88,11 +88,8 @@ p4est3_procs_recv_from (const p4est3_t * p3, int node_num, int *node_offsets,
   int from_proc;
   p4est3_gloidx my_begin, my_end, lower_bound;
 
-  /* we limit the boundaries within one node so far */
-  my_begin = SC3_MAX (p3->goffset[p3->mpirank],
-                      p3->goffset[node_offsets[node_num]]);
-  my_end = SC3_MIN (p3->goffset[p3->mpirank + 1],
-                    p3->goffset[node_offsets[node_num + 1]]) - 1;
+  my_begin = p3->goffset[p3->mpirank];
+  my_end = p3->goffset[p3->mpirank + 1] - 1;
   *num_proc_recv_from = 0;
 
   if (my_begin > my_end) {
@@ -103,11 +100,6 @@ p4est3_procs_recv_from (const p4est3_t * p3, int node_num, int *node_offsets,
     SC3E (p4est3_find_partition
           (p3->alloc, p3->mpisize, last_goffsets,
            my_begin, my_end, from_begin, from_end));
-
-    /* this min and max only because we work within a node so far */
-    *from_begin = SC3_MAX (*from_begin, node_offsets[node_num]);
-    *from_end = SC3_MIN (*from_end, node_offsets[node_num + 1] - 1);
-
     for (from_proc = *from_begin; from_proc <= *from_end; ++from_proc) {
       lower_bound = p3->old->goffset[from_proc];
 
@@ -130,7 +122,7 @@ p4est3_procs_recv_from (const p4est3_t * p3, int node_num, int *node_offsets,
 
 /* p4est3::goffsets should be updated before calling this function */
 static sc3_error_t *
-p4est3_procs_send_to (const p4est3_t * p3, int node_num, int *node_offsets,
+p4est3_procs_send_to (const p4est3_t * p3,
                       const p4est3_gloidx *new_last_goffsets,
                       p4est3_locidx *num_send_to,
                       p4est3_gloidx *begin_send_to, p4est3_locidx *to_begin,
@@ -139,11 +131,8 @@ p4est3_procs_send_to (const p4est3_t * p3, int node_num, int *node_offsets,
   int to_proc;
   p4est3_gloidx my_begin, my_end, lower_bound;
 
-  /* we limit the boundaries within one node so far */
-  my_begin = SC3_MAX (p3->old->goffset[p3->mpirank],
-                      p3->old->goffset[node_offsets[node_num]]);
-  my_end = SC3_MIN (p3->old->goffset[p3->mpirank + 1],
-                    p3->old->goffset[node_offsets[node_num + 1]]) - 1;
+  my_begin = p3->old->goffset[p3->mpirank];
+  my_end = p3->old->goffset[p3->mpirank + 1] - 1;
   *num_proc_send_to = 0;
 
   if (my_begin > my_end) {
@@ -154,11 +143,6 @@ p4est3_procs_send_to (const p4est3_t * p3, int node_num, int *node_offsets,
   } else {
     p4est3_find_partition (p3->alloc, p3->mpisize, new_last_goffsets,
                            my_begin, my_end, to_begin, to_end);
-
-    /* this min and max only because we work within a node so far */
-    *to_begin = SC3_MAX (*to_begin, node_offsets[node_num]);
-    *to_end = SC3_MIN (*to_end, node_offsets[node_num + 1] - 1);
-
     for (to_proc = to_begin; to_proc <= to_end; ++to_proc) {
       /* I send to to_proc which may be empty */
       lower_bound = p3->goffset[to_proc];
