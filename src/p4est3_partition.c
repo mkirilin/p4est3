@@ -388,6 +388,9 @@ p4est3_partition (p4est3_t * p3)
     SC3E (p4est3_procs_recv_from
           (p3, last_goffsets, num_recv_from,
            &from_begin, &from_end, &num_proc_recv_from));
+
+    from_begin_global_quad = from_begin;
+    from_end_global_quad = from_end;
     /* Post receives for the trees */
 #ifdef P4EST_ENABLE_MPI
     SC3E (sc3_allocator_malloc (p3->alloc,
@@ -396,7 +399,8 @@ p4est3_partition (p4est3_t * p3)
 #endif
 
     /* Allocate space for receiving trees */
-    for (from_proc = from_begin, sk = 0; from_proc <= from_end; ++from_proc) {
+    for (from_proc = from_begin_global_quad, sk = 0
+         ; from_proc <= from_end_global_quad; ++from_proc) {
       if (from_proc != p3->mpirank && num_recv_from[from_proc]) {
         num_recv_trees =
           p3->gftree[from_proc + 1] - p3->gftree[from_proc] + 1;
@@ -422,6 +426,7 @@ p4est3_partition (p4est3_t * p3)
       recv_request[sk] = MPI_REQUEST_NULL;
     }
 #endif
+
     /* For each processor calculate the number of quadrants sent */
     for (i = 0; i < p3->mpisize; ++i) {
         new_last_goffsets[i] = p3->goffset[i + 1] - 1;
@@ -429,6 +434,8 @@ p4est3_partition (p4est3_t * p3)
     SC3E (p4est3_procs_send_to
           (p3, new_last_goffsets, num_send_to,
            begin_send_to, &to_begin, &to_end, &num_proc_send_to));
+    to_begin_global_quad = to_begin;
+    to_end_global_quad = to_end;
 
     /* Communicate the trees */
 #ifdef P4EST_ENABLE_MPI
@@ -441,7 +448,8 @@ p4est3_partition (p4est3_t * p3)
           (p3, begin_send_to, num_send_to,
            num_send_trees, p3->mpirank, num_per_tree_local));
 
-    for (to_proc = to_begin, sk = 0; to_proc <= to_end; ++to_proc) {
+    for (to_proc = to_begin_global_quad, sk = 0
+         ; to_proc <= to_end_global_quad; ++to_proc) {
       if (to_proc != p3->mpirank && num_send_to[to_proc]) {
         SC3E (sc3_allocator_malloc
               (p3->alloc, send_size, &send_buf[to_proc]));
