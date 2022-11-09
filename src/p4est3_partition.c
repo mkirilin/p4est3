@@ -239,6 +239,10 @@ p4est3_trees_send_to (const p4est3_t * p3, const p4est3_gloidx *begin_send_to,
                 tree_from_begin, tree_from_end, num_copy_global;
   p4est3_topidx which_tree;
   p4est3_tree_t *tree;
+  p4est3_gloidx *first_last_tquad
+    = (p4est3_gloidx *) (&num_per_tree_send_buf[num_send_trees]);
+  first_last_tquad[0] = -1;
+  first_last_tquad[1] = -1;
 
   /* Pack in the data to be sent */
   my_base = p3->old->goffset[p3->mpirank];
@@ -263,6 +267,12 @@ p4est3_trees_send_to (const p4est3_t * p3, const p4est3_gloidx *begin_send_to,
     SC3A_CHECK (num_copy_global <= (p4est3_gloidx) P4EST3_LOCIDX_MAX);
     num_copy = (p4est3_locidx) num_copy_global;
     num_per_tree_send_buf[which_tree - p3->fltree] = num_copy;
+    if (num_copy > 0) {
+      if (first_last_tquad[0] == -1) {
+        first_last_tquad[0] = tree->first_tquad;
+      }
+      first_last_tquad[1] = tree->last_tquad;
+    }
 
     if (to_proc == p3->mpirank) {
       continue;
@@ -454,6 +464,7 @@ p4est3_partition (p4est3_t * p3)
         SC3E (sc3_allocator_malloc
               (p3->alloc, send_size, &send_buf[to_proc]));
         num_per_tree_send_buf = (p4est3_locidx *) send_buf[to_proc];
+        memset (num_per_tree_send_buf, 0, send_size);
         SC3E (p4est3_trees_send_to
               (p3, begin_send_to, num_send_to,
                num_send_trees, to_proc, num_per_tree_send_buf));
