@@ -83,6 +83,7 @@ p4est3_partition_allocations (const p4est3_t * p3,
                               p4est3_locidx ** pnum_recv_from,
                               p4est3_locidx ** pnum_send_to,
                               p4est3_locidx ** pnum_per_tree_local,
+                              p4est3_locidx ** pnew_local_tree_elem_count,
                               p4est3_gloidx ** plast_goffsets,
                               p4est3_gloidx ** pbegin_send_to,
                               p4est3_gloidx ** pnew_last_goffsets)
@@ -92,6 +93,9 @@ p4est3_partition_allocations (const p4est3_t * p3,
   char ** char_pprt;
   p4est3_locidx * locidx_prt;
   p4est3_gloidx * gloidx_prt;
+  p4est3_topidx total_num_trees;
+
+  SC3E (p4est3_connectivity_get_num_trees (p3->conn, &total_num_trees));
 
   SC3E_RETVAL (char_pprt, NULL);
   SC3E (sc3_allocator_malloc
@@ -117,6 +121,11 @@ p4est3_partition_allocations (const p4est3_t * p3,
   SC3E (sc3_allocator_malloc
         (p3->alloc, num_send_trees * sizeof (p4est3_locidx), &locidx_prt));
   *pnum_per_tree_local = locidx_prt;
+
+  SC3E_RETVAL (locidx_prt, NULL);
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, total_num_trees * sizeof (p4est3_locidx), &locidx_prt));
+  *pnew_local_tree_elem_count = locidx_prt;
 
   SC3E_RETVAL (gloidx_prt, NULL);
   SC3E (sc3_allocator_malloc
@@ -283,6 +292,71 @@ p4est3_trees_send_to (const p4est3_t * p3, const p4est3_gloidx *begin_send_to,
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_trees_new_boundaries (const p4est3_t * p3,
+                             const p4est3_locidx * num_recv_from,
+                             const p4est3_locidx * num_per_tree_local,
+                             const char ** recv_buf,
+                             p4est3_gloidx from_begin_global_quad,
+                             p4est3_gloidx from_end_global_quad,
+                             p4est3_locidx * new_local_tree_elem_count)
+{
+  int from_proc;
+  p4est3_locidx * num_per_tree_recv_buf;
+  p4est3_topidx first_from_tree, last_from_tree, num_recv_trees, it,
+                from_tree, new_first_local_tree, new_last_local_tree;
+
+#ifdef P4EST_ENABLE_DEBUG
+  p4est3_topidx total_num_trees;
+  SC3E (p4est3_connectivity_get_num_trees (p3->conn, &total_num_trees));
+#endif
+
+  new_first_local_tree = (p4est3_topidx) P4EST3_TOPIDX_MAX;
+  new_last_local_tree = 0;
+
+  for (from_proc = from_begin_global_quad; from_proc <= from_end_global_quad;
+       ++from_proc) {
+    SC3A_CHECK (num_recv_from[from_proc] >= 0);
+    if (num_recv_from[from_proc] == 0) {
+      continue;
+    }
+    first_from_tree = p3->gftree[from_proc];
+    last_from_tree = p3->gftree[from_proc + 1];
+    num_recv_trees = last_from_tree - first_from_tree + (p4est3_topidx) 1;
+
+    num_per_tree_recv_buf = (from_proc == p3->mpirank) ?
+      num_per_tree_local : (p4est3_locidx *) recv_buf[from_proc];
+
+    for (it = 0; it < num_recv_trees; ++it) {
+
+      if (num_per_tree_recv_buf[it] <= 0) {
+        continue;
+      }
+      from_tree = first_from_tree + it;
+
+      SC3A_CHECK (from_tree >= 0 && from_tree < total_num_trees);
+      P4EST_LDEBUGF ("partition recv %lld [%lld,%lld] quadrants"
+                      " from tree %lld from proc %d\n",
+                      (long long) num_per_tree_recv_buf[it],
+                      (long long) new_local_tree_elem_count[from_tree],
+                      (long long) new_local_tree_elem_count[from_tree]
+                      + num_per_tree_recv_buf[it], (long long) from_tree,
+                      from_proc);
+      new_first_local_tree = SC3_MIN (new_first_local_tree, from_tree);
+      new_last_local_tree = SC3_MAX (new_last_local_tree, from_tree);
+      new_local_tree_elem_count[from_tree] += num_per_tree_recv_buf[it];
+    }
+  }
+  if (new_first_local_tree > new_last_local_tree) {
+    new_first_local_tree = -1;
+    new_last_local_tree = -2;
+  }
+  P4EST_VERBOSEF ("partition new forest [%lld,%lld]\n",
+                  (long long) new_first_local_tree,
+                  (long long) new_last_local_tree);
+  return NULL;
+}
+
 sc3_error_t        *
 p4est3_partition (p4est3_t * p3)
 {
@@ -305,7 +379,7 @@ p4est3_partition (p4est3_t * p3)
   p4est3_locidx from_begin, from_end, to_begin, to_end;
   p4est3_locidx from_begin_global_quad, from_end_global_quad;
   p4est3_locidx to_begin_global_quad, to_end_global_quad;
-  p4est3_locidx *num_per_tree_send_buf;
+  p4est3_locidx *num_per_tree_send_buf, *new_local_tree_elem_count;
   p4est3_locidx *num_send_to;
   p4est3_locidx *num_recv_from; /**< Numbers of quadrants coming from the i-th process */
   p4est3_locidx *num_per_tree_local;
@@ -389,8 +463,8 @@ p4est3_partition (p4est3_t * p3)
     /* Adjust trees partition information of the forest */
     SC3E (p4est3_partition_allocations
           (p3, &recv_buf, &send_buf, &num_recv_from, &num_send_to,
-           &num_per_tree_local, &last_goffsets, &begin_send_to,
-           &new_last_goffsets));
+           &num_per_tree_local, &new_local_tree_elem_count, &last_goffsets,
+           &begin_send_to, &new_last_goffsets));
 
     for (i = 0; i < p3->mpisize; ++i) {
       last_goffsets[i] = p3->old->goffset[i + 1] - 1;
@@ -478,14 +552,19 @@ p4est3_partition (p4est3_t * p3)
       }
     }
 #ifdef P4EST_ENABLE_MPI
-  for (; sk < num_proc_send_to; ++sk) {
-    send_request[sk] = MPI_REQUEST_NULL;
-  }
-  /* Fill in forest */
-  mpiret =
-    MPI_Waitall (num_proc_recv_from, recv_request, MPI_STATUSES_IGNORE);
-    SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
+    for (; sk < num_proc_send_to; ++sk) {
+      send_request[sk] = MPI_REQUEST_NULL;
+    }
+    /* Fill in forest */
+    mpiret =
+      MPI_Waitall (num_proc_recv_from, recv_request, MPI_STATUSES_IGNORE);
+      SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
+    /* Calculate the local index of the end of each tree in the repartition */
+    SC3E (p4est3_trees_new_boundaries (p3, num_recv_from, num_per_tree_local,
+                                       recv_buf, from_begin_global_quad,
+                                       from_end_global_quad,
+                                       new_local_tree_elem_count));
   }
 
 }
