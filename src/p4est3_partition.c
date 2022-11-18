@@ -86,9 +86,7 @@ p4est3_partition_allocations (const p4est3_t * p3,
                               p4est3_locidx ** pnew_local_tree_elem_count,
                               p4est3_gloidx ** plast_goffsets,
                               p4est3_gloidx ** pbegin_send_to,
-                              p4est3_gloidx ** pnew_last_goffsets,
-                              p4est3_gloidx ** pproc_first_tquad,
-                              p4est3_gloidx ** pproc_last_tquad)
+                              p4est3_gloidx ** pnew_last_goffsets)
 {
   const p4est3_topidx num_send_trees
     = p3->gftree[p3->mpirank + 1] - p3->gftree[p3->mpirank] + 1;
@@ -147,16 +145,6 @@ p4est3_partition_allocations (const p4est3_t * p3,
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
   *pnew_last_goffsets = gloidx_prt;
-
-  SC3E_RETVAL (gloidx_prt, NULL);
-  SC3E (sc3_allocator_calloc
-        (p3->alloc, p3->mpisize, sizeof (p4est3_gloidx), &gloidx_prt));
-  *pproc_first_tquad = gloidx_prt;
-
-  SC3E_RETVAL (gloidx_prt, NULL);
-  SC3E (sc3_allocator_calloc
-        (p3->alloc, p3->mpisize, sizeof (p4est3_gloidx), &gloidx_prt));
-  *pproc_last_tquad = gloidx_prt;
 
   return NULL;
 }
@@ -312,21 +300,25 @@ p4est3_trees_new_boundaries (const p4est3_t * p3,
                              p4est3_gloidx from_begin_global_quad,
                              p4est3_gloidx from_end_global_quad,
                              p4est3_locidx * new_local_tree_elem_count,
-                             p4est3_gloidx * proc_first_tquad,
-                             p4est3_gloidx * proc_last_tquad)
+                             p4est3_gloidx * new_first_tquad,
+                             p4est3_gloidx * new_last_tquad,
+                             p4est3_topidx * new_first_local_tree,
+                             p4est3_topidx * new_last_local_tree)
 {
   int from_proc;
   p4est3_locidx * num_per_tree_recv_buf;
-  p4est3_topidx first_from_tree, last_from_tree, num_recv_trees, it,
-                from_tree, new_first_local_tree, new_last_local_tree;
+  p4est3_topidx first_from_tree, last_from_tree,
+                num_recv_trees, it, from_tree;
 
 #ifdef P4EST_ENABLE_DEBUG
   p4est3_topidx total_num_trees;
   SC3E (p4est3_connectivity_get_num_trees (p3->conn, &total_num_trees));
 #endif
 
-  new_first_local_tree = (p4est3_topidx) P4EST3_TOPIDX_MAX;
-  new_last_local_tree = 0;
+  SC3E_RETVAL (new_first_tquad, -1);
+  SC3E_RETVAL (new_last_tquad, -1);
+  SC3E_RETVAL (new_first_local_tree, (p4est3_topidx) P4EST3_TOPIDX_MAX);
+  SC3E_RETVAL (new_last_local_tree, 0);
 
   for (from_proc = from_begin_global_quad; from_proc <= from_end_global_quad;
        ++from_proc) {
@@ -356,20 +348,80 @@ p4est3_trees_new_boundaries (const p4est3_t * p3,
                       (long long) new_local_tree_elem_count[from_tree]
                       + num_per_tree_recv_buf[it], (long long) from_tree,
                       from_proc);
-      new_first_local_tree = SC3_MIN (new_first_local_tree, from_tree);
-      new_last_local_tree = SC3_MAX (new_last_local_tree, from_tree);
+      *new_first_local_tree = SC3_MIN (*new_first_local_tree, from_tree);
+      *new_last_local_tree = SC3_MAX (*new_last_local_tree, from_tree);
       new_local_tree_elem_count[from_tree] += num_per_tree_recv_buf[it];
     }
-    proc_first_tquad[from_proc] = num_per_tree_recv_buf[num_recv_trees];
-    proc_last_tquad[from_proc] = num_per_tree_recv_buf[num_recv_trees + 1];
+    if (*new_first_tquad == -1) {
+      *new_first_tquad = num_per_tree_recv_buf[num_recv_trees];
+    }
+    *new_last_tquad = num_per_tree_recv_buf[num_recv_trees + 1];
   }
-  if (new_first_local_tree > new_last_local_tree) {
-    new_first_local_tree = -1;
-    new_last_local_tree = -2;
+  if (*new_first_local_tree > *new_last_local_tree) {
+    *new_first_local_tree = -1;
+    *new_last_local_tree = -2;
   }
   P4EST_VERBOSEF ("partition new forest [%lld,%lld]\n",
-                  (long long) new_first_local_tree,
-                  (long long) new_last_local_tree);
+                  (long long) *new_first_local_tree,
+                  (long long) *new_last_local_tree);
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_trees_local_reproduce (const p4est3_locidx * num_send_to,
+                              const p4est3_locidx * new_local_tree_elem_count,
+                              p4est3_t * p3,
+                              p4est3_topidx new_first_local_tree,
+                              p4est3_topidx new_last_local_tree,
+                              p4est3_gloidx new_first_tquad,
+                              p4est3_gloidx new_last_tquad)
+{
+  p4est3_topidx tt;
+  sc3_array_t *trees;
+  p4est3_tree_t *tree, *prev_tree;
+
+  SC3E (p4est3_part_array_new
+    (p3->alloc, sizeof (p4est3_tree_t), p3->nltrees, p3->nltrees, &trees));
+  SC3E (sc3_array_unref (&p3->trees));
+  p3->trees = trees;
+  p3->fltree = new_first_local_tree;
+  p3->lltree = new_last_local_tree;
+  p3->nltrees = p3->lltree - p3->fltree + 1;
+
+  if (p3->nltrees == 0) {
+    return NULL;
+  }
+  /* process the 0-th local tree */
+  SC3E (p4est3_tree_index (p3, 0, &tree));
+  tree->treeid = p3->fltree;
+  tree->num_quads = new_local_tree_elem_count[p3->fltree];
+  tree->first_tquad = new_first_tquad;
+  tree->end_tquad = new_first_tquad + tree->num_quads;
+  tree->last_tquad = tree->end_tquad - 1;
+  tree->quad_offset = 0;
+  tree->tquads = p3->quads;
+  /* processing middle trees */
+  for (tt = 1, prev_tree = tree; tt < p3->nltrees - 1
+    ; ++tt, prev_tree = tree) {
+    SC3E (p4est3_tree_index (p3, tt, &tree));
+    tree->treeid = p3->fltree + tt;
+    tree->num_quads = new_local_tree_elem_count[p3->fltree + tt];
+    tree->first_tquad = 0;
+    tree->end_tquad = tree->num_quads;
+    tree->last_tquad = tree->end_tquad - 1;
+    tree->quad_offset = prev_tree->quad_offset + prev_tree->num_quads;
+    tree->tquads = p3->quads + p3->qsize * tree->quad_offset;
+  }
+  /* processing the last tree */
+  SC3E (p4est3_tree_index (p3, p3->nltrees - 1, &tree));
+  tree->treeid = p3->lltree;
+  tree->num_quads = new_local_tree_elem_count[p3->lltree];
+  tree->end_tquad = new_last_tquad;
+  tree->last_tquad = new_last_tquad - 1;
+  tree->first_tquad = tree->end_tquad - tree->num_quads;
+  tree->quad_offset = prev_tree->quad_offset + prev_tree->quad_offset;
+  tree->tquads = p3->quads + p3->qsize * tree->quad_offset;
+
   return NULL;
 }
 
@@ -392,6 +444,7 @@ p4est3_partition (p4est3_t * p3)
   char **recv_buf, **send_buf;
   int32_t            *coords;
   p4est3_topidx num_recv_trees;
+  p4est3_topidx new_first_local_tree, new_last_local_tree;
   p4est3_locidx from_begin, from_end, to_begin, to_end;
   p4est3_locidx from_begin_global_quad, from_end_global_quad;
   p4est3_locidx to_begin_global_quad, to_end_global_quad;
@@ -405,6 +458,7 @@ p4est3_partition (p4est3_t * p3)
   p4est3_gloidx *proc_first_tquad, *proc_last_tquad;
   p4est3_gloidx        prev_quadrant, next_quadrant, qcount_node;
   p4est3_gloidx        new_right_border, new_left_border;
+  p4est3_gloidx new_first_tquad, new_last_tquad;
   p4est3_gloidx *last_goffsets, *new_last_goffsets; /**< Offsets of last quadrant in a process */
   size_t recv_size;
   sc3_MPI_Comm_t nodecomm;
@@ -481,8 +535,7 @@ p4est3_partition (p4est3_t * p3)
     SC3E (p4est3_partition_allocations
           (p3, &recv_buf, &send_buf, &num_recv_from, &num_send_to,
            &num_per_tree_local, &new_local_tree_elem_count, &last_goffsets,
-           &begin_send_to, &new_last_goffsets, &proc_first_tquad,
-           &proc_last_tquad));
+           &begin_send_to, &new_last_goffsets));
 
     for (i = 0; i < p3->mpisize; ++i) {
       last_goffsets[i] = p3->old->goffset[i + 1] - 1;
@@ -582,9 +635,16 @@ p4est3_partition (p4est3_t * p3)
     SC3E (p4est3_trees_new_boundaries (p3, num_recv_from, num_per_tree_local,
                                        recv_buf, from_begin_global_quad,
                                        from_end_global_quad,
-                                       new_local_tree_elem_count));
-  }
+                                       new_local_tree_elem_count,
+                                       &new_first_tquad, &new_last_tquad,
+                                       &new_first_local_tree,
+                                       &new_last_local_tree));
+    /* Restore local trees */
+    SC3E (p4est3_trees_local_reproduce
+          (num_send_to, new_local_tree_elem_count, p3, new_first_local_tree,
+           new_last_local_tree, new_first_tquad, new_last_tquad));
 
+  }
 }
 
 #ifdef __cplusplus
