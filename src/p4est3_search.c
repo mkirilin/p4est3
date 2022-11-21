@@ -94,7 +94,7 @@ p4est3_find_partition (const sc3_allocator_t * alloc,
   p4est3_gloidx        my_begin_end[2];
 
   SC3A_CHECK (my_begin <= my_end);
-  SC3E (p4est3_search_array_new (alloc, sizeof (int), 3, 3, &offsets));
+  SC3E (p4est3_search_array_new (alloc, sizeof (int), 0, 0, &offsets));
   SC3E (sc3_array_new_data (alloc, &view, search_in,
                             sizeof (p4est3_gloidx), 0, num_entities));
 
