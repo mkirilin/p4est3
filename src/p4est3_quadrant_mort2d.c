@@ -70,14 +70,13 @@ p4est3_quadrant_mort_is_valid (const p4est3_quadrant_mort_t * q, char *reason)
 
 static sc3_error_t *
 p4est3_quadrant_mort_coords (const p4est3_quadrant_mort_t * q,
-                             int n, p4est_qcoord_t * coords)
+                             p4est_qcoord_t * coords)
 {
   const int           level = P4EST3_MORT_EXT_LEVEL (*q);
   int                 i, forward, backward;
   int                 d = P4EST3_REF_MAXLEVEL - P4EST3_MORT_MAXLEVEL;
 
   SC3A_IS (p4est3_quadrant_mort_is_valid, q);
-  SC3A_CHECK (n == P4EST_DIM);
   SC3A_CHECK (d >= 0);
 
   coords[0] = 0;
@@ -682,7 +681,7 @@ static const p4est3_quadrant_vtable_t quadrant_vtable_mort =
   (p4est3_quadrant_level_t) p4est3_quadrant_mort_level,
   (p4est3_quadrant_child_id_t) p4est3_quadrant_mort_child_id,
   (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_mort_ancestor_id,
-  (p4est3_quadrant_in_i_out_t) p4est3_quadrant_mort_coords,
+  (p4est3_quadrant_in_out_t) p4est3_quadrant_mort_coords,
   (p4est3_quadrant_linear_id_t) p4est3_quadrant_mort_linear_id,
   (p4est3_quadrant_get_tree_boundary_t) p4est3_quadrant_mort_get_tree_boundary,
   (p4est3_quadrant_tree_boundaries_t) p4est3_quadrant_mort_tree_boundaries,

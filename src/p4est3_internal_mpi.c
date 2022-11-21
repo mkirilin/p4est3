@@ -768,7 +768,7 @@ p4est3_internal_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
   }
   else {
     SC3A_CHECK (level <= qvt_new->max_level);
-    SC3E (p4est3_quadrant_coordinates (qvt_old, qin, qvt_old->dim, c));
+    SC3E (p4est3_quadrant_coordinates (qvt_old, qin, c));
     SC3E (p4est3_quadrant_quadrant (qvt_new, c, level, qout));
   }
 

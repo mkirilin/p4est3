@@ -195,7 +195,7 @@ typedef struct p4est3_quadrant_vtable
   p4est3_quadrant_level_t quadrant_level;               /**< Query the level. */
   p4est3_quadrant_child_id_t quadrant_child_id;         /**< Query child id. */
   p4est3_quadrant_ancestor_id_t quadrant_ancestor_id;   /**< Query ancestor id. */
-  p4est3_quadrant_in_i_out_t quadrant_coordinates;      /**< Query coordinates. */
+  p4est3_quadrant_in_out_t quadrant_coordinates;        /**< Query coordinates. */
   p4est3_quadrant_linear_id_t quadrant_linear_id;       /**< Query Morton index. */
 
   /** Query tree boundary in a specific direction. */
@@ -372,14 +372,12 @@ sc3_error_t        *p4est3_quadrant_ancestor_id (const p4est3_quadrant_vtable_t 
  * with a maximum level equal to P4EST_MAXLEVEL.
  * \param [in] qvt      Valid virtual quadrant table.
  * \param [in] q        Valid quadrant in this implementation.
- * \param [in] n        Number of coordinates must match the dimension of \a qvt.
- * \param [out] j       Output array of \a n coordinates.
+ * \param [out] j       Output array of \a P4EST_DIM coordinates.
  *                      We assume that the number of bits in an int suffices.
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_quadrant_coordinates (const p4est3_quadrant_vtable_t *
-                                                 qvt, const void *q, int n,
-                                                 void *j);
+                                                 qvt, const void *q, void *j);
 
 /** Construct a quadrant assigning its coordinates and level.
  * \param [in] qvt      Valid virtual quadrant table.

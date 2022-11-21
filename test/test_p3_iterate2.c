@@ -411,7 +411,7 @@ iterate_unimesh_inner_face_compl (setup_t * t,
     start_id + nquads_per_next_level / (p4est3_gloidx) num_children;
 
   SC3E (p4est3_quadrant_morton (qvt, t->level, bound_id - 1, q));
-  SC3E (p4est3_quadrant_coordinates (qvt, q, qvt->dim, bound_coords));
+  SC3E (p4est3_quadrant_coordinates (qvt, q, bound_coords));
   for (face = 0; face < nfaces; ++face) {
     SC3E (p4est3_quadrant_morton (qvt, t->level, start_ids[face], r));
     if (qvt->dim == 2) {
@@ -425,7 +425,7 @@ iterate_unimesh_inner_face_compl (setup_t * t,
       face_neighbor_predef = nface_predef_3d[face][1];
     }
     for (i = 0; i < nquads_per_level - 1; ++i) {
-      SC3E (p4est3_quadrant_coordinates (qvt, r, qvt->dim, coords));
+      SC3E (p4est3_quadrant_coordinates (qvt, r, coords));
       if (coords[bound_dir] == bound_coords[bound_dir]) {
         SC3E (fill_face_info (fpredef, start_ids[face] + i,
                               face_predef, face_neighbor_predef,
@@ -434,7 +434,7 @@ iterate_unimesh_inner_face_compl (setup_t * t,
       }
       SC3E (p4est3_quadrant_successor (qvt, r, r));
     }
-    SC3E (p4est3_quadrant_coordinates (qvt, r, qvt->dim, coords));
+    SC3E (p4est3_quadrant_coordinates (qvt, r, coords));
     if (coords[bound_dir] == bound_coords[bound_dir]) {
       SC3E (fill_face_info (fpredef, start_ids[face] + nquads_per_level - 1,
                             face_predef, face_neighbor_predef,
@@ -624,9 +624,9 @@ compare_results (setup_t * t, p4est3_t * p3,
 
 #ifdef P4EST_ENABLE_DEBUG
     SC3E (p4est3_quadrant_coordinates
-          (qvt, vit_out->quadrant, qvt->dim, out_coord));
+          (qvt, vit_out->quadrant, out_coord));
     SC3E (p4est3_quadrant_coordinates
-          (qvt, vit_pre->quadrant, qvt->dim, pre_coord));
+          (qvt, vit_pre->quadrant, pre_coord));
     SC3E (p4est3_quadrant_level (qvt, vit_out->quadrant, &out_l));
     SC3E (p4est3_quadrant_level (qvt, vit_pre->quadrant, &pre_l));
 #endif
