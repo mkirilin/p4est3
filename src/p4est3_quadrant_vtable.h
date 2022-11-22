@@ -385,9 +385,22 @@ sc3_error_t        *p4est3_quadrant_coordinates (const p4est3_quadrant_vtable_t 
  *                      for quadrant coordinates.
  * \param [in] l        Desired level of the quadrant.
  * \param [in] q        Constructed quadrant is placed here.
+ * \return              NULL on success, error object otherwise.
 */
 sc3_error_t        *p4est3_quadrant_quadrant (const p4est3_quadrant_vtable_t * qvt,
                                               const void *c, int l, void *q);
+
+/** Translate a quadrant from one representation to another.
+ * \param [in] vtold    Valid virtual table of the quadrant to translate.
+ * \param [in] qin      Valid quadrant to translate.
+ * \param [in] vtnew    Valid virtual table of target quadrant representation.
+ * \param [out] qout    Translated quadrant is plased here.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_quadrant_translate (const p4est3_quadrant_vtable_t * vtold,
+                                               const void *qin,
+                                               const p4est3_quadrant_vtable_t * vtnew,
+                                               void *qout);
 
 /** Compare two quadrants by linear index.
  * \param [in] qvt      Valid virtual quadrant table.

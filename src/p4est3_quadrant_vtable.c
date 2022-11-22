@@ -205,6 +205,38 @@ p4est3_quadrant_quadrant (const p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
+p4est3_quadrant_translate (const p4est3_quadrant_vtable_t * vtold,
+                           const void *qin,
+                           const p4est3_quadrant_vtable_t * vtnew,
+                           void *qout)
+{
+  int                 level;
+  int32_t             c[3] = {-1, -1, -1};
+
+  SC3A_CHECK (vtold != NULL && vtnew != NULL);
+  SC3A_CHECK (vtold->quadrant_is_valid != NULL);
+  SC3A_IS (vtold->quadrant_is_valid, qin);
+  SC3A_CHECK (vtold->dim == vtnew->dim);
+
+  if (vtold == vtnew) {
+    /* just hardcopy the quadrant */
+    SC3A_CHECK (vtold->quadrant_copy != NULL);
+    SC3E (vtold->quadrant_copy(qin, qout));
+  }
+  else {
+    SC3A_CHECK (vtold->quadrant_level != NULL);
+    SC3E (vtold->quadrant_level(qin, &level));
+    SC3A_CHECK (level <= vtnew->max_level);
+    SC3A_CHECK (vtold->quadrant_coordinates != NULL
+                && vtnew->quadrant_quadrant != NULL);
+    SC3E (vtold->quadrant_coordinates(qin, c));
+    SC3E (vtnew->quadrant_quadrant(c, level, qout));
+  }
+  SC3A_IS (vtnew->quadrant_is_valid, qout);
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_quadrant_compare (const p4est3_quadrant_vtable_t * qvt,
                          const void *q1, const void *q2, int *j)
 {
