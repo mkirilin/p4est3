@@ -52,33 +52,6 @@ p4est3_part_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 }
 
 static sc3_error_t *
-p4est3_translate_quadrant (const p4est3_quadrant_vtable_t * qvt_old,
-                           const p4est3_quadrant_vtable_t * qvt_new,
-                           const void *qin, void *qout, int32_t * c)
-{
-  int                 level;
-
-  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_old);
-  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_new);
-  SC3A_IS2 (p4est3_quadrant_vtable_is2_valid, qvt_old, qin);
-  SC3A_CHECK (qvt_old->dim == qvt_new->dim);
-
-  if (qvt_old == qvt_new) {
-    /* just hardcopy the quadrant */
-    SC3E (p4est3_quadrant_copy (qvt_old, qin, qout));
-  }
-  else {
-    SC3E (p4est3_quadrant_level (qvt_old, qin, &level));
-    SC3A_CHECK (level <= qvt_new->max_level);
-    SC3E (p4est3_quadrant_coordinates (qvt_old, qin, qvt_old->dim, c));
-    SC3E (p4est3_quadrant_quadrant (qvt_new, c, level, qout));
-  }
-
-  SC3A_IS2 (p4est3_quadrant_vtable_is2_valid, qvt_new, qout);
-  return NULL;
-}
-
-static sc3_error_t *
 p4est3_partition_allocations (const p4est3_t * p3,
                               char ***precv_buf, char ***psend_buf,
                               p4est3_locidx ** pnum_recv_from,
@@ -441,7 +414,6 @@ p4est3_partition (p4est3_t * p3)
   int *node_offsets;
   int num_proc_recv_from, num_proc_send_to;
   char **recv_buf, **send_buf;
-  int32_t            *coords;
   p4est3_topidx num_recv_trees;
   p4est3_topidx new_first_local_tree, new_last_local_tree;
   p4est3_locidx from_begin_global_quad, from_end_global_quad;
@@ -515,13 +487,11 @@ p4est3_partition (p4est3_t * p3)
            p3->qmaxlevel, p3->gfpos + p3->mpirank * p3->qsize));
 
     if (noderank == 0) {
-      SC3E (sc3_allocator_calloc
-            (p3->alloc, p3->qvt->dim, sizeof (int32_t), &coords));
-      SC3E (p4est3_translate_quadrant
-            (p3->old->qvt, p3->qvt,
+      SC3E (p4est3_quadrant_translate
+            (p3->old->qvt,
              p3->old->gfpos + node_offsets[node_num + 1] * p3->old->qsize,
-             p3->gfpos + node_offsets[node_num + 1] * p3->qsize, coords));
-      SC3E (sc3_allocator_free (p3->alloc, coords));
+             p3->qvt,
+             p3->gfpos + node_offsets[node_num + 1] * p3->qsize));
     } else {
       p3->nodequads[noderank] = p3->nodequads[0] + p3->qsize * new_left_border;
     }
