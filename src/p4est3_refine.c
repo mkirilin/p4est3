@@ -250,36 +250,8 @@ p4est3_refine_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
 }
 
 static sc3_error_t *
-p4est3_translate_quadrant (const p4est3_quadrant_vtable_t * qvt_old,
-                           const p4est3_quadrant_vtable_t * qvt_new,
-                           const void *qin, void *qout, int32_t * c)
-{
-  int                 level;
-
-  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_old);
-  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_new);
-  SC3A_IS2 (p4est3_quadrant_vtable_is2_valid, qvt_old, qin);
-  SC3A_CHECK (qvt_old->dim == qvt_new->dim);
-
-  if (qvt_old == qvt_new) {
-    /* just hardcopy the quadrant */
-    SC3E (p4est3_quadrant_copy (qvt_old, qin, qout));
-  }
-  else {
-    SC3E (p4est3_quadrant_level (qvt_old, qin, &level));
-    SC3A_CHECK (level <= qvt_new->max_level);
-    SC3E (p4est3_quadrant_coordinates (qvt_old, qin, qvt_old->dim, c));
-    SC3E (p4est3_quadrant_quadrant (qvt_new, c, level, qout));
-  }
-
-  SC3A_IS2 (p4est3_quadrant_vtable_is2_valid, qvt_new, qout);
-  return NULL;
-}
-
-static sc3_error_t *
 p4est3_pattern_populate_tree_ref_coar (p4est3_t * p3, p4est3_tree_t * tree,
-                                       sc3_array_t * pattern, int *lt_offset,
-                                       int32_t * c)
+                                       sc3_array_t * pattern, int *lt_offset)
 {
   int                 i = 0, nch, n_new_quads = 0;
   char               *n_insert;
@@ -294,22 +266,22 @@ p4est3_pattern_populate_tree_ref_coar (p4est3_t * p3, p4est3_tree_t * tree,
     quad_old = (void *) (oldtree->tquads + i * p3->old->qsize);
     if ((int) *n_insert == 0) {
       quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
-      SC3E (p4est3_translate_quadrant
-            (p3->old->qvt, p3->qvt, quad_old, quad_new, c));
+      SC3E (p4est3_quadrant_translate
+            (p3->old->qvt,quad_old, p3->qvt, quad_new));
       n_new_quads++;
       i++;
     }
     else if ((int) *n_insert == 1) {
-      SC3E (p4est3_translate_quadrant
-            (p3->old->qvt, p3->qvt, quad_old, p3->temp_quad[0], c));
+      SC3E (p4est3_quadrant_translate
+            (p3->old->qvt, quad_old, p3->qvt, p3->temp_quad[0]));
       quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
       SC3E (p4est3_quadrant_parent (p3->qvt, p3->temp_quad[0], quad_new));
       n_new_quads++;
       i += p3->num_children;
     }
     else {
-      SC3E (p4est3_translate_quadrant
-            (p3->old->qvt, p3->qvt, quad_old, p3->temp_quad[0], c));
+      SC3E (p4est3_quadrant_translate
+            (p3->old->qvt, quad_old, p3->qvt, p3->temp_quad[0]));
       for (nch = 0; nch < p3->num_children; ++nch) {
         quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
         SC3E (p4est3_quadrant_child
@@ -325,7 +297,7 @@ p4est3_pattern_populate_tree_ref_coar (p4est3_t * p3, p4est3_tree_t * tree,
 
 static sc3_error_t *
 p4est3_populate_tree_cpy (p4est3_t * p3, p4est3_tree_t * tree,
-                          int *lt_offset, int32_t * c)
+                          int *lt_offset)
 {
   int                 i;
   void               *quad_old, *quad_new;
@@ -335,8 +307,8 @@ p4est3_populate_tree_cpy (p4est3_t * p3, p4est3_tree_t * tree,
   for (i = 0; i < oldtree->num_quads; ++i) {
     quad_old = (void *) (oldtree->tquads + i * p3->old->qsize);
     quad_new = (void *) (tree->tquads + i * p3->qsize);
-    SC3E (p4est3_translate_quadrant
-          (p3->old->qvt, p3->qvt, quad_old, quad_new, c));
+    SC3E (p4est3_quadrant_translate
+          (p3->old->qvt, quad_old, p3->qvt, quad_new));
   }
   *lt_offset += oldtree->num_quads;
   return NULL;
@@ -349,7 +321,6 @@ p4est3_fill_from_source (p4est3_t * p3)
   int                 dispunit;
   int                 noderank;
   char               *quadmem, *nqmem;
-  int32_t            *coords;
   p4est3_locidx       lt_offset, num_quads = 0;
   p4est3_locidx      *local_num_quads;  /**< Array of the numbers of quadrants at every rank */
   p4est3_locidx      *first_tree_quads; /**< Array of the numbers of quadrants at the first local tree */
@@ -463,8 +434,6 @@ p4est3_fill_from_source (p4est3_t * p3)
      and set p4est3_tree_t:: treeid, quad_offset and num_quads.
      We also initialize p4est3_tree_t::first_tquad by 0.
      We work on the process-local window onto the quadrants */
-  SC3E (sc3_allocator_calloc
-        (p3->alloc, p3->qvt->dim, sizeof (int32_t), &coords));
   lt_offset = 0;
   for (i = p3->fltree; i <= p3->lltree; ++i) {
     SC3E (p4est3_tree_index (p3, i, &tree));
@@ -473,11 +442,11 @@ p4est3_fill_from_source (p4est3_t * p3)
     tree->tquads = p3->quads + p3->qsize * tree->quad_offset;
     if (p3->crefine != NULL || p3->ccoarse != NULL) {
       SC3E (p4est3_pattern_populate_tree_ref_coar
-            (p3, tree, pattern, &lt_offset, coords));
+            (p3, tree, pattern, &lt_offset));
     }
     else {
       /*simply copying */
-      SC3E (p4est3_populate_tree_cpy (p3, tree, &lt_offset, coords));
+      SC3E (p4est3_populate_tree_cpy (p3, tree, &lt_offset));
     }
     tree->num_quads = lt_offset - tree->quad_offset;
     tree->first_tquad = 0;
@@ -523,7 +492,6 @@ p4est3_fill_from_source (p4est3_t * p3)
   SC3E (sc3_array_destroy (&pattern));
   SC3E (sc3_allocator_free (p3->alloc, local_num_quads));
   SC3E (sc3_allocator_free (p3->alloc, first_tree_quads));
-  SC3E (sc3_allocator_free (p3->alloc, coords));
   if (p3->ccoarse != NULL) {
     SC3E (sc3_array_destroy (&family));
   }

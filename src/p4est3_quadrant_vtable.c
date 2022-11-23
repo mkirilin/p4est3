@@ -188,10 +188,10 @@ p4est3_quadrant_ancestor_id (const p4est3_quadrant_vtable_t * qvt,
 
 sc3_error_t        *
 p4est3_quadrant_coordinates (const p4est3_quadrant_vtable_t * qvt,
-                             const void *q, int n, void *j)
+                             const void *q, void *j)
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_coordinates != NULL);
-  SC3E (qvt->quadrant_coordinates (q, n, j));
+  SC3E (qvt->quadrant_coordinates (q, j));
   return NULL;
 }
 
@@ -201,6 +201,38 @@ p4est3_quadrant_quadrant (const p4est3_quadrant_vtable_t * qvt,
 {
   SC3A_CHECK (qvt != NULL && qvt->quadrant_quadrant != NULL);
   SC3E (qvt->quadrant_quadrant (c, l, q));
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_quadrant_translate (const p4est3_quadrant_vtable_t * vtold,
+                           const void *qin,
+                           const p4est3_quadrant_vtable_t * vtnew,
+                           void *qout)
+{
+  int                 level;
+  int32_t             c[3] = {-1, -1, -1};
+
+  SC3A_CHECK (vtold != NULL && vtnew != NULL);
+  SC3A_CHECK (vtold->quadrant_is_valid != NULL);
+  SC3A_IS (vtold->quadrant_is_valid, qin);
+  SC3A_CHECK (vtold->dim == vtnew->dim);
+
+  if (vtold == vtnew) {
+    /* just hardcopy the quadrant */
+    SC3A_CHECK (vtold->quadrant_copy != NULL);
+    SC3E (vtold->quadrant_copy(qin, qout));
+  }
+  else {
+    SC3A_CHECK (vtold->quadrant_level != NULL);
+    SC3E (vtold->quadrant_level(qin, &level));
+    SC3A_CHECK (level <= vtnew->max_level);
+    SC3A_CHECK (vtold->quadrant_coordinates != NULL
+                && vtnew->quadrant_quadrant != NULL);
+    SC3E (vtold->quadrant_coordinates(qin, c));
+    SC3E (vtnew->quadrant_quadrant(c, level, qout));
+  }
+  SC3A_IS (vtnew->quadrant_is_valid, qout);
   return NULL;
 }
 

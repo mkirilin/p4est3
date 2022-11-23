@@ -494,12 +494,11 @@ p4est3_quadrant_zyx_child_id (const __m128i * q, int *j)
 }
 
 static sc3_error_t *
-p4est3_quadrant_zyx_coordinates (const __m128i * q, int n, int *j)
+p4est3_quadrant_zyx_coordinates (const __m128i * q, int *j)
 {
   __m128i             r;
   int                 d = P4EST3_REF_MAXLEVEL - P4EST3_YX_MAXLEVEL;
   SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
-  SC3A_CHECK (n == P4EST_DIM);
   SC3A_CHECK (d >= 0);
 
   r = _mm_slli_epi32 (*q, d);
@@ -851,7 +850,7 @@ static const p4est3_quadrant_vtable_t quadrant_vtable_yx =
   (p4est3_quadrant_level_t) p4est3_quadrant_zyx_level,
   (p4est3_quadrant_child_id_t) p4est3_quadrant_zyx_child_id,
   (p4est3_quadrant_ancestor_id_t) p4est3_quadrant_zyx_ancestor_id,
-  (p4est3_quadrant_in_i_out_t) p4est3_quadrant_zyx_coordinates,
+  (p4est3_quadrant_in_out_t) p4est3_quadrant_zyx_coordinates,
   (p4est3_quadrant_linear_id_t) p4est3_quadrant_zyx_linear_id,
   (p4est3_quadrant_get_tree_boundary_t) p4est3_quadrant_zyx_get_tree_boundary,
   (p4est3_quadrant_tree_boundaries_t) p4est3_quadrant_zyx_tree_boundaries,

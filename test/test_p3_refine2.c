@@ -119,7 +119,7 @@ refine_p3_normal_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
   }
 
   SC3E (p4est3_quadrant_coordinates
-        (ri->qvt, ri->quadrant, ri->qvt->dim, coords));
+        (ri->qvt, ri->quadrant, coords));
   if (coords[0] > 0) {
     *is_refine = 0;
     return NULL;

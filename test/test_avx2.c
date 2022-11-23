@@ -135,8 +135,8 @@ is_equal_child (p4est3_quadrant_vtable_t * qvt_avx,
   for (i = 0; i < n_quad; ++i) {
     SC3E (sc3_array_index (v, i, &v_p));
     SC3E (p4est3_quadrant_level (qvt_avx, v_p, &l));
-    SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, P4EST_DIM, xy_avx));
-    SC3E (p4est3_quadrant_coordinates (qvt, &q_row[i], P4EST_DIM, xy));
+    SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, xy_avx));
+    SC3E (p4est3_quadrant_coordinates (qvt, &q_row[i], xy));
     is_equal =
       (int32_t) q_row[i].level == l && xy[0] == xy_avx[0] &&
       xy[1] == xy_avx[1] &&
@@ -173,8 +173,8 @@ is_equal_parent (p4est3_quadrant_vtable_t * qvt_avx,
     SC3E (p4est3_quadrant_parent (qvt, in, q_p));
 
     SC3E (p4est3_quadrant_level (qvt_avx, v_p, &l));
-    SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, P4EST_DIM, xy_avx));
-    SC3E (p4est3_quadrant_coordinates (qvt, q_p, P4EST_DIM, xy));
+    SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, xy_avx));
+    SC3E (p4est3_quadrant_coordinates (qvt, q_p, xy));
     is_equal =
       (int32_t) q_p->level == l && xy[0] == xy_avx[0] && xy[1] == xy_avx[1] &&
 #ifdef P4_TO_P8
@@ -231,8 +231,8 @@ is_equal_successor (p4est3_quadrant_vtable_t * qvt_avx,
       SC3E (p4est3_quadrant_successor (qvt, in, q_row));
 
       SC3E (p4est3_quadrant_level (qvt_avx, v_p, &l));
-      SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, P4EST_DIM, xy_avx));
-      SC3E (p4est3_quadrant_coordinates (qvt, &q_row[i], P4EST_DIM, xy));
+      SC3E (p4est3_quadrant_coordinates (qvt_avx, v_p, xy_avx));
+      SC3E (p4est3_quadrant_coordinates (qvt, &q_row[i], xy));
       is_equal =
         (int32_t) q_row[i].level == l && xy[0] == xy_avx[0] &&
         xy[1] == xy_avx[1] &&
