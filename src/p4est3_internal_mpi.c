@@ -23,6 +23,7 @@
 
 #include <p4est3_internal.h>
 #include <p4est3_refine.h>
+#include <p4est3_partition.h>
 
 #ifndef P4EST_ENABLE_OPENMP
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -866,6 +867,9 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
    * quads, trees, goffsetwin, goffset and global_num_quads.
   */
   SC3E (p4est3_fill_from_source (p3));
+  if (p3->partition) {
+    SC3E (p4est3_partition (p3));
+  }
   p3->setup = 1;
   return NULL;
 }

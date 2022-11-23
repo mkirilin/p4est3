@@ -23,6 +23,7 @@
 
 #include <p4est3_partition.h>
 #include <p4est3_internal.h>
+#include <p4est3_search.h>
 
 #ifdef __cplusplus
 extern              "C"
@@ -97,42 +98,42 @@ p4est3_partition_allocations (const p4est3_t * p3,
 
   SC3E (p4est3_connectivity_get_num_trees (p3->conn, &total_num_trees));
 
-  SC3E_RETVAL (char_pprt, NULL);
+  SC3E_RETVAL (&char_pprt, NULL);
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (char *), &char_pprt));
   *precv_buf = char_pprt;
 
-  SC3E_RETVAL (char_pprt, NULL);
+  SC3E_RETVAL (&char_pprt, NULL);
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (char *), &char_pprt));
   *psend_buf = char_pprt;
 
-  SC3E_RETVAL (locidx_prt, NULL);
+  SC3E_RETVAL (&locidx_prt, NULL);
   SC3E (sc3_allocator_calloc
         (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &locidx_prt));
   *pnum_recv_from = locidx_prt;
 
-  SC3E_RETVAL (locidx_prt, NULL);
+  SC3E_RETVAL (&locidx_prt, NULL);
   SC3E (sc3_allocator_calloc
         (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &locidx_prt));
   *pnum_send_to = locidx_prt;
 
-  SC3E_RETVAL (locidx_prt, NULL);
+  SC3E_RETVAL (&locidx_prt, NULL);
   SC3E (sc3_allocator_malloc
         (p3->alloc, num_send_trees * sizeof (p4est3_locidx), &locidx_prt));
   *pnum_per_tree_local = locidx_prt;
 
-  SC3E_RETVAL (locidx_prt, NULL);
+  SC3E_RETVAL (&locidx_prt, NULL);
   SC3E (sc3_allocator_malloc
         (p3->alloc, total_num_trees * sizeof (p4est3_locidx), &locidx_prt));
   *pnew_local_tree_elem_count = locidx_prt;
 
-  SC3E_RETVAL (gloidx_prt, NULL);
+  SC3E_RETVAL (&gloidx_prt, NULL);
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
   *plast_goffsets = gloidx_prt;
 
-  SC3E_RETVAL (gloidx_prt, NULL);
+  SC3E_RETVAL (&gloidx_prt, NULL);
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
 #ifdef P4EST_ENABLE_DEBUG
@@ -141,7 +142,7 @@ p4est3_partition_allocations (const p4est3_t * p3,
 #endif
   *pbegin_send_to = gloidx_prt;
 
-  SC3E_RETVAL (gloidx_prt, NULL);
+  SC3E_RETVAL (&gloidx_prt, NULL);
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
   *pnew_last_goffsets = gloidx_prt;
@@ -152,9 +153,9 @@ p4est3_partition_allocations (const p4est3_t * p3,
 /* p4est3::goffsets should be updated before calling this function */
 static sc3_error_t *
 p4est3_procs_recv_from (const p4est3_t * p3,
-                        const p4est3_gloidx *last_goffsets,
+                        p4est3_gloidx *last_goffsets,
                         p4est3_locidx *num_recv_from,
-                        p4est3_locidx *from_begin, p4est3_locidx *from_end,
+                        p4est3_gloidx *from_begin, p4est3_gloidx *from_end,
                         int *num_proc_recv_from)
 {
   int from_proc;
@@ -195,10 +196,10 @@ p4est3_procs_recv_from (const p4est3_t * p3,
 /* p4est3::goffsets should be updated before calling this function */
 static sc3_error_t *
 p4est3_procs_send_to (const p4est3_t * p3,
-                      const p4est3_gloidx *new_last_goffsets,
+                      p4est3_gloidx *new_last_goffsets,
                       p4est3_locidx *num_send_to,
-                      p4est3_gloidx *begin_send_to, p4est3_locidx *to_begin,
-                      p4est3_locidx *to_end, int *num_proc_send_to)
+                      p4est3_gloidx *begin_send_to, p4est3_gloidx *to_begin,
+                      p4est3_gloidx *to_end, int *num_proc_send_to)
 {
   int to_proc;
   p4est3_gloidx my_begin, my_end, lower_bound;
@@ -215,7 +216,7 @@ p4est3_procs_send_to (const p4est3_t * p3,
   } else {
     p4est3_find_partition (p3->alloc, p3->mpisize, new_last_goffsets,
                            my_begin, my_end, to_begin, to_end);
-    for (to_proc = to_begin; to_proc <= to_end; ++to_proc) {
+    for (to_proc = *to_begin; to_proc <= *to_end; ++to_proc) {
       /* I send to to_proc which may be empty */
       lower_bound = p3->goffset[to_proc];
 
@@ -224,8 +225,8 @@ p4est3_procs_send_to (const p4est3_t * p3,
       }
       /*TODO: make num_send_to true/false only, sice we do not send quads*/
       num_send_to[to_proc] =
-          SC_MIN (my_end, new_last_goffsets[to_proc])
-        - SC_MAX (my_begin, lower_bound) + 1;
+          SC3_MIN (my_end, new_last_goffsets[to_proc])
+        - SC3_MAX (my_begin, lower_bound) + 1;
       begin_send_to[to_proc] = SC3_MAX (my_begin, lower_bound);
       SC3A_CHECK (num_send_to[to_proc] >= 0);
       if (to_proc == p3->mpisize) {
@@ -238,8 +239,8 @@ p4est3_procs_send_to (const p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_trees_send_to (const p4est3_t * p3, const p4est3_gloidx *begin_send_to,
-                      const p4est3_locidx * num_send_to,
+p4est3_trees_send_to (const p4est3_gloidx *begin_send_to,
+                      const p4est3_locidx * num_send_to, p4est3_t * p3,
                       p4est3_topidx num_send_trees, int to_proc,
                       p4est3_locidx * num_per_tree_send_buf)
 {
@@ -249,8 +250,7 @@ p4est3_trees_send_to (const p4est3_t * p3, const p4est3_gloidx *begin_send_to,
             - (p4est3_gloidx) 1 - my_base;
   p4est3_gloidx my_begin = begin_send_to[to_proc] - my_base;
   p4est3_locidx num_copy;
-  p4est3_gloidx from_begin, from_end, my_base, my_begin, my_end,
-                tree_from_begin, tree_from_end, num_copy_global;
+  p4est3_gloidx from_begin, from_end, tree_from_begin, tree_from_end, num_copy_global;
   p4est3_topidx which_tree;
   p4est3_tree_t *tree;
   p4est3_gloidx *first_last_tquad
@@ -295,8 +295,8 @@ p4est3_trees_send_to (const p4est3_t * p3, const p4est3_gloidx *begin_send_to,
 static sc3_error_t *
 p4est3_trees_new_boundaries (const p4est3_t * p3,
                              const p4est3_locidx * num_recv_from,
-                             const p4est3_locidx * num_per_tree_local,
-                             const char ** recv_buf,
+                             char ** recv_buf,
+                             p4est3_locidx * num_per_tree_local,
                              p4est3_gloidx from_begin_global_quad,
                              p4est3_gloidx from_end_global_quad,
                              p4est3_locidx * new_local_tree_elem_count,
@@ -341,13 +341,13 @@ p4est3_trees_new_boundaries (const p4est3_t * p3,
       from_tree = first_from_tree + it;
 
       SC3A_CHECK (from_tree >= 0 && from_tree < total_num_trees);
-      P4EST_LDEBUGF ("partition recv %lld [%lld,%lld] quadrants"
+      /*P4EST_LDEBUGF ("partition recv %lld [%lld,%lld] quadrants"
                       " from tree %lld from proc %d\n",
                       (long long) num_per_tree_recv_buf[it],
                       (long long) new_local_tree_elem_count[from_tree],
                       (long long) new_local_tree_elem_count[from_tree]
                       + num_per_tree_recv_buf[it], (long long) from_tree,
-                      from_proc);
+                      from_proc);*/
       *new_first_local_tree = SC3_MIN (*new_first_local_tree, from_tree);
       *new_last_local_tree = SC3_MAX (*new_last_local_tree, from_tree);
       new_local_tree_elem_count[from_tree] += num_per_tree_recv_buf[it];
@@ -361,9 +361,9 @@ p4est3_trees_new_boundaries (const p4est3_t * p3,
     *new_first_local_tree = -1;
     *new_last_local_tree = -2;
   }
-  P4EST_VERBOSEF ("partition new forest [%lld,%lld]\n",
+  /*P4EST_VERBOSEF ("partition new forest [%lld,%lld]\n",
                   (long long) *new_first_local_tree,
-                  (long long) *new_last_local_tree);
+                  (long long) *new_last_local_tree);*/
   return NULL;
 }
 
@@ -436,27 +436,25 @@ p4est3_partition (p4est3_t * p3)
      p4est3_tree::last_tquad for the last sent tree. */
   const size_t send_size = num_send_trees * sizeof (p4est3_locidx)
                             + 2 * sizeof (p4est3_gloidx);
-  int i, p, from_proc, sk, mpiret, to_proc;
+  int i, from_proc, sk, mpiret, to_proc;
   int nodesize, noderank, node_num;
-  int *node_sizes, *node_offsets;
+  int *node_offsets;
   int num_proc_recv_from, num_proc_send_to;
-  char               *temp = p3->temp_quad[0];
   char **recv_buf, **send_buf;
   int32_t            *coords;
   p4est3_topidx num_recv_trees;
   p4est3_topidx new_first_local_tree, new_last_local_tree;
-  p4est3_locidx from_begin, from_end, to_begin, to_end;
   p4est3_locidx from_begin_global_quad, from_end_global_quad;
   p4est3_locidx to_begin_global_quad, to_end_global_quad;
   p4est3_locidx *num_per_tree_send_buf, *new_local_tree_elem_count;
   p4est3_locidx *num_send_to;
   p4est3_locidx *num_recv_from; /**< Numbers of quadrants coming from the i-th process */
   p4est3_locidx *num_per_tree_local;
+  p4est3_gloidx from_begin, from_end, to_begin, to_end;
   p4est3_gloidx *begin_send_to; /**< Begin (quadrant) of proc where we want to send to
                                      or begin of current proc (MAX of them). From which quad we start
                                      sending info. */
-  p4est3_gloidx *proc_first_tquad, *proc_last_tquad;
-  p4est3_gloidx        prev_quadrant, next_quadrant, qcount_node;
+  p4est3_gloidx        qcount_node;
   p4est3_gloidx        new_right_border, new_left_border;
   p4est3_gloidx new_first_tquad, new_last_tquad;
   p4est3_gloidx *last_goffsets, *new_last_goffsets; /**< Offsets of last quadrant in a process */
@@ -470,7 +468,7 @@ p4est3_partition (p4est3_t * p3)
 
   /* this function does nothing for processes without shared memory */
   if (nodesize == 1) {
-    return;
+    return NULL;
   }
   if (p3->cweight == NULL) {
     /* Divide up the quadrants equally */
@@ -514,15 +512,15 @@ p4est3_partition (p4est3_t * p3)
                             p3->gposition->gfposwin));
     SC3E(p4est3_quadrant_first_descendant
           (p3->qvt, p3->nodequads[0] + p3->qsize * new_left_border,
-           p3->qmaxlevel, p3->gfpos[p3->mpirank]));
+           p3->qmaxlevel, p3->gfpos + p3->mpirank * p3->qsize));
 
     if (noderank == 0) {
       SC3E (sc3_allocator_calloc
             (p3->alloc, p3->qvt->dim, sizeof (int32_t), &coords));
       SC3E (p4est3_translate_quadrant
             (p3->old->qvt, p3->qvt,
-             p3->old->gfpos[node_offsets[node_num + 1]],
-             p3->gfpos[node_offsets[node_num + 1]], coords));
+             p3->old->gfpos + node_offsets[node_num + 1] * p3->old->qsize,
+             p3->gfpos + node_offsets[node_num + 1] * p3->qsize, coords));
       SC3E (sc3_allocator_free (p3->alloc, coords));
     } else {
       p3->nodequads[noderank] = p3->nodequads[0] + p3->qsize * new_left_border;
@@ -600,7 +598,7 @@ p4est3_partition (p4est3_t * p3)
 #endif
     /* Set the num_per_tree_local */
     SC3E (p4est3_trees_send_to
-          (p3, begin_send_to, num_send_to,
+          (begin_send_to, num_send_to, p3,
            num_send_trees, p3->mpirank, num_per_tree_local));
 
     for (to_proc = to_begin_global_quad, sk = 0
@@ -611,7 +609,7 @@ p4est3_partition (p4est3_t * p3)
         num_per_tree_send_buf = (p4est3_locidx *) send_buf[to_proc];
         memset (num_per_tree_send_buf, 0, send_size);
         SC3E (p4est3_trees_send_to
-              (p3, begin_send_to, num_send_to,
+              (begin_send_to, num_send_to, p3,
                num_send_trees, to_proc, num_per_tree_send_buf));
         /* Post send operation for the quadrants and their data */
 #ifdef P4EST_ENABLE_MPI
@@ -632,8 +630,9 @@ p4est3_partition (p4est3_t * p3)
       SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
     /* Calculate the local index of the end of each tree in the repartition */
-    SC3E (p4est3_trees_new_boundaries (p3, num_recv_from, num_per_tree_local,
-                                       recv_buf, from_begin_global_quad,
+    SC3E (p4est3_trees_new_boundaries (p3, num_recv_from, recv_buf,
+                                       num_per_tree_local,
+                                       from_begin_global_quad,
                                        from_end_global_quad,
                                        new_local_tree_elem_count,
                                        &new_first_tquad, &new_last_tquad,
@@ -643,8 +642,8 @@ p4est3_partition (p4est3_t * p3)
     SC3E (p4est3_trees_local_reproduce
           (num_send_to, new_local_tree_elem_count, p3, new_first_local_tree,
            new_last_local_tree, new_first_tquad, new_last_tquad));
-
   }
+  return NULL;
 }
 
 #ifdef __cplusplus

@@ -33,8 +33,8 @@ extern              "C"
 #endif
 
 static sc3_error_t *
-p4est3_search_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
-                         int ecount, sc3_array_t ** arr)
+p4est3_search_array_new (sc3_allocator_t * alloc, size_t esize,
+                         int ealloc, int ecount, sc3_array_t ** arr)
 {
   SC3E_RETVAL (arr, NULL);
   SC3A_IS (sc3_allocator_is_setup, alloc);
@@ -60,7 +60,7 @@ p4est3_search_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
  *  it in 3D in the usual way.
  */
 static sc3_error_t *
-type_fn_global_quad_index (sc3_array_t * array, size_t index,
+type_fn_global_quad_index (sc3_array_t * array, int index,
                            void *data_array, int *type)
 {
   p4est3_gloidx     *my_begin_end, *entry;
@@ -85,8 +85,8 @@ type_fn_global_quad_index (sc3_array_t * array, size_t index,
 }
 
 sc3_error_t        *
-p4est3_find_partition (const sc3_allocator_t * alloc,
-                       const int num_entities, const p4est3_gloidx * search_in,
+p4est3_find_partition (sc3_allocator_t * alloc, int num_entities,
+                       p4est3_gloidx * search_in,
                        p4est3_gloidx my_begin, p4est3_gloidx my_end,
                        p4est3_gloidx * begin, p4est3_gloidx * end)
 {
