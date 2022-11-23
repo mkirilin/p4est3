@@ -63,7 +63,7 @@ static sc3_error_t *
 type_fn_global_quad_index (sc3_array_t * array, int index,
                            void *data_array, int *type)
 {
-  p4est3_gloidx     *my_begin_end, *entry;
+  p4est3_gloidx      *my_begin_end, *entry;
 
   SC3A_CHECK (data_array != NULL);
   my_begin_end = (p4est3_gloidx *) data_array;
@@ -90,8 +90,8 @@ p4est3_find_partition (sc3_allocator_t * alloc, int num_entities,
                        p4est3_gloidx my_begin, p4est3_gloidx my_end,
                        p4est3_gloidx * begin, p4est3_gloidx * end)
 {
-  sc3_array_t         *view, *offsets;
-  p4est3_gloidx        my_begin_end[2];
+  sc3_array_t        *view, *offsets;
+  p4est3_gloidx       my_begin_end[2];
 
   SC3A_CHECK (my_begin <= my_end);
   SC3E (p4est3_search_array_new (alloc, sizeof (int), 0, 0, &offsets));
@@ -102,7 +102,7 @@ p4est3_find_partition (sc3_allocator_t * alloc, int num_entities,
   my_begin_end[1] = my_end;
 
   SC3E (sc3_array_split
-         (view, offsets, 3, type_fn_global_quad_index, my_begin_end));
+        (view, offsets, 3, type_fn_global_quad_index, my_begin_end));
 
   SC3E (sc3_array_index (offsets, 1, &begin));
   SC3E (sc3_array_index (offsets, 2, &end));

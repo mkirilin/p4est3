@@ -39,7 +39,6 @@ extern              "C"
 #endif
 #endif
 
-
 sc3_error_t        *p4est3_partition (p4est3_t * p3);
 
 #ifdef __cplusplus
