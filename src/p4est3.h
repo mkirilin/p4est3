@@ -231,6 +231,15 @@ sc3_error_t        *p4est3_set_comm (p4est3_t * p3,
 */
 sc3_error_t        *p4est3_set_shared (p4est3_t * p3, int shared);
 
+/** Enable/disable continious MPI shared memory when possible.
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] contiguous   True value indicates enabling, while false
+ *                          is for disabling of MPI-3 contiguous shared
+ *                          memory. Default value is false.
+ * \return                  NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_set_contiguous (p4est3_t * p3, int contiguous);
+
 /** Provide a connectivity to be used in creating the forest.
  * TODO: set 2D unit square as default.
  * This function is mandatory to call at least once before \ref p4est3_setup.

@@ -127,6 +127,7 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   p3->mpicomm = SC3_MPI_COMM_WORLD;
   p3->setup_mode = P4EST3_NEW_MORTON;
   p3->shared = 0;
+  p3->contiguous = 0;
   p3->family = 0;
   p3->partition = 0;
   SC3A_IS (p4est3_is_new, p3);
@@ -278,6 +279,14 @@ p4est3_set_shared (p4est3_t * p3, int shared)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->shared = shared;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_set_contiguous (p4est3_t * p3, int contiguous)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  p3->contiguous = contiguous;
   return NULL;
 }
 
