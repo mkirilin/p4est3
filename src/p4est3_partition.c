@@ -93,7 +93,8 @@ p4est3_partition_allocations (const p4est3_t * p3,
 
   SC3E_RETVAL (&locidx_prt, NULL);
   SC3E (sc3_allocator_malloc
-        (p3->alloc, num_send_trees * sizeof (p4est3_locidx), &locidx_prt));
+        (p3->alloc, num_send_trees * sizeof (p4est3_locidx)
+          + 2 * sizeof (p4est3_gloidx), &locidx_prt));
   *pnum_per_tree_local = locidx_prt;
 
   SC3E_RETVAL (&locidx_prt, NULL);
@@ -465,10 +466,10 @@ p4est3_partition (p4est3_t * p3)
     if (noderank + 1 == nodesize) {
       SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                               p3->goffsets->goffsetwin));
-      SC3A_CHECK (p3->goffset[p3->mpirank] == new_right_border);
+      SC3A_CHECK (p3->goffset[p3->mpirank + 1] == new_right_border);
       SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
     }
-    else if (noderank == 0) {
+    if (noderank == 0) {
       SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                               p3->goffsets->goffsetwin));
       SC3A_CHECK (p3->goffset[p3->mpirank] == new_left_border);
@@ -504,6 +505,7 @@ p4est3_partition (p4est3_t * p3)
     p3->quads = p3->nodequads[noderank];
 
     /* Adjust trees partition information of the forest */
+    /** TODO: Put some of the allocations after isend/irecv */
     SC3E (p4est3_partition_allocations
           (p3, &recv_buf, &send_buf, &num_recv_from, &num_send_to,
            &num_per_tree_local, &new_local_tree_elem_count, &last_goffsets,
@@ -571,6 +573,7 @@ p4est3_partition (p4est3_t * p3)
                                 &send_request));
 #endif
     /* Set the num_per_tree_local */
+    memset (num_per_tree_local, 0, send_size);
     SC3E (p4est3_trees_send_to
           (begin_send_to, num_send_to, p3,
            num_send_trees, p3->mpirank, num_per_tree_local));
