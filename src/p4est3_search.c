@@ -90,6 +90,7 @@ p4est3_find_partition (sc3_allocator_t * alloc, int num_entities,
                        p4est3_gloidx my_begin, p4est3_gloidx my_end,
                        p4est3_gloidx * begin, p4est3_gloidx * end)
 {
+  int                *iptr;
   sc3_array_t        *view, *offsets;
   p4est3_gloidx       my_begin_end[2];
 
@@ -104,8 +105,10 @@ p4est3_find_partition (sc3_allocator_t * alloc, int num_entities,
   SC3E (sc3_array_split
         (view, offsets, 3, type_fn_global_quad_index, my_begin_end));
 
-  SC3E (sc3_array_index (offsets, 1, &begin));
-  SC3E (sc3_array_index (offsets, 2, &end));
+  SC3E (sc3_array_index (offsets, 1, &iptr));
+  *begin = *iptr;
+  SC3E (sc3_array_index (offsets, 2, &iptr));
+  *end = *iptr;
 
   sc3_array_destroy (&offsets);
   sc3_array_destroy (&view);
