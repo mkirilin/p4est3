@@ -444,9 +444,12 @@ p4est3_partition (p4est3_t * p3)
   SC3A_IS (p4est3_is_setup, p3->old);
 
   /* this function does nothing for processes without shared memory */
-  if (nodesize == 1) {
-    return NULL;
-  }
+  /** TODO: Make sence to limit it for nodesize == 1, w/o sh.mem it leads to extra work. 
+   * Keep it so far for testing purposes.
+  */
+  /*if (nodesize == 1) {
+      return NULL;
+    }*/
   if (p3->cweight == NULL) {
     /* Divide up the quadrants equally */
     SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
@@ -457,7 +460,8 @@ p4est3_partition (p4est3_t * p3)
 
     qcount_node = p3->goffset[node_offsets[node_num + 1]]
       - p3->goffset[node_offsets[node_num]];
-    SC3E (sc3_MPI_Barrier (nodecomm));
+    /** TODO: Is this barrier really necessary? */
+    //SC3E (sc3_MPI_Barrier (nodecomm));
     /* Find new left and right borders for the local partition */
     new_left_border = p4est3_glocut (qcount_node, noderank, nodesize);
     new_right_border = p4est3_glocut (qcount_node, noderank + 1, nodesize);
