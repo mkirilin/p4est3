@@ -40,12 +40,6 @@
 #define MAX_TEST_TREES 5
 #define FOREST_START_LEVEL 1
 
-/* Let's assume the overall max_level for every quadrant implementation */
-#define TEST_MAX_LEVEL 15
-#define TEST_ROOT_LEN ((int32_t) 1 << TEST_MAX_LEVEL)
-#define TEST_QUADRANT_LEN(l) ((int32_t) 1 << (TEST_MAX_LEVEL - (l)))
-#define TEST_LAST_OFFSET(l) (TEST_ROOT_LEN - TEST_QUADRANT_LEN (l))
-
 static int          refine_level = 0;
 
 typedef struct setup
@@ -155,7 +149,7 @@ make_allocator (setup_t * t)
 }
 
 static sc3_error_t *
-make_connectivity (setup_t * t, int dim)
+make_connectivity (setup_t * t)
 {
   t->conn2 =
 #ifdef P4_TO_P8
@@ -403,7 +397,7 @@ perform_tests (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
         printf ("l = %d, t = %d\n", t->level, t->num_trees);
       }
 #endif /* P4EST_ENABLE_DEBUG */
-      SC3E (make_connectivity (t, (*qvt)->dim));
+      SC3E (make_connectivity (t));
       SC3E (make_new_p4est (&p, t));
       SC3E (make_new_p4est3 (&p3, t, qvt));
 
