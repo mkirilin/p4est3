@@ -290,6 +290,7 @@ perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
   SC3E (compare_results (t, p3ptr, p, qvt));
 
   /* Test partition */
+  p4est_partition (p, 0, NULL);
   SC3E (p4est3_new (t->alloc, &p3refined));
   SC3E (set_qvt (&qvt, 0));
   SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
