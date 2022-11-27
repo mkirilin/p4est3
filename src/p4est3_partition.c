@@ -355,20 +355,20 @@ p4est3_trees_local_reproduce (const p4est3_locidx * num_send_to,
   sc3_array_t        *trees;
   p4est3_tree_t      *tree, *prev_tree;
 
+  p3->fltree = new_first_local_tree;
+  p3->lltree = new_last_local_tree;
+  p3->nltrees = p3->lltree - p3->fltree + 1;
   SC3E (p4est3_part_array_new
         (p3->alloc, sizeof (p4est3_tree_t), p3->nltrees, p3->nltrees,
          &trees));
   SC3E (sc3_array_unref (&p3->trees));
   p3->trees = trees;
-  p3->fltree = new_first_local_tree;
-  p3->lltree = new_last_local_tree;
-  p3->nltrees = p3->lltree - p3->fltree + 1;
 
   if (p3->nltrees == 0) {
     return NULL;
   }
-  /* process the 0-th local tree */
-  SC3E (p4est3_tree_index (p3, 0, &tree));
+  /* process the first local tree */
+  SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
   tree->treeid = p3->fltree;
   tree->num_quads = new_local_tree_elem_count[p3->fltree];
   tree->first_tquad = new_first_tquad;
@@ -377,7 +377,8 @@ p4est3_trees_local_reproduce (const p4est3_locidx * num_send_to,
   tree->quad_offset = 0;
   tree->tquads = p3->quads;
   /* processing middle trees */
-  for (tt = 1, prev_tree = tree; tt < p3->nltrees - 1; ++tt, prev_tree = tree) {
+  for (tt = p3->fltree + 1, prev_tree = tree; tt < p3->lltree;
+       ++tt, prev_tree = tree) {
     SC3E (p4est3_tree_index (p3, tt, &tree));
     tree->treeid = p3->fltree + tt;
     tree->num_quads = new_local_tree_elem_count[p3->fltree + tt];
@@ -387,8 +388,8 @@ p4est3_trees_local_reproduce (const p4est3_locidx * num_send_to,
     tree->quad_offset = prev_tree->quad_offset + prev_tree->num_quads;
     tree->tquads = p3->quads + p3->qsize * tree->quad_offset;
   }
-  /* processing the last tree */
-  SC3E (p4est3_tree_index (p3, p3->nltrees - 1, &tree));
+  /* processing the last local tree */
+  SC3E (p4est3_tree_index (p3, p3->lltree, &tree));
   tree->treeid = p3->lltree;
   tree->num_quads = new_local_tree_elem_count[p3->lltree];
   tree->end_tquad = new_last_tquad;
@@ -680,6 +681,10 @@ p4est3_partition (p4est3_t * p3)
            new_last_local_tree, new_first_tquad, new_last_tquad));
 
     /* Free allocations */
+#ifdef P4EST_ENABLE_MPI
+    mpiret = MPI_Waitall (num_proc_send_to, send_request, MPI_STATUSES_IGNORE);
+    SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
+#endif
     SC3E (p4est3_partition_cleanup
           (p3, num_proc_recv_from, num_proc_send_to, from_begin_global_quad,
            from_end_global_quad, to_begin_global_quad, to_end_global_quad,
