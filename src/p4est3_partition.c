@@ -519,8 +519,8 @@ p4est3_partition (p4est3_t * p3)
     /** TODO: Is this barrier really necessary? */
     //SC3E (sc3_MPI_Barrier (nodecomm));
     /* Find new left and right borders for the local partition */
-    new_left_border = p4est3_glocut (qcount_node, noderank, nodesize);
-    new_right_border = p4est3_glocut (qcount_node, noderank + 1, nodesize);
+    new_left_border = p4est3_glocut (qcount_node, nodesize, noderank);
+    new_right_border = p4est3_glocut (qcount_node, nodesize, noderank + 1);
 
 #ifdef P4EST_ENABLE_DEBUG
     if (noderank + 1 == nodesize) {
