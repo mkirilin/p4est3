@@ -400,6 +400,61 @@ p4est3_trees_local_reproduce (const p4est3_locidx * num_send_to,
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_partition_cleanup (const p4est3_t * p3,
+                          int num_proc_recv_from, int num_proc_send_to,
+                          p4est3_locidx from_begin_global_quad,
+                          p4est3_locidx from_end_global_quad,
+                          p4est3_locidx to_begin_global_quad,
+                          p4est3_locidx to_end_global_quad,
+                          MPI_Request * recv_request,
+                          MPI_Request * send_request,
+                          char **recv_buf, char **send_buf,
+                          p4est3_locidx * num_recv_from,
+                          p4est3_locidx * num_send_to,
+                          p4est3_locidx * num_per_tree_local,
+                          p4est3_locidx * new_local_tree_elem_count,
+                          p4est3_gloidx * last_goffsets,
+                          p4est3_gloidx * begin_send_to,
+                          p4est3_gloidx * new_last_goffsets)
+{
+  int i;
+#ifdef P4EST_ENABLE_MPI
+#ifdef P4EST_ENABLE_DEBUG
+    for (i = 0; i < num_proc_recv_from; ++i) {
+      SC3A_CHECK (recv_request[i] == MPI_REQUEST_NULL);
+    }
+    for (i = 0; i < num_proc_send_to; ++i) {
+      SC3A_CHECK (send_request[i] == MPI_REQUEST_NULL);
+    }
+#endif
+    SC3E (sc3_allocator_free (p3->alloc, recv_request));
+    SC3E (sc3_allocator_free (p3->alloc, send_request));
+#endif
+
+  for (i = from_begin_global_quad; i <= from_end_global_quad; ++i) {
+    if (i != p3->mpirank && num_recv_from[i])
+      SC3E (sc3_allocator_free (p3->alloc, recv_buf[i]));
+  }
+  SC3E (sc3_allocator_free (p3->alloc, recv_buf));
+
+  for (i = to_begin_global_quad; i <= to_end_global_quad; ++i) {
+    if (i != p3->mpirank && num_send_to[i])
+      SC3E (sc3_allocator_free (p3->alloc, send_buf[i]));
+  }
+  SC3E (sc3_allocator_free (p3->alloc, send_buf));
+
+  SC3E (sc3_allocator_free (p3->alloc, num_recv_from));
+  SC3E (sc3_allocator_free (p3->alloc, num_send_to));
+  SC3E (sc3_allocator_free (p3->alloc, num_per_tree_local));
+  SC3E (sc3_allocator_free (p3->alloc, new_local_tree_elem_count));
+  SC3E (sc3_allocator_free (p3->alloc, last_goffsets));
+  SC3E (sc3_allocator_free (p3->alloc, begin_send_to));
+  SC3E (sc3_allocator_free (p3->alloc, new_last_goffsets));
+
+  return NULL;
+}
+
 sc3_error_t        *
 p4est3_partition (p4est3_t * p3)
 {
@@ -623,6 +678,14 @@ p4est3_partition (p4est3_t * p3)
     SC3E (p4est3_trees_local_reproduce
           (num_send_to, new_local_tree_elem_count, p3, new_first_local_tree,
            new_last_local_tree, new_first_tquad, new_last_tquad));
+
+    /* Free allocations */
+    SC3E (p4est3_partition_cleanup
+          (p3, num_proc_recv_from, num_proc_send_to, from_begin_global_quad,
+           from_end_global_quad, to_begin_global_quad, to_end_global_quad,
+           recv_request, send_request, recv_buf, send_buf, num_recv_from,
+           num_send_to, num_per_tree_local, new_local_tree_elem_count,
+           last_goffsets, begin_send_to, new_last_goffsets));
   }
   return NULL;
 }

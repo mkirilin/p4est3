@@ -302,6 +302,7 @@ perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
   p3ptr = p3refined;
   SC3E (compare_results (t, p3ptr, p, qvt));
 
+  SC3E (p4est3_destroy (&p3ptr));
   return NULL;
 }
 
