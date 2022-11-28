@@ -47,6 +47,8 @@ p4est3_internal_setup_comm (p4est3_t * p3)
   SC3E (sc3_MPI_Comm_rank (p3->mpicomm, &p3->mpirank));
 
   /* make calculations and setup mpi environment */
+  SC3E (sc3_mpienv_set_shared (p3->split_info, p3->shared));
+  SC3E (sc3_mpienv_set_contiguous (p3->split_info, p3->contiguous));
   SC3E (sc3_mpienv_setup (p3->split_info));
   return NULL;
 }
