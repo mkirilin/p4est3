@@ -249,10 +249,9 @@ compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
                "different #global quadrants");
   SC3E_DEMAND (num_loc_quads == p->local_num_quadrants,
                "different #local quadrants");
+  SC3E (array_new (t->alloc, sizeof (int), num_loc_quads, 0, &p3levels));
   SC3E (array_new
-        (t->alloc, qvt->quadrant_size, num_loc_quads, 0, &p3levels));
-  SC3E (array_new
-        (t->alloc, qvt->quadrant_size, p->local_num_quadrants, 0, &levels));
+        (t->alloc, sizeof (int), p->local_num_quadrants, 0, &levels));
   for (tt = p->first_local_tree; tt <= p->last_local_tree; ++tt) {
     tree = p4est_tree_array_index (p->trees, tt);
     for (nq = 0; nq < tree->quadrants.elem_count; ++nq) {
