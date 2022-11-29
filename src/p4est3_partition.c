@@ -516,8 +516,6 @@ p4est3_partition (p4est3_t * p3)
 
     qcount_node = p3->goffset[node_offsets[node_num + 1]]
       - p3->goffset[node_offsets[node_num]];
-    /** TODO: Is this barrier really necessary? */
-    //SC3E (sc3_MPI_Barrier (nodecomm));
     /* Find new left and right borders for the local partition */
     new_left_border = p4est3_glocut (qcount_node, nodesize, noderank);
     new_right_border = p4est3_glocut (qcount_node, nodesize, noderank + 1);
@@ -535,12 +533,15 @@ p4est3_partition (p4est3_t * p3)
       SC3A_CHECK (p3->goffset[p3->mpirank] == new_left_border);
       SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
     }
+    SC3E (sc3_MPI_Barrier (nodecomm));
 #endif
     /* Adjust quadrant partition information of the forest */
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                             p3->goffsets->goffsetwin));
     p3->goffset[p3->mpirank] = new_left_border;
+    SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
     SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+    SC3E (sc3_MPI_Barrier (nodecomm));
 
     p3->local_num_quads = new_right_border - new_left_border;
 
