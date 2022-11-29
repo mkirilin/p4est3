@@ -39,6 +39,8 @@
 
 #define MAX_TEST_LEVEL 5
 
+static int          refine_level = 0;
+
 typedef struct setup
 {
   sc3_allocator_t    *alloc;
@@ -56,7 +58,7 @@ static int
 refine_fn (p4est_t * p4est, p4est_topidx_t which_tree,
            p4est_quadrant_t * quadrant)
 {
-  if ((int) quadrant->level >= p4est->mpirank) {
+  if ((int) quadrant->level >= SC3_MIN (MAX_TEST_LEVEL, p4est->mpirank)) {
     return 0;
   }
   return 1;
@@ -69,7 +71,7 @@ refine_p3_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
   *is_refine = 1;
 
   SC3E (p4est3_quadrant_level (ri->qvt, ri->quadrant, &level));
-  if (level >= ri->p3->mpirank) {
+  if (level >= SC3_MIN (MAX_TEST_LEVEL, ri->p3->mpirank)) {
     *is_refine = 0;
     return NULL;
   }
@@ -268,12 +270,12 @@ static sc3_error_t *
 perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
               const p4est3_quadrant_vtable_t * qvt)
 {
-  const int refine_level = SC3_MIN (MAX_TEST_LEVEL, p3->mpisize);
   int i;
   p4est3_t           *p3refined, *p3ptr = p3;
+  refine_level = SC3_MIN (MAX_TEST_LEVEL, p3->mpisize);
   p4est_refine (p, 1, refine_fn, NULL);
 
-  for (i = 0; i < refine_level; ++i) {
+  for (i = 0; i <= refine_level; ++i) {
     SC3E (p4est3_new (t->alloc, &p3refined));
     SC3E (set_qvt (&qvt, i % 1));
     SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
