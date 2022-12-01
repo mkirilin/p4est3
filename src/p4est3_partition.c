@@ -610,6 +610,7 @@ p4est3_partition (p4est3_t * p3)
       }
       SC3E (sc3_MPI_Barrier (nodecomm));
 #endif
+      /** TODO: figure out mpisize vs nodesize stuff */
       p3->goffset[p3->mpirank] = p4est3_glocut (qcount_node, nodesize, noderank);
     }
     else {
