@@ -53,6 +53,7 @@
  *                          `search_in[begin] <= my_begin`.
  * \param [out] end         The second offset such that
  *                          `my_end <= search_in[end]`.
+ * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_find_partition (sc3_allocator_t * alloc,
                                            int num_entities,
@@ -61,5 +62,19 @@ sc3_error_t        *p4est3_find_partition (sc3_allocator_t * alloc,
                                            p4est3_gloidx my_end,
                                            p4est3_gloidx * begin,
                                            p4est3_gloidx * end);
+
+/** Find lowest position k in a sorted array such that array[k] >= target.
+ * \param [in]  target  The target lower bound to binary search for.
+ * \param [in]  array   The 64bit integer array to binary search in.
+ * \param [in]  nmemb   The number of int64_t's in the array.
+ * \param [in, out]  guess Input: initial array position to look at.
+ *                         Output: the matching position
+ *                         or -1 if array[size-1] < target or if size == 0.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_search_lower_bound64 (int64_t target,
+                                                 const int64_t * array,
+                                                 size_t nmemb,
+                                                 ssize_t * guess);
 
 #endif /* !P4EST_SEARCH_H */
