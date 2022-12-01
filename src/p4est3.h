@@ -160,7 +160,7 @@ typedef             sc3_error_t
 /** Callback to use in partition function. It gives quadrant's weight. */
 typedef             sc3_error_t
   * (*p4est3_weight_callback_t) (p4est3_quadrant_weight_info_t * wi,
-                                 int *weight);
+                                 int64_t *weight);
 
 /** Check whether a forest is valid (no matter if setup or not).
  * \param [in] p3       Forest pointer.  NULL is considered not valid.
