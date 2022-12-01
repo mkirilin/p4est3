@@ -456,6 +456,88 @@ p4est3_partition_cleanup (const p4est3_t * p3,
   return NULL;
 }
 
+static sc3_error_t *
+p4est3_weighted_new_boundaries (const p4est3_t * p3, int nodesize,
+                                int node_offset, int noderank,
+                                sc3_MPI_Comm_t nodecomm)
+{
+  int i;
+  int64_t weight, weight_sum, cut;
+  int64_t *local_weights, *global_weight_sums;
+  ssize_t new_left_border;
+  char *quad;
+  p4est3_locidx kl = 0, lz;
+  p4est3_topidx nt;
+  p4est3_tree_t *tree;
+  p4est3_quadrant_weight_info_t swi, *wi = &swi;
+  wi->p3 = p3;
+  wi->qvt = p3->qvt;
+  wi->user_data = NULL; /**< Keep user_data NULL so far, may be we will use it in the future. */
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, sizeof (int64_t) * p3->local_num_quads, &local_weights));
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, sizeof (int64_t) * (nodesize + 1), &global_weight_sums));
+
+  /* linearly sum weights across all trees */
+  local_weights[0] = 0;
+  for (nt = p3->fltree; nt <= p3->lltree; ++nt) {
+    wi->ntree = nt;
+    SC3E (p4est3_tree_index (p3, nt, &tree));
+    for (lz = 0; lz < tree->num_quads; ++lz, ++kl) {
+      quad = tree->tquads + p3->qsize * lz;
+      SC3E (p3->cweight (wi, &weight));
+      SC3A_CHECK (weight >= 0);
+      local_weights[kl + 1] = local_weights[kl] + weight;
+    }
+  }
+
+  SC3A_CHECK (kl == p3->local_num_quads);
+  weight_sum = local_weights[p3->local_num_quads];
+
+  /* distribute local weight sums */
+  global_weight_sums[0] = 0;
+  SC3E (sc3_MPI_Allgather (&weight_sum, 1, MPI_LONG_LONG_INT,
+                           &global_weight_sums[1], 1, MPI_LONG_LONG_INT,
+                           nodecomm));
+  /* adjust all arrays to reflect the global weight */
+  for (i = 0; i < nodesize; ++i) {
+    global_weight_sums[i + 1] += global_weight_sums[i];
+  }
+  if (noderank > 0) {
+    weight_sum = global_weight_sums[noderank];
+    for (kl = 0; kl <= p3->local_num_quads; ++kl) {
+      local_weights[kl] += weight_sum;
+    }
+  }
+
+  SC3A_CHECK (local_weights[0] == global_weight_sums[noderank]);
+  SC3A_CHECK (local_weights[p3->local_num_quads] ==
+                global_weight_sums[noderank + 1]);
+  weight_sum = global_weight_sums[nodesize];
+
+  /* if all quadrants have zero weight we do nothing */
+  if (weight_sum == 0) {
+    SC3E (sc3_allocator_free (p3->alloc, &local_weights));
+    SC3E (sc3_allocator_free (p3->alloc, &global_weight_sums));
+    return NULL;
+  }
+
+  /* determine processor ids to edit their boundary and just do it */
+  for (i = 0; i < nodesize; ++i) {
+    cut = p4est3_uint64cut (weight_sum, i, nodesize);
+    if (global_weight_sums[noderank] > cut ||
+        cut >= global_weight_sums[noderank + 1]) {
+      continue;
+    }
+    SC3E (p4est3_search_lower_bound64
+          (cut, local_weights, (size_t) p3->local_num_quads, &new_left_border));
+    SC3A_CHECK (new_left_border > 0
+                && (p4est3_locidx) new_left_border <= p3->local_num_quads);
+    p3->goffset[node_offset + i] = new_left_border;
+  }
+  return NULL;
+}
+
 sc3_error_t        *
 p4est3_partition (p4est3_t * p3)
 {
@@ -468,7 +550,7 @@ p4est3_partition (p4est3_t * p3)
   const size_t        send_size = num_send_trees * sizeof (p4est3_locidx)
     + 2 * sizeof (p4est3_gloidx);
   int                 i, from_proc, sk, mpiret, to_proc;
-  int                 nodesize, noderank, node_num;
+  int                 nodesize, noderank, node_num, node_offset;
   int                *node_offsets;
   int                 num_proc_recv_from, num_proc_send_to;
   char              **recv_buf, **send_buf;
@@ -487,7 +569,6 @@ p4est3_partition (p4est3_t * p3)
                                      or begin of current proc (MAX of them). From which quad we start
                                      sending info. */
   p4est3_gloidx       qcount_node;
-  p4est3_gloidx       new_right_border, new_left_border;
   p4est3_gloidx       new_first_tquad, new_last_tquad;
   p4est3_gloidx      *last_goffsets, *new_last_goffsets;
                                                     /**< Offsets of last quadrant in a process */
@@ -514,42 +595,38 @@ p4est3_partition (p4est3_t * p3)
     SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
     SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
 
-    qcount_node = p3->goffset[node_offsets[node_num + 1]]
-      - p3->goffset[node_offsets[node_num]];
-    /* Find new left and right borders for the local partition */
-    new_left_border = p4est3_glocut (qcount_node, nodesize, noderank);
-    new_right_border = p4est3_glocut (qcount_node, nodesize, noderank + 1);
+  node_offset = node_offsets[node_num];
+  /* Adjust quadrant partition information of the forest */
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->goffsets->goffsetwin));
 
+  if (p3->cweight == NULL) {
+    qcount_node = p3->goffset[node_offsets[node_num + 1]]
+      - p3->goffset[node_offset];
 #ifdef P4EST_ENABLE_DEBUG
-    if (noderank + 1 == nodesize) {
-      SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                              p3->goffsets->goffsetwin));
-      SC3A_CHECK (p3->goffset[p3->mpirank + 1] == new_right_border);
-      SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
-    }
-    if (noderank == 0) {
-      SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                              p3->goffsets->goffsetwin));
-      SC3A_CHECK (p3->goffset[p3->mpirank] == new_left_border);
-      SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
-    }
-    SC3E (sc3_MPI_Barrier (nodecomm));
+      if (noderank == 0) {
+        SC3A_CHECK (p3->goffset[p3->mpirank] ==
+                    p4est3_glocut (qcount_node, nodesize, noderank));
+      }
+      SC3E (sc3_MPI_Barrier (nodecomm));
 #endif
-    /* Adjust quadrant partition information of the forest */
-    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                            p3->goffsets->goffsetwin));
-    p3->goffset[p3->mpirank] = new_left_border;
+      p3->goffset[p3->mpirank] = p4est3_glocut (qcount_node, nodesize, noderank);
+    }
+    else {
+      SC3E (p4est3_weighted_new_boundaries
+            (p3, nodesize, node_offset, noderank, nodecomm));
+    }
     SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
     SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
     SC3E (sc3_MPI_Barrier (nodecomm));
 
-    p3->local_num_quads = new_right_border - new_left_border;
+    p3->local_num_quads = p3->goffset[p3->mpirank + 1] - p3->goffset[p3->mpirank];
 
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                             p3->gposition->gfposwin));
     SC3E (p4est3_quadrant_first_descendant
-          (p3->qvt, p3->nodequads[0] + p3->qsize * new_left_border,
-           p3->qmaxlevel, p3->gfpos + p3->mpirank * p3->qsize));
+          (p3->qvt, p3->nodequads[0] + p3->qsize * p3->goffset[p3->mpirank],
+            p3->qmaxlevel, p3->gfpos + p3->mpirank * p3->qsize));
 
     if (noderank == 0) {
       SC3E (p4est3_quadrant_translate
@@ -559,7 +636,7 @@ p4est3_partition (p4est3_t * p3)
     }
     else {
       p3->nodequads[noderank] =
-        p3->nodequads[0] + p3->qsize * new_left_border;
+        p3->nodequads[0] + p3->qsize * p3->goffset[p3->mpirank];
     }
     SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
 
