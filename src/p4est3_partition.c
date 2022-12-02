@@ -464,9 +464,10 @@ p4est3_weighted_new_boundaries (p4est3_t * p3, int nodesize,
   int i;
   int64_t weight, weight_sum, cut;
   int64_t *local_weights, *global_weight_sums;
-  ssize_t new_left_border;
+  ssize_t new_left_border = 0;
   char *quad;
   p4est3_locidx kl = 0, lz;
+  p4est3_gloidx goffset_current_rank = p3->goffset[p3->mpirank];
   p4est3_topidx nt;
   p4est3_tree_t *tree;
   p4est3_quadrant_weight_info_t swi, *wi = &swi;
@@ -474,7 +475,8 @@ p4est3_weighted_new_boundaries (p4est3_t * p3, int nodesize,
   wi->qvt = p3->qvt;
   wi->user_data = NULL; /**< Keep user_data NULL so far, may be we will use it in the future. */
   SC3E (sc3_allocator_malloc
-        (p3->alloc, sizeof (int64_t) * p3->local_num_quads, &local_weights));
+        (p3->alloc, sizeof (int64_t) * (p3->local_num_quads + 1),
+         &local_weights));
   SC3E (sc3_allocator_malloc
         (p3->alloc, sizeof (int64_t) * (nodesize + 1), &global_weight_sums));
 
@@ -518,24 +520,29 @@ p4est3_weighted_new_boundaries (p4est3_t * p3, int nodesize,
 
   /* if all quadrants have zero weight we do nothing */
   if (weight_sum == 0) {
-    SC3E (sc3_allocator_free (p3->alloc, &local_weights));
-    SC3E (sc3_allocator_free (p3->alloc, &global_weight_sums));
+    SC3E (sc3_allocator_free (p3->alloc, local_weights));
+    SC3E (sc3_allocator_free (p3->alloc, global_weight_sums));
     return NULL;
   }
 
   /* determine processor ids to edit their boundary and just do it */
   for (i = 0; i < nodesize; ++i) {
-    cut = p4est3_uint64cut (weight_sum, i, nodesize);
+    cut = p4est3_uint64cut (weight_sum, nodesize, i);
+
     if (global_weight_sums[noderank] > cut ||
         cut >= global_weight_sums[noderank + 1]) {
       continue;
     }
     SC3E (p4est3_search_lower_bound64
-          (cut, local_weights, (ssize_t) p3->local_num_quads, &new_left_border));
-    SC3A_CHECK (new_left_border > 0
-                && (p4est3_locidx) new_left_border <= p3->local_num_quads);
-    p3->goffset[node_offset + i] = new_left_border;
+          (cut, local_weights, (ssize_t) p3->local_num_quads + 1, &new_left_border));
+    SC3A_CHECK (new_left_border >= 0
+                && (p4est3_locidx) new_left_border < p3->local_num_quads);
+    /* shift new left border by goffset since we searched it in local array */
+    p3->goffset[node_offset + i] = new_left_border + goffset_current_rank;
+
   }
+  SC3E (sc3_allocator_free (p3->alloc, local_weights));
+  SC3E (sc3_allocator_free (p3->alloc, global_weight_sums));
   return NULL;
 }
 
