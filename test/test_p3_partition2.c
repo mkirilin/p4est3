@@ -79,6 +79,13 @@ refine_p3_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
 }
 
 static sc3_error_t *
+weight_p3_fn (p4est3_quadrant_weight_info_t * wi, int64_t *weight)
+{
+  *weight = 1;
+  return NULL;
+}
+
+static sc3_error_t *
 array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
            int ecount, sc3_array_t ** arr)
 {
@@ -299,6 +306,7 @@ perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
   SC3E (p4est3_set_partition (p3refined, 1));
   SC3E (p4est3_set_shared (p3refined, 1));
   SC3E (p4est3_set_contiguous (p3refined, 1));
+  SC3E (p4est3_set_weight (p3refined, weight_p3_fn));
   SC3E (p4est3_setup (p3refined));
 
   SC3E (p4est3_destroy (&p3ptr));
