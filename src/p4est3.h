@@ -281,7 +281,7 @@ sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
  */
 sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old);
 
-/** Provide a function and data to be used as refinement contition.
+/** Provide a function to be used as refinement contition.
  * Must be assign to the source forest.
  * \param [in,out] p3       New forest object under construction.
  * \param [in] crefine      Callback function prototype to decide
@@ -293,7 +293,7 @@ sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old);
 sc3_error_t        *p4est3_set_refine (p4est3_t * p3,
                                        p4est3_refine_callback_t crefine);
 
-/** Provide a function and data to be used as coarsening contition.
+/** Provide a function to be used as coarsening contition.
  * Must be assigned to the source forest.
  * \param [in,out] p3       New forest object under construction.
  * \param [in] ccoarse      Callback function prototype to decide
@@ -323,6 +323,16 @@ sc3_error_t        *p4est3_set_family (p4est3_t * p3, int is_family);
  * \return                  NULL on success, error object otherwise.
 */
 sc3_error_t        *p4est3_set_partition (p4est3_t * p3, int partition);
+
+/** Provide a function to be used as weighted partition contition.
+ * \param [in, out] p3      The forest must not have been setup.
+ * \param [in] cweight      Weight function prototype to calculate
+ *                          the weight of a quadrant. NULL value is possible,
+ *                          in this case even partition is performed.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_set_weight (p4est3_t * p3,
+                                       p4est3_weight_callback_t cweight);
 
 /** TODO document */
 sc3_error_t        *p4est3_set_user_data (p4est3_t * p3, void *user_data);

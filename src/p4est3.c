@@ -67,6 +67,7 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
     SC3E_IS (p4est3_glooffs_is_valid, p3->goffsets, reason);
     SC3E_TEST (p3->old == NULL, reason);
     SC3E_TEST (p3->crefine == NULL && p3->ccoarse == NULL, reason);
+    SC3E_TEST (p3->cweight == NULL, reason);
   }
 
   /* TODO check communicator and connectivity members */
@@ -308,6 +309,15 @@ p4est3_set_partition (p4est3_t * p3, int partition)
 }
 
 sc3_error_t        *
+p4est3_set_weight (p4est3_t * p3, p4est3_weight_callback_t cweight)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  p3->cweight = cweight;
+
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_setup (p4est3_t * p3)
 {
   int                 cdim;
@@ -346,6 +356,7 @@ p4est3_setup (p4est3_t * p3)
     p3->old = NULL;
     p3->crefine = NULL;
     p3->ccoarse = NULL;
+    p3->cweight = NULL;
   }
   else {
     /* query input communicator and populate node and head communicators */
