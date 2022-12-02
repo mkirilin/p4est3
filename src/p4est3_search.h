@@ -74,7 +74,7 @@ sc3_error_t        *p4est3_find_partition (sc3_allocator_t * alloc,
  */
 sc3_error_t        *p4est3_search_lower_bound64 (int64_t target,
                                                  const int64_t * array,
-                                                 size_t nmemb,
+                                                 ssize_t nmemb,
                                                  ssize_t * guess);
 
 #endif /* !P4EST_SEARCH_H */

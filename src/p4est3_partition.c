@@ -530,7 +530,7 @@ p4est3_weighted_new_boundaries (const p4est3_t * p3, int nodesize,
       continue;
     }
     SC3E (p4est3_search_lower_bound64
-          (cut, local_weights, (size_t) p3->local_num_quads, &new_left_border));
+          (cut, local_weights, (ssize_t) p3->local_num_quads, &new_left_border));
     SC3A_CHECK (new_left_border > 0
                 && (p4est3_locidx) new_left_border <= p3->local_num_quads);
     p3->goffset[node_offset + i] = new_left_border;

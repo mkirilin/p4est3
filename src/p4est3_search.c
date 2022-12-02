@@ -118,9 +118,9 @@ p4est3_find_partition (sc3_allocator_t * alloc, int num_entities,
 
 sc3_error_t        *
 p4est3_search_lower_bound64 (int64_t target, const int64_t * array,
-                             size_t nmemb, ssize_t * guess)
+                             ssize_t nmemb, ssize_t * guess)
 {
-  size_t              k_low, k_high;
+  ssize_t             k_low, k_high;
   int64_t             cur;
 
   if (nmemb == 0) {
@@ -133,26 +133,26 @@ p4est3_search_lower_bound64 (int64_t target, const int64_t * array,
   for (;;) {
     SC3A_CHECK (k_low <= k_high);
     SC3A_CHECK (k_low < nmemb && k_high < nmemb);
-    SC3A_CHECK (k_low <= guess && guess <= k_high);
+    SC3A_CHECK (k_low <= *guess && *guess <= k_high);
 
     /* compare two quadrants */
     cur = array[*guess];
 
     /* check if guess is higher or equal target and there's room below it */
-    if (target <= cur && (guess > 0 && target <= array[*guess - 1])) {
-      k_high = guess - 1;
-      guess = (k_low + k_high + 1) / 2;
+    if (target <= cur && (*guess > 0 && target <= array[*guess - 1])) {
+      k_high = *guess - 1;
+      *guess = (k_low + k_high + 1) / 2;
       continue;
     }
 
     /* check if guess is lower than target */
     if (target > cur) {
-      k_low = guess + 1;
+      k_low = *guess + 1;
       if (k_low > k_high) {
         *guess = -1;
         return NULL;
       }
-      guess = (k_low + k_high) / 2;
+      *guess = (k_low + k_high) / 2;
       continue;
     }
 
@@ -160,10 +160,10 @@ p4est3_search_lower_bound64 (int64_t target, const int64_t * array,
     break;
   }
 
-  SC3A_CHECK (guess < nmemb);
+  SC3A_CHECK (*guess < nmemb);
   SC3A_CHECK (array[*guess] >= target);
-  SC3A_CHECK (guess == 0 || array[*guess - 1] < target);
-  return (ssize_t) guess;
+  SC3A_CHECK (*guess == 0 || array[*guess - 1] < target);
+  return NULL;
 }
 
 #ifdef __cplusplus
