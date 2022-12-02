@@ -485,6 +485,7 @@ p4est3_weighted_new_boundaries (p4est3_t * p3, int nodesize,
     SC3E (p4est3_tree_index (p3, nt, &tree));
     for (lz = 0; lz < tree->num_quads; ++lz, ++kl) {
       quad = tree->tquads + p3->qsize * lz;
+      wi->quadrant = quad;
       SC3E (p3->cweight (wi, &weight));
       SC3A_CHECK (weight >= 0);
       local_weights[kl + 1] = local_weights[kl] + weight;
