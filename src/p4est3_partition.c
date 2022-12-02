@@ -457,7 +457,7 @@ p4est3_partition_cleanup (const p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_weighted_new_boundaries (const p4est3_t * p3, int nodesize,
+p4est3_weighted_new_boundaries (p4est3_t * p3, int nodesize,
                                 int node_offset, int noderank,
                                 sc3_MPI_Comm_t nodecomm)
 {
@@ -551,7 +551,7 @@ p4est3_partition (p4est3_t * p3)
     + 2 * sizeof (p4est3_gloidx);
   int                 i, from_proc, sk, mpiret, to_proc;
   int                 nodesize, noderank, node_num, node_offset;
-  int                *node_offsets;
+  const int          *node_offsets;
   int                 num_proc_recv_from, num_proc_send_to;
   char              **recv_buf, **send_buf;
   p4est3_topidx       num_recv_trees;
