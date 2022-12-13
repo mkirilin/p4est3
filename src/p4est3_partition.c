@@ -21,7 +21,6 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#include <p4est3_partition.h>
 #include <p4est3_internal.h>
 #include <p4est3_search.h>
 
@@ -623,6 +622,11 @@ p4est3_partition (p4est3_t * p3)
   sc3_MPI_Aint_t      quadbytes, tempbytes;
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Win_t       new_quadwin;
+
+  if (!p3->partition) {
+    /* nothing to do here */
+    return NULL;
+  }
 
   /* We suppose to call this function after setting up routine */
   SC3A_CHECK (p3->old != NULL);

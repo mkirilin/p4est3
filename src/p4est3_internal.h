@@ -238,6 +238,13 @@ extern              "C"
 sc3_error_t        *p4est3_tree_index (p4est3_t * p3, p4est3_topidx tt,
                                        p4est3_tree_t ** tree);
 
+/* Refine, coarsen of simply copy forest from the source. */
+/* Warning: this functions does not support multithreading */
+sc3_error_t        *p4est3_refine_coarsen_copy (p4est3_t * p3);
+
+/** Make a repartition of the input forest when set it up from source. */
+sc3_error_t        *p4est3_partition (p4est3_t * p3);
+
 /** \cond P4EST_FALSE */
 /* these functions are not documented on purpose */
 sc3_error_t        *p4est3_internal_setup_comm (p4est3_t * p3);

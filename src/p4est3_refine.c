@@ -21,9 +21,8 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#include <p4est3_refine.h>
-#include <p4est3_iterate.h>
 #include <p4est3_internal.h>
+#include <p4est3_iterate.h>
 
 #ifdef __cplusplus
 extern              "C"
@@ -315,7 +314,7 @@ p4est3_populate_tree_cpy (p4est3_t * p3, p4est3_tree_t * tree,
 }
 
 sc3_error_t        *
-p4est3_fill_from_source (p4est3_t * p3)
+p4est3_refine_coarsen_copy (p4est3_t * p3)
 {
   int                 i, nodesize;
   int                 dispunit;
