@@ -301,19 +301,12 @@ p4est3_set_family (p4est3_t * p3, int is_family)
 }
 
 sc3_error_t        *
-p4est3_set_partition (p4est3_t * p3, int partition)
+p4est3_set_partition (p4est3_t * p3, int partition,
+                      p4est3_weight_callback_t cweight)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->partition = partition;
-  return NULL;
-}
-
-sc3_error_t        *
-p4est3_set_weight (p4est3_t * p3, p4est3_weight_callback_t cweight)
-{
-  SC3A_IS (p4est3_is_new, p3);
   p3->cweight = cweight;
-
   return NULL;
 }
 

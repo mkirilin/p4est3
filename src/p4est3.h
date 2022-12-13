@@ -320,19 +320,13 @@ sc3_error_t        *p4est3_set_family (p4est3_t * p3, int is_family);
  * \param [in,out] p3       The forest must not have been setup.
  * \param [in] partition    True value indicates enabling, while false is for
  *                          disabling of partition. Default value is false.
- * \return                  NULL on success, error object otherwise.
-*/
-sc3_error_t        *p4est3_set_partition (p4est3_t * p3, int partition);
-
-/** Provide a function to be used as weighted partition contition.
- * \param [in, out] p3      The forest must not have been setup.
  * \param [in] cweight      Weight function prototype to calculate
  *                          the weight of a quadrant. NULL value is possible,
  *                          in this case even partition is performed.
  * \return                  NULL on success, error object otherwise.
- */
-sc3_error_t        *p4est3_set_weight (p4est3_t * p3,
-                                       p4est3_weight_callback_t cweight);
+*/
+sc3_error_t        *p4est3_set_partition (p4est3_t * p3, int partition,
+                                          p4est3_weight_callback_t cweight);
 
 /** TODO document */
 sc3_error_t        *p4est3_set_user_data (p4est3_t * p3, void *user_data);
