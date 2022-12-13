@@ -148,7 +148,7 @@ make_new_p4est3 (p4est3_t ** p3, setup_t * t,
   SC3E (p4est3_set_quadrant_vtable (*p3, *qvt));
   SC3E (p4est3_set_level (*p3, 0));
   SC3E (p4est3_set_shared (*p3, 1));
-  SC3E (p4est3_set_contiguous (*p3, 1));
+  SC3E (p4est3_set_contiguous (*p3, 0));
   SC3E (p4est3_setup (*p3));
 
   return NULL;
@@ -305,7 +305,7 @@ perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
   SC3E (p4est3_set_source (p3refined, p3ptr));
   SC3E (p4est3_set_partition (p3refined, 1));
   SC3E (p4est3_set_shared (p3refined, 1));
-  SC3E (p4est3_set_contiguous (p3refined, 1));
+  SC3E (p4est3_set_contiguous (p3refined, 0));
   SC3E (p4est3_set_weight (p3refined, weight_p3_fn));
   SC3E (p4est3_setup (p3refined));
 
