@@ -320,7 +320,7 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
   int                 dispunit;
   int                 noderank;
   char               *quadmem, *nqmem;
-  p4est3_locidx       lt_offset, num_quads = 0;
+  p4est3_locidx       lt_offset;
   p4est3_locidx      *local_num_quads;  /**< Array of the numbers of quadrants at every rank */
   p4est3_locidx      *first_tree_quads; /**< Array of the numbers of quadrants at the first local tree */
   sc3_MPI_Info_t      info_noncontig;
