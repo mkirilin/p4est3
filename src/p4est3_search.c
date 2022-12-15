@@ -85,7 +85,7 @@ type_fn_global_quad_index (sc3_array_t * array, size_t index,
 }
 
 sc3_error_t        *
-p4est3_find_partition (const p4est3_t * p3,
+p4est3_find_partition (sc3_allocator_t * alloc,
                        const int num_entities, p4est3_gloidx * search_in,
                        p4est3_gloidx my_begin, p4est3_gloidx my_end,
                        p4est3_gloidx * begin, p4est3_gloidx * end)
@@ -94,8 +94,8 @@ p4est3_find_partition (const p4est3_t * p3,
   p4est3_gloidx        my_begin_end[2];
 
   SC3A_CHECK (my_begin <= my_end);
-  SC3E (p4est3_search_array_new (p3->alloc, sizeof (int), 3, 3, &offsets));
-  SC3E (sc3_array_new_data (p3->alloc, &view, search_in,
+  SC3E (p4est3_search_array_new (alloc, sizeof (int), 3, 3, &offsets));
+  SC3E (sc3_array_new_data (alloc, &view, search_in,
                             sizeof (p4est3_gloidx), 0, num_entities));
 
   my_begin_end[0] = my_begin;
