@@ -168,6 +168,9 @@ struct p4est3
   /* functions set before p4est3_setup */
   p4est3_refine_callback_t crefine; /**< Refinemet callback function */
   p4est3_coarsen_callback_t ccoarse; /**< Coarsening  callback function */
+  p4est3_weight_callback_t cweight; /**< Quadrant's weight callback function.
+                                         Might be NULL, in this case divide up
+                                         the quadrants equally. */
 
   /* pointer to user data, p4est does not touch them */
   void               *user_data;

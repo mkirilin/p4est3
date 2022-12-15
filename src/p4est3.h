@@ -131,6 +131,22 @@ typedef struct p4est3_coarsen_callback_info
 }
 p4est3_coarsen_callback_info_t;
 
+/** Pass context information about a local element to calculate its weight. */
+typedef struct p4est3_quadrant_weight_info
+{
+  /* these variables stay the same during weights assigning process */
+  p4est3_t           *p3;               /**< Pointer to the forest */
+  p4est3_quadrant_vtable_t *qvt;        /**< Pointer to the quadrant virtual
+                                             table of current implementation */
+  void               *user_data;        /**< For convenience, the user data */
+
+  /* these variables are specific to each quadrant asked for refinement */
+  p4est3_topidx       ntree;            /**< Number of tree of quadrant */
+  void               *quadrant;         /**< Pointer to the quadrant whose
+                                             weight is calculated */
+}
+p4est3_quadrant_weight_info_t;
+
 /** Document this. */
 typedef             sc3_error_t
   * (*p4est3_refine_callback_t) (p4est3_refine_callback_info_t * ci,
@@ -140,6 +156,11 @@ typedef             sc3_error_t
 typedef             sc3_error_t
   * (*p4est3_coarsen_callback_t) (p4est3_coarsen_callback_info_t * ci,
                                   int *is_coarsen);
+
+/** Callback to use in partition function. It gives quadrant's weight. */
+typedef             sc3_error_t
+  * (*p4est3_weight_callback_t) (p4est3_quadrant_weight_info_t * wi,
+                                 int *weight);
 
 /** Check whether a forest is valid (no matter if setup or not).
  * \param [in] p3       Forest pointer.  NULL is considered not valid.
