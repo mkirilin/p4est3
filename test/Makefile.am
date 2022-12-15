@@ -15,7 +15,7 @@ p4est_test_programs += \
         test/p4est_test_mesh_bijective test/p4est_test_conn_transformation \
         test/p4est_test_iterate test/p4est_test_lnodes \
         test/p4est_test_search test/p4est_test_brick \
-	test/p4est_test_complete_subtree \
+        test/p4est_test_complete_subtree \
         test/p4est_test_partition_corr \
         test/p4est_test_conn_complete test/p4est_test_balance_seeds \
         test/p4est_test_wrap test/p4est_test_replace test/p4est_test_join \
@@ -27,7 +27,9 @@ p4est_test_programs += \
         test/p4est_test_avx \
         test/p4est_test_version \
         test/p4est3_test_p3_iterate \
-        test/p4est3_test_p3_refine
+        test/p4est3_test_p3_refine \
+        test/p4est_test_io \
+        test/p4est_test_neighbor_transform
 if P4EST_WITH_METIS
 p4est_test_programs += \
         test/p4est_test_reorder
@@ -55,7 +57,9 @@ p4est_test_programs += \
         test/p8est_test_avx \
         test/p8est_test_version \
         test/p8est3_test_p3_iterate \
-        test/p8est3_test_p3_refine
+        test/p8est3_test_p3_refine \
+        test/p8est_test_io \
+        test/p8est_test_neighbor_transform
 if P4EST_WITH_METIS
 p4est_test_programs += \
         test/p8est_test_reorder
@@ -113,6 +117,8 @@ test_p4est_test_avx_SOURCES = test/test_avx2.c
 test_p4est_test_version_SOURCES = test/test_version.c
 test_p4est3_test_p3_iterate_SOURCES = test/test_p3_iterate2.c
 test_p4est3_test_p3_refine_SOURCES = test/test_p3_refine2.c
+test_p4est_test_neighbor_transform_SOURCES = test/test_neighbor_transform2.c
+test_p4est_test_io_SOURCES = test/test_io2.c
 if P4EST_WITH_METIS
 test_p4est_test_reorder_SOURCES = test/test_reorder2.c
 endif
@@ -156,6 +162,8 @@ test_p8est_test_avx_SOURCES = test/test_avx3.c
 test_p8est_test_version_SOURCES = test/test_version.c
 test_p8est3_test_p3_iterate_SOURCES = test/test_p3_iterate3.c
 test_p8est3_test_p3_refine_SOURCES = test/test_p3_refine3.c
+test_p8est_test_neighbor_transform_SOURCES = test/test_neighbor_transform3.c
+test_p8est_test_io_SOURCES = test/test_io3.c
 if P4EST_WITH_METIS
 test_p8est_test_reorder_SOURCES = test/test_reorder3.c
 endif
@@ -212,6 +220,7 @@ LINT_CSOURCES += \
         $(test_p4est_test_version_SOURCES) \
         $(test_p4est3_test_p3_iterate_SOURCES) \
         $(test_p4est3_test_p3_refine_SOURCES) \
+        $(test_p4est_test_io_SOURCES) \
         $(test_p8est_test_quadrants_SOURCES) \
         $(test_p8est_test_balance_SOURCES) \
         $(test_p8est_test_partition_SOURCES) \
@@ -247,7 +256,8 @@ LINT_CSOURCES += \
         $(test_p8est3_test_p3_iterate_SOURCES) \
         $(test_p8est3_test_p3_refine_SOURCES) \
         $(test_p6est_test_all_SOURCES) \
-        $(test_p4est3_test_conn3_transformation)
+        $(test_p4est3_test_conn3_transformation) \
+        $(test_p8est_test_io_SOURCES)
 
 if P4EST_WITH_METIS
 LINT_CSOURCES += \

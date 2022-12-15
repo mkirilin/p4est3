@@ -88,6 +88,18 @@ int                 p8est_quadrant_is_equal_piggy (const p8est_quadrant_t *
  */
 int                 p8est_quadrant_compare (const void *v1, const void *v2);
 
+/** Compare two sets of coordinates in their Morton ordering.
+ * Coordinates are signed, but the sorted order will treat them
+ * as unsigned, with negative coordinates being greater than
+ * positive coordinates because of their representation in twos-complement.
+ * \param [in] v1, v2    Two sets of 3d coordinates.
+ * \return Returns < 0 if \a v1 < \a v2,
+ *                   0 if \a v1 == \a v2,
+ *                 > 0 if \a v1 > \a v2
+ */
+int                 p8est_coordinates_compare (const p4est_qcoord_t v1[],
+                                               const p4est_qcoord_t v2[]);
+
 /** Compare two quadrants in their Morton ordering, with equivalence if the
  * two quadrants overlap.
  * \return Returns < 0 if \a v1 < \a v2 and \a v1 and \v2 do not overlap,
@@ -176,6 +188,13 @@ int                 p8est_quadrant_ancestor_id (const p8est_quadrant_t * q,
  */
 int                 p8est_quadrant_child_id (const p8est_quadrant_t * q);
 
+/** Test if Morton indices are inside the unit tree.
+ * \param [in] coord   3d coordinates.
+ * \return Returns true if \a (coord[0],coord[1],coord[2]) is inside the unit tree.
+ */
+int                 p8est_coordinates_is_inside_root (const p4est_qcoord_t
+                                                      coord[]);
+
 /** Test if a quadrant is inside the unit tree.
  * \param [in] q Quadrant to be tested.
  * \return Returns true if \a q is inside the unit tree.
@@ -228,6 +247,14 @@ int                 p8est_quadrant_is_outside_corner (const p8est_quadrant_t *
  */
 int                 p8est_quadrant_is_node (const p8est_quadrant_t * q,
                                             int inside);
+
+/** Test if Morton indices are valid and are inside the unit tree.
+ * \param [in] coord  3d coordinates.
+ * \param [in] level  level
+ * \return Returns true if \a (coord[0],coord[1],coord[2],level) is valid.
+ */
+int                 p8est_coordinates_is_valid (const p4est_qcoord_t coord[],
+                                                int level);
 
 /** Test if a quadrant has valid Morton indices and is inside the unit tree.
  * \param [in] q Quadrant to be tested.
@@ -507,7 +534,7 @@ void                p8est_quadrant_edge_neighbor (const p8est_quadrant_t * q,
  *                        trees containing the edge neighbors will be placed.
  * \param [in,out] nedges if not NULL, filled with the edges of \a quads that
  *                        neighbor \q. the ints in \nedges are encoded with
- *                        orientation informatin like the edge_to_edge array
+ *                        orientation information like the edge_to_edge array
  *                        in the p8est_connectivity_t struct
  * \param [in]     conn   The connectivity structure for the forest.
  */
@@ -677,6 +704,20 @@ void                p8est_quadrant_transform_face (const p8est_quadrant_t * q,
                                                    p8est_quadrant_t * r,
                                                    const int ftransform[]);
 
+/** Transforms coordinates across a face between trees.
+ * \param [in]  coords_in   Input coordinates.
+ * \param [out] coords_out  Output coordinates.
+ * \param [in] ftransform   This array holds 9 integers.
+ *             [0]..[2]     The coordinate axis sequence of the origin face.
+ *             [3]..[5]     The coordinate axis sequence of the target face.
+ *             [6]..[8]     Edge reverse flag for axes 0, 1; face code for 2.
+ */
+void                p8est_coordinates_transform_face (const p4est_qcoord_t
+                                                      coords_in[],
+                                                      p4est_qcoord_t
+                                                      coords_out[],
+                                                      const int ftransform[]);
+
 /** Checks if a quadrant touches an edge (diagonally inside or outside).
  */
 int                 p8est_quadrant_touches_edge (const p8est_quadrant_t * q,
@@ -685,8 +726,8 @@ int                 p8est_quadrant_touches_edge (const p8est_quadrant_t * q,
 /** Transforms a quadrant across an edge between trees.
  * \param [in]     q          Input quadrant.
  * \param [in,out] r          Quadrant whose Morton index will be filled.
- * \param [in]     edge       Edge index of the originating quadrant.
- * \param [in]     ei         Edge information computed previously.
+ * \param [in]     ei         Edge info from p8est_find_edge_transform().
+ * \param [in]     et         One of ei's transformations.
  * \param [in]     inside     The quadrant will be placed inside or outside.
  */
 void                p8est_quadrant_transform_edge (const p8est_quadrant_t * q,
@@ -696,6 +737,23 @@ void                p8est_quadrant_transform_edge (const p8est_quadrant_t * q,
                                                    const
                                                    p8est_edge_transform_t *
                                                    et, int inside);
+
+/** Transforms coordinates on an edge between trees.
+ * \param [in]     coords_in  Input coordinates.
+ * \param [out]    coords_out Output coordinates.
+ * \param [in]     ei         Edge info from p8est_find_edge_transform().
+ * \param [in]     et         One of ei's transformations.
+ */
+void                p8est_coordinates_transform_edge (const p4est_qcoord_t
+                                                      coords_in[],
+                                                      p4est_qcoord_t
+                                                      coords_out[],
+                                                      const
+                                                      p8est_edge_info_t *
+                                                      ei,
+                                                      const
+                                                      p8est_edge_transform_t *
+                                                      et);
 
 /** Shifts a quadrant until it touches the specified edge from the inside.
  * If this shift is meant to recreate the effects of \a q on balancing across
@@ -800,6 +858,33 @@ void                p8est_quadrant_predecessor (const p8est_quadrant_t *
 void                p8est_quadrant_srand (const p8est_quadrant_t * q,
                                           sc_rand_state_t * rstate);
 
+/** Transform a quadrant from self's coordinate system to neighbor's coordinate system.
+ *
+ * \param [in]  nt            A neighbor transform.
+ * \param [in]  self_quad     Input quadrant in self coordinates.
+ * \param [out] neigh_coords  Quad transformed into neighbor coordinates.
+ *
+ * \note This transform gives meaningful results when \a self_quad is inside
+ * the tree root or touches the interface between the two trees in the
+ * transform.
+ */
+void                p8est_neighbor_transform_quadrant
+  (const p8est_neighbor_transform_t * nt,
+   const p8est_quadrant_t * self_quad, p8est_quadrant_t * neigh_quad);
+
+/** Transform a quadrant from a neighbors's coordinate system to self's coordinate system.
+ *
+ * \param [in]  nt            A neighbor transform.
+ * \param [in]  neigh_coords  Input quadrant in neighbor coordinates.
+ * \param [out] self_coords   Quad transformed into self coordinates.
+ *
+ * \note This transform gives meaningful results when \a neigh_quad is inside
+ * the tree root or touches the interface between the two trees in the
+ * transform.
+ */
+void                p4est_neighbor_transform_quadrant_reverse
+  (const p8est_neighbor_transform_t * nt,
+   const p8est_quadrant_t * neigh_quad, p8est_quadrant_t * self_quad);
 SC_EXTERN_C_END;
 
 #endif /* !P8EST_BITS_H */
