@@ -79,7 +79,7 @@ type_fn_global_quad_index (sc3_array_t * array, size_t index,
     *type = 2;
   }
   else {
-    type = 0;
+    *type = 0;
   }
   return NULL;
 }
