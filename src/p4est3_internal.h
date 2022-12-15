@@ -89,6 +89,7 @@ typedef struct p4est3_glopart
 {
   sc3_refcount_t      rc;
   int                 setup;
+  sc3_allocator_t    *mator;
   sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
                                               information. It should correspond
                                               to the same forest as the current object. */
@@ -107,6 +108,7 @@ typedef struct p4est3_glooffs
 {
   sc3_refcount_t      rc;
   int                 setup;
+  sc3_allocator_t    *mator;
   sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
                                               information. It should correspond
                                               to the same forest as the current object. */
@@ -157,6 +159,9 @@ struct p4est3
                                               information. */
 
   /* variables populated during p4est3_setup: partition related */
+  p4est3_glopart_t   *gpartition;       /**< Store global tree partition and
+                                             global first quadrants. */
+  p4est3_glooffs_t   *goffsets;         /**< Store global quadrants offsets. */
   int                 qsize;            /**< Store byte size of one quadrant. */
   int                 qmaxlevel;        /**< Maximum allowed refinement level. */
   int                 num_children;     /**< Number of children for a quadrant. */
@@ -237,10 +242,10 @@ sc3_error_t        *p4est3_glooffs_new (sc3_allocator_t * mator,
                                         p4est3_glooffs_t ** mp);
 sc3_error_t        *p4est3_glopart_set_qsize (p4est3_glopart_t * m,
                                               int qsize);
-sc3_error_t        *p4est3_glopart_set_mpienv (sc3_mpienv_t * mpienv,
-                                               p4est3_glopart_t * m);
-sc3_error_t        *p4est3_glooffs_set_mpienv (sc3_mpienv_t * mpienv,
-                                               p4est3_glooffs_t * m);
+sc3_error_t        *p4est3_glopart_set_mpienv (p4est3_glopart_t * m,
+                                               sc3_mpienv_t * mpienv);
+sc3_error_t        *p4est3_glooffs_set_mpienv (p4est3_glooffs_t * m,
+                                               sc3_mpienv_t * mpienv);
 sc3_error_t        *p4est3_glopart_setup (p4est3_glopart_t * m);
 sc3_error_t        *p4est3_glooffs_setup (p4est3_glooffs_t * m);
 sc3_error_t        *p4est3_glopart_ref (p4est3_glopart_t * m);

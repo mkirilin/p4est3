@@ -131,19 +131,21 @@ p4est3_glooffs_new (sc3_allocator_t * mator, p4est3_glooffs_t ** mp)
 }
 
 sc3_error_t *
-p4est3_glopart_set_mpienv (sc3_mpienv_t * mpienv, p4est3_glopart_t * m)
+p4est3_glopart_set_mpienv ( p4est3_glopart_t * m, sc3_mpienv_t * mpienv)
 {
   SC3A_IS (p4est3_glopart_is_new, m);
   SC3A_IS (sc3_mpienv_is_setup, mpienv);
+  SC3E (sc3_mpienv_ref (mpienv));
   m->mpienv = mpienv;
   return NULL;
 }
 
 sc3_error_t *
-p4est3_glooffs_set_mpienv (sc3_mpienv_t * mpienv, p4est3_glooffs_t * m)
+p4est3_glooffs_set_mpienv (p4est3_glooffs_t * m, sc3_mpienv_t * mpienv)
 {
   SC3A_IS (p4est3_glooffs_is_new, m);
   SC3A_IS (sc3_mpienv_is_setup, mpienv);
+  SC3E (sc3_mpienv_ref (mpienv));
   m->mpienv = mpienv;
   return NULL;
 }
