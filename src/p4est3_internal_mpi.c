@@ -58,11 +58,11 @@ p4est3_internal_setup_cut (p4est3_t * p3,
   int                 beginr, endr, p;
   int                 nfamilies;
   int                 dispunit;
-  char               *gfposmem, *qptr;
+  char               *qptr;
   char               *temp = p3->temp_quad[0];
-  p4est3_topidx      *gftreemem;
-  p4est3_gloidx      *goffsetmem, num_global;
+  p4est3_gloidx       num_global;
   sc3_MPI_Comm_t      nodecomm;
+  sc3_MPI_Win_t       gftreewin, gfposwin, goffsetwin;
 
   SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
   SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
@@ -77,61 +77,73 @@ p4est3_internal_setup_cut (p4est3_t * p3,
   SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
 
   /* create shared partition arrays */
-  SC3E (p4est3_glopart_new (p3->alloc, ))
+  SC3E (p4est3_glopart_new (p3->alloc, &p3->gpartition));
+  SC3E (p4est3_glopart_set_mpienv (p3->gpartition, p3->split_info));
+  SC3E (p4est3_glopart_set_qsize (p3->gpartition, qsize));
+  SC3E (p4est3_glopart_setup (p3->gpartition));
+
+  SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
+  SC3E (p4est3_glooffs_set_mpienv (p3->goffsets, p3->split_info));
+  SC3E (p4est3_glooffs_setup (p3->goffsets));
+
+  /* making shortcuts */
+  SC3E (p4est3_glopart_get_gftree (p3->gpartition, &p3->gftree));
+  SC3E (p4est3_glopart_get_gfpos (p3->gpartition, &p3->gfpos));
+  SC3E (p4est3_glooffs_get_goffset (p3->gpartition, &p3->goffset));
 
   /* compute global partition information fairly across node ranks */
+  SC3E (p4est3_get_gftreewin (p3, &gftreewin));
+  SC3E (p4est3_get_gfposwin (p3, &gfposwin));
+  SC3E (p4est3_get_goffsetwin (p3, &goffsetwin));
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->gftreewin));
+                          gftreewin));
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->gfposwin));
+                          gfposwin));
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->goffsetwin));
+                          goffsetwin));
   num_global = p3->num_trees * num_uniform;
   beginr = sc3_intcut (p3->mpisize + 1, nodesize, noderank);
   endr = sc3_intcut (p3->mpisize + 1, nodesize, noderank + 1);
 
   /* parallelize process loop across threads */
-  qptr = gfposmem + beginr * qsize;
+  qptr = p3->gfpos + beginr * qsize;
   nfamilies = num_global / p3->num_children;
   for (p = beginr; p < endr; ++p) {
-    goffsetmem[p] = p4est3_glocut (num_global, p3->mpisize, p);
+    p3->goffset[p] = p4est3_glocut (num_global, p3->mpisize, p);
     if (p3->family && p3->level != 0) {
       if (nfamilies < p3->mpisize) {
-        goffsetmem[p] = p4est3_glocut (num_global, nfamilies, p);
+        p3->goffset[p] = p4est3_glocut (num_global, nfamilies, p);
       }
       /*else if (p3->level == 1) {
          
-        goffsetmem[p] =
+        p3->goffset[p] =
           nfamilies - p4est3_glocut (nfamilies, p3->mpisize, p3->mpisize - p);
-        goffsetmem[p] *= num_uniform;
+        p3->goffset[p] *= num_uniform;
       }*/
       else {
-        goffsetmem[p] -= (goffsetmem[p] % p3->num_children);
-        /*goffsetmem[p] = p4est3_glocut (nfamilies, p3->mpisize, p);
-        goffsetmem[p] *= p3->num_children;*/
+        p3->goffset[p] -= (p3->goffset[p] % p3->num_children);
+        /*p3->goffset[p] = p4est3_glocut (nfamilies, p3->mpisize, p);
+        p3->goffset[p] *= p3->num_children;*/
       }
     }
-    gftreemem[p] = goffsetmem[p] / num_uniform;
+    p3->gftree[p] = p3->goffset[p] / num_uniform;
     SC3E (p4est3_quadrant_morton
             (p3->qvt, p3->level,
-            goffsetmem[p] - gftreemem[p] * num_uniform, temp));
+            p3->goffset[p] - p3->gftree[p] * num_uniform, temp));
     SC3E(p4est3_quadrant_first_descendant
           (p3->qvt, temp, p3->qmaxlevel, qptr));
     qptr += qsize;
   }
-  SC3E (sc3_MPI_Win_unlock (0, p3->gftreewin));
-  SC3E (sc3_MPI_Win_unlock (0, p3->gfposwin));
-  SC3E (sc3_MPI_Win_unlock (0, p3->goffsetwin));
+  SC3E (sc3_MPI_Win_unlock (0, gftreewin));
+  SC3E (sc3_MPI_Win_unlock (0, gfposwin));
+  SC3E (sc3_MPI_Win_unlock (0, goffsetwin));
   SC3E (sc3_MPI_Barrier (nodecomm));
-  SC3A_CHECK (gftreemem[p3->mpisize] == p3->num_trees);
-  SC3A_CHECK (goffsetmem[p3->mpisize] == num_global);
+  SC3A_CHECK (p3->gftree[p3->mpisize] == p3->num_trees);
+  SC3A_CHECK (p3->goffset[p3->mpisize] == num_global);
 
   /* assign further object members */
   p3->qsize = qsize;
   p3->global_num_quads = num_global;
-  p3->goffset = goffsetmem;
-  p3->gftree = gftreemem;
-  p3->gfpos = gfposmem;
   return NULL;
 }
 
