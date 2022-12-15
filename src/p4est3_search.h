@@ -36,7 +36,7 @@
  * for \a begin and minimal index for \a end is the result.
  * If \a my_begin is less than the smallest value of \a search_in
  * \a begin is set to -1 and if \a my_end is bigger than the largest
- * value of \a search_in \a end is set to \a num_entities.
+ * value of \a search_in \a end is set to `num_entities + 1`.
  * \param [in] alloc        Valid allocator to setup temporary arrays.
  *                          Must be setup.
  * \param [in] num_entities Number of entities to get the length of
@@ -50,7 +50,7 @@
  * \param [in] my_end       The second target that defines the end (excluded)
  *                          of the search window.
  * \param [out] begin       The first offset such that
- *                          `search_in[begin] >= my_begin`.
+ *                          `search_in[begin] <= my_begin`.
  * \param [out] end         The second offset such that
  *                          `my_end <= search_in[end]`.
  */
