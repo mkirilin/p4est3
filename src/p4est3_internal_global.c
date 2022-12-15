@@ -25,7 +25,7 @@
 #include <sc3_mpienv.h>
 #include <p4est3_internal.h>
 
-static int
+int
 p4est3_glotree_is_valid (const p4est3_glotree_t * m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);
@@ -42,7 +42,7 @@ p4est3_glotree_is_valid (const p4est3_glotree_t * m, char *reason)
   SC3E_YES (reason);
 }
 
-static int
+int
 p4est3_glopos_is_valid (const p4est3_glopos_t * m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);
@@ -60,7 +60,7 @@ p4est3_glopos_is_valid (const p4est3_glopos_t * m, char *reason)
   SC3E_YES (reason);
 }
 
-static int
+int
 p4est3_glooffs_is_valid (const p4est3_glooffs_t * m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);

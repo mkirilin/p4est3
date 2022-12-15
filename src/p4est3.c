@@ -63,6 +63,9 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
   else {
     SC3E_TEST (p3->accessed_conn >= 0, reason);
     SC3E_IS (sc3_mpienv_is_valid, p3->split_info, reason);
+    SC3E_IS (p4est3_glotree_is_valid, p3->gtrees, reason);
+    SC3E_IS (p4est3_glopos_is_valid, p3->gposition, reason);
+    SC3E_IS (p4est3_glooffs_is_valid, p3->goffsets, reason);
     SC3E_TEST (p3->old == NULL, reason);
     SC3E_TEST (p3->crefine == NULL && p3->ccoarse == NULL, reason);
   }
@@ -197,7 +200,8 @@ p4est3_set_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
 }
 
 sc3_error_t        *
-p4est3_set_quadrant_vtable (p4est3_t * p3, const p4est3_quadrant_vtable_t * qvt)
+p4est3_set_quadrant_vtable (p4est3_t * p3,
+                            const p4est3_quadrant_vtable_t * qvt)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (qvt != NULL);
@@ -415,7 +419,6 @@ p4est3_destroy (p4est3_t ** pp3)
   p4est3_t           *p3;
   sc3_MPI_Win_t       gftreewin, gfposwin, goffsetwin;
 
-
   SC3E_INULLP (pp3, p3);
   SC3A_IS (p4est3_is_valid, p3);
   SC3A_CHECK (p3->accessed_conn == 0);
@@ -438,12 +441,10 @@ p4est3_destroy (p4est3_t ** pp3)
       int                 ti;
 
       /* free internal MPI objects */
-      SC3E (p4est3_get_gftreewin (p3, &gftreewin));
-      SC3E (p4est3_get_gfposwin (p3, &gfposwin));
-      SC3E (p4est3_get_goffsetwin (p3, &goffsetwin));
-      SC3E (sc3_MPI_Win_free (gftreewin));
-      SC3E (sc3_MPI_Win_free (gfposwin));
-      SC3E (sc3_MPI_Win_free (goffsetwin));
+      SC3E (p4est3_glotree_unref (&p3->gtrees));
+      SC3E (p4est3_glopos_unref (&p3->gposition));
+      SC3E (p4est3_glooffs_unref (&p3->goffsets));
+
       SC3E (sc3_MPI_Win_free (&p3->quadwin));
 
       /* deallocate internal storage */
@@ -563,7 +564,7 @@ p4est3_get_local_num_quads (const p4est3_t * p3, p4est3_locidx * n)
 }
 
 sc3_error_t        *
-p4est3_get_gftreewin (const p4est3_t *p3, sc3_MPI_Win_t *tw)
+p4est3_get_gftreewin (const p4est3_t * p3, sc3_MPI_Win_t * tw)
 {
   SC3A_IS (p4est3_is_setup, p3);
   SC3A_CHECK (tw != NULL);
@@ -573,7 +574,7 @@ p4est3_get_gftreewin (const p4est3_t *p3, sc3_MPI_Win_t *tw)
 }
 
 sc3_error_t        *
-p4est3_get_gfposwin (const p4est3_t *p3, sc3_MPI_Win_t *pw)
+p4est3_get_gfposwin (const p4est3_t * p3, sc3_MPI_Win_t * pw)
 {
   SC3A_IS (p4est3_is_setup, p3);
   SC3A_CHECK (pw != NULL);
@@ -583,7 +584,7 @@ p4est3_get_gfposwin (const p4est3_t *p3, sc3_MPI_Win_t *pw)
 }
 
 sc3_error_t        *
-p4est3_get_goffsetwin (const p4est3_t *p3, sc3_MPI_Win_t *ow)
+p4est3_get_goffsetwin (const p4est3_t * p3, sc3_MPI_Win_t * ow)
 {
   SC3A_IS (p4est3_is_setup, p3);
   SC3A_CHECK (ow != NULL);
