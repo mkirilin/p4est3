@@ -357,7 +357,7 @@ p4est3_glopart_get_gfpos (const p4est3_glopart_t * m, int **gfpos)
 }
 
 sc3_error_t        *
-p4est3_gloffs_get_goffset (const p4est3_glooffs_t * m, int **goffset)
+p4est3_glooffs_get_goffset (const p4est3_glooffs_t * m, int **goffset)
 {
   SC3A_IS (p4est3_glooffs_is_setup, m);
   SC3A_CHECK (goffset != NULL);

@@ -258,8 +258,8 @@ sc3_error_t        *p4est3_glopart_get_gftree (const p4est3_glopart_t * m,
                                                int **gftree);
 sc3_error_t        *p4est3_glopart_get_gfpos (const p4est3_glopart_t * m,
                                               int **gfpos);
-sc3_error_t        *p4est3_gloffs_get_goffset (const p4est3_glooffs_t * m,
-                                               int **goffset);
+sc3_error_t        *p4est3_glooffs_get_goffset (const p4est3_glooffs_t * m,
+                                                int **goffset);
 /** \endcond */
 
 /* TODO: document default value for all _set_ */
