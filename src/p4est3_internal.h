@@ -231,12 +231,16 @@ sc3_error_t        *p4est3_internal_setup_tree (p4est3_t * p3,
 sc3_error_t        *p4est3_internal_setup_quadrants (p4est3_t * p3);
 sc3_error_t        *p4est3_internal_setup_from_source (p4est3_t * p3);
 /* global partition and offsets section */
-sc3_error_t        *p4est3_glopart_new (sc3_mpienv_t * mpienv,
+sc3_error_t        *p4est3_glopart_new (sc3_allocator_t * mator,
                                         p4est3_glopart_t ** mp);
-sc3_error_t        *p4est3_glooffs_new (sc3_mpienv_t * mpienv,
+sc3_error_t        *p4est3_glooffs_new (sc3_allocator_t * mator,
                                         p4est3_glooffs_t ** mp);
 sc3_error_t        *p4est3_glopart_set_qsize (p4est3_glopart_t * m,
                                               int qsize);
+sc3_error_t        *p4est3_glopart_set_mpienv (sc3_mpienv_t * mpienv,
+                                               p4est3_glopart_t * m);
+sc3_error_t        *p4est3_glooffs_set_mpienv (sc3_mpienv_t * mpienv,
+                                               p4est3_glooffs_t * m);
 sc3_error_t        *p4est3_glopart_setup (p4est3_glopart_t * m);
 sc3_error_t        *p4est3_glooffs_setup (p4est3_glooffs_t * m);
 sc3_error_t        *p4est3_glopart_ref (p4est3_glopart_t * m);

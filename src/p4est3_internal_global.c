@@ -30,13 +30,13 @@ p4est3_glopart_is_valid (const p4est3_glopart_t * m, char * reason)
 {
   SC3E_TEST (m != NULL, reason);
   SC3E_IS (sc3_refcount_is_valid, &m->rc, reason);
-  SC3E_IS (sc3_mpienv_is_setup, &m->mpienv, reason);
 
   if (!m->setup) {
     SC3E_TEST (m->gfpos == NULL, reason);
     SC3E_TEST (m->gftree == NULL, reason);
   }
   else {
+    SC3E_IS (sc3_mpienv_is_setup, &m->mpienv, reason);
     SC3E_TEST (m->gfpos != NULL, reason);
     SC3E_TEST (m->gftree != NULL, reason);
     SC3E_TEST (m->gftree > 0, reason);
@@ -49,12 +49,12 @@ p4est3_glooffs_is_valid (const p4est3_glooffs_t * m, char * reason)
 {
   SC3E_TEST (m != NULL, reason);
   SC3E_IS (sc3_refcount_is_valid, &m->rc, reason);
-  SC3E_IS (sc3_mpienv_is_setup, &m->mpienv, reason);
 
   if (!m->setup) {
     SC3E_TEST (m->goffset == NULL, reason);
   }
   else {
+    SC3E_IS (sc3_mpienv_is_setup, &m->mpienv, reason);
     SC3E_TEST (m->goffset != NULL, reason);
   }
   SC3E_YES (reason);
@@ -93,16 +93,16 @@ p4est3_glooffs_is_setup (const p4est3_glooffs_t * m, char *reason)
 }
 
 sc3_error_t        *
-p4est3_glopart_new (sc3_mpienv_t * mpienv, p4est3_glopart_t ** mp)
+p4est3_glopart_new (sc3_allocator_t * mator, p4est3_glopart_t ** mp)
 {
   p4est3_glopart_t *m;
 
   SC3E_RETVAL (mp, NULL);
-  SC3A_IS (sc3_mpienv_is_setup, &mpienv);
+  SC3A_IS (sc3_allocator_is_setup, mator);
 
-  SC3E (sc3_mpienv_ref (mpienv));
+  SC3E (sc3_allocator_ref (mator));
+  SC3E (sc3_allocator_calloc_one (mator, sizeof (p4est3_glopart_t), &m));
   SC3E (sc3_refcount_init (&m->rc));
-  m->mpienv = mpienv;
   m->gfpos = NULL;
   m->gftree = NULL;
   m->qsize = 0;
@@ -113,20 +113,38 @@ p4est3_glopart_new (sc3_mpienv_t * mpienv, p4est3_glopart_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_glooffs_new (sc3_mpienv_t * mpienv, p4est3_glooffs_t ** mp)
+p4est3_glooffs_new (sc3_allocator_t * mator, p4est3_glooffs_t ** mp)
 {
   p4est3_glooffs_t *m;
 
   SC3E_RETVAL (mp, NULL);
-  SC3A_IS (sc3_mpienv_is_setup, &mpienv);
+  SC3A_IS (sc3_allocator_is_setup, mator);
 
-  SC3E (sc3_mpienv_ref (mpienv));
+  SC3E (sc3_allocator_ref (mator));
+  SC3E (sc3_allocator_calloc_one (mator, sizeof (p4est3_glooffs_t), &m));
   SC3E (sc3_refcount_init (&m->rc));
-  m->mpienv = mpienv;
   m->goffset = NULL;
 
   SC3A_IS (p4est3_glooffs_is_new, m);
   *mp = m;
+  return NULL;
+}
+
+sc3_error_t *
+p4est3_glopart_set_mpienv (sc3_mpienv_t * mpienv, p4est3_glopart_t * m)
+{
+  SC3A_IS (p4est3_glopart_is_new, m);
+  SC3A_IS (sc3_mpienv_is_setup, mpienv);
+  m->mpienv = mpienv;
+  return NULL;
+}
+
+sc3_error_t *
+p4est3_glooffs_set_mpienv (sc3_mpienv_t * mpienv, p4est3_glooffs_t * m)
+{
+  SC3A_IS (p4est3_glooffs_is_new, m);
+  SC3A_IS (sc3_mpienv_is_setup, mpienv);
+  m->mpienv = mpienv;
   return NULL;
 }
 
