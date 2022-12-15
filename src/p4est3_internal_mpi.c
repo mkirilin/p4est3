@@ -76,20 +76,19 @@ p4est3_internal_setup_cut (p4est3_t * p3,
 
   SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
 
-  /* create shared partition arrays */
-  SC3E (p4est3_glopart_new (p3->alloc, &p3->gpartition));
-  SC3E (p4est3_glopart_set_mpienv (p3->gpartition, p3->split_info));
-  SC3E (p4est3_glopart_set_qsize (p3->gpartition, qsize));
-  SC3E (p4est3_glopart_setup (p3->gpartition));
-
+  /* create shared partition structures */
+  SC3E (p4est3_glotree_new (p3->alloc, &p3->gtrees));
+  SC3E (p4est3_glopos_new (p3->alloc, &p3->gposition));
   SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
-  SC3E (p4est3_glooffs_set_mpienv (p3->goffsets, p3->split_info));
-  SC3E (p4est3_glooffs_setup (p3->goffsets));
+  SC3E (p4est3_glopartition_set_mpienv
+        (p3->gtrees, p3->gposition, p3->goffsets, p3->split_info));
+  SC3E (p4est3_glotree_set_qsize (p3->gposition, qsize));
+  SC3E (p4est3_glopartition_setup (p3->gtrees, p3->gposition, p3->goffsets));
 
   /* making shortcuts */
-  SC3E (p4est3_glopart_get_gftree (p3->gpartition, &p3->gftree));
-  SC3E (p4est3_glopart_get_gfpos (p3->gpartition, &p3->gfpos));
-  SC3E (p4est3_glooffs_get_goffset (p3->gpartition, &p3->goffset));
+  p3->gftree = p3->gtrees->gftree;
+  p3->gfpos = p3->gposition->gfpos;
+  p3->goffset = p3->goffsets->goffset;
 
   /* compute global partition information fairly across node ranks */
   SC3E (p4est3_get_gftreewin (p3, &gftreewin));

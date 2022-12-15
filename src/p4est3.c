@@ -413,6 +413,8 @@ p4est3_destroy (p4est3_t ** pp3)
 {
   sc3_allocator_t    *alloc;
   p4est3_t           *p3;
+  sc3_MPI_Win_t       gftreewin, gfposwin, goffsetwin;
+
 
   SC3E_INULLP (pp3, p3);
   SC3A_IS (p4est3_is_valid, p3);
@@ -436,9 +438,12 @@ p4est3_destroy (p4est3_t ** pp3)
       int                 ti;
 
       /* free internal MPI objects */
-      SC3E (sc3_MPI_Win_free (&p3->gfposwin));
-      SC3E (sc3_MPI_Win_free (&p3->gftreewin));
-      SC3E (sc3_MPI_Win_free (&p3->goffsetwin));
+      SC3E (p4est3_get_gftreewin (p3, &gftreewin));
+      SC3E (p4est3_get_gfposwin (p3, &gfposwin));
+      SC3E (p4est3_get_goffsetwin (p3, &goffsetwin));
+      SC3E (sc3_MPI_Win_free (gftreewin));
+      SC3E (sc3_MPI_Win_free (gfposwin));
+      SC3E (sc3_MPI_Win_free (goffsetwin));
       SC3E (sc3_MPI_Win_free (&p3->quadwin));
 
       /* deallocate internal storage */
