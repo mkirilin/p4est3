@@ -170,8 +170,8 @@ struct p4est3
                                               information. */
 
   /* variables populated during p4est3_setup: partition related */
-  p4est3_glotree_t   *gpartition;       /**< Store global tree partition and
-                                             global first quadrants. */
+  p4est3_glotree_t   *gtrees;           /**< Store global tree partition. */
+  p4est3_glopos_t    *gposition;        /**< Store global first quadrants. */
   p4est3_glooffs_t   *goffsets;         /**< Store global quadrants offsets. */
   int                 qsize;            /**< Store byte size of one quadrant. */
   int                 qmaxlevel;        /**< Maximum allowed refinement level. */

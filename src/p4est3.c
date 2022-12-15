@@ -563,7 +563,7 @@ p4est3_get_gftreewin (const p4est3_t *p3, sc3_MPI_Win_t *tw)
   SC3A_IS (p4est3_is_setup, p3);
   SC3A_CHECK (tw != NULL);
 
-  *tw = p3->gpartition->gftreewin;
+  *tw = p3->gtrees->gftreewin;
   return NULL;
 }
 
@@ -573,7 +573,7 @@ p4est3_get_gfposwin (const p4est3_t *p3, sc3_MPI_Win_t *pw)
   SC3A_IS (p4est3_is_setup, p3);
   SC3A_CHECK (pw != NULL);
 
-  *pw = p3->gpartition->gfposwin;
+  *pw = p3->gposition->gfposwin;
   return NULL;
 }
 

@@ -316,8 +316,7 @@ sc3_error_t        *p4est3_set_family (p4est3_t * p3, int is_family);
 sc3_error_t        *p4est3_set_partition (p4est3_t * p3, int partition);
 
 /** TODO document */
-sc3_error_t        *p4est3_set_user_data (p4est3_t * p3,
-                                          void *user_data);
+sc3_error_t        *p4est3_set_user_data (p4est3_t * p3, void *user_data);
 
 /** Finalize construction of a forest.
  * Afterwards, no more \c p4est3_set_* functions may be called.
@@ -394,8 +393,8 @@ sc3_error_t        *p4est3_get_local_num_trees (const p4est3_t * p3,
  *                          Pointer to this output variable must not be NULL.
  * \return                  NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_get_gftreewin (const p4est3_t *p3,
-                                          sc3_MPI_Win_t *tw);
+sc3_error_t        *p4est3_get_gftreewin (const p4est3_t * p3,
+                                          sc3_MPI_Win_t * tw);
 
 /** Query MPI window for global first quadrant.
  * \param [in] p3           Initialized, valid forest.
@@ -403,8 +402,8 @@ sc3_error_t        *p4est3_get_gftreewin (const p4est3_t *p3,
  *                          Pointer to this output variable must not be NULL.
  * \return                  NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_get_gfposwin (const p4est3_t *p3,
-                                         sc3_MPI_Win_t *pw);
+sc3_error_t        *p4est3_get_gfposwin (const p4est3_t * p3,
+                                         sc3_MPI_Win_t * pw);
 
 /** Query MPI window for global quadrant offsets.
  * \param [in] p3           Initialized, valid forest.
@@ -412,8 +411,8 @@ sc3_error_t        *p4est3_get_gfposwin (const p4est3_t *p3,
  *                          Pointer to this output variable must not be NULL.
  * \return                  NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_get_goffsetwin (const p4est3_t *p3,
-                                           sc3_MPI_Win_t *ow);
+sc3_error_t        *p4est3_get_goffsetwin (const p4est3_t * p3,
+                                           sc3_MPI_Win_t * ow);
 
 /*----------------------- accessing quadrants ------------------------*/
 
@@ -425,8 +424,7 @@ sc3_error_t        *p4est3_get_global_num_quads (const p4est3_t * p3,
 sc3_error_t        *p4est3_get_local_num_quads (const p4est3_t * p3,
                                                 p4est3_locidx * n);
 
-sc3_error_t        *p4est3_get_user_data (p4est3_t * p3,
-                                          void **user_data);
+sc3_error_t        *p4est3_get_user_data (p4est3_t * p3, void **user_data);
 
 /*-------------------- working with quadrants ------------------------*/
 
