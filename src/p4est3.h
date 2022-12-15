@@ -283,6 +283,17 @@ sc3_error_t        *p4est3_set_coarsen (p4est3_t * p3,
 */
 sc3_error_t        *p4est3_set_family (p4est3_t * p3, int is_family);
 
+/**
+ * Warning: Works only for shared memory so far.
+ * Enable/disable partition while making a mesh from a source. The partition
+ * is performed after the refinement/coarsening in case of simultenious use.
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] partition    True value indicates enabling, while false is for
+ *                          disabling of partition. Default value is false.
+ * \return                  NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_set_partition (p4est3_t * p3, int partition);
+
 /** TODO document */
 sc3_error_t        *p4est3_set_user_data (p4est3_t * p3,
                                           void *user_data);

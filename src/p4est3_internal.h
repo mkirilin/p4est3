@@ -119,6 +119,8 @@ struct p4est3
   int                 mpirank;          /**< Rank in forest communicator. */
   int                 shared;           /**< MPI sharined memory enable/disable
                                              indicator. */
+  int                 partition;        /**< Indicator to make a partition of
+                                             the source forest.*/
   sc3_mpienv_t       *split_info;       /**<  Pointer to a relevant MPI
                                               processes split related
                                               information. */

@@ -126,6 +126,7 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   p3->setup_mode = P4EST3_NEW_MORTON;
   p3->shared = 0;
   p3->family = 0;
+  p3->partition = 0;
   SC3A_IS (p4est3_is_new, p3);
 
   *pp3 = p3;
@@ -283,6 +284,14 @@ p4est3_set_family (p4est3_t * p3, int is_family)
   SC3A_IS (p4est3_is_new, p3);
   p3->family = is_family;
 
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_set_partition (p4est3_t * p3, int partition)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  p3->partition = partition;
   return NULL;
 }
 
