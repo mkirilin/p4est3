@@ -257,6 +257,7 @@ sc3_error_t *
 p4est3_glopart_unref (p4est3_glopart_t ** mp)
 {
   int waslast;
+  sc3_allocator_t    *mator;
   p4est3_glopart_t *m;
   sc3_error_t        *leak = NULL;
 
@@ -265,6 +266,7 @@ p4est3_glopart_unref (p4est3_glopart_t ** mp)
   SC3E (sc3_refcount_unref (&m->rc, &waslast));
   if (waslast) {
     *mp = NULL;
+    mator = m->mator;
     if (m->setup) {
       /* deallocate data created on setup here */
       SC3E (sc3_MPI_Win_free (&m->gfposwin));
@@ -272,6 +274,8 @@ p4est3_glopart_unref (p4est3_glopart_t ** mp)
     }
     /* deallocate data knonw on setup here */
     SC3L (&leak, sc3_mpienv_unref (&m->mpienv));
+    SC3E (sc3_allocator_free (mator, m));
+    SC3L (&leak, sc3_allocator_unref (&mator));
   }
   return leak;
 }
@@ -281,6 +285,7 @@ p4est3_glooffs_unref (p4est3_glooffs_t ** mp)
 {
   int waslast;
   p4est3_glopart_t *m;
+  sc3_allocator_t    *mator;
   sc3_error_t        *leak = NULL;
 
   SC3E_INOUTP (mp, m);
@@ -288,12 +293,15 @@ p4est3_glooffs_unref (p4est3_glooffs_t ** mp)
   SC3E (sc3_refcount_unref (&m->rc, &waslast));
   if (waslast) {
     *mp = NULL;
+    mator = m->mator;
     if (m->setup) {
       /* deallocate data created on setup here */
       SC3E (sc3_MPI_Win_free (&m->gfposwin));
     }
     /* deallocate data knonw on setup here */
     SC3L (&leak, sc3_mpienv_unref (&m->mpienv));
+    SC3E (sc3_allocator_free (mator, m));
+    SC3L (&leak, sc3_allocator_unref (&mator));
   }
   return leak;
 }

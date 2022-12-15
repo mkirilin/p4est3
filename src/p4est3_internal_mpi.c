@@ -62,9 +62,7 @@ p4est3_internal_setup_cut (p4est3_t * p3,
   char               *temp = p3->temp_quad[0];
   p4est3_topidx      *gftreemem;
   p4est3_gloidx      *goffsetmem, num_global;
-  sc3_MPI_Aint_t      gftreebytes, gfposbytes, goffsetbytes, tempbytes;
   sc3_MPI_Comm_t      nodecomm;
-  sc3_MPI_Info_t      info_noncontig;
 
   SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
   SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
@@ -77,38 +75,9 @@ p4est3_internal_setup_cut (p4est3_t * p3,
   SC3A_CHECK (qsize > 0);
 
   SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
-  SC3E (sc3_mpienv_get_info_noncont (p3->split_info, &info_noncontig));
 
   /* create shared partition arrays */
-  gftreebytes = (p3->mpisize + 1) * sizeof (p4est3_topidx);
-  SC3E (sc3_MPI_Win_allocate_shared
-        (noderank == 0 ? gftreebytes : 0, sizeof (p4est3_topidx),
-         info_noncontig, nodecomm, &gftreemem, &p3->gftreewin));
-  gfposbytes = (p3->mpisize + 1) * qsize;
-  SC3E (sc3_MPI_Win_allocate_shared
-        (noderank == 0 ? gfposbytes : 0, qsize,
-         info_noncontig, nodecomm, &gfposmem, &p3->gfposwin));
-  goffsetbytes = (p3->mpisize + 1) * sizeof (p4est3_gloidx);
-  SC3E (sc3_MPI_Win_allocate_shared
-        (noderank == 0 ? goffsetbytes : 0, sizeof (p4est3_gloidx),
-         info_noncontig, nodecomm, &goffsetmem, &p3->goffsetwin));
-  if (noderank > 0) {
-    SC3E (sc3_MPI_Win_shared_query (p3->gftreewin, 0,
-                                    &tempbytes, &dispunit, &gftreemem));
-    SC3A_CHECK (tempbytes >= gftreebytes);
-    SC3A_CHECK (dispunit == sizeof (p4est3_topidx));
-    SC3A_CHECK (gftreemem != NULL);
-    SC3E (sc3_MPI_Win_shared_query (p3->gfposwin, 0,
-                                    &tempbytes, &dispunit, &gfposmem));
-    SC3A_CHECK (tempbytes >= gfposbytes);
-    SC3A_CHECK (dispunit == qsize);
-    SC3A_CHECK (gfposmem != NULL);
-    SC3E (sc3_MPI_Win_shared_query (p3->goffsetwin, 0,
-                                    &tempbytes, &dispunit, &goffsetmem));
-    SC3A_CHECK (tempbytes >= goffsetbytes);
-    SC3A_CHECK (dispunit == (int) sizeof (p4est3_gloidx));
-    SC3A_CHECK (goffsetmem != NULL);
-  }
+  SC3E (p4est3_glopart_new (p3->alloc, ))
 
   /* compute global partition information fairly across node ranks */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
