@@ -54,15 +54,17 @@ sc3_error_t        *
 p4est3_partition (p4est3_t * p3)
 {
   int p;
-  int nodesize, noderank;
+  int nodesize, noderank, node_num;
+  int *node_sizes, *node_offsets;
   p4est3_locidx       *num_quadrants_in_proc;
   p4est3_gloidx        prev_quadrant, next_quadrant, qcount;
+  p4est3_gloidx        new_right_border;
 
   /* We suppose to call this function after setting up routine */
   SC3A_CHECK (p3->old != NULL);
   SC3A_IS (p4est3_is_setup, p3->old);
 
-  SC3E (sc3_mpienv_get_nodesize (p3->old->split_info, &nodesize));
+  SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
   /* this function does nothing for processes without shared memory */
   if (nodesize == 1) {
     return;
@@ -70,7 +72,7 @@ p4est3_partition (p4est3_t * p3)
 
   if (p3->cweight == NULL) {
     /* Divide up the quadrants equally */
-    SC3E (p4est3_part_array_new
+    /*SC3E (p4est3_part_array_new
           (p3->alloc, sizeof (p4est3_gloidx), nodesize + 1, nodesize + 1,
            num_quadrants_in_proc));
     for (p = 0, next_quadrant = 0; p < nodesize; ++p) {
@@ -79,9 +81,22 @@ p4est3_partition (p4est3_t * p3)
       qcount = next_quadrant - prev_quadrant;
       SC3A_CHECK (0 <= qcount && qcount <= (p4est3_gloidx) P4EST3_GLOIDX_MAX);
       num_quadrants_in_proc[p] = (p4est3_locidx) (qcount);
-    }
+    }*/
 
-    
+    /* Find a new right border for the local partition */
+    SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
+    new_right_border
+      = p4est3_glocut (p3->global_num_quads, noderank + 1, nodesize);
+    /* Find to which process belongs the new right border */
+    SC3E (sc3_mpienv_get_node_num (p3->split_info, &node_num));
+    SC3E (sc3_mpienv_get_node_sizes (p3->split_info, &node_sizes));
+    SC3E (sc3_mpienv_get_node_offsets (p3->split_info, &node_offsets));
+    SC3E (p4est3_find_partition (p3->alloc, node_sizes[node_num], p3->goffset +,
+                                 new_right_border, new_right_border,
+                                 
+                                 ))
+
+
   }
 
 }

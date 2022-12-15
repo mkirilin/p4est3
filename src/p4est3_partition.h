@@ -30,6 +30,7 @@
 #define P4EST3_PARTITION_H
 
 #include <p4est3.h>
+#include <p4est3_search.h>
 
 #ifdef __cplusplus
 extern              "C"
