@@ -388,6 +388,33 @@ sc3_error_t        *p4est3_get_local_num_trees (const p4est3_t * p3,
                                                 p4est3_topidx *
                                                 last_local_tree);
 
+/** Query MPI window for the global partition of trees.
+ * \param [in] p3           Initialized, valid forest.
+ * \param [out] tw          MPI window for the global partition of trees.
+ *                          Pointer to this output variable must not be NULL.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_gftreewin (const p4est3_t *p3,
+                                          sc3_MPI_Win_t *tw);
+
+/** Query MPI window for global first quadrant.
+ * \param [in] p3           Initialized, valid forest.
+ * \param [out] pw          MPI window for global first quadrants.
+ *                          Pointer to this output variable must not be NULL.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_gfposwin (const p4est3_t *p3,
+                                         sc3_MPI_Win_t *pw);
+
+/** Query MPI window for global quadrant offsets.
+ * \param [in] p3           Initialized, valid forest.
+ * \param [out] ow          MPI window for global quadrant offsets.
+ *                          Pointer to this output variable must not be NULL.
+ * \return                  NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_goffsetwin (const p4est3_t *p3,
+                                           sc3_MPI_Win_t *ow);
+
 /*----------------------- accessing quadrants ------------------------*/
 
 /* TODO: think about this interface */
