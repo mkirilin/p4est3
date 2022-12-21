@@ -131,6 +131,22 @@ typedef struct p4est3_coarsen_callback_info
 }
 p4est3_coarsen_callback_info_t;
 
+/** Pass context information about a local element to calculate its weight. */
+typedef struct p4est3_quadrant_weight_info
+{
+  /* these variables stay the same during weights assigning process */
+  p4est3_t           *p3;               /**< Pointer to the forest */
+  p4est3_quadrant_vtable_t *qvt;        /**< Pointer to the quadrant virtual
+                                             table of current implementation */
+  void               *user_data;        /**< For convenience, the user data */
+
+  /* these variables are specific to each quadrant asked for refinement */
+  p4est3_topidx       ntree;            /**< Number of tree of quadrant */
+  void               *quadrant;         /**< Pointer to the quadrant whose
+                                             weight is calculated */
+}
+p4est3_quadrant_weight_info_t;
+
 /** Document this. */
 typedef             sc3_error_t
   * (*p4est3_refine_callback_t) (p4est3_refine_callback_info_t * ci,
@@ -140,6 +156,11 @@ typedef             sc3_error_t
 typedef             sc3_error_t
   * (*p4est3_coarsen_callback_t) (p4est3_coarsen_callback_info_t * ci,
                                   int *is_coarsen);
+
+/** Callback to use in partition function. It gives quadrant's weight. */
+typedef             sc3_error_t
+  * (*p4est3_weight_callback_t) (p4est3_quadrant_weight_info_t * wi,
+                                 int64_t *weight);
 
 /** Check whether a forest is valid (no matter if setup or not).
  * \param [in] p3       Forest pointer.  NULL is considered not valid.
@@ -210,6 +231,15 @@ sc3_error_t        *p4est3_set_comm (p4est3_t * p3,
 */
 sc3_error_t        *p4est3_set_shared (p4est3_t * p3, int shared);
 
+/** Enable/disable continious MPI shared memory when possible.
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] contiguous   True value indicates enabling, while false
+ *                          is for disabling of MPI-3 contiguous shared
+ *                          memory. Default value is false.
+ * \return                  NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_set_contiguous (p4est3_t * p3, int contiguous);
+
 /** Provide a connectivity to be used in creating the forest.
  * TODO: set 2D unit square as default.
  * This function is mandatory to call at least once before \ref p4est3_setup.
@@ -251,7 +281,7 @@ sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
  */
 sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old);
 
-/** Provide a function and data to be used as refinement contition.
+/** Provide a function to be used as refinement contition.
  * Must be assign to the source forest.
  * \param [in,out] p3       New forest object under construction.
  * \param [in] crefine      Callback function prototype to decide
@@ -263,7 +293,7 @@ sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old);
 sc3_error_t        *p4est3_set_refine (p4est3_t * p3,
                                        p4est3_refine_callback_t crefine);
 
-/** Provide a function and data to be used as coarsening contition.
+/** Provide a function to be used as coarsening contition.
  * Must be assigned to the source forest.
  * \param [in,out] p3       New forest object under construction.
  * \param [in] ccoarse      Callback function prototype to decide
@@ -283,9 +313,23 @@ sc3_error_t        *p4est3_set_coarsen (p4est3_t * p3,
 */
 sc3_error_t        *p4est3_set_family (p4est3_t * p3, int is_family);
 
+/**
+ * Warning: Works only for shared memory so far.
+ * Enable/disable partition while making a mesh from a source. The partition
+ * is performed after the refinement/coarsening in case of simultenious use.
+ * \param [in,out] p3       The forest must not have been setup.
+ * \param [in] partition    True value indicates enabling, while false is for
+ *                          disabling of partition. Default value is false.
+ * \param [in] cweight      Weight function prototype to calculate
+ *                          the weight of a quadrant. NULL value is possible,
+ *                          in this case even partition is performed.
+ * \return                  NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_set_partition (p4est3_t * p3, int partition,
+                                          p4est3_weight_callback_t cweight);
+
 /** TODO document */
-sc3_error_t        *p4est3_set_user_data (p4est3_t * p3,
-                                          void *user_data);
+sc3_error_t        *p4est3_set_user_data (p4est3_t * p3, void *user_data);
 
 /** Finalize construction of a forest.
  * Afterwards, no more \c p4est3_set_* functions may be called.
@@ -366,8 +410,7 @@ sc3_error_t        *p4est3_get_global_num_quads (const p4est3_t * p3,
 sc3_error_t        *p4est3_get_local_num_quads (const p4est3_t * p3,
                                                 p4est3_locidx * n);
 
-sc3_error_t        *p4est3_get_user_data (p4est3_t * p3,
-                                          void **user_data);
+sc3_error_t        *p4est3_get_user_data (p4est3_t * p3, void **user_data);
 
 /*-------------------- working with quadrants ------------------------*/
 

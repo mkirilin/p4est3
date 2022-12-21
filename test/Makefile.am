@@ -29,7 +29,8 @@ p4est_test_programs += \
         test/p4est3_test_p3_iterate \
         test/p4est3_test_p3_refine \
         test/p4est_test_io \
-        test/p4est_test_neighbor_transform
+        test/p4est_test_neighbor_transform \
+        test/p4est3_test_p3_partition
 if P4EST_WITH_METIS
 p4est_test_programs += \
         test/p4est_test_reorder
@@ -59,7 +60,8 @@ p4est_test_programs += \
         test/p8est3_test_p3_iterate \
         test/p8est3_test_p3_refine \
         test/p8est_test_io \
-        test/p8est_test_neighbor_transform
+        test/p8est_test_neighbor_transform \
+        test/p8est3_test_p3_partition
 if P4EST_WITH_METIS
 p4est_test_programs += \
         test/p8est_test_reorder
@@ -119,6 +121,7 @@ test_p4est3_test_p3_iterate_SOURCES = test/test_p3_iterate2.c
 test_p4est3_test_p3_refine_SOURCES = test/test_p3_refine2.c
 test_p4est_test_neighbor_transform_SOURCES = test/test_neighbor_transform2.c
 test_p4est_test_io_SOURCES = test/test_io2.c
+test_p4est3_test_p3_partition_SOURCES = test/test_p3_partition2.c
 if P4EST_WITH_METIS
 test_p4est_test_reorder_SOURCES = test/test_reorder2.c
 endif
@@ -164,6 +167,7 @@ test_p8est3_test_p3_iterate_SOURCES = test/test_p3_iterate3.c
 test_p8est3_test_p3_refine_SOURCES = test/test_p3_refine3.c
 test_p8est_test_neighbor_transform_SOURCES = test/test_neighbor_transform3.c
 test_p8est_test_io_SOURCES = test/test_io3.c
+test_p8est3_test_p3_partition_SOURCES = test/test_p3_partition3.c
 if P4EST_WITH_METIS
 test_p8est_test_reorder_SOURCES = test/test_reorder3.c
 endif
@@ -221,6 +225,7 @@ LINT_CSOURCES += \
         $(test_p4est3_test_p3_iterate_SOURCES) \
         $(test_p4est3_test_p3_refine_SOURCES) \
         $(test_p4est_test_io_SOURCES) \
+        $(test_p4est3_test_p3_partition_SOURCES) \
         $(test_p8est_test_quadrants_SOURCES) \
         $(test_p8est_test_balance_SOURCES) \
         $(test_p8est_test_partition_SOURCES) \
@@ -255,6 +260,7 @@ LINT_CSOURCES += \
         $(test_p8est_test_version_SOURCES) \
         $(test_p8est3_test_p3_iterate_SOURCES) \
         $(test_p8est3_test_p3_refine_SOURCES) \
+        $(test_p8est3_test_p3_partition_SOURCES) \
         $(test_p6est_test_all_SOURCES) \
         $(test_p4est3_test_conn3_transformation) \
         $(test_p8est_test_io_SOURCES)

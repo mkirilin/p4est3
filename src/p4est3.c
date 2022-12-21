@@ -58,13 +58,16 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
 
   if (!p3->setup) {
     SC3E_TEST (p3->accessed_conn == 0, reason);
-    SC3E_TEST (p3->split_info == NULL, reason);
   }
   else {
     SC3E_TEST (p3->accessed_conn >= 0, reason);
     SC3E_IS (sc3_mpienv_is_valid, p3->split_info, reason);
+    SC3E_IS (p4est3_glotree_is_valid, p3->gtrees, reason);
+    SC3E_IS (p4est3_glopos_is_valid, p3->gposition, reason);
+    SC3E_IS (p4est3_glooffs_is_valid, p3->goffsets, reason);
     SC3E_TEST (p3->old == NULL, reason);
     SC3E_TEST (p3->crefine == NULL && p3->ccoarse == NULL, reason);
+    SC3E_TEST (p3->cweight == NULL, reason);
   }
 
   /* TODO check communicator and connectivity members */
@@ -125,7 +128,9 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
   p3->mpicomm = SC3_MPI_COMM_WORLD;
   p3->setup_mode = P4EST3_NEW_MORTON;
   p3->shared = 0;
+  p3->contiguous = 0;
   p3->family = 0;
+  p3->partition = 0;
   SC3A_IS (p4est3_is_new, p3);
 
   *pp3 = p3;
@@ -196,7 +201,8 @@ p4est3_set_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
 }
 
 sc3_error_t        *
-p4est3_set_quadrant_vtable (p4est3_t * p3, const p4est3_quadrant_vtable_t * qvt)
+p4est3_set_quadrant_vtable (p4est3_t * p3,
+                            const p4est3_quadrant_vtable_t * qvt)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (qvt != NULL);
@@ -278,11 +284,29 @@ p4est3_set_shared (p4est3_t * p3, int shared)
 }
 
 sc3_error_t        *
+p4est3_set_contiguous (p4est3_t * p3, int contiguous)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  p3->contiguous = contiguous;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_set_family (p4est3_t * p3, int is_family)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->family = is_family;
 
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_set_partition (p4est3_t * p3, int partition,
+                      p4est3_weight_callback_t cweight)
+{
+  SC3A_IS (p4est3_is_new, p3);
+  p3->partition = partition;
+  p3->cweight = cweight;
   return NULL;
 }
 
@@ -325,6 +349,7 @@ p4est3_setup (p4est3_t * p3)
     p3->old = NULL;
     p3->crefine = NULL;
     p3->ccoarse = NULL;
+    p3->cweight = NULL;
   }
   else {
     /* query input communicator and populate node and head communicators */
@@ -427,9 +452,10 @@ p4est3_destroy (p4est3_t ** pp3)
       int                 ti;
 
       /* free internal MPI objects */
-      SC3E (sc3_MPI_Win_free (&p3->gfposwin));
-      SC3E (sc3_MPI_Win_free (&p3->gftreewin));
-      SC3E (sc3_MPI_Win_free (&p3->goffsetwin));
+      SC3E (p4est3_glotree_unref (&p3->gtrees));
+      SC3E (p4est3_glopos_unref (&p3->gposition));
+      SC3E (p4est3_glooffs_unref (&p3->goffsets));
+
       SC3E (sc3_MPI_Win_free (&p3->quadwin));
 
       /* deallocate internal storage */

@@ -21,36 +21,6 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-/** \file p4est3_refine.h
- * Refine and coarse existing forest copying the final result to a new one.
- *
- * \ingroup p4est3
- */
-#ifndef P4EST3_REFINE_H
-#define P4EST3_REFINE_H
-
-#include <p4est3.h>
-
-#ifdef __cplusplus
-extern              "C"
-{
-#if 0
-}
-#endif
-#endif
-
-/* Refine forest. If the forest's data and settings (including
-  refinement/coarsening callbacks and data) ware not set up manually, they,
-  rather than quadrant related, will be inherited from the sourse forest.
- */
-/* Warning: this functions does not support multithreading */
-sc3_error_t        *p4est3_fill_from_source (p4est3_t * p3);
-
-#ifdef __cplusplus
-#if 0
-{
-#endif
-}
-#endif
-
-#endif /* !P4EST3_ITERATE_H */
+#include <p4est_to_p8est.h>
+#include <p4est3_to_p8est3.h>
+#include "test_p3_partition2.c"

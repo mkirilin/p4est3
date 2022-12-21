@@ -80,6 +80,8 @@ typedef long        p4est3_gloidx;
 #define p4est3_glopow sc3_longpow       /**< Suitable integer power function. */
 #define p4est3_glocut sc3_longcut       /**< Suitable partition cut function. */
 
+#define p4est3_uint64cut sc3_uint64cut  /**< Suitable partition cut function. */
+
 #ifdef __cplusplus
 extern              "C"
 {

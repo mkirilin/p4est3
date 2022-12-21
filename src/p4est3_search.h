@@ -1,0 +1,80 @@
+/*
+  This file is part of p4est, version 3.
+  p4est is a C library to manage a collection (a forest) of multiple
+  connected adaptive quadtrees or octrees in parallel.
+
+  Copyright (C) 2019 individual authors
+  Originally written by Carsten Burstedde, Lucas C. Wilcox, and Tobin Isaac
+
+  p4est is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  p4est is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with p4est; if not, write to the Free Software Foundation, Inc.,
+  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+*/
+
+#ifndef P4EST_SEARCH_H
+#define P4EST_SEARCH_H
+
+#include <p4est3.h>
+
+/** Binary search of a subrange in an sorted in ascending order array.
+ * Given two targets \a my_begin and \a my_end, find offsets such that
+ * `search_in[begin] >= my_begin`, `my_end <= search_in[end]`.
+ * If more than one index satisfies the conditions, then the minimal index is the
+ * result. If there is no index that satisfies the conditions, then \a begin
+ * and \a end are tried to set equal such that `search_in[begin] >= my_end`.
+ * If \a my_begin is less or equal than the smallest value of \a search_in
+ * \a begin is set to 0 and if \a my_end is bigger or equal than the largest
+ * value of \a search_in \a end is set to \a num_procs - 1.
+ * If none of the above conditions is satisfied, the output is not well defined.
+ * We require `my_begin <= my_begin'.
+ * \param [in] alloc        Valid allocator to setup temporary arrays.
+ *                          Must be setup.
+ * \param [in] num_entities Number of entities to get the length of
+ *                          \a search_in.
+ * \param [in] search_in    The sorted array (ascending) in that the function
+ *                          will search.
+ *                          If `k` indexes search_in, then
+ *                          `0 <= k < num_entities`.
+ * \param [in] my_begin     The first target that defines the start of the
+ *                          search window.
+ * \param [in] my_end       The second target that defines the end (excluded)
+ *                          of the search window.
+ * \param [out] begin       The first offset such that
+ *                          `search_in[begin] <= my_begin`.
+ * \param [out] end         The second offset such that
+ *                          `my_end <= search_in[end]`.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_find_partition (sc3_allocator_t * alloc,
+                                           int num_entities,
+                                           p4est3_gloidx * search_in,
+                                           p4est3_gloidx my_begin,
+                                           p4est3_gloidx my_end,
+                                           p4est3_gloidx * begin,
+                                           p4est3_gloidx * end);
+
+/** Find lowest position k in a sorted array such that array[k] >= target.
+ * \param [in]  target  The target lower bound to binary search for.
+ * \param [in]  array   The 64bit integer array to binary search in.
+ * \param [in]  nmemb   The number of int64_t's in the array.
+ * \param [in, out]  guess Input: initial array position to look at.
+ *                         Output: the matching position
+ *                         or -1 if array[size-1] < target or if size == 0.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_search_lower_bound64 (int64_t target,
+                                                 const int64_t * array,
+                                                 ssize_t nmemb,
+                                                 ssize_t * guess);
+
+#endif /* !P4EST_SEARCH_H */

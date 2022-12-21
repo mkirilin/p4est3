@@ -22,6 +22,7 @@
 */
 
 #include <p4est3.h>
+#include <p4est3_internal.h>
 #ifndef P4_TO_P8
 #include <p4est_extended.h>
 #include <p4est_bits.h>
@@ -37,8 +38,6 @@
 #endif
 
 #define MAX_TEST_LEVEL 5
-#define MAX_TEST_TREES 5
-#define FOREST_START_LEVEL 1
 
 static int          refine_level = 0;
 
@@ -50,71 +49,29 @@ typedef struct setup
   p4est3_connectivity_t *conn3;
   sc3_MPI_Comm_t      mpicomm;
   int                 mpirank;
+  int                 mpisize;
   int                 level;
-  p4est3_topidx       num_trees;
 }
 setup_t;
 
 static int
-refine_normal_fn (p4est_t * p4est, p4est_topidx_t which_tree,
-                  p4est_quadrant_t * quadrant)
+refine_fn (p4est_t * p4est, p4est_topidx_t which_tree,
+           p4est_quadrant_t * quadrant)
 {
-  if ((int) quadrant->level >= (refine_level - (int) (which_tree % 3))) {
+  if ((int) quadrant->level >= SC3_MIN (MAX_TEST_LEVEL, p4est->mpirank)) {
     return 0;
   }
-  if (quadrant->level == 1 && p4est_quadrant_child_id (quadrant) == 3) {
-    return 1;
-  }
-  if (quadrant->x > 0) {
-    return 0;
-  }
-
   return 1;
 }
 
-static int
-coarsen_normal_fn (p4est_t * p4est, p4est_topidx_t which_tree,
-                   p4est_quadrant_t * quadrants[])
-{
-  int                 condition = refine_level - 2 - which_tree % 3;
-  condition = condition < 1 ? 1 : condition;
-  if ((int) quadrants[0]->level > condition) {
-    return 1;
-  }
-  return 0;
-}
-
-static int
-coarsen_one_step_back (p4est_t * p4est, p4est_topidx_t which_tree,
-                       p4est_quadrant_t * quadrants[])
-{
-  if (quadrants[0]->level > refine_level - which_tree % 3 - 1) {
-    return 1;
-  }
-  return 0;
-}
-
 static sc3_error_t *
-refine_p3_normal_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
+refine_p3_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
 {
-  int                 level, child_id, coords[P4EST_DIM];
+  int                 level;
   *is_refine = 1;
 
   SC3E (p4est3_quadrant_level (ri->qvt, ri->quadrant, &level));
-  if (level >= (refine_level - (ri->ntree % 3))) {
-    *is_refine = 0;
-    return NULL;
-  }
-
-  SC3E (p4est3_quadrant_child_id (ri->qvt, ri->quadrant, &child_id));
-  if (level == 1 && child_id == 3) {
-    *is_refine = 1;
-    return NULL;
-  }
-
-  SC3E (p4est3_quadrant_coordinates
-        (ri->qvt, ri->quadrant, coords));
-  if (coords[0] > 0) {
+  if (level >= SC3_MIN (MAX_TEST_LEVEL, ri->p3->mpirank)) {
     *is_refine = 0;
     return NULL;
   }
@@ -122,42 +79,9 @@ refine_p3_normal_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
 }
 
 static sc3_error_t *
-coarsen_p3_normal_fn (p4est3_coarsen_callback_info_t * ci, int *is_coarse)
+weight_p3_fn (p4est3_quadrant_weight_info_t * wi, int64_t *weight)
 {
-  int                 condition = refine_level - 2 - ci->ntree % 3;
-  int                 level;
-  void              **q;
-  condition = condition < 1 ? 1 : condition;
-
-  SC3E_RETVAL (is_coarse, 0);
-  SC3E (sc3_array_index (ci->family, 0, &q));
-  SC3E (p4est3_quadrant_level (ci->qvt, *(void **) q, &level));
-  if (level > condition) {
-    *is_coarse = 1;
-  }
-  return NULL;
-}
-
-static sc3_error_t *
-make_allocator (setup_t * t)
-{
-  SC3A_IS (sc3_allocator_is_setup, t->mainalloc);
-  SC3E (sc3_allocator_new (t->mainalloc, &t->alloc));
-  SC3E (sc3_allocator_setup (t->alloc));
-
-  return NULL;
-}
-
-static sc3_error_t *
-make_connectivity (setup_t * t)
-{
-  t->conn2 =
-#ifdef P4_TO_P8
-    p8est_connectivity_new_brick (t->num_trees, 1, 1, 0, 0, 0);
-#else
-    p4est_connectivity_new_brick (t->num_trees, 1, 0, 0);
-#endif
-  SC3E (p4est3_connectivity_new_p4est (t->alloc, &t->conn3, t->conn2, 1));
+  *weight = 1;
   return NULL;
 }
 
@@ -180,12 +104,25 @@ array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 }
 
 static sc3_error_t *
-set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
+make_allocator (setup_t * t)
 {
-  t->mainalloc = sc3_allocator_nothread ();
-  SC3E (make_allocator (t));
-  SC3E (p4est3_quadrant_vtable_p4est (qvt));
-  SC3E_DEMAND (*qvt != NULL, "p4est is not build neither in 2D nor 3D");
+  SC3A_IS (sc3_allocator_is_setup, t->mainalloc);
+  SC3E (sc3_allocator_new (t->mainalloc, &t->alloc));
+  SC3E (sc3_allocator_setup (t->alloc));
+
+  return NULL;
+}
+
+static sc3_error_t *
+make_connectivity (setup_t * t)
+{
+  t->conn2 =
+#ifdef P4_TO_P8
+    p8est_connectivity_new_brick (t->mpisize, 1, 1, 0, 0, 0);
+#else
+    p4est_connectivity_new_brick (t->mpisize, 1, 0, 0);
+#endif
+  SC3E (p4est3_connectivity_new_p4est (t->alloc, &t->conn3, t->conn2, 1));
   return NULL;
 }
 
@@ -193,7 +130,7 @@ static sc3_error_t *
 make_new_p4est (p4est_t ** p, setup_t * t)
 {
   *p = p4est_new_ext
-    (t->mpicomm, t->conn2, 0, FOREST_START_LEVEL, 1, 0, NULL, NULL);
+    (t->mpicomm, t->conn2, 0, 0, 1, 0, NULL, NULL);
 
   return NULL;
 }
@@ -209,17 +146,40 @@ make_new_p4est3 (p4est3_t ** p3, setup_t * t,
   SC3E (p4est3_set_comm (*p3, t->mpicomm, 1));
   SC3E (p4est3_set_connectivity (*p3, t->conn3));
   SC3E (p4est3_set_quadrant_vtable (*p3, *qvt));
-  SC3E (p4est3_set_level (*p3, FOREST_START_LEVEL));
+  SC3E (p4est3_set_level (*p3, 0));
+  SC3E (p4est3_set_shared (*p3, 1));
+  SC3E (p4est3_set_contiguous (*p3, 0));
   SC3E (p4est3_setup (*p3));
 
   return NULL;
 }
 
 static sc3_error_t *
-free_allocator (sc3_allocator_t ** alloc)
+prepare_objects (p4est3_t ** p3, p4est_t ** p, setup_t * t,
+                 const p4est3_quadrant_vtable_t ** qvt)
 {
-  SC3A_IS (sc3_allocator_is_setup, *alloc);
-  SC3E (sc3_allocator_destroy (alloc));
+  t->mainalloc = sc3_allocator_nothread ();
+  SC3E (make_allocator (t));
+  SC3E (make_connectivity (t));
+  SC3E (p4est3_quadrant_vtable_p4est (qvt));
+  SC3E_DEMAND (*qvt != NULL, "p4est is not build neither in 2D nor 3D");
+  SC3E (make_new_p4est (p, t));
+  SC3E (make_new_p4est3 (p3, t, qvt));
+  return NULL;
+}
+
+static sc3_error_t *
+clean_up (p4est3_t * p3, p4est_t * p, setup_t * t)
+{
+  /*destroy forest, that was referenced for others */
+  SC3E (p4est3_destroy (&p3));
+  SC3E (p4est3_connectivity_destroy (&t->conn3));
+  p4est_destroy (p);
+  /* There is no need to destroy p4est2 connectivity,
+      since it is destroyed at p4est3 conn destroying stage */
+  /* p4est_connectivity_destroy (t->conn2); */
+  SC3A_IS (sc3_allocator_is_setup, t->alloc);
+  SC3E (sc3_allocator_destroy (&t->alloc));
   return NULL;
 }
 
@@ -314,20 +274,19 @@ set_qvt (const p4est3_quadrant_vtable_t ** qvt, int i)
 }
 
 static sc3_error_t *
-perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
+perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
+              const p4est3_quadrant_vtable_t * qvt)
 {
-  int                 i;
+  int i;
   p4est3_t           *p3refined, *p3ptr = p3;
-  const p4est3_quadrant_vtable_t *qvt;
-  /* refine the old forest */
-  refine_level = t->level;
-  p4est_refine (p, 1, refine_normal_fn, NULL);
+  refine_level = SC3_MIN (MAX_TEST_LEVEL, p3->mpisize);
+  p4est_refine (p, 1, refine_fn, NULL);
 
-  for (i = 0; i < refine_level; ++i) {
+  for (i = 0; i <= refine_level; ++i) {
     SC3E (p4est3_new (t->alloc, &p3refined));
-    SC3E (set_qvt (&qvt, i % 3));
+    SC3E (set_qvt (&qvt, i % 1));
     SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
-    SC3E (p4est3_set_refine (p3refined, refine_p3_normal_fn));
+    SC3E (p4est3_set_refine (p3refined, refine_p3_fn));
     SC3E (p4est3_set_source (p3refined, p3ptr));
     SC3E (p4est3_setup (p3refined));
 
@@ -338,97 +297,44 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
   }
   SC3E (compare_results (t, p3ptr, p, qvt));
 
-  p4est_coarsen (p, 1, coarsen_normal_fn, NULL);
-  for (i = 0; i < refine_level; ++i) {
-    SC3E (p4est3_new (t->alloc, &p3refined));
-    SC3E (set_qvt (&qvt, i % 3));
-    SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
-    SC3E (p4est3_set_coarsen (p3refined, coarsen_p3_normal_fn));
-    SC3E (p4est3_set_source (p3refined, p3ptr));
-    SC3E (p4est3_setup (p3refined));
-
-    SC3E (p4est3_destroy (&p3ptr));
-    p3ptr = p3refined;
-  }
-  SC3E (compare_results (t, p3ptr, p, qvt));
-  if (t->level == MAX_TEST_LEVEL) {
-    /* test refine+coasen */
-    SC3E (set_qvt (&qvt, 0));
-    for (i = 0; i < refine_level; ++i) {
-      SC3E (p4est3_new (t->alloc, &p3refined));
-      SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
-      SC3E (p4est3_set_refine (p3refined, refine_p3_normal_fn));
-      SC3E (p4est3_set_coarsen (p3refined, coarsen_p3_normal_fn));
-      SC3E (p4est3_set_source (p3refined, p3ptr));
-      SC3E (p4est3_setup (p3refined));
-
-      SC3E (p4est3_destroy (&p3ptr));
-      p3ptr = p3refined;
-    }
-    p4est_refine (p, 1, refine_normal_fn, NULL);
-    p4est_coarsen (p, 1, coarsen_one_step_back, NULL);
-    SC3E (compare_results (t, p3ptr, p, qvt));
-  }
+  /* Test partition */
+  p4est_partition (p, 0, NULL);
   SC3E (p4est3_new (t->alloc, &p3refined));
-  SC3E (set_qvt (&qvt, refine_level % 3));
+  SC3E (set_qvt (&qvt, 0));
   SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
   SC3E (p4est3_set_source (p3refined, p3ptr));
+  SC3E (p4est3_set_partition (p3refined, 1, weight_p3_fn));
+  SC3E (p4est3_set_shared (p3refined, 1));
+  SC3E (p4est3_set_contiguous (p3refined, 0));
   SC3E (p4est3_setup (p3refined));
+
   SC3E (p4est3_destroy (&p3ptr));
   p3ptr = p3refined;
-
   SC3E (compare_results (t, p3ptr, p, qvt));
 
   SC3E (p4est3_destroy (&p3ptr));
-  return NULL;
-}
-
-static sc3_error_t *
-perform_tests (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
-{
-  p4est_t            *p;
-  p4est3_t           *p3;
-
-  for (t->level = 1; t->level <= MAX_TEST_LEVEL; ++t->level) {
-    for (t->num_trees = 1; t->num_trees <= MAX_TEST_TREES; ++t->num_trees) {
-#ifdef P4EST_ENABLE_DEBUG
-      if (t->mpirank == 0) {
-        printf ("l = %d, t = %d\n", t->level, t->num_trees);
-      }
-#endif /* P4EST_ENABLE_DEBUG */
-      SC3E (make_connectivity (t));
-      SC3E (make_new_p4est (&p, t));
-      SC3E (make_new_p4est3 (&p3, t, qvt));
-
-      SC3E (perform_test (t, p3, p));
-
-      /*destroy forest, that was referenced for others */
-      SC3E (p4est3_destroy (&p3));
-      SC3E (p4est3_connectivity_destroy (&t->conn3));
-      p4est_destroy (p);
-      /* There is no need to destroy p4est2 connectivity,
-         since it is destroyed at p4est3 conn destroying stage */
-      /* p4est_connectivity_destroy (t->conn2); */
-    }
-  }
   return NULL;
 }
 
 int
 main (int argc, char **argv)
 {
+  p4est3_t *p3;
+  p4est_t *p;
   setup_t             st, *t = &st;
   const p4est3_quadrant_vtable_t *qvt;
 
   SC3X (sc3_MPI_Init (&argc, &argv));
   t->mpicomm = SC3_MPI_COMM_WORLD;
   SC3X (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
+  SC3X (sc3_MPI_Comm_size (t->mpicomm, &t->mpisize));
   sc_init (t->mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
   p4est_init (NULL, SC_LP_DEFAULT);
 
-  SC3X (set_parameters (t, &qvt));
-  SC3X (perform_tests (t, &qvt));
-  SC3X (free_allocator (&t->alloc));
+  SC3X (prepare_objects (&p3, &p, t, &qvt));
+  SC3X (perform_test (p3, p, t, qvt));
+  SC3X (clean_up (p3, p, t));
+
   sc_finalize_noabort ();
   SC3X (sc3_MPI_Finalize ());
   return 0;

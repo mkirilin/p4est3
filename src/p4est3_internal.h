@@ -85,6 +85,50 @@ typedef struct p4est3_tree
 }
 p4est3_tree_t;
 
+typedef struct p4est3_glotree
+{
+  sc3_refcount_t      rc;
+  int                 setup;
+  sc3_allocator_t    *mator;
+  sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
+                                              information. It should correspond
+                                              to the same forest as the current object. */
+  sc3_MPI_Win_t       gftreewin;        /**< Array of (\ref mpisize + 1) \ref
+                                             p4est3_topidx integers for the
+                                             global partition of trees. */
+  p4est3_topidx      *gftree;           /**< Pointer to \ref gftreewin's memory. */
+}
+p4est3_glotree_t;
+
+typedef struct p4est3_glopos
+{
+  sc3_refcount_t      rc;
+  int                 setup;
+  sc3_allocator_t    *mator;
+  sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
+                                              information. It should correspond
+                                              to the same forest as the current object. */
+  int                 qsize;            /**< Size of quadrants stored in \ref gfposwin. */
+  sc3_MPI_Win_t       gfposwin;         /**< Array of (\ref mpisize + 1) times \ref
+                                        qsize bytes for global first quadrant. */
+  char               *gfpos;            /**< Pointer to \ref gfposwin's memory. */
+}
+p4est3_glopos_t;
+
+typedef struct p4est3_glooffs
+{
+  sc3_refcount_t      rc;
+  int                 setup;
+  sc3_allocator_t    *mator;
+  sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
+                                              information. It should correspond
+                                              to the same forest as the current object. */
+  sc3_MPI_Win_t       goffsetwin;       /**< Array of (\ref mpisize + 1) \ref
+                                        p4est3_gloidx for global quadrant offsets. */
+  p4est3_gloidx      *goffset;          /**< Pointer to \ref goffsetwin's memory. */
+}
+p4est3_glooffs_t;
+
 /** This internal structure holds the members of a forest object.
  * Don't rely on its declaration in code outside the library. */
 struct p4est3
@@ -119,18 +163,18 @@ struct p4est3
   int                 mpirank;          /**< Rank in forest communicator. */
   int                 shared;           /**< MPI sharined memory enable/disable
                                              indicator. */
+  int                 contiguous;       /**< Enable/disable continious MPI
+                                             shared memory when possible */
+  int                 partition;        /**< Indicator to make a partition of
+                                             the source forest.*/
   sc3_mpienv_t       *split_info;       /**<  Pointer to a relevant MPI
                                               processes split related
                                               information. */
 
   /* variables populated during p4est3_setup: partition related */
-  sc3_MPI_Win_t       gftreewin;        /**< Array of (\ref mpisize + 1) \ref
-                                             p4est3_topidx integers for the
-                                             global partition of trees. */
-  sc3_MPI_Win_t       gfposwin;         /**< Array of (\ref mpisize + 1) times \ref
-                                        qsize bytes for global first quadrant. */
-  sc3_MPI_Win_t       goffsetwin;       /**< Array of (\ref mpisize + 1) \ref
-                                        p4est3_gloidx for global quadrant offsets. */
+  p4est3_glotree_t   *gtrees;           /**< Store global tree partition. */
+  p4est3_glopos_t    *gposition;        /**< Store global first quadrants. */
+  p4est3_glooffs_t   *goffsets;         /**< Store global quadrants offsets. */
   int                 qsize;            /**< Store byte size of one quadrant. */
   int                 qmaxlevel;        /**< Maximum allowed refinement level. */
   int                 num_children;     /**< Number of children for a quadrant. */
@@ -166,6 +210,9 @@ struct p4est3
   /* functions set before p4est3_setup */
   p4est3_refine_callback_t crefine; /**< Refinemet callback function */
   p4est3_coarsen_callback_t ccoarse; /**< Coarsening  callback function */
+  p4est3_weight_callback_t cweight; /**< Quadrant's weight callback function.
+                                         Might be NULL, in this case divide up
+                                         the quadrants equally. */
 
   /* pointer to user data, p4est does not touch them */
   void               *user_data;
@@ -191,6 +238,13 @@ extern              "C"
 sc3_error_t        *p4est3_tree_index (p4est3_t * p3, p4est3_topidx tt,
                                        p4est3_tree_t ** tree);
 
+/* Refine, coarsen of simply copy forest from the source. */
+/* Warning: this functions does not support multithreading */
+sc3_error_t        *p4est3_refine_coarsen_copy (p4est3_t * p3);
+
+/** Make a repartition of the input forest when set it up from source. */
+sc3_error_t        *p4est3_partition (p4est3_t * p3);
+
 /** \cond P4EST_FALSE */
 /* these functions are not documented on purpose */
 sc3_error_t        *p4est3_internal_setup_comm (p4est3_t * p3);
@@ -201,6 +255,36 @@ sc3_error_t        *p4est3_internal_setup_tree (p4est3_t * p3,
                                                 p4est3_gloidx num_uniform);
 sc3_error_t        *p4est3_internal_setup_quadrants (p4est3_t * p3);
 sc3_error_t        *p4est3_internal_setup_from_source (p4est3_t * p3);
+/* global partition and offsets section */
+int                 p4est3_glotree_is_valid (const p4est3_glotree_t * m,
+                                             char *reason);
+int                 p4est3_glopos_is_valid (const p4est3_glopos_t * m,
+                                            char *reason);
+int                 p4est3_glooffs_is_valid (const p4est3_glooffs_t * m,
+                                             char *reason);
+sc3_error_t        *p4est3_glotree_new (sc3_allocator_t * mator,
+                                        p4est3_glotree_t ** mp);
+sc3_error_t        *p4est3_glopos_new (sc3_allocator_t * mator,
+                                       p4est3_glopos_t ** mp);
+sc3_error_t        *p4est3_glooffs_new (sc3_allocator_t * mator,
+                                        p4est3_glooffs_t ** mp);
+sc3_error_t        *p4est3_glopos_set_qsize (p4est3_glopos_t * m, int qsize);
+sc3_error_t        *p4est3_glopartition_set_mpienv (p4est3_glotree_t * mt,
+                                                    p4est3_glopos_t * mp,
+                                                    p4est3_glooffs_t * mo,
+                                                    sc3_mpienv_t * mpienv);
+sc3_error_t        *p4est3_glopartition_setup (p4est3_glotree_t * mt,
+                                               p4est3_glopos_t * mp,
+                                               p4est3_glooffs_t * mo);
+sc3_error_t        *p4est3_glotree_ref (p4est3_glotree_t * m);
+sc3_error_t        *p4est3_glopos_ref (p4est3_glopos_t * m);
+sc3_error_t        *p4est3_glooffs_ref (p4est3_glooffs_t * m);
+sc3_error_t        *p4est3_glotree_unref (p4est3_glotree_t ** mp);
+sc3_error_t        *p4est3_glopos_unref (p4est3_glopos_t ** mp);
+sc3_error_t        *p4est3_glooffs_unref (p4est3_glooffs_t ** mp);
+sc3_error_t        *p4est3_glotree_destroy (p4est3_glotree_t ** mp);
+sc3_error_t        *p4est3_glopos_destroy (p4est3_glopos_t ** mp);
+sc3_error_t        *p4est3_glooffs_destroy (p4est3_glooffs_t ** mp);
 /** \endcond */
 
 /* TODO: document default value for all _set_ */
