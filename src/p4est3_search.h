@@ -21,10 +21,18 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P4EST_SEARCH_H
-#define P4EST_SEARCH_H
+#ifndef P4EST3_SEARCH_H
+#define P4EST3_SEARCH_H
 
 #include <p4est3.h>
+
+#ifdef __cplusplus
+extern              "C"
+{
+#if 0
+}
+#endif
+#endif
 
 /** Binary search of a subrange in an sorted in ascending order array.
  * Given two targets \a my_begin and \a my_end, find offsets such that
@@ -77,4 +85,11 @@ sc3_error_t        *p4est3_search_lower_bound64 (int64_t target,
                                                  ssize_t nmemb,
                                                  ssize_t * guess);
 
-#endif /* !P4EST_SEARCH_H */
+#ifdef __cplusplus
+#if 0
+{
+#endif
+}
+#endif
+
+#endif /* !P4EST3_SEARCH_H */
