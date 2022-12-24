@@ -472,45 +472,115 @@ p4est3_partition_cleanup (const p4est3_t * p3,
 }
 
 /* p4est3::goffsets should be updated before calling this function */
+/** Compute correction of partition for a process.
+ *
+ * The correction denotes how many quadrants the process with id `rank` takes
+ * from (if correction positive) or gives to (if correction negative) the
+ * previous process with id `rank-1` in order to assign a family of quadrants
+ * to one process.
+ * The process with the highest number of quadrants of a family gets all
+ * quadrants belonging to this family from other processes. If this applies to
+ * several processes, then the process with the lowest id gets the quadrants.
+ * A process can give more quadrants than it owns, if it passes quadrants from
+ * other processes.
+ */
 static sc3_error_t *
 p4est3_partition_correction (const p4est3_t * p3,
                              int node_offset, int node_offset_next,
                              p4est3_gloidx * last_goffsets,
                              p4est3_locidx * correction)
 {
-  int                 from_proc, base_level, level;
-  p4est3_gloidx       lower_bound;
-  p4est3_gloidx       my_begin, my_end, lower_bound, from_begin, from_end;
+  int                 from_proc, level, is_parent;
+  int                 i, rank_with_max_quads = p3->mpirank;
+  char               *family_parent = p3->temp_quad[0];
   p4est3_locidx       qid, quad_begin, quad_end;
+  p4est3_gloidx       my_begin, my_end, lower_bound, from_begin, from_end;
+  p4est3_gloidx       min_quadrant_id, max_quadrant_id, h;
+  p4est3_gloidx       max_num_quadrants;
 
+  /* Determine first and last global ids of a family on the process border */
+  /* set minimum possible borders containing the target family inside */
   my_begin =
     p3->goffset[p3->mpirank] - (p4est3_gloidx) (p3->num_children - 1);
   my_end = p3->goffset[p3->mpirank] + (p4est3_gloidx) (p3->num_children - 1);
+
+  /* correct the borders w.r.t shared memory node boundaries */
   my_begin = SC3_MAX (my_begin, p3->goffset[node_offset]);
   my_end = SC3_MIN (my_end, p3->goffset[node_offset_next] - 1);
-  SC3E (p4est3_quadrant_level (p3->qvt, p3->quads, &base_level));
-  if (base_level == 0) {
+
+  /* if border quadrant is a tree, do nothing */
+  SC3E (p4est3_quadrant_level (p3->qvt, p3->quads, &level));
+  if (level == 0) {
     *correction = 0;
     return NULL;
   }
-  SC3E (p4est3_quadrant_parent (p3->qvt, p3->quads, p3->temp_quad[0]));
 
+  /* find which processes new (but uncorrected) borders belong to */
   SC3E (p4est3_find_partition
         (p3->alloc, p3->mpisize, last_goffsets,
           my_begin, my_end, &from_begin, &from_end));
 
+  min_quadrant_id = max_quadrant_id = -1;
+  /* the parent of the target family, we find min and max global ids to */
+  SC3E (p4est3_quadrant_parent (p3->qvt, p3->quads, family_parent));
+
   for (from_proc = from_begin; from_proc <= from_end; ++from_proc) {
     lower_bound = p3->old->goffset[from_proc];
+    /* go from global ids to local ones w.r.t shared memory node boundaries */
     quad_begin = SC3_MAX (my_begin, lower_bound) - lower_bound;
     quad_end = SC3_MIN (my_end, last_goffsets[from_proc]) - lower_bound;
     for (qid = quad_begin; qid <= quad_end; ++qid) {
-      SC3E (p4est3_quadrant_level
-            (p3->qvt, p3->nodequads[from_proc - node_offset], &level));
-      if (base_level != level) {
-        continue;
+      SC3E (p4est3_quadrant_is_parent
+            (p3->qvt, family_parent,
+             p3->nodequads[from_proc - node_offset] + qid * p3->qsize,
+             &is_parent));
+      if (is_parent) {
+        max_quadrant_id = (p4est3_gloidx) qid + lower_bound;
+        min_quadrant_id = min_quadrant_id == -1 ? max_quadrant_id : -1;
       }
-      SC3E (p4est3_quadrant_is_parent (p3->qvt, ))
     }
+  }
+
+  /* Compute correction */
+  /* no correction if num quadrants not sufficient for family */
+  if (max_quadrant_id - min_quadrant_id + 1 != p3->num_children) {
+    return 0;
+  }
+
+  max_num_quadrants =
+    SC3_MIN (max_quadrant_id, p3->goffset[p3->mpirank + 1] - 1)
+      - p3->goffset[p3->mpirank] + 1;
+  /* decreasing search for process with highest amount of quadrants */
+  i = rank_with_max_quads - 1;
+  while (min_quadrant_id < p3->goffset[i + 1]) {
+    h = p3->goffset[i + 1] - SC3_MAX (min_quadrant_id, p3->goffset[i]);
+    if (max_num_quadrants <= h) {
+      max_num_quadrants = h;
+      rank_with_max_quads = i;
+    }
+    i--;
+  }
+
+  /* increasing search for process with highest amount of quadrants */
+  i = rank_with_max_quads + 1;
+  while (p3->goffset[i] <= max_quadrant_id) {
+    h =
+      SC3_MIN (max_quadrant_id, p3->goffset[i + 1] - 1) - p3->goffset[i] + 1;
+    if (max_num_quadrants < h) {
+      max_num_quadrants = h;
+      rank_with_max_quads = i;
+    }
+    i++;
+  }
+
+  /* compute correction */
+  if (rank_with_max_quads < p3->mpirank) {
+    *correction =
+      (p4est3_locidx) (p3->goffset[p3->mpirank] - max_quadrant_id - 1);
+  }
+  else {
+    *correction =
+      (p4est3_locidx) (p3->goffset[p3->mpirank] - min_quadrant_id);
   }
   return NULL;
 }
