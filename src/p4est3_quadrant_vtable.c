@@ -441,6 +441,15 @@ p4est3_quadrant_is_ancestor (const p4est3_quadrant_vtable_t * qvt,
 }
 
 sc3_error_t        *
+p4est3_quadrant_is_parent (const p4est3_quadrant_vtable_t * qvt,
+                           const void *q1, const void *q2, int *j)
+{
+  SC3A_CHECK (qvt != NULL && qvt->quadrant_is_parent != NULL);
+  SC3E (qvt->quadrant_is_parent (q1, q2, j));
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_quadrant_array_new (sc3_allocator_t * alloc,
                            const p4est3_quadrant_vtable_t * qvt,
                            p4est3_locidx n, sc3_array_t ** arr)

@@ -187,24 +187,40 @@ p4est3_quadrant_mort_level (const p4est3_quadrant_mort_t * q, int *l)
   return NULL;
 }
 
-#ifdef P4EST_ENABLE_DEBUG
-
-static int
+static sc3_error_t *
 p4est3_quadrant_mort_is_parent (const p4est3_quadrant_mort_t * q,
-                                const p4est3_quadrant_mort_t * r,
-                                char *reason)
+                                const p4est3_quadrant_mort_t * r, int *j)
 {
   const int           r_level = P4EST3_MORT_EXT_LEVEL (*r);
   int32_t             mask;
-  SC3E_IS (p4est3_quadrant_mort_is_valid, q, reason);
-  SC3E_IS (p4est3_quadrant_mort_is_valid, r, reason);
+  SC3A_IS (p4est3_quadrant_mort_is_valid, q);
+  SC3A_IS (p4est3_quadrant_mort_is_valid, r);
+  SC3E_RETVAL (j, 0);
+  if ((int) P4EST3_MORT_EXT_LEVEL (*q) + 1 != r_level) {
+    return NULL;
+  }
 #ifdef P4_TO_P8
   mask = 0x07;
 #else
   mask = 0x03;
 #endif
-  SC3E_TEST ((*q + ((uint64_t) 1 << CRD_BITS)) ==
-             (*r & ~P4EST3_QUADRANT_MORT_LEN (mask, r_level)), reason);
+  if ((*q + ((uint64_t) 1 << CRD_BITS)) ==
+      (*r & ~P4EST3_QUADRANT_MORT_LEN (mask, r_level))) {
+    *j = 1;
+  }
+  return NULL;
+}
+
+#ifdef P4EST_ENABLE_DEBUG
+
+static int
+p4est3_quadrant_mort_is_parent_internal (const p4est3_quadrant_mort_t * q,
+                                         const p4est3_quadrant_mort_t * r,
+                                         char *reason)
+{
+  int             j;
+  SC3E_DO (p4est3_quadrant_mort_is_parent (q, r, &j), reason);
+  SC3E_TEST (j, reason);
   SC3E_YES (reason);
 }
 
@@ -308,7 +324,7 @@ p4est3_quadrant_mort_child (const p4est3_quadrant_mort_t * q,
   *r = child_id & 0x04 ? (*r | (shift << 2)) : *r;
 #endif
   *r += ((uint64_t) 1 << CRD_BITS);
-  SC3A_IS2 (p4est3_quadrant_mort_is_parent, q, r);
+  SC3A_IS2 (p4est3_quadrant_mort_is_parent_internal, q, r);
   return NULL;
 }
 
@@ -699,6 +715,7 @@ static const p4est3_quadrant_vtable_t quadrant_vtable_mort =
   (p4est3_quadrant_compare_t) p4est3_quadrant_mort_compare,
   NULL, /*< use generic implementation */
   (p4est3_quadrant_is_ancestor_t) p4est3_quadrant_mort_is_ancestor,
+  (p4est3_quadrant_is_parent_t) p4est3_quadrant_mort_is_parent,
   (p4est3_nearest_common_ancestor_t) p4est3_mort_nearest_common_ancestor
 };
 
