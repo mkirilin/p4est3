@@ -492,11 +492,14 @@ p4est3_partition_correction (const p4est3_t * p3,
 {
   int                 from_proc, level, is_parent;
   int                 i, rank_with_max_quads = p3->mpirank;
+  char               *cut_border_quad; /* first quadrant in the new uncorrected cut */
   char               *family_parent = p3->temp_quad[0];
   p4est3_locidx       qid, quad_begin, quad_end;
   p4est3_gloidx       my_begin, my_end, lower_bound, from_begin, from_end;
   p4est3_gloidx       min_quadrant_id, max_quadrant_id, h;
   p4est3_gloidx       max_num_quadrants;
+
+  SC3E_RETVAL (correction, 0);
 
   /* Determine first and last global ids of a family on the process border */
   /* set minimum possible borders containing the target family inside */
@@ -508,10 +511,17 @@ p4est3_partition_correction (const p4est3_t * p3,
   my_begin = SC3_MAX (my_begin, p3->goffset[node_offset]);
   my_end = SC3_MIN (my_end, p3->goffset[node_offset_next] - 1);
 
+  /* find to which process the beginning of the (uncorrected) cut belongs */
+  SC3E (p4est3_find_partition
+        (p3->alloc, p3->mpisize, last_goffsets,
+          p3->goffset[p3->mpirank], p3->goffset[p3->mpirank],
+          &from_begin, &from_end));
+  SC3A_CHECK (from_begin == from_end);
+  qid = p3->goffset[p3->mpirank] - p3->old->goffset[from_begin];
   /* if border quadrant is a tree, do nothing */
-  SC3E (p4est3_quadrant_level (p3->qvt, p3->quads, &level));
+  cut_border_quad = p3->nodequads[from_begin - node_offset] + qid * p3->qsize;
+  SC3E (p4est3_quadrant_level (p3->qvt, cut_border_quad, &level));
   if (level == 0) {
-    *correction = 0;
     return NULL;
   }
 
@@ -522,7 +532,7 @@ p4est3_partition_correction (const p4est3_t * p3,
 
   min_quadrant_id = max_quadrant_id = -1;
   /* the parent of the target family, we find min and max global ids to */
-  SC3E (p4est3_quadrant_parent (p3->qvt, p3->quads, family_parent));
+  SC3E (p4est3_quadrant_parent (p3->qvt, cut_border_quad, family_parent));
 
   for (from_proc = from_begin; from_proc <= from_end; ++from_proc) {
     lower_bound = p3->old->goffset[from_proc];
@@ -536,7 +546,8 @@ p4est3_partition_correction (const p4est3_t * p3,
              &is_parent));
       if (is_parent) {
         max_quadrant_id = (p4est3_gloidx) qid + lower_bound;
-        min_quadrant_id = min_quadrant_id == -1 ? max_quadrant_id : -1;
+        min_quadrant_id =
+          min_quadrant_id == -1 ? max_quadrant_id : min_quadrant_id;
       }
     }
   }
@@ -544,7 +555,7 @@ p4est3_partition_correction (const p4est3_t * p3,
   /* Compute correction */
   /* no correction if num quadrants not sufficient for family */
   if (max_quadrant_id - min_quadrant_id + 1 != p3->num_children) {
-    return 0;
+    return NULL;
   }
 
   max_num_quadrants =
