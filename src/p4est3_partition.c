@@ -705,6 +705,7 @@ p4est3_partition (p4est3_t * p3)
   char              **recv_buf, **send_buf;
   p4est3_topidx       num_recv_trees;
   p4est3_topidx       new_first_local_tree, new_last_local_tree;
+  p4est3_locidx       correction;
   p4est3_locidx       from_begin_global_quad, from_end_global_quad;
   p4est3_locidx       to_begin_global_quad, to_end_global_quad;
   p4est3_locidx      *num_per_tree_send_buf, *new_local_tree_elem_count;
@@ -790,6 +791,27 @@ p4est3_partition (p4est3_t * p3)
   SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
   SC3E (sc3_MPI_Barrier (nodecomm));
 
+  /** TODO: Put some of the allocations after isend/irecv */
+  SC3E (p4est3_partition_allocations
+        (p3, &recv_buf, &send_buf, &num_recv_from, &num_send_to,
+         &num_per_tree_local, &new_local_tree_elem_count, &last_goffsets,
+         &begin_send_to, &new_last_goffsets));
+
+  for (i = 0; i < p3->mpisize; ++i) {
+    last_goffsets[i] = p3->old->goffset[i + 1] - 1;
+  }
+
+  if (p3->family) {
+    SC3E (p4est3_partition_correction
+          (p3, node_offset, node_offset_next, last_goffsets, &correction));
+    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->goffsets->goffsetwin));
+    p3->goffset[p3->mpirank] -= correction;
+    SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
+    SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+    SC3E (sc3_MPI_Barrier (nodecomm));
+  }
+
   p3->local_num_quads =
     p3->goffset[p3->mpirank + 1] - p3->goffset[p3->mpirank];
 
@@ -807,15 +829,6 @@ p4est3_partition (p4est3_t * p3)
   }
 
   /* Adjust trees partition information of the forest */
-  /** TODO: Put some of the allocations after isend/irecv */
-  SC3E (p4est3_partition_allocations
-        (p3, &recv_buf, &send_buf, &num_recv_from, &num_send_to,
-         &num_per_tree_local, &new_local_tree_elem_count, &last_goffsets,
-         &begin_send_to, &new_last_goffsets));
-
-  for (i = 0; i < p3->mpisize; ++i) {
-    last_goffsets[i] = p3->old->goffset[i + 1] - 1;
-  }
   SC3E (p4est3_procs_recv_from
         (p3, last_goffsets, num_recv_from,
          &from_begin, &from_end, &num_proc_recv_from));
