@@ -56,7 +56,6 @@ testavx2_prepare (timeavx2_t * t, int *retval)
 
   /* the standard p4est2 virtual table always exists */
   SC3E (p4est3_quadrant_vtable_p4est (&t->qvt));
-  SC3E_DEMAND (t->qvt_avx != NULL, "AVX is not supported by hardware");
 
   /* the AVX virtual table can only be set with hardware support */
   SC3E (p4est3_quadrant_yx_vtable (&t->qvt_avx));

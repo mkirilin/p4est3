@@ -723,7 +723,11 @@ set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt,
   SC3E (make_allocator (t));
   SC3E (p4est3_quadrant_vtable_p4est (qvt));
   /* the AVX virtual table can only be set with hardware support */
+#ifdef P4EST_ENABLE_AVX2
   SC3E (p4est3_quadrant_yx_vtable (qvt_avx));
+  SC3E_DEMAND (*qvt_avx != NULL, "AVX is not supported by hardware "
+               "p4est is not build neither in 2D nor 3D");
+#endif
   SC3E (p4est3_quadrant_mort2d_vtable (qvt_mrt));
   SC3E (array_new (t->alloc, sizeof (int), 9, 9, &t->transform));
   SC3E (array_new (t->alloc, sizeof (int), (*qvt)->dim, (*qvt)->dim, &t->nf));
@@ -821,7 +825,9 @@ test_simple_volume_iterator (setup_t * t, const p4est3_quadrant_vtable_t ** qvt,
 {
   SC3E (set_parameters (t, qvt, qvt_avx, qvt_mrt));
   SC3E (perform_tests_simple_volume_iterator (t, *qvt));
+#ifdef P4EST_ENABLE_AVX2
   SC3E (perform_tests_simple_volume_iterator (t, *qvt_avx));
+#endif
   SC3E (perform_tests_simple_volume_iterator (t, *qvt_mrt));
   SC3E (clean_up (t));
 
@@ -846,7 +852,9 @@ main (int argc, char **argv)
 #endif /* P4EST_ENABLE_DEBUG */
 
   SC3X (perform_tests (t, qvt));
+#ifdef P4EST_ENABLE_AVX2
   SC3X (perform_tests (t, qvt_avx));
+#endif
   SC3X (perform_tests (t, qvt_mrt));
   SC3X (clean_up (t));
 

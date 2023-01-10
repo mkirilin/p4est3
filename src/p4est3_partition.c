@@ -730,7 +730,10 @@ p4est3_partition (p4est3_t * p3)
 #endif
 
   /* new shared memory variables block */
-  int                 dispunit, node_frank;
+#ifdef P4EST_ENABLE_DEBUG
+  int                 node_frank;
+#endif
+  int                 dispunit;
   char               *new_quadmem, *nqmem, *new_nodequad;
   sc3_MPI_Aint_t      quadbytes, tempbytes;
   sc3_MPI_Info_t      info_noncontig;

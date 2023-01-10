@@ -300,7 +300,11 @@ set_qvt (const p4est3_quadrant_vtable_t ** qvt, int i)
     SC3E (p4est3_quadrant_vtable_p4est (qvt));
     break;
   case 1:
+#ifdef P4EST_ENABLE_AVX2
     SC3E (p4est3_quadrant_yx_vtable (qvt));
+#else
+    SC3E (p4est3_quadrant_vtable_p4est (qvt));
+#endif
     break;
   case 2:
     SC3E (p4est3_quadrant_mort2d_vtable (qvt));
