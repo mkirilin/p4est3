@@ -75,7 +75,7 @@ p4est3_glooffs_is_valid (const p4est3_glooffs_t * m, char *reason)
   SC3E_YES (reason);
 }
 
-static int
+int
 p4est3_glotree_is_new (const p4est3_glotree_t * m, char *reason)
 {
   SC3E_IS (p4est3_glotree_is_valid, m, reason);
@@ -83,7 +83,7 @@ p4est3_glotree_is_new (const p4est3_glotree_t * m, char *reason)
   SC3E_YES (reason);
 }
 
-static int
+int
 p4est3_glopos_is_new (const p4est3_glopos_t * m, char *reason)
 {
   SC3E_IS (p4est3_glopos_is_valid, m, reason);
@@ -91,7 +91,7 @@ p4est3_glopos_is_new (const p4est3_glopos_t * m, char *reason)
   SC3E_YES (reason);
 }
 
-static int
+int
 p4est3_glooffs_is_new (const p4est3_glooffs_t * m, char *reason)
 {
   SC3E_IS (p4est3_glooffs_is_valid, m, reason);

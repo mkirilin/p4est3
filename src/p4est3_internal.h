@@ -262,6 +262,12 @@ int                 p4est3_glopos_is_valid (const p4est3_glopos_t * m,
                                             char *reason);
 int                 p4est3_glooffs_is_valid (const p4est3_glooffs_t * m,
                                              char *reason);
+int                 p4est3_glotree_is_new (const p4est3_glotree_t * m,
+                                           char *reason);
+int                 p4est3_glopos_is_new (const p4est3_glopos_t * m,
+                                          char *reason);
+int                 p4est3_glooffs_is_new (const p4est3_glooffs_t * m,
+                                           char *reason);
 sc3_error_t        *p4est3_glotree_new (sc3_allocator_t * mator,
                                         p4est3_glotree_t ** mp);
 sc3_error_t        *p4est3_glopos_new (sc3_allocator_t * mator,

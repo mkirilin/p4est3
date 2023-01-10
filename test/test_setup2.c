@@ -65,9 +65,11 @@ set_vtables (const p4est3_quadrant_vtable_t ** q,
   SC3E_DEMAND (*q != NULL && *qmort != NULL,
                "p4est is not build neither in 2D nor 3D");
   /* the AVX virtual table can only be set with hardware support */
+#ifdef P4EST_ENABLE_AVX2
   SC3E (p4est3_quadrant_yx_vtable (qavx));
   SC3E_DEMAND (*qavx != NULL, "AVX is not supported by hardware "
                "p4est is not build neither in 2D nor 3D");
+#endif
 
   return NULL;
 }
@@ -309,7 +311,9 @@ main (int argc, char **argv)
   const p4est3_quadrant_vtable_t *qvt, *qvtavx, *qvtmort;
   setup_t             st, *t = &st;
   p4est3_t           *p3m, *p3s, *p3rc;
+#ifdef P4EST_ENABLE_AVX2
   p4est3_t           *p3m_avx, *p3s_avx, *p3rc_avx;
+#endif
   p4est3_t           *p3m_mort, *p3s_mort, *p3rc_mort;
 
   /* v3 standard procedure to isolate memory allocation contexts */
@@ -339,7 +343,9 @@ main (int argc, char **argv)
         SC3X (perform_test_mort (t, &p3m, &p3s, &p3rc, qvt, qvt));
         SC3X (perform_test (t, p3m, &p3m_mort, &p3s_mort, &p3rc_mort, qvt,
                             qvtmort));
+#ifdef P4EST_ENABLE_AVX2
         SC3X (perform_test (t, p3m, &p3m_avx, &p3s_avx, &p3rc_avx, qvt, qvtavx));
+#endif
 
         /*destroy forest, that was referenced for others*/
         SC3X (p4est3_destroy (&p3m));
