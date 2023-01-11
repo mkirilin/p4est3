@@ -70,43 +70,43 @@ p4est3_partition_allocations (const p4est3_t * p3,
 
   SC3E (p4est3_connectivity_get_num_trees (p3->conn, &total_num_trees));
 
-  SC3E_RETVAL (&char_pprt, NULL);
+  char_pprt = NULL;
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (char *), &char_pprt));
   *precv_buf = char_pprt;
 
-  SC3E_RETVAL (&char_pprt, NULL);
+  char_pprt = NULL;
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (char *), &char_pprt));
   *psend_buf = char_pprt;
 
-  SC3E_RETVAL (&locidx_prt, NULL);
+  locidx_prt = NULL;
   SC3E (sc3_allocator_calloc
         (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &locidx_prt));
   *pnum_recv_from = locidx_prt;
 
-  SC3E_RETVAL (&locidx_prt, NULL);
+  locidx_prt = NULL;
   SC3E (sc3_allocator_calloc
         (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &locidx_prt));
   *pnum_send_to = locidx_prt;
 
-  SC3E_RETVAL (&locidx_prt, NULL);
+  locidx_prt = NULL;
   SC3E (sc3_allocator_malloc
         (p3->alloc, num_send_trees * sizeof (p4est3_locidx)
          + 2 * sizeof (p4est3_gloidx), &locidx_prt));
   *pnum_per_tree_local = locidx_prt;
 
-  SC3E_RETVAL (&locidx_prt, NULL);
+  locidx_prt = NULL;
   SC3E (sc3_allocator_malloc
         (p3->alloc, total_num_trees * sizeof (p4est3_locidx), &locidx_prt));
   *pnew_local_tree_elem_count = locidx_prt;
 
-  SC3E_RETVAL (&gloidx_prt, NULL);
+  gloidx_prt = NULL;
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
   *plast_goffsets = gloidx_prt;
 
-  SC3E_RETVAL (&gloidx_prt, NULL);
+  gloidx_prt = NULL;
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
 #ifdef P4EST_ENABLE_DEBUG
@@ -115,7 +115,7 @@ p4est3_partition_allocations (const p4est3_t * p3,
 #endif
   *pbegin_send_to = gloidx_prt;
 
-  SC3E_RETVAL (&gloidx_prt, NULL);
+  gloidx_prt = NULL;
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
   *pnew_last_goffsets = gloidx_prt;
@@ -702,30 +702,33 @@ p4est3_partition (p4est3_t * p3)
   int                 nodesize, noderank, node_num, node_offset, node_offset_next;
   const int          *node_offsets;
   int                 num_proc_recv_from, num_proc_send_to;
-  char              **recv_buf, **send_buf;
+  char              **recv_buf = NULL, **send_buf = NULL;
   p4est3_topidx       num_recv_trees;
   p4est3_topidx       new_first_local_tree, new_last_local_tree;
   p4est3_locidx       correction;
   p4est3_locidx       from_begin_global_quad, from_end_global_quad;
   p4est3_locidx       to_begin_global_quad, to_end_global_quad;
-  p4est3_locidx      *num_per_tree_send_buf, *new_local_tree_elem_count;
-  p4est3_locidx      *num_send_to;
-  p4est3_locidx      *num_recv_from;
+  p4est3_locidx      *num_per_tree_send_buf, *new_local_tree_elem_count = NULL;
+  p4est3_locidx      *num_send_to = NULL;
+  p4est3_locidx      *num_recv_from = NULL;
                                 /**< Numbers of quadrants coming from the i-th process */
-  p4est3_locidx      *num_per_tree_local;
+  p4est3_locidx      *num_per_tree_local = NULL;
   p4est3_gloidx       from_begin, from_end, to_begin, to_end;
-  p4est3_gloidx      *begin_send_to;
+  p4est3_gloidx      *begin_send_to = NULL;
                                 /**< Begin (quadrant) of proc where we want to send to
                                      or begin of current proc (MAX of them). From which quad we start
                                      sending info. */
   p4est3_gloidx       qcount_node;
   p4est3_gloidx       new_first_tquad, new_last_tquad;
-  p4est3_gloidx      *last_goffsets, *new_last_goffsets;
+  p4est3_gloidx      *last_goffsets = NULL, *new_last_goffsets = NULL;
                                                     /**< Offsets of last quadrant in a process */
   size_t              recv_size;
   sc3_MPI_Comm_t      nodecomm;
 #ifdef P4EST_ENABLE_MPI
-  int                 sk, mpiret;
+#ifdef P4EST_ENABLE_DEBUG
+  int mpiret;
+#endif
+  int                 sk;
   MPI_Request        *recv_request, *send_request;
 #endif
 
@@ -860,8 +863,11 @@ p4est3_partition (p4est3_t * p3)
             (p3->alloc, recv_size * sizeof (char), &recv_buf[from_proc]));
       /* Post receives for the quadrants and their data */
 #ifdef P4EST_ENABLE_MPI
-      mpiret = MPI_Irecv (recv_buf[from_proc], (int) recv_size, MPI_BYTE,
-                          from_proc, 0, p3->mpicomm, recv_request + sk);
+#ifdef P4EST_ENABLE_DEBUG
+      mpiret =
+#endif
+      MPI_Irecv (recv_buf[from_proc], (int) recv_size, MPI_BYTE,
+                 from_proc, 0, p3->mpicomm, recv_request + sk);
       SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
       ++sk;
 #endif
@@ -946,8 +952,11 @@ p4est3_partition (p4est3_t * p3)
              num_send_trees, to_proc, num_per_tree_send_buf));
       /* Post send operation for the quadrants and their data */
 #ifdef P4EST_ENABLE_MPI
-      mpiret = MPI_Isend (send_buf[to_proc], (int) send_size, MPI_BYTE,
-                          to_proc, 0, p3->mpicomm, send_request + sk);
+#ifdef P4EST_ENABLE_DEBUG
+      mpiret =
+#endif
+      MPI_Isend (send_buf[to_proc], (int) send_size, MPI_BYTE,
+                 to_proc, 0, p3->mpicomm, send_request + sk);
       SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
       ++sk;
 #endif
@@ -958,8 +967,10 @@ p4est3_partition (p4est3_t * p3)
     send_request[sk] = MPI_REQUEST_NULL;
   }
   /* Fill in forest */
+#ifdef P4EST_ENABLE_DEBUG
   mpiret =
-    MPI_Waitall (num_proc_recv_from, recv_request, MPI_STATUSES_IGNORE);
+#endif
+  MPI_Waitall (num_proc_recv_from, recv_request, MPI_STATUSES_IGNORE);
   SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
   /* Calculate the local index of the end of each tree in the repartition */
@@ -977,7 +988,10 @@ p4est3_partition (p4est3_t * p3)
          new_last_local_tree, new_first_tquad, new_last_tquad));
 
 #ifdef P4EST_ENABLE_MPI
-  mpiret = MPI_Waitall (num_proc_send_to, send_request, MPI_STATUSES_IGNORE);
+#ifdef P4EST_ENABLE_DEBUG
+  mpiret =
+#endif
+  MPI_Waitall (num_proc_send_to, send_request, MPI_STATUSES_IGNORE);
   SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
   /* Free allocations */

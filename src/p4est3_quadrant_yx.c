@@ -149,7 +149,7 @@ p4est3_quadrant_zyx_get_tree_boundary (const __m128i * q, int face, int *j)
 {
   const int32_t       l = _mm_extract_epi32 (*q, 0);
   const int           direction = face / 2;
-  int32_t             coord, bound;
+  int32_t             coord = 0, bound;
   switch (direction) {
   case 0:
     coord = _mm_extract_epi32 (*q, 3);

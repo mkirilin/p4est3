@@ -773,7 +773,7 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
   p4est3_search_area_t ssa, *search_area = &ssa;
   p4est3_topidx       tree;
   p4est3_iterate_face_side_t *fside;
-  int                 face, is_lower;
+  int                 face, is_lower = 0;
 
   /* This iteration is w/o ghost layer and for volumes only */
   if (codims < 0 || codims >= P4EST3_ITERATE_LAST) {

@@ -321,7 +321,7 @@ int
 main (int argc, char **argv)
 {
   p4est3_t *p3;
-  p4est_t *p;
+  p4est_t *p = NULL;
   setup_t             st, *t = &st;
   const p4est3_quadrant_vtable_t *qvt;
 
