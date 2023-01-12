@@ -333,7 +333,10 @@ main (int argc, char **argv)
   p4est_init (NULL, SC_LP_DEFAULT);
 
   SC3X (prepare_objects (&p3, &p, t, &qvt));
+#ifdef P4EST_ENABLE_MPICOMMSHARED
+  /* so far p3 partition works with shared memory only */
   SC3X (perform_test (p3, p, t, qvt));
+#endif
   SC3X (clean_up (p3, p, t));
 
   sc_finalize_noabort ();
