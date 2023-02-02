@@ -44,7 +44,63 @@
 
 #include <string.h>
 
+typedef enum refinement_pattern
+{
+  PAIRS,
+  FRACTAL,
+  FRACTION,
+  PATTERN_LAST
+}
+refinement_pattern_t;
+
 static int          refine_level = 1;
+static int          level_shift = 0;
+
+static int
+refine_fractal (p4est_t * p4est, p4est_topidx_t which_tree,
+                p4est_quadrant_t * q)
+{
+  int                 qid;
+
+  if ((int) q->level >= refine_level) {
+    return 0;
+  }
+  if ((int) q->level < refine_level - level_shift) {
+    return 1;
+  }
+
+  qid = p4est_quadrant_child_id (q);
+  return (qid == 0 || qid == 3
+#ifdef P4_TO_P8
+          || qid == 5 || qid == 6
+#endif
+    );
+}
+
+static sc3_error_t *
+refine_p3_fractal (p4est3_refine_callback_info_t * ri, int *is_refine)
+{
+  int                 level, child_id;
+
+  SC3E (p4est3_quadrant_level (ri->qvt, ri->quadrant, &level));
+  if (level >= refine_level) {
+    *is_refine = 0;
+    return NULL;
+  }
+  if (level < refine_level - level_shift) {
+    *is_refine = 1;
+    return NULL;
+  }
+
+  SC3E (p4est3_quadrant_child_id (ri->qvt, ri->quadrant, &child_id));
+  *is_refine = (child_id == 0 || child_id == 3
+#ifdef P4_TO_P8
+          || child_id == 5 || child_id == 6
+#endif
+    );
+
+  return NULL;
+}
 
 static int
 refine_pairs (p4est_t * p4est, p4est_topidx_t which_tree,
@@ -238,14 +294,23 @@ wrong_input (const char *name, int n)
   printf ("Wrong input parameter: \n");
   switch (n) {
   case 1:
+    printf ("PAttern type %s is not valid\n"
+            "Valid quadrant type value: PAIRS or"
+            "FRACTAL, FRACTION\n", name);
+    break;
+  case 2:
     printf ("Quadrant type %s is not valid\n"
             "Valid quadrant type value: P4EST2 or"
             "STANDARD, AVX, MORT_ORD\n", name);
     break;
-  case 2:
+  case 3:
     printf ("The maximum number of levels %s is not valid\n"
             "Valid value: " "positiv int\n", name);
     break;
+  case 4:
+    printf ("The number of level shift %s is not valid\n"
+            "Valid value: " "positiv int, "
+            "less than maximum number of levels \n", name);
   default:
     break;
   }
@@ -253,6 +318,31 @@ wrong_input (const char *name, int n)
           "<QUADRANT TYPE> <refine_level>\n");
 }
 
+static sc3_error_t *
+check_refinement_pattern (int argc, char **argv,
+                          int mpirank, sc3_MPI_Comm_t mpicomm,
+                          refinement_pattern_t *ref_pattern)
+{
+  if (argc <= 1) {
+    return NULL;
+  }
+  if (strcmp (argv[1], "PAIRS") == 0) {
+    *ref_pattern = PAIRS;
+  }
+  else if (strcmp (argv[1], "FRACTAL") == 0) {
+    *ref_pattern = FRACTAL;
+  }
+  else if (strcmp (argv[1], "FRACTION") == 0) {
+    *ref_pattern = FRACTION;
+  }
+  else {
+    if (mpirank == 0) {
+      wrong_input (argv[1], 1);
+      sc_MPI_Abort (mpicomm, -1);
+    }
+  }
+  return NULL;
+}
 
 static sc3_error_t *
 check_quadrant_type (int argc, char **argv,
@@ -262,21 +352,21 @@ check_quadrant_type (int argc, char **argv,
   if (argc <= 2) {
     return NULL;
   }
-  if (strcmp (argv[1], "P4EST2") == 0) {
+  if (strcmp (argv[2], "P4EST2") == 0) {
     return NULL;
   }
-  if (strcmp (argv[1], "STANDARD") == 0) {
+  if (strcmp (argv[2], "STANDARD") == 0) {
     SC3E (p4est3_quadrant_vtable_p4est (qvt));
   }
-  else if (strcmp (argv[1], "AVX") == 0) {
+  else if (strcmp (argv[2], "AVX") == 0) {
     SC3E (p4est3_quadrant_yx_vtable (qvt));
   }
-  else if (strcmp (argv[1], "MORT_ORD") == 0) {
+  else if (strcmp (argv[2], "MORT_ORD") == 0) {
     SC3E (p4est3_quadrant_mort2d_vtable (qvt));
   }
   else {
     if (mpirank == 0) {
-      wrong_input (argv[1], 1);
+      wrong_input (argv[2], 1);
       sc_MPI_Abort (mpicomm, -1);
     }
   }
@@ -289,13 +379,25 @@ char *
 set_heading (int argc, char **argv, sc3_MPI_Comm_t mpicomm)
 {
   char               *heading;
-  if (argc > 1) {
-    heading = (char *) malloc (strlen (argv[1]) + 1);
+  if (argc > 2) {
+    heading = (char *) malloc (strlen (argv[1]) + 1 + strlen (argv[2]) + 1);
     strcpy (heading, argv[1]);
+    strcat (heading, " ");
+    strcat (heading, argv[2]);
+  }
+  else if (argc == 2) {
+    heading =
+      (char *) malloc (strlen (argv[1]) + 1 + strlen ("STANDARD") + 1);
+    strcpy (heading, argv[1]);
+    strcat (heading, " ");
+    strcat (heading, "STANDARD");
   }
   else {
-    heading = (char *) malloc (strlen ("P4EST2") + 1);
-    strcpy (heading, "P4EST2");
+    heading =
+      (char *) malloc (strlen ("PAIRS") + 1 + strlen ("STANDARD") + 1);
+    strcpy (heading, "PAIRS");
+    strcat (heading, " ");
+    strcat (heading, "STANDARD");
   }
   if (heading == NULL) {
     sc_MPI_Abort (mpicomm, -1);
@@ -318,6 +420,7 @@ main (int argc, char **argv)
   sc_flopinfo_t       fi, snapshot;
   sc_statinfo_t       stats;
   char               *heading;
+  refinement_pattern_t ref_pattern = PAIRS;
 
   /* v3 standard procedure to isolate memory allocation contexts */
   mainalloc = sc3_allocator_nothread ();
@@ -334,14 +437,24 @@ main (int argc, char **argv)
     printf ("Execution without parameters. "
             "Default parameters are applied.\n"
             "Parameter's format: "
-            "<QUADRANT TYPE> <refine_level>\n");
+            "<PATTERN> <QUADRANT TYPE> <refine_level> <level_shift>\n");
   }
 
+  SC3E_NULL_SET (e, check_refinement_pattern
+                    (argc, argv, mpirank, mpicomm, &ref_pattern));
   SC3E_NULL_SET (e, check_quadrant_type (argc, argv, &qvt, mpirank, mpicomm));
-  if (argc > 2) {
-    refine_level = atoi (argv[2]);
+  if (argc > 3) {
+    refine_level = atoi (argv[3]);
     if (refine_level == 0 && mpirank == 0) {
-      wrong_input (argv[2], 2);
+      wrong_input (argv[3], 3);
+      sc_MPI_Abort (mpicomm, -1);
+    }
+  }
+  if (argc > 4) {
+    level_shift = atoi (argv[4]);
+    if (mpirank == 0 &&
+        (level_shift == 0 || level_shift >= refine_level)) {
+      wrong_input (argv[4], 4);
       sc_MPI_Abort (mpicomm, -1);
     }
   }
