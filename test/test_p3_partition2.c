@@ -298,7 +298,7 @@ perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
   SC3E (compare_results (t, p3ptr, p, qvt));
 
   /* Test partition */
-  p4est_partition (p, 0, NULL);
+  p4est_partition (p, 1, NULL);
   SC3E (p4est3_new (t->alloc, &p3refined));
   SC3E (set_qvt (&qvt, 0));
   SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
@@ -306,6 +306,7 @@ perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
   SC3E (p4est3_set_partition (p3refined, 1, weight_p3_fn));
   SC3E (p4est3_set_shared (p3refined, 1));
   SC3E (p4est3_set_contiguous (p3refined, 0));
+  SC3E (p4est3_set_family (p3refined, 1));
   SC3E (p4est3_setup (p3refined));
 
   SC3E (p4est3_destroy (&p3ptr));
@@ -320,7 +321,7 @@ int
 main (int argc, char **argv)
 {
   p4est3_t *p3;
-  p4est_t *p;
+  p4est_t *p = NULL;
   setup_t             st, *t = &st;
   const p4est3_quadrant_vtable_t *qvt;
 
@@ -332,7 +333,10 @@ main (int argc, char **argv)
   p4est_init (NULL, SC_LP_DEFAULT);
 
   SC3X (prepare_objects (&p3, &p, t, &qvt));
+#ifdef P4EST_ENABLE_MPICOMMSHARED
+  /* so far p3 partition works with shared memory only */
   SC3X (perform_test (p3, p, t, qvt));
+#endif
   SC3X (clean_up (p3, p, t));
 
   sc_finalize_noabort ();

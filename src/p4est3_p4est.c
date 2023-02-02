@@ -540,6 +540,14 @@ p4est_quadrant_vtable_is_ancestor (const void *q1, const void *q2, int *j)
   return NULL;
 }
 
+static sc3_error_t *
+p4est_quadrant_vtable_is_parent (const void *q, const void *r, int *j)
+{
+  *j = p4est_quadrant_is_parent ((const p4est_quadrant_t *) q,
+                                 (const p4est_quadrant_t *) r);
+  return NULL;
+}
+
 static const p4est3_quadrant_vtable_t quadrant_vtable_p4est =
 {
   P4EST_STRING "quadrant_vtable_p4est",
@@ -573,6 +581,7 @@ static const p4est3_quadrant_vtable_t quadrant_vtable_p4est =
   (p4est3_quadrant_compare_t) p4est_quadrant_vtable_compare,
   (p4est3_quadrant_is2_t) p4est_quadrant_vtable_is_equal,
   (p4est3_quadrant_is_ancestor_t) p4est_quadrant_vtable_is_ancestor,
+  (p4est3_quadrant_is_parent_t) p4est_quadrant_vtable_is_parent,
   (p4est3_nearest_common_ancestor_t) p4est_vtable_nearest_common_ancestor
 };
 

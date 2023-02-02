@@ -1,6 +1,7 @@
 include(CheckIncludeFile)
 include(CheckSymbolExists)
 include(ProcessorCount)
+include(CheckCSourceCompiles)
 
 # on some platforms e.g. ARM, we have to try a few ways to get CPU count > 1 for multi-core systems
 cmake_host_system_information(RESULT Ncpu QUERY NUMBER_OF_PHYSICAL_CORES)
@@ -62,7 +63,25 @@ set(P4EST_ENABLE_MEMALIGN 1)
 
 if(mpi)
   set(P4EST_ENABLE_MPI 1)
-  check_symbol_exists(MPI_COMM_TYPE_SHARED mpi.h P4EST_ENABLE_MPICOMMSHARED)
+  check_c_source_compiles("
+  #include <mpi.h>
+  int main (void) {
+    MPI_Comm subcomm;
+    MPI_Init ((int *) 0, (char ***) 0);
+    MPI_Comm_split_type(MPI_COMM_WORLD,MPI_COMM_TYPE_SHARED,0,MPI_INFO_NULL,&subcomm);
+    MPI_Finalize ();
+    return 0;
+  }" P4EST_ENABLE_MPICOMMSHARED)
+
+  check_c_source_compiles("
+  #include <mpi.h>
+  int main (void) {
+    MPI_Comm subcomm;
+    MPI_Init ((int *) 0, (char ***) 0);
+    MPI_Comm_split_type(MPI_COMM_WORLD,OMPI_COMM_TYPE_SOCKET,0,MPI_INFO_NULL,&subcomm);
+    MPI_Finalize ();
+    return 0;
+  }" P4EST_ENABLE_OMPICOMMSOCKET)
   set(P4EST_ENABLE_MPIIO 1)
   check_symbol_exists(MPI_Init_thread mpi.h P4EST_ENABLE_MPITHREAD)
   check_symbol_exists(MPI_Win_allocate_shared mpi.h P4EST_ENABLE_MPIWINSHARED)

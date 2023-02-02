@@ -125,6 +125,8 @@ typedef p4est3_quadrant_in_i_j_t p4est3_quadrant_ancestor_id_t;
 typedef p4est3_quadrant_in2_j_t p4est3_quadrant_compare_t;
 /** Prototype to query the one quadrant is ancetor of another. */
 typedef p4est3_quadrant_in2_j_t p4est3_quadrant_is_ancestor_t;
+/** Prototype to query the one quadrant is parent of another. */
+typedef p4est3_quadrant_in2_j_t p4est3_quadrant_is_parent_t;
 
 /*** Specific prototypes for quadrant creation functions ***/
 
@@ -231,6 +233,9 @@ typedef struct p4est3_quadrant_vtable
 
   /**< Query if a quadrant is a ancestor of another. */
   p4est3_quadrant_is_ancestor_t quadrant_is_ancestor;
+
+  /**< Query if a quadrant is a parent of another. */
+  p4est3_quadrant_is_parent_t quadrant_is_parent;
 
   p4est3_nearest_common_ancestor_t nearest_common_ancestor;
 }
@@ -594,6 +599,17 @@ sc3_error_t        *p4est3_quadrant_linear_id (const p4est3_quadrant_vtable_t * 
 sc3_error_t        *p4est3_quadrant_is_ancestor (const p4est3_quadrant_vtable_t
                                                  * qvt, const void *q1,
                                                  const void *q2, int *j);
+
+/** Query if quadrant q1 is a parent of quadrant q2.
+ * \param [in] qvt      Valid virtual quadrant table.
+ * \param [in] q1       Valid quadrant in this implementation.
+ * \param [in] q2       Valid quadrant in this implementation.
+ * \param [out] j       True if q1 is parent of q2, false otherwise.
+ * \return              NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_quadrant_is_parent (const p4est3_quadrant_vtable_t
+                                               * qvt, const void *q1,
+                                               const void *q2, int *j);
 
 /************************ convenience functions **************************/
 

@@ -69,18 +69,18 @@ p4est3_quadrant_zyx_is_valid (const __m128i * q, char *reason)
   SC3E_YES (reason);
 }
 
-#ifdef P4EST_ENABLE_DEBUG
-
-static int
-p4est3_quadrant_zyx_is_parent (const __m128i * q, const __m128i * r,
-                               char *reason)
+static sc3_error_t *
+p4est3_quadrant_zyx_is_parent (const __m128i * q, const __m128i * r, int *j)
 {
   int32_t             r_level = _mm_extract_epi32 (*r, 0);
 
-  SC3E_IS (p4est3_quadrant_zyx_is_valid, q, reason);
-  SC3E_IS (p4est3_quadrant_zyx_is_valid, r, reason);
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, q);
+  SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
+  SC3E_RETVAL (j, 0);
 
-  SC3E_TEST (_mm_extract_epi32 (*q, 0) + 1 == r_level, reason);
+  if (_mm_extract_epi32 (*q, 0) + 1 != r_level) {
+    return NULL;
+  }
 
 /* *INDENT-OFF* */
   __m128i             lhs = _mm_add_epi32 (*q, _mm_set_epi32 (0, 0, 0, 1));
@@ -96,7 +96,21 @@ p4est3_quadrant_zyx_is_parent (const __m128i * q, const __m128i * r,
                                            , 0xFFFFFFFF)
                             );
 /* *INDENT-ON* */
-  SC3E_TEST (_mm_testc_si128 (rhs, lhs) == 1, reason);
+  if (_mm_testc_si128 (rhs, lhs) == 1) {
+    *j = 1;
+  }
+  return NULL;
+}
+
+#ifdef P4EST_ENABLE_DEBUG
+
+static int
+p4est3_quadrant_zyx_is_parent_internal (const __m128i * q, const __m128i * r,
+                                        char *reason)
+{
+  int             j;
+  SC3E_DO (p4est3_quadrant_zyx_is_parent (q, r, &j), reason);
+  SC3E_TEST (j, reason);
   SC3E_YES (reason);
 }
 
@@ -135,7 +149,7 @@ p4est3_quadrant_zyx_get_tree_boundary (const __m128i * q, int face, int *j)
 {
   const int32_t       l = _mm_extract_epi32 (*q, 0);
   const int           direction = face / 2;
-  int32_t             coord, bound;
+  int32_t             coord = 0, bound;
   switch (direction) {
   case 0:
     coord = _mm_extract_epi32 (*q, 3);
@@ -239,7 +253,7 @@ p4est3_quadrant_zyx_child (const __m128i * q, int child_id, __m128i * r)
 #ifndef P4_TO_P8
   *r = _mm_insert_epi32 (*r, 0, 1);
 #endif
-  SC3A_IS2 (p4est3_quadrant_zyx_is_parent, q, r);
+  SC3A_IS2 (p4est3_quadrant_zyx_is_parent_internal, q, r);
   return NULL;
 }
 
@@ -262,7 +276,7 @@ p4est3_quadrant_zyx_parent (const __m128i * q, __m128i * r)
 /* *INDENT-ON* */
 
   SC3A_IS (p4est3_quadrant_zyx_is_valid, r);
-  SC3A_IS2 (p4est3_quadrant_zyx_is_parent, r, q);
+  SC3A_IS2 (p4est3_quadrant_zyx_is_parent_internal, r, q);
   return NULL;
 }
 
@@ -868,6 +882,7 @@ static const p4est3_quadrant_vtable_t quadrant_vtable_yx =
   (p4est3_quadrant_compare_t) p4est3_quadrant_zyx_compare,
   NULL, /*< use generic implementation */
   (p4est3_quadrant_is_ancestor_t) p4est3_quadrant_zyx_is_ancestor,
+  (p4est3_quadrant_is_parent_t) p4est3_quadrant_zyx_is_parent,
   (p4est3_nearest_common_ancestor_t) p4est3_zyx_nearest_common_ancestor
 };
 #endif /* P4EST_ENABLE_AVX2 */
