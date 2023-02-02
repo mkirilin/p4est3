@@ -47,8 +47,8 @@
 static int          refine_level = 1;
 
 static int
-refine_fractal (p4est_t * p4est, p4est_topidx_t which_tree,
-                p4est_quadrant_t * q)
+refine_pairs (p4est_t * p4est, p4est_topidx_t which_tree,
+              p4est_quadrant_t * q)
 {
   if ((which_tree & 1) == 0) {
     if (q->level < refine_level) {
@@ -64,7 +64,7 @@ refine_fractal (p4est_t * p4est, p4est_topidx_t which_tree,
 }
 
 static sc3_error_t *
-refine_p3_fractal (p4est3_refine_callback_info_t * ri, int *is_refine)
+refine_p3_pairs (p4est3_refine_callback_info_t * ri, int *is_refine)
 {
   int                 level;
   *is_refine = 0;
@@ -167,21 +167,21 @@ compare_results (sc3_allocator_t *alloc, p4est3_t * p3, p4est_t * p,
 }
 
 static sc3_error_t *
-refine (sc3_allocator_t *alloc, p4est3_t * p3,
+refine (sc3_allocator_t *alloc, p4est3_t ** p3,
         const p4est3_quadrant_vtable_t * qvt,
         sc3_MPI_Comm_t mpicomm, p4est_connectivity_t *conn_old)
 {
   int                 i;
   p4est_t * p;
-  p4est3_t           *p3refined, *p3ptr = p3;
+  p4est3_t           *p3refined, *p3ptr = *p3;
   /* refine the old forest */
   p = p4est_new_ext (mpicomm, conn_old, 0, 1, 1, 0, NULL, NULL);
-  p4est_refine (p, 1, refine_fractal, NULL);
+  p4est_refine (p, 1, refine_pairs, NULL);
 
   for (i = 0; i < refine_level; ++i) {
     SC3E (p4est3_new (alloc, &p3refined));
     SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
-    SC3E (p4est3_set_refine (p3refined, refine_p3_fractal));
+    SC3E (p4est3_set_refine (p3refined, refine_p3_pairs));
     SC3E (p4est3_set_source (p3refined, p3ptr));
     SC3E (p4est3_setup (p3refined));
 
@@ -192,8 +192,26 @@ refine (sc3_allocator_t *alloc, p4est3_t * p3,
   }
   SC3E (compare_results (alloc, p3ptr, p, qvt));
 
-  SC3E (p4est3_destroy (&p3ptr));
+  SC3E (p4est3_destroy (p3));
+  *p3 = p3refined;
   p4est_destroy (p);
+  return NULL;
+}
+
+static sc3_error_t *
+partition (sc3_allocator_t *alloc, p4est3_t ** p3)
+{
+  p4est3_t *p3part, *p3ptr = *p3;
+
+  SC3E (p4est3_new (alloc, &p3part));
+  SC3E (p4est3_set_quadrant_vtable (p3part, p3ptr->qvt));
+  SC3E (p4est3_set_source (p3part, p3ptr));
+  SC3E (p4est3_set_partition (p3part, 1, NULL));
+  SC3E (p4est3_set_shared (p3part, 1));
+  SC3E (p4est3_set_contiguous (p3part, 0));
+  SC3E (p4est3_setup (p3part));
+  SC3E (p4est3_destroy (&p3ptr));
+  *p3 = p3part;
   return NULL;
 }
 
@@ -359,9 +377,10 @@ main (int argc, char **argv)
     SC3E_NULL_SET (e, p4est3_set_shared (p3, 0));
 
     SC3E_NULL_SET (e, p4est3_setup (p3));
-    SC3E_NULL_SET (e, refine (alloc, p3, qvt, mpicomm, conn_old));
+    SC3E_NULL_SET (e, refine (alloc, &p3, qvt, mpicomm, conn_old));
 
     sc_flops_snap (&fi, &snapshot);
+    SC3E_NULL_SET (e, partition (alloc, &p3));
     sc_flops_shot (&fi, &snapshot);
     sc_stats_set1 (&stats, snapshot.iwtime, heading);
 
@@ -369,10 +388,14 @@ main (int argc, char **argv)
     sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
 
     SC3E_NULL_SET (e, p4est3_destroy (&p3));
+    SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn));
+    SC3E_NULL_SET (e, sc3_allocator_destroy (&alloc));
   }
   else {
     p = p4est_new_ext (mpicomm, conn_old, 0, 1, 1, 0, NULL, NULL);
+    p4est_refine (p, 1, refine_pairs, NULL);
     sc_flops_snap (&fi, &snapshot);
+    p4est_partition (p, 0, NULL);
     sc_flops_shot (&fi, &snapshot);
     sc_stats_set1 (&stats, snapshot.iwtime, heading);
 
@@ -382,5 +405,5 @@ main (int argc, char **argv)
     p4est_destroy (p);
   }
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
-
+  SC3X (e);
 }
