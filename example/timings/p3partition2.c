@@ -62,6 +62,10 @@ refine_fractal (p4est_t * p4est, p4est_topidx_t which_tree,
 {
   int                 qid;
 
+  if (which_tree != 0) {
+    return NULL;
+  }
+
   if ((int) q->level >= refine_level) {
     return 0;
   }
@@ -225,13 +229,14 @@ compare_results (sc3_allocator_t *alloc, p4est3_t * p3, p4est_t * p,
 static sc3_error_t *
 refine (sc3_allocator_t *alloc, p4est3_t ** p3,
         const p4est3_quadrant_vtable_t * qvt,
-        sc3_MPI_Comm_t mpicomm, p4est_connectivity_t *conn_old)
+        sc3_MPI_Comm_t mpicomm, p4est_connectivity_t *conn_old,
+        int begin_level)
 {
   int                 i;
   p4est_t * p;
   p4est3_t           *p3refined, *p3ptr = *p3;
   /* refine the old forest */
-  p = p4est_new_ext (mpicomm, conn_old, 0, 1, 1, 0, NULL, NULL);
+  p = p4est_new_ext (mpicomm, conn_old, 0, begin_level, 1, 0, NULL, NULL);
   p4est_refine (p, 1, refine_pairs, NULL);
 
   for (i = 0; i < refine_level; ++i) {
@@ -421,6 +426,7 @@ main (int argc, char **argv)
   sc_statinfo_t       stats;
   char               *heading;
   refinement_pattern_t ref_pattern = PAIRS;
+  int begin_level = 1;
 
   /* v3 standard procedure to isolate memory allocation contexts */
   mainalloc = sc3_allocator_nothread ();
@@ -442,6 +448,9 @@ main (int argc, char **argv)
 
   SC3E_NULL_SET (e, check_refinement_pattern
                     (argc, argv, mpirank, mpicomm, &ref_pattern));
+  if (ref_pattern == FRACTAL) {
+    begin_level = refine_level - level_shift;
+  }
   SC3E_NULL_SET (e, check_quadrant_type (argc, argv, &qvt, mpirank, mpicomm));
   if (argc > 3) {
     refine_level = atoi (argv[3]);
@@ -485,7 +494,7 @@ main (int argc, char **argv)
     SC3E_NULL_SET (e, p4est3_set_comm (p3, mpicomm, 1));
     SC3E_NULL_SET (e, p4est3_set_connectivity (p3, conn));
     SC3E_NULL_SET (e, p4est3_set_quadrant_vtable (p3, qvt));
-    SC3E_NULL_SET (e, p4est3_set_level (p3, 1));
+    SC3E_NULL_SET (e, p4est3_set_level (p3, begin_level));
     SC3E_NULL_SET (e, p4est3_set_setup_mode (p3, P4EST3_NEW_RECURSIVE));
     SC3E_NULL_SET (e, p4est3_set_shared (p3, 0));
 
@@ -505,7 +514,7 @@ main (int argc, char **argv)
     SC3E_NULL_SET (e, sc3_allocator_destroy (&alloc));
   }
   else {
-    p = p4est_new_ext (mpicomm, conn_old, 0, 1, 1, 0, NULL, NULL);
+    p = p4est_new_ext (mpicomm, conn_old, 0, begin_level, 1, 0, NULL, NULL);
     p4est_refine (p, 1, refine_pairs, NULL);
     sc_flops_snap (&fi, &snapshot);
     p4est_partition (p, 0, NULL);
