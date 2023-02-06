@@ -555,6 +555,8 @@ main (int argc, char **argv)
 
     p4est_destroy (p);
   }
+  free (heading);
+  p4est_connectivity_destroy (conn_old);
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
   SC3X (e);
