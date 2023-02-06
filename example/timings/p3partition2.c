@@ -514,7 +514,7 @@ main (int argc, char **argv)
   SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));
 
     /* create p4est object with connectivity */
-  if (strcmp (argv[1], "P4EST2") != 0) {
+  if (strcmp (argv[2], "P4EST2") != 0) {
     SC3E_NULL_SET (e, p4est3_new (alloc, &p3));
     SC3E_NULL_SET (e, p4est3_set_comm (p3, mpicomm, 1));
     SC3E_NULL_SET (e, p4est3_set_connectivity (p3, conn));
