@@ -63,7 +63,7 @@ refine_fractal (p4est_t * p4est, p4est_topidx_t which_tree,
   int                 qid;
 
   if (which_tree != 0) {
-    return NULL;
+    return 0;
   }
 
   if ((int) q->level >= refine_level) {
@@ -85,6 +85,11 @@ static sc3_error_t *
 refine_p3_fractal (p4est3_refine_callback_info_t * ri, int *is_refine)
 {
   int                 level, child_id;
+
+  if (ri->ntree != 0) {
+    *is_refine = 0;
+    return NULL;
+  }
 
   SC3E (p4est3_quadrant_level (ri->qvt, ri->quadrant, &level));
   if (level >= refine_level) {
