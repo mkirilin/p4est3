@@ -302,7 +302,7 @@ partition (sc3_allocator_t *alloc, p4est3_t ** p3)
   SC3E (p4est3_set_source (p3part, p3ptr));
   SC3E (p4est3_set_partition (p3part, 1, NULL));
   SC3E (p4est3_set_shared (p3part, 1));
-  SC3E (p4est3_set_contiguous (p3part, 0));
+  SC3E (p4est3_set_contiguous (p3part, 1));
   SC3E (p4est3_setup (p3part));
   SC3E (p4est3_destroy (&p3ptr));
   *p3 = p3part;
@@ -324,13 +324,13 @@ wrong_input (const char *name, int n)
   printf ("Wrong input parameter: \n");
   switch (n) {
   case 1:
-    printf ("PAttern type %s is not valid\n"
-            "Valid quadrant type value: PAIRS or"
+    printf ("Pattern type %s is not valid\n"
+            "Valid quadrant type value: PAIRS or "
             "FRACTAL, FRACTION\n", name);
     break;
   case 2:
     printf ("Quadrant type %s is not valid\n"
-            "Valid quadrant type value: P4EST2 or"
+            "Valid quadrant type value: P4EST2 or "
             "STANDARD, AVX, MORT_ORD\n", name);
     break;
   case 3:
@@ -396,7 +396,7 @@ check_quadrant_type (int argc, char **argv,
   }
   else {
     if (mpirank == 0) {
-      wrong_input (argv[2], 1);
+      wrong_input (argv[2], 2);
       sc_MPI_Abort (mpicomm, -1);
     }
   }
@@ -521,7 +521,8 @@ main (int argc, char **argv)
     SC3E_NULL_SET (e, p4est3_set_quadrant_vtable (p3, qvt));
     SC3E_NULL_SET (e, p4est3_set_level (p3, begin_level));
     SC3E_NULL_SET (e, p4est3_set_setup_mode (p3, P4EST3_NEW_RECURSIVE));
-    SC3E_NULL_SET (e, p4est3_set_shared (p3, 0));
+    SC3E_NULL_SET (e, p4est3_set_shared (p3, 1));
+    SC3E_NULL_SET (e, p4est3_set_contiguous (p3, 1));
 
     SC3E_NULL_SET (e, p4est3_setup (p3));
     SC3E_NULL_SET (e, refine
