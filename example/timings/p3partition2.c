@@ -310,14 +310,6 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
   return NULL;
 }
 
-static sc3_error_t *
-free_allocator (sc3_allocator_t ** alloc)
-{
-  SC3A_IS (sc3_allocator_is_setup, *alloc);
-  SC3E (sc3_allocator_destroy (alloc));
-  return NULL;
-}
-
 void
 wrong_input (const char *name, int n)
 {
@@ -563,6 +555,7 @@ main (int argc, char **argv)
 
     p4est_destroy (p);
   }
+  SC3E_NULL_REQ (e, !sc_finalize_noabort ());
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
   SC3X (e);
 }
