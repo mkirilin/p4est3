@@ -150,6 +150,7 @@ refine_p3_pairs (p4est3_refine_callback_info_t * ri, int *is_refine)
   return NULL;
 }
 
+#ifdef P4EST_ENABLE_DEBUG
 static sc3_error_t *
 array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
            int ecount, sc3_array_t ** arr)
@@ -230,6 +231,7 @@ compare_results (sc3_allocator_t *alloc, p4est3_t * p3, p4est_t * p,
   SC3E (sc3_array_destroy (&levels));
   return NULL;
 }
+#endif /* P4EST_ENABLE_DEBUG */
 
 static sc3_error_t *
 refine (sc3_allocator_t *alloc, p4est3_t ** p3,
@@ -238,8 +240,9 @@ refine (sc3_allocator_t *alloc, p4est3_t ** p3,
         int begin_level, refinement_pattern_t ref_pattern)
 {
   int                 i;
-  p4est_t * p;
   p4est3_t           *p3refined, *p3ptr = *p3;
+#ifdef P4EST_ENABLE_DEBUG
+  p4est_t * p;
   /* refine the old forest */
   p = p4est_new_ext (mpicomm, conn_old, 0, begin_level, 1, 0, NULL, NULL);
   switch (ref_pattern)
@@ -254,6 +257,7 @@ refine (sc3_allocator_t *alloc, p4est3_t ** p3,
     SC3E_UNREACH ("unavailable pattern");
     break;
   }
+#endif
 
   for (i = 0; i < refine_level; ++i) {
     SC3E (p4est3_new (alloc, &p3refined));
@@ -278,11 +282,13 @@ refine (sc3_allocator_t *alloc, p4est3_t ** p3,
     }
     p3ptr = p3refined;
   }
+#ifdef P4EST_ENABLE_DEBUG
   SC3E (compare_results (alloc, p3ptr, p, qvt));
+  p4est_destroy (p);
+#endif
 
   SC3E (p4est3_destroy (p3));
   *p3 = p3refined;
-  p4est_destroy (p);
   return NULL;
 }
 
