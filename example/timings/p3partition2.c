@@ -249,6 +249,7 @@ refine (sc3_allocator_t *alloc, p4est3_t ** p3,
     break;
   case FRACTAL:
     p4est_refine (p, 1, refine_fractal, NULL);
+    break;
   default:
     SC3E_UNREACH ("unavailable pattern");
     break;
@@ -264,6 +265,7 @@ refine (sc3_allocator_t *alloc, p4est3_t ** p3,
       break;
     case FRACTAL:
       SC3E (p4est3_set_refine (p3refined, refine_p3_fractal));
+      break;
     default:
       SC3E_UNREACH ("unavailable pattern");
       break;
@@ -541,6 +543,7 @@ main (int argc, char **argv)
       break;
     case FRACTAL:
       p4est_refine (p, 1, refine_fractal, NULL);
+      break;
     default:
       sc_MPI_Abort (mpicomm, -1);
       break;
