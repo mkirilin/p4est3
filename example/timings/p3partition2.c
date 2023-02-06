@@ -235,19 +235,39 @@ static sc3_error_t *
 refine (sc3_allocator_t *alloc, p4est3_t ** p3,
         const p4est3_quadrant_vtable_t * qvt,
         sc3_MPI_Comm_t mpicomm, p4est_connectivity_t *conn_old,
-        int begin_level)
+        int begin_level, refinement_pattern_t ref_pattern)
 {
   int                 i;
   p4est_t * p;
   p4est3_t           *p3refined, *p3ptr = *p3;
   /* refine the old forest */
   p = p4est_new_ext (mpicomm, conn_old, 0, begin_level, 1, 0, NULL, NULL);
-  p4est_refine (p, 1, refine_pairs, NULL);
+  switch (ref_pattern)
+  {
+  case PAIRS:
+    p4est_refine (p, 1, refine_pairs, NULL);
+    break;
+  case FRACTAL:
+    p4est_refine (p, 1, refine_fractal, NULL);
+  default:
+    SC3E_UNREACH ("unavailable pattern");
+    break;
+  }
 
   for (i = 0; i < refine_level; ++i) {
     SC3E (p4est3_new (alloc, &p3refined));
     SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
-    SC3E (p4est3_set_refine (p3refined, refine_p3_pairs));
+    switch (ref_pattern)
+    {
+    case PAIRS:
+      SC3E (p4est3_set_refine (p3refined, refine_p3_pairs));
+      break;
+    case FRACTAL:
+      SC3E (p4est3_set_refine (p3refined, refine_p3_fractal));
+    default:
+      SC3E_UNREACH ("unavailable pattern");
+      break;
+    }
     SC3E (p4est3_set_source (p3refined, p3ptr));
     SC3E (p4est3_setup (p3refined));
 
@@ -504,7 +524,9 @@ main (int argc, char **argv)
     SC3E_NULL_SET (e, p4est3_set_shared (p3, 0));
 
     SC3E_NULL_SET (e, p4est3_setup (p3));
-    SC3E_NULL_SET (e, refine (alloc, &p3, qvt, mpicomm, conn_old));
+    SC3E_NULL_SET (e, refine
+                      (alloc, &p3, qvt, mpicomm, conn_old,
+                       begin_level, ref_pattern));
 
     sc_flops_snap (&fi, &snapshot);
     SC3E_NULL_SET (e, partition (alloc, &p3));
@@ -520,7 +542,17 @@ main (int argc, char **argv)
   }
   else {
     p = p4est_new_ext (mpicomm, conn_old, 0, begin_level, 1, 0, NULL, NULL);
-    p4est_refine (p, 1, refine_pairs, NULL);
+    switch (ref_pattern)
+    {
+    case PAIRS:
+      p4est_refine (p, 1, refine_pairs, NULL);
+      break;
+    case FRACTAL:
+      p4est_refine (p, 1, refine_fractal, NULL);
+    default:
+      sc_MPI_Abort (mpicomm, -1);
+      break;
+    }
     sc_flops_snap (&fi, &snapshot);
     p4est_partition (p, 0, NULL);
     sc_flops_shot (&fi, &snapshot);
