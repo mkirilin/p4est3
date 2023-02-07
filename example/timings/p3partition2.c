@@ -28,6 +28,7 @@
 #include <p4est3_p4est.h>
 #include <p4est3_quadrant_yx.h>
 #include <p4est3_quadrant_mort2d.h>
+#include <p4est_vtk.h>
 #else
 #include <p4est_to_p8est.h>
 #include <p8est_extended.h>
@@ -35,18 +36,20 @@
 #include <p4est3_p8est.h>
 #include <p4est3_quadrant_zyx.h>
 #include <p4est3_quadrant_mort3d.h>
+#include <p8est_vtk.h>
 #endif
 
 /* Generally speaking, it is not allowed to use _internal headers in
  applications. We use it only in exceptional cases as timings and tests. */
 #include <p4est3_internal.h>
 #include <sc_statistics.h>
+#include <sc_options.h>
 #include <sc_flops.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 static int          refine_level = 1;
-static int          level_shift = 0;
 #ifdef P4_TO_P8
 static double       refinement_fraction = 1. / 7.;
 #else
@@ -343,24 +346,19 @@ wrong_input (const char *name, int n)
 }
 
 static sc3_error_t *
-check_refinement_pattern (int argc, char **argv,
-                          int mpirank, sc3_MPI_Comm_t mpicomm,
+check_refinement_pattern (const char *opt_pattern,
                           p4est_refine_t *crefine,
                           p4est3_refine_callback_t *p3crefine)
 {
-  if (argc <= 1) {
+  if (strcmp (opt_pattern, "PAIRS") == 0) {
     *crefine = refine_pairs;
     *p3crefine = refine_p3_pairs;
   }
-  if (strcmp (argv[1], "PAIRS") == 0) {
-    *crefine = refine_pairs;
-    *p3crefine = refine_p3_pairs;
-  }
-  else if (strcmp (argv[1], "FRACTAL") == 0) {
+  else if (strcmp (opt_pattern, "FRACTAL") == 0) {
     *crefine = refine_fractal;
     *p3crefine = refine_p3_fractal;
   }
-  else if (strcmp (argv[1], "FRACTION") == 0) {
+  else if (strcmp (opt_pattern, "FRACTION") == 0) {
     *crefine = refine_fraction;
     *p3crefine = refine_p3_fraction;
   }
@@ -371,30 +369,25 @@ check_refinement_pattern (int argc, char **argv,
 }
 
 static sc3_error_t *
-check_quadrant_type (int argc, char **argv,
-                     const p4est3_quadrant_vtable_t **qvt,
-                     int mpirank, sc3_MPI_Comm_t mpicomm)
+check_quadrant_type (const char *opt_qtype,
+                     const p4est3_quadrant_vtable_t **qvt)
 {
-  if (argc <= 2) {
+  if (strcmp (opt_qtype, "P4EST2") == 0) {
     return NULL;
   }
-  if (strcmp (argv[2], "P4EST2") == 0) {
-    return NULL;
-  }
-  if (strcmp (argv[2], "STANDARD") == 0) {
+  if (strcmp (opt_qtype, "STANDARD") == 0) {
     SC3E (p4est3_quadrant_vtable_p4est (qvt));
   }
-  else if (strcmp (argv[2], "AVX") == 0) {
+  else if (strcmp (opt_qtype, "AVX") == 0) {
     SC3E (p4est3_quadrant_yx_vtable (qvt));
   }
-  else if (strcmp (argv[2], "MORT_ORD") == 0) {
+  else if (strcmp (opt_qtype, "MORT_ORD") == 0) {
     SC3E (p4est3_quadrant_mort2d_vtable (qvt));
   }
   else {
-    if (mpirank == 0) {
-      wrong_input (argv[2], 2);
-      sc_MPI_Abort (mpicomm, -1);
-    }
+    SC3E_UNREACH
+      ("Invalid quadrant implementation name. "
+       "Valid names are: P4EST2, STANDARD, AVX, MORT_ORD");
   }
   SC3E_DEMAND (*qvt != NULL, "AVX is not supported by hardware or"
                "p4est is not build neither in 2D nor 3D");
@@ -402,32 +395,13 @@ check_quadrant_type (int argc, char **argv,
 }
 
 char *
-set_heading (int argc, char **argv, sc3_MPI_Comm_t mpicomm)
+set_heading (const char *opt_pattern, const char *opt_qtype)
 {
-  char               *heading;
-  if (argc > 2) {
-    heading = (char *) malloc (strlen (argv[1]) + 1 + strlen (argv[2]) + 1);
-    strcpy (heading, argv[1]);
-    strcat (heading, " ");
-    strcat (heading, argv[2]);
-  }
-  else if (argc == 2) {
-    heading =
-      (char *) malloc (strlen (argv[1]) + 1 + strlen ("STANDARD") + 1);
-    strcpy (heading, argv[1]);
-    strcat (heading, " ");
-    strcat (heading, "STANDARD");
-  }
-  else {
-    heading =
-      (char *) malloc (strlen ("PAIRS") + 1 + strlen ("STANDARD") + 1);
-    strcpy (heading, "PAIRS");
-    strcat (heading, " ");
-    strcat (heading, "STANDARD");
-  }
-  if (heading == NULL) {
-    sc_MPI_Abort (mpicomm, -1);
-  }
+  char *heading =
+    (char *) malloc (strlen (opt_pattern) + 1 + strlen (opt_qtype) + 1);
+  strcpy (heading, opt_pattern);
+  strcat (heading, " ");
+  strcat (heading, opt_qtype);
   return heading;
 }
 
@@ -435,7 +409,7 @@ int
 main (int argc, char **argv)
 {
   const p4est3_quadrant_vtable_t *qvt;
-  int i;
+  int i, start_level, write_vtk, num_trees;
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e;
   sc3_MPI_Comm_t      mpicomm = SC3_MPI_COMM_WORLD;
@@ -446,10 +420,12 @@ main (int argc, char **argv)
   int                 mpirank, mpisize;
   sc_flopinfo_t       fi, snapshot;
   sc_statinfo_t       stats;
-  char               *heading;
   p4est_refine_t crefine = refine_pairs;
   p4est3_refine_callback_t p3crefine = refine_p3_pairs;
-  int begin_level = 1;
+  sc_options_t       *opt;
+  const char         *opt_pattern, *opt_qtype;
+  char heading[80], ref_lvl_string[10];
+
 
   /* v3 standard procedure to isolate memory allocation contexts */
   mainalloc = sc3_allocator_nothread ();
@@ -460,35 +436,35 @@ main (int argc, char **argv)
   SC3E_NULL_SET (e, sc3_MPI_Comm_rank (mpicomm, &mpirank));
   SC3E_NULL_SET (e, sc3_MPI_Comm_size (mpicomm, &mpisize));
 
-  /* default parameters */
-  SC3E_NULL_SET (e, p4est3_quadrant_vtable_p4est (&qvt));
-  if (argc == 1 && mpirank == 0) {
-    printf ("Execution without parameters. "
-            "Default parameters are applied.\n"
-            "Parameter's format: "
-            "<PATTERN> <QUADRANT TYPE> <refine_level> <level_shift>\n");
-  }
+  /*** read command line parameters ***/
+
+  opt = sc_options_new (argv[0]);
+  sc_options_add_string
+    (opt, 'P', "pattern", &opt_pattern, "PAIRS", "Refinement pattern");
+  sc_options_add_string
+    (opt, 'Q', "qtype", &opt_qtype, "STANDARD", "Quadrant implementation");
+  sc_options_add_int
+    (opt, 'l', "start level", &start_level, 4,
+     "Level of the uniform starting grid");
+  sc_options_add_int
+    (opt, 'L', "refine level", &refine_level, 10, "Highest level");
+  sc_options_add_int
+    (opt, 'T', "trees", &num_trees, 1, "Number of trees in a forest");
+  sc_options_add_switch (opt, 'V', "write-vtk", &write_vtk,
+                         "write vtk output");
+  sc_options_parse (p4est_package_id, SC_LP_DEFAULT, opt, argc, argv);
 
   SC3E_NULL_SET (e, check_refinement_pattern
-                    (argc, argv, mpirank, mpicomm, &crefine, &p3crefine));
-  SC3E_NULL_SET (e, check_quadrant_type (argc, argv, &qvt, mpirank, mpicomm));
-  if (argc > 3) {
-    refine_level = atoi (argv[3]);
-    if (refine_level == 0 && mpirank == 0) {
-      wrong_input (argv[3], 3);
-      sc_MPI_Abort (mpicomm, -1);
-    }
-  }
-  if (argc > 4) {
-    level_shift = atoi (argv[4]);
-    if (mpirank == 0 &&
-        (level_shift == 0 || level_shift >= refine_level)) {
-      wrong_input (argv[4], 4);
-      sc_MPI_Abort (mpicomm, -1);
-    }
-  }
-  sc3_MPI_Barrier (mpicomm);
-  heading = set_heading (argc, argv, mpicomm);
+                    (opt_pattern, &crefine, &p3crefine));
+  SC3E_NULL_SET (e, check_quadrant_type (opt_qtype, &qvt));
+
+  /*** set heading ***/
+  sprintf(ref_lvl_string, "%d", refine_level);
+  strcpy (heading, opt_pattern);
+  strcat (heading, " ");
+  strcat (heading, opt_qtype);
+  strcat (heading, " ");
+  strcat (heading, ref_lvl_string);
 
   /* we don't need init calls for v3.  Just to check legacy wrapping */
   /* must not use SC3_MPI_COMM_WORLD due to incompatible non-mpi wrapping */
@@ -498,14 +474,14 @@ main (int argc, char **argv)
 
   /* make the old style connectivity */
 #ifdef P4_TO_P8
-  conn_old = p8est_connectivity_new_brick (mpisize, 1, 1, 0, 0, 0);
+  conn_old = p8est_connectivity_new_brick (num_trees, 1, 1, 0, 0, 0);
 #else
-  conn_old = p4est_connectivity_new_brick (mpisize, 1, 0, 0);
+  conn_old = p4est_connectivity_new_brick (num_trees, 1, 0, 0);
 #endif /* P4_TO_P8 */
   /* make the p4est3 style connectivity */
   SC3E_NULL_SET (e, p4est3_connectivity_new (alloc, &conn));
   SC3E_NULL_SET (e, p4est3_connectivity_set_dim (conn, P4EST_DIM));
-  SC3E_NULL_SET (e, p4est3_connectivity_set_num_trees (conn, mpisize));
+  SC3E_NULL_SET (e, p4est3_connectivity_set_num_trees (conn, num_trees));
   SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));
 
     /* create p4est object with connectivity */
@@ -514,7 +490,7 @@ main (int argc, char **argv)
     SC3E_NULL_SET (e, p4est3_set_comm (p3, mpicomm, 1));
     SC3E_NULL_SET (e, p4est3_set_connectivity (p3, conn));
     SC3E_NULL_SET (e, p4est3_set_quadrant_vtable (p3, qvt));
-    SC3E_NULL_SET (e, p4est3_set_level (p3, begin_level));
+    SC3E_NULL_SET (e, p4est3_set_level (p3, 0));
     SC3E_NULL_SET (e, p4est3_set_setup_mode (p3, P4EST3_NEW_RECURSIVE));
     SC3E_NULL_SET (e, p4est3_set_shared (p3, 1));
     SC3E_NULL_SET (e, p4est3_set_contiguous (p3, 1));
@@ -551,7 +527,6 @@ main (int argc, char **argv)
 
     p4est_destroy (p);
   }
-  free (heading);
   p4est_connectivity_destroy (conn_old);
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
