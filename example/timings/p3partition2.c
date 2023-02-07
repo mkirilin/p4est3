@@ -21,7 +21,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#include <p4est3.h>
+#include <p4est3_internal.h>
 #ifndef P4_TO_P8
 #include <p4est_extended.h>
 #include <p4est_bits.h>
@@ -29,6 +29,7 @@
 #include <p4est3_quadrant_yx.h>
 #include <p4est3_quadrant_mort2d.h>
 #else
+#include <p4est_to_p8est.h>
 #include <p8est_extended.h>
 #include <p8est_bits.h>
 #include <p4est3_p8est.h>
@@ -44,17 +45,9 @@
 
 #include <string.h>
 
-typedef enum refinement_pattern
-{
-  PAIRS,
-  FRACTAL,
-  FRACTION,
-  PATTERN_LAST
-}
-refinement_pattern_t;
-
 static int          refine_level = 1;
 static int          level_shift = 0;
+static double       refinement_fraction = 0.25;
 
 static int
 refine_fractal (p4est_t * p4est, p4est_topidx_t which_tree,
@@ -341,43 +334,22 @@ static sc3_error_t *
 refine (sc3_allocator_t *alloc, p4est3_t ** p3,
         const p4est3_quadrant_vtable_t * qvt,
         sc3_MPI_Comm_t mpicomm, p4est_connectivity_t *conn_old,
-        int begin_level, refinement_pattern_t ref_pattern)
+        p4est_refine_t *crefine, p4est3_refine_callback_t *p3crefine)
 {
   int                 i;
   p4est3_t           *p3refined, *p3ptr = *p3;
 #ifdef P4EST_ENABLE_DEBUG
-  p4est_t * p;
-  /* refine the old forest */
-  p = p4est_new_ext (mpicomm, conn_old, 0, begin_level, 1, 0, NULL, NULL);
-  switch (ref_pattern)
-  {
-  case PAIRS:
-    p4est_refine (p, 1, refine_pairs, NULL);
-    break;
-  case FRACTAL:
-    p4est_refine (p, 1, refine_fractal, NULL);
-    break;
-  default:
-    SC3E_UNREACH ("unavailable pattern");
-    break;
-  }
+  p4est_t *p;
+  p = p4est_new_ext (mpicomm, conn_old, 0, 0, 1, 0, NULL, NULL);
 #endif
 
   for (i = 0; i < refine_level; ++i) {
+#ifdef P4EST_ENABLE_DEBUG
+    p4est_refine (p, 0, *crefine, NULL);
+#endif
     SC3E (p4est3_new (alloc, &p3refined));
     SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
-    switch (ref_pattern)
-    {
-    case PAIRS:
-      SC3E (p4est3_set_refine (p3refined, refine_p3_pairs));
-      break;
-    case FRACTAL:
-      SC3E (p4est3_set_refine (p3refined, refine_p3_fractal));
-      break;
-    default:
-      SC3E_UNREACH ("unavailable pattern");
-      break;
-    }
+    SC3E (p4est3_set_refine (p3refined, *p3crefine));
     SC3E (p4est3_set_source (p3refined, p3ptr));
     SC3E (p4est3_setup (p3refined));
 
@@ -455,25 +427,27 @@ wrong_input (const char *name, int n)
 static sc3_error_t *
 check_refinement_pattern (int argc, char **argv,
                           int mpirank, sc3_MPI_Comm_t mpicomm,
-                          refinement_pattern_t *ref_pattern)
+                          p4est_refine_t *crefine,
+                          p4est3_refine_callback_t *p3crefine)
 {
   if (argc <= 1) {
-    return NULL;
+    *crefine = refine_pairs;
+    *p3crefine = refine_p3_pairs;
   }
   if (strcmp (argv[1], "PAIRS") == 0) {
-    *ref_pattern = PAIRS;
+    *crefine = refine_pairs;
+    *p3crefine = refine_p3_pairs;
   }
   else if (strcmp (argv[1], "FRACTAL") == 0) {
-    *ref_pattern = FRACTAL;
+    *crefine = refine_fractal;
+    *p3crefine = refine_p3_fractal;
   }
   else if (strcmp (argv[1], "FRACTION") == 0) {
-    *ref_pattern = FRACTION;
+    *crefine = refine_fraction;
+    *p3crefine = refine_p3_fraction;
   }
   else {
-    if (mpirank == 0) {
-      wrong_input (argv[1], 1);
-      sc_MPI_Abort (mpicomm, -1);
-    }
+    SC3E_UNREACH ("unavailable refine mode");
   }
   return NULL;
 }
@@ -543,6 +517,7 @@ int
 main (int argc, char **argv)
 {
   const p4est3_quadrant_vtable_t *qvt;
+  int i;
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e;
   sc3_MPI_Comm_t      mpicomm = SC3_MPI_COMM_WORLD;
@@ -554,7 +529,8 @@ main (int argc, char **argv)
   sc_flopinfo_t       fi, snapshot;
   sc_statinfo_t       stats;
   char               *heading;
-  refinement_pattern_t ref_pattern = PAIRS;
+  p4est_refine_t crefine = refine_pairs;
+  p4est3_refine_callback_t p3crefine = refine_p3_pairs;
   int begin_level = 1;
 
   /* v3 standard procedure to isolate memory allocation contexts */
@@ -576,10 +552,7 @@ main (int argc, char **argv)
   }
 
   SC3E_NULL_SET (e, check_refinement_pattern
-                    (argc, argv, mpirank, mpicomm, &ref_pattern));
-  if (ref_pattern == FRACTAL) {
-    begin_level = refine_level - level_shift;
-  }
+                    (argc, argv, mpirank, mpicomm, &crefine, &p3crefine));
   SC3E_NULL_SET (e, check_quadrant_type (argc, argv, &qvt, mpirank, mpicomm));
   if (argc > 3) {
     refine_level = atoi (argv[3]);
@@ -630,8 +603,8 @@ main (int argc, char **argv)
 
     SC3E_NULL_SET (e, p4est3_setup (p3));
     SC3E_NULL_SET (e, refine
-                      (alloc, &p3, qvt, mpicomm, conn_old,
-                       begin_level, ref_pattern));
+                      (alloc, &p3, qvt, mpicomm,
+                       conn_old, &crefine, &p3crefine));
 
     sc_flops_snap (&fi, &snapshot);
     SC3E_NULL_SET (e, partition (alloc, &p3));
@@ -646,18 +619,9 @@ main (int argc, char **argv)
     SC3E_NULL_SET (e, sc3_allocator_destroy (&alloc));
   }
   else {
-    p = p4est_new_ext (mpicomm, conn_old, 0, begin_level, 1, 0, NULL, NULL);
-    switch (ref_pattern)
-    {
-    case PAIRS:
-      p4est_refine (p, 1, refine_pairs, NULL);
-      break;
-    case FRACTAL:
-      p4est_refine (p, 1, refine_fractal, NULL);
-      break;
-    default:
-      sc_MPI_Abort (mpicomm, -1);
-      break;
+    p = p4est_new_ext (mpicomm, conn_old, 0, 0, 1, 0, NULL, NULL);
+    for (i = 0; i < refine_level; ++i) {
+      p4est_refine (p, 0, crefine, NULL);
     }
     sc_flops_snap (&fi, &snapshot);
     p4est_partition (p, 0, NULL);
