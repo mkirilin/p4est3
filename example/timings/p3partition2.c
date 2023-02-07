@@ -47,60 +47,44 @@
 
 static int          refine_level = 1;
 static int          level_shift = 0;
-static double       refinement_fraction = 0.25;
+#ifdef P4_TO_P8
+static double       refinement_fraction = 1. / 7.;
+#else
+static double       refinement_fraction = 1. / 3.;
+#endif
 
 static int
-refine_fractal (p4est_t * p4est, p4est_topidx_t which_tree,
+refine_fractal (p4est_t * p, p4est_topidx_t which_tree,
                 p4est_quadrant_t * q)
 {
-  int                 qid;
+  /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
+  p4est_locidx_t     *quadrant_local_id = (p4est_locidx_t *) p->user_pointer;
 
-  if (which_tree != 0) {
-    return 0;
-  }
-
-  if ((int) q->level >= refine_level) {
-    return 0;
-  }
-  if ((int) q->level < refine_level - level_shift) {
-    return 1;
-  }
-
-  qid = p4est_quadrant_child_id (q);
-  return (qid == 0 || qid == 3
+  return
+    (((p->global_first_quadrant[p->mpirank] + (*quadrant_local_id)++) %
 #ifdef P4_TO_P8
-          || qid == 5 || qid == 6
+      7)
+#else
+      3)
 #endif
-    );
+     == 0);
 }
 
 static sc3_error_t *
 refine_p3_fractal (p4est3_refine_callback_info_t * ri, int *is_refine)
 {
-  int                 level, child_id;
+  /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
+  p4est3_locidx     *quadrant_local_id = (p4est3_locidx *) ri->user_data;
+  SC3A_CHECK (is_refine != NULL);
 
-  if (ri->ntree != 0) {
-    *is_refine = 0;
-    return NULL;
-  }
-
-  SC3E (p4est3_quadrant_level (ri->qvt, ri->quadrant, &level));
-  if (level >= refine_level) {
-    *is_refine = 0;
-    return NULL;
-  }
-  if (level < refine_level - level_shift) {
-    *is_refine = 1;
-    return NULL;
-  }
-
-  SC3E (p4est3_quadrant_child_id (ri->qvt, ri->quadrant, &child_id));
-  *is_refine = (child_id == 0 || child_id == 3
+  *is_refine =
+    (((ri->p3->goffset[ri->p3->mpirank] + (*quadrant_local_id)++) %
 #ifdef P4_TO_P8
-          || child_id == 5 || child_id == 6
+      7)
+#else
+      3)
 #endif
-    );
-
+     == 0);
   return NULL;
 }
 
@@ -154,8 +138,7 @@ refine_fraction (p4est_t * p, p4est_topidx_t which_tree,
   */
   const p4est_locidx_t quad_count_refinement_threshold =
     (p4est_locidx_t) (refinement_fraction * p->global_num_quadrants);
-  p4est_locidx_t     *quadrant_local_id =
-    (p4est_locidx_t *) p->user_pointer;
+  p4est_locidx_t     *quadrant_local_id = (p4est_locidx_t *) p->user_pointer;
 
   return
     ((p->global_first_quadrant[p->mpirank] + (*quadrant_local_id)++) <=
@@ -171,7 +154,7 @@ refine_p3_fraction (p4est3_refine_callback_info_t * ri, int *is_refine)
    * refinment_factor = 1 / 7.
    */
   /* p4est->global_num_quadrants is the old number of quadrants */
-  SC3E_RETVAL (is_refine, 0);
+  SC3A_CHECK (is_refine != NULL);
   const p4est3_locidx quad_count_refinement_threshold =
     (p4est3_locidx) (refinement_fraction * ri->p3->global_num_quads);
   p4est3_locidx     *quadrant_local_id = (p4est3_locidx *) ri->user_data;
