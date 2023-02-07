@@ -150,6 +150,110 @@ refine_p3_pairs (p4est3_refine_callback_info_t * ri, int *is_refine)
   return NULL;
 }
 
+static int
+refine_fraction (p4est_t * p4est, p4est_topidx_t which_tree,
+                 p4est_quadrant_t * q)
+{
+  /* The formula in the line below implies
+   * quadrant_fraction = 7 * refinement_fraction + 1.
+   * In particular we need for doubling the quadrants for a level increment
+   * refinment_factor = 1 / 7.
+   */
+  /* p4est->global_num_quadrants is the old number of quadrants */
+  const p4est_locidx_t quad_count_refinement_threshold =
+    (p4est_locidx_t) (refinement_fraction * p4est->global_num_quadrants);
+  p4est_locidx_t      local_refined_quads;
+  p4est_gloidx_t     *refinement_counter =
+    (p4est_gloidx_t *) p4est->user_pointer;
+
+#if 0
+  if ((int) q->level >= refine_level) {
+    ++(*refinement_counter);
+    return 0;
+  }
+#endif
+
+  if (p4est->global_first_quadrant[p4est->mpirank + 1] - 1 <
+      quad_count_refinement_threshold) {
+    /* This process owns quadrants that we want to refine. */
+    /* On this process is no refinement conting needed. */
+    return 1;
+  }
+
+  if (p4est->global_first_quadrant[p4est->mpirank] <=
+      quad_count_refinement_threshold
+      && p4est->global_first_quadrant[p4est->mpirank + 1] - 1 >=
+      quad_count_refinement_threshold) {
+    /* This process owns the threshold quadrant. */
+    local_refined_quads =
+      quad_count_refinement_threshold -
+      p4est->global_first_quadrant[p4est->mpirank];
+    if (*refinement_counter < local_refined_quads) {
+      /* refine only a defined fraction of the quadrants */
+      ++(*refinement_counter);
+      return 1;
+    }
+  }
+
+  /* If this return is reached we already know that we reached the threshold.
+   * That is why we do not have to increment refinement_counter.
+   */
+  return 0;
+}
+
+static sc3_error_t *
+refine_p3_fraction (p4est3_refine_callback_info_t * ri, int *is_refine)
+{
+  /* The formula in the line below implies
+   * quadrant_fraction = 7 * refinement_fraction + 1.
+   * In particular we need for doubling the quadrants for a level increment
+   * refinment_factor = 1 / 7.
+   */
+  /* p4est->global_num_quadrants is the old number of quadrants */
+  const p4est3_locidx quad_count_refinement_threshold =
+    (p4est3_locidx) (refinement_fraction * ri->p3->global_num_quads);
+  p4est3_locidx      local_refined_quads;
+  p4est3_gloidx     *refinement_counter = (p4est3_gloidx *) ri->user_data;
+  p4est3_t *p3 = ri->p3;
+  *is_refine = 0;
+
+#if 0
+  if ((int) q->level >= refine_level) {
+    ++(*refinement_counter);
+    return 0;
+  }
+#endif
+
+  if (p3->goffset[p3->mpirank + 1] - 1 <
+      quad_count_refinement_threshold) {
+    /* This process owns quadrants that we want to refine. */
+    /* On this process is no refinement conting needed. */
+    *is_refine = 1;
+    return NULL;
+  }
+
+  if (p3->goffset[p3->mpirank] <=
+      quad_count_refinement_threshold
+      && p3->goffset[p3->mpirank + 1] - 1 >=
+      quad_count_refinement_threshold) {
+    /* This process owns the threshold quadrant. */
+    local_refined_quads =
+      quad_count_refinement_threshold -
+      p3->goffset[p3->mpirank];
+    if (*refinement_counter < local_refined_quads) {
+      /* refine only a defined fraction of the quadrants */
+      ++(*refinement_counter);
+      *is_refine = 1;
+      return NULL;
+    }
+  }
+
+  /* If this return is reached we already know that we reached the threshold.
+   * That is why we do not have to increment refinement_counter.
+   */
+  return NULL;
+}
+
 #ifdef P4EST_ENABLE_DEBUG
 static sc3_error_t *
 array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
