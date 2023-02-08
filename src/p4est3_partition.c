@@ -97,8 +97,8 @@ p4est3_partition_allocations (const p4est3_t * p3,
   *pnum_per_tree_local = locidx_prt;
 
   locidx_prt = NULL;
-  SC3E (sc3_allocator_malloc
-        (p3->alloc, total_num_trees * sizeof (p4est3_locidx), &locidx_prt));
+  SC3E (sc3_allocator_calloc
+        (p3->alloc, total_num_trees, sizeof (p4est3_locidx), &locidx_prt));
   *pnew_local_tree_elem_count = locidx_prt;
 
   gloidx_prt = NULL;
