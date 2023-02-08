@@ -333,17 +333,6 @@ check_quadrant_type (const char *opt_qtype,
   return NULL;
 }
 
-char *
-set_heading (const char *opt_pattern, const char *opt_qtype)
-{
-  char *heading =
-    (char *) malloc (strlen (opt_pattern) + 1 + strlen (opt_qtype) + 1);
-  strcpy (heading, opt_pattern);
-  strcat (heading, " ");
-  strcat (heading, opt_qtype);
-  return heading;
-}
-
 int
 main (int argc, char **argv)
 {
