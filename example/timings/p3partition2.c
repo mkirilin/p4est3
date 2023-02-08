@@ -361,6 +361,8 @@ main (int argc, char **argv)
 
   /* this is generally needed for MPI */
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
+  sc_init (mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
+  p4est_init (NULL, SC_LP_DEFAULT);
 
   SC3E_NULL_SET (e, sc3_MPI_Comm_rank (mpicomm, &mpirank));
   SC3E_NULL_SET (e, sc3_MPI_Comm_size (mpicomm, &mpisize));
@@ -396,8 +398,6 @@ main (int argc, char **argv)
 
   /* we don't need init calls for v3.  Just to check legacy wrapping */
   /* must not use SC3_MPI_COMM_WORLD due to incompatible non-mpi wrapping */
-  sc_init (mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
-  p4est_init (NULL, SC_LP_DEFAULT);
 
   /* make the old style connectivity */
 #ifdef P4_TO_P8
