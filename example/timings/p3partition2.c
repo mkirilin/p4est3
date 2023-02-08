@@ -462,7 +462,7 @@ main (int argc, char **argv)
           (mpicomm, conn_old, 0, start_level, 1, 0, NULL, &quadrant_local_id);
     for (i = 0; i < refine_level; ++i) {
       p4est_refine (p, 0, crefine, NULL);
-      if (i == refine_level - 1) {
+      if ((i == refine_level - 1) && !write_vtk) {
         sc_flops_snap (&fi, &snapshot);
         p4est_partition (p, 0, NULL);
         sc_flops_shot (&fi, &snapshot);
