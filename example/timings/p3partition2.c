@@ -252,9 +252,11 @@ compare_results (sc3_allocator_t *alloc, p4est3_t * p3, p4est_t * p,
 #endif /* P4EST_ENABLE_DEBUG */
 
 static sc3_error_t *
-initial_setup (sc3_allocator_t *alloc, p4est3_t ** p3,
-               const p4est3_quadrant_vtable_t * qvt, int start_level,
-               sc3_MPI_Comm_t mpicomm, p4est3_connectivity_t *conn)
+p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
+                     sc3_MPI_Comm_t mpicomm, p4est3_connectivity_t *conn,
+                     const p4est3_quadrant_vtable_t * qvt, int start_level,
+                     p4est3_t * src, p4est3_refine_callback_t *p3crefine,
+                     int is_partition, void *user_data)
 {
   SC3E (p4est3_new (alloc, p3));
   SC3E (p4est3_set_comm (*p3, mpicomm, 1));
@@ -262,65 +264,14 @@ initial_setup (sc3_allocator_t *alloc, p4est3_t ** p3,
   SC3E (p4est3_set_quadrant_vtable (*p3, qvt));
   SC3E (p4est3_set_level (*p3, start_level));
   SC3E (p4est3_set_setup_mode (*p3, P4EST3_NEW_RECURSIVE));
+  SC3E (p4est3_set_refine (*p3, *p3crefine));
+  SC3E (p4est3_set_source (*p3, src));
   SC3E (p4est3_set_shared (*p3, 1));
   SC3E (p4est3_set_contiguous (*p3, 1));
+  SC3E (p4est3_set_partition (*p3, is_partition, NULL));
+  /*SC3E (p4est3_set_user_data (*p3, user_data));*/
+  (*p3)->user_data = user_data;
 
-  SC3E (p4est3_setup (*p3));
-  return NULL;
-}
-
-static sc3_error_t *
-refine (sc3_allocator_t *alloc, p4est3_t ** p3,
-        const p4est3_quadrant_vtable_t * qvt,
-        sc3_MPI_Comm_t mpicomm, p4est_connectivity_t *conn_old,
-        p4est_refine_t *crefine, p4est3_refine_callback_t *p3crefine)
-{
-  int                 i;
-  p4est3_t           *p3refined, *p3ptr = *p3;
-#ifdef P4EST_ENABLE_DEBUG
-  p4est_t *p;
-  p = p4est_new_ext (mpicomm, conn_old, 0, 0, 1, 0, NULL, NULL);
-#endif
-
-  for (i = 0; i < refine_level; ++i) {
-#ifdef P4EST_ENABLE_DEBUG
-    p4est_refine (p, 0, *crefine, NULL);
-#endif
-    SC3E (p4est3_new (alloc, &p3refined));
-    SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
-    SC3E (p4est3_set_refine (p3refined, *p3crefine));
-    SC3E (p4est3_set_source (p3refined, p3ptr));
-    SC3E (p4est3_setup (p3refined));
-
-    if (i != 0) {
-      SC3E (p4est3_destroy (&p3ptr));
-    }
-    p3ptr = p3refined;
-  }
-#ifdef P4EST_ENABLE_DEBUG
-  SC3E (compare_results (alloc, p3ptr, p, qvt));
-  p4est_destroy (p);
-#endif
-
-  SC3E (p4est3_destroy (p3));
-  *p3 = p3refined;
-  return NULL;
-}
-
-static sc3_error_t *
-partition (sc3_allocator_t *alloc, p4est3_t ** p3)
-{
-  p4est3_t *p3part, *p3ptr = *p3;
-
-  SC3E (p4est3_new (alloc, &p3part));
-  SC3E (p4est3_set_quadrant_vtable (p3part, p3ptr->qvt));
-  SC3E (p4est3_set_source (p3part, p3ptr));
-  SC3E (p4est3_set_partition (p3part, 1, NULL));
-  SC3E (p4est3_set_shared (p3part, 1));
-  SC3E (p4est3_set_contiguous (p3part, 1));
-  SC3E (p4est3_setup (p3part));
-  SC3E (p4est3_destroy (&p3ptr));
-  *p3 = p3part;
   return NULL;
 }
 
@@ -331,36 +282,6 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
   SC3E (sc3_allocator_new (oa, alloc));
   SC3E (sc3_allocator_setup (*alloc));
   return NULL;
-}
-
-void
-wrong_input (const char *name, int n)
-{
-  printf ("Wrong input parameter: \n");
-  switch (n) {
-  case 1:
-    printf ("Pattern type %s is not valid\n"
-            "Valid quadrant type value: PAIRS or "
-            "FRACTAL, FRACTION\n", name);
-    break;
-  case 2:
-    printf ("Quadrant type %s is not valid\n"
-            "Valid quadrant type value: P4EST2 or "
-            "STANDARD, AVX, MORT_ORD\n", name);
-    break;
-  case 3:
-    printf ("The maximum number of levels %s is not valid\n"
-            "Valid value: " "positiv int\n", name);
-    break;
-  case 4:
-    printf ("The number of level shift %s is not valid\n"
-            "Valid value: " "positiv int, "
-            "less than maximum number of levels \n", name);
-  default:
-    break;
-  }
-  printf ("Parameter's format: "
-          "<QUADRANT TYPE> <refine_level>\n");
 }
 
 static sc3_error_t *
@@ -431,7 +352,7 @@ main (int argc, char **argv)
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e;
   sc3_MPI_Comm_t      mpicomm = SC3_MPI_COMM_WORLD;
-  p4est3_t           *p3;
+  p4est3_t           *p3, *p3refined;
   p4est_t            *p;
   p4est3_connectivity_t *conn;
   p4est_connectivity_t *conn_old;
@@ -443,6 +364,7 @@ main (int argc, char **argv)
   sc_options_t       *opt;
   const char         *opt_pattern, *opt_qtype;
   char heading[80], ref_lvl_string[10];
+  p4est3_locidx     quadrant_local_id = 0;
 
 
   /* v3 standard procedure to isolate memory allocation contexts */
@@ -487,7 +409,6 @@ main (int argc, char **argv)
   /* must not use SC3_MPI_COMM_WORLD due to incompatible non-mpi wrapping */
   sc_init (mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
   p4est_init (NULL, SC_LP_DEFAULT);
-  SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
 
   /* make the old style connectivity */
 #ifdef P4_TO_P8
@@ -495,49 +416,84 @@ main (int argc, char **argv)
 #else
   conn_old = p4est_connectivity_new_brick (num_trees, 1, 0, 0);
 #endif /* P4_TO_P8 */
-  /* make the p4est3 style connectivity */
-  SC3E_NULL_SET (e, p4est3_connectivity_new (alloc, &conn));
-  SC3E_NULL_SET (e, p4est3_connectivity_set_dim (conn, P4EST_DIM));
-  SC3E_NULL_SET (e, p4est3_connectivity_set_num_trees (conn, num_trees));
-  SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));
 
-    /* create p4est object with connectivity */
   if (strcmp (opt_qtype, "P4EST2") != 0) {
-    SC3E_NULL_SET (e, initial_setup
-                        (alloc, &p3, qvt, start_level, mpicomm, conn));
-    SC3E_NULL_SET (e, refine
-                      (alloc, &p3, qvt, mpicomm,
-                       conn_old, &crefine, &p3crefine));
-
-    sc_flops_snap (&fi, &snapshot);
-    SC3E_NULL_SET (e, partition (alloc, &p3));
-    sc_flops_shot (&fi, &snapshot);
-    sc_stats_set1 (&stats, snapshot.iwtime, heading);
-
-    sc_stats_compute (mpicomm, 1, &stats);
-    sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
-
+    SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
+    /* make the p4est3 style connectivity */
+    SC3E_NULL_SET (e, p4est3_connectivity_new (alloc, &conn));
+    SC3E_NULL_SET (e, p4est3_connectivity_set_dim (conn, P4EST_DIM));
+    SC3E_NULL_SET (e, p4est3_connectivity_set_num_trees (conn, num_trees));
+    SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));
+    SC3E_NULL_SET (e, p4est3_new_shortcut
+                      (&p3, alloc, mpicomm, conn, qvt, start_level,
+                       NULL, NULL, 0, &quadrant_local_id));
+    SC3E_NULL_SET (e, p4est3_setup (p3));
+#ifdef P4EST_ENABLE_DEBUG
+    p = p4est_new_ext
+          (mpicomm, conn_old, 0, start_level, 1, 0, NULL, &quadrant_local_id);
+#endif
+ 
+    /*** refine in a loop ***/
+    for (i = 0; i < refine_level; ++i, quadrant_local_id = 0) {
+      SC3E_NULL_SET (e, p4est3_new_shortcut
+                        (&p3refined, alloc, mpicomm, conn, qvt, start_level,
+                         p3, &p3crefine, 0, &quadrant_local_id));
+      SC3E_NULL_SET (e, p4est3_setup (p3refined));
+      SC3E_NULL_SET (e, p4est3_destroy (&p3));
+      SC3E_NULL_SET (e, p4est3_new_shortcut
+                        (&p3, alloc, mpicomm, conn, qvt, start_level,
+                         NULL, NULL, 1, &quadrant_local_id));
+      if (i == refine_level - 1) {
+        sc_flops_snap (&fi, &snapshot);
+        SC3E_NULL_SET (e, p4est3_setup (p3));
+        sc_flops_shot (&fi, &snapshot);
+        sc_stats_set1 (&stats, snapshot.iwtime, heading);
+        sc_stats_compute (mpicomm, 1, &stats);
+        sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+      }
+      else {
+        SC3E_NULL_SET (e, p4est3_setup (p3));
+      }
+#ifdef P4EST_ENABLE_DEBUG
+      quadrant_local_id = 0;
+      p4est_refine (p, 0, crefine, NULL);
+      SC3E_NULL_SET (e, compare_results (alloc, p3, p, qvt));
+#endif
+      SC3E_NULL_SET (e, p4est3_destroy (&p3refined));
+    }
+#ifdef P4EST_ENABLE_DEBUG
+    p4est_destroy (p);
+#endif
     SC3E_NULL_SET (e, p4est3_destroy (&p3));
     SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn));
     SC3E_NULL_SET (e, sc3_allocator_destroy (&alloc));
   }
-  else {
-    p = p4est_new_ext (mpicomm, conn_old, 0, 0, 1, 0, NULL, NULL);
+  else if ((strcmp (opt_qtype, "P4EST2") == 0) || write_vtk) {
+    p = p4est_new_ext
+          (mpicomm, conn_old, 0, start_level, 1, 0, NULL, &quadrant_local_id);
     for (i = 0; i < refine_level; ++i) {
       p4est_refine (p, 0, crefine, NULL);
+      if (i == refine_level - 1) {
+        sc_flops_snap (&fi, &snapshot);
+        p4est_partition (p, 0, NULL);
+        sc_flops_shot (&fi, &snapshot);
+        sc_stats_set1 (&stats, snapshot.iwtime, heading);
+        sc_stats_compute (mpicomm, 1, &stats);
+        sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+      }
+      else {
+        p4est_partition (p, 0, NULL);
+      }
     }
-    sc_flops_snap (&fi, &snapshot);
-    p4est_partition (p, 0, NULL);
-    sc_flops_shot (&fi, &snapshot);
-    sc_stats_set1 (&stats, snapshot.iwtime, heading);
-
-    sc_stats_compute (mpicomm, 1, &stats);
-    sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
-
+    if (write_vtk) {
+      p4est_vtk_write_file (p, NULL, opt_pattern);
+    }
     p4est_destroy (p);
   }
   p4est_connectivity_destroy (conn_old);
+  sc_options_destroy (opt);
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
   SC3X (e);
+  return 0;
 }
