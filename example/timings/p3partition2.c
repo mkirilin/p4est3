@@ -252,6 +252,24 @@ compare_results (sc3_allocator_t *alloc, p4est3_t * p3, p4est_t * p,
 #endif /* P4EST_ENABLE_DEBUG */
 
 static sc3_error_t *
+initial_setup (sc3_allocator_t *alloc, p4est3_t ** p3,
+               const p4est3_quadrant_vtable_t * qvt, int start_level,
+               sc3_MPI_Comm_t mpicomm, p4est3_connectivity_t *conn)
+{
+  SC3E (p4est3_new (alloc, p3));
+  SC3E (p4est3_set_comm (*p3, mpicomm, 1));
+  SC3E (p4est3_set_connectivity (*p3, conn));
+  SC3E (p4est3_set_quadrant_vtable (*p3, qvt));
+  SC3E (p4est3_set_level (*p3, start_level));
+  SC3E (p4est3_set_setup_mode (*p3, P4EST3_NEW_RECURSIVE));
+  SC3E (p4est3_set_shared (*p3, 1));
+  SC3E (p4est3_set_contiguous (*p3, 1));
+
+  SC3E (p4est3_setup (*p3));
+  return NULL;
+}
+
+static sc3_error_t *
 refine (sc3_allocator_t *alloc, p4est3_t ** p3,
         const p4est3_quadrant_vtable_t * qvt,
         sc3_MPI_Comm_t mpicomm, p4est_connectivity_t *conn_old,
@@ -437,7 +455,6 @@ main (int argc, char **argv)
   SC3E_NULL_SET (e, sc3_MPI_Comm_size (mpicomm, &mpisize));
 
   /*** read command line parameters ***/
-
   opt = sc_options_new (argv[0]);
   sc_options_add_string
     (opt, 'P', "pattern", &opt_pattern, "PAIRS", "Refinement pattern");
@@ -485,17 +502,9 @@ main (int argc, char **argv)
   SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));
 
     /* create p4est object with connectivity */
-  if (strcmp (argv[2], "P4EST2") != 0) {
-    SC3E_NULL_SET (e, p4est3_new (alloc, &p3));
-    SC3E_NULL_SET (e, p4est3_set_comm (p3, mpicomm, 1));
-    SC3E_NULL_SET (e, p4est3_set_connectivity (p3, conn));
-    SC3E_NULL_SET (e, p4est3_set_quadrant_vtable (p3, qvt));
-    SC3E_NULL_SET (e, p4est3_set_level (p3, 0));
-    SC3E_NULL_SET (e, p4est3_set_setup_mode (p3, P4EST3_NEW_RECURSIVE));
-    SC3E_NULL_SET (e, p4est3_set_shared (p3, 1));
-    SC3E_NULL_SET (e, p4est3_set_contiguous (p3, 1));
-
-    SC3E_NULL_SET (e, p4est3_setup (p3));
+  if (strcmp (opt_qtype, "P4EST2") != 0) {
+    SC3E_NULL_SET (e, initial_setup
+                        (alloc, &p3, qvt, start_level, mpicomm, conn));
     SC3E_NULL_SET (e, refine
                       (alloc, &p3, qvt, mpicomm,
                        conn_old, &crefine, &p3crefine));
