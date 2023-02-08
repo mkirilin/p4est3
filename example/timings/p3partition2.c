@@ -255,7 +255,7 @@ static sc3_error_t *
 p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
                      sc3_MPI_Comm_t mpicomm, p4est3_connectivity_t *conn,
                      const p4est3_quadrant_vtable_t * qvt, int start_level,
-                     p4est3_t * src, p4est3_refine_callback_t *p3crefine,
+                     p4est3_t * src, p4est3_refine_callback_t p3crefine,
                      int is_partition, void *user_data)
 {
   SC3E (p4est3_new (alloc, p3));
@@ -264,7 +264,7 @@ p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
   SC3E (p4est3_set_quadrant_vtable (*p3, qvt));
   SC3E (p4est3_set_level (*p3, start_level));
   SC3E (p4est3_set_setup_mode (*p3, P4EST3_NEW_RECURSIVE));
-  SC3E (p4est3_set_refine (*p3, *p3crefine));
+  SC3E (p4est3_set_refine (*p3, p3crefine));
   SC3E (p4est3_set_source (*p3, src));
   SC3E (p4est3_set_shared (*p3, 1));
   SC3E (p4est3_set_contiguous (*p3, 1));
@@ -436,13 +436,13 @@ main (int argc, char **argv)
     /*** refine in a loop ***/
     for (i = 0; i < refine_level; ++i, quadrant_local_id = 0) {
       SC3E_NULL_SET (e, p4est3_new_shortcut
-                        (&p3refined, alloc, mpicomm, conn, qvt, start_level,
-                         p3, &p3crefine, 0, &quadrant_local_id));
+                        (&p3refined, alloc, mpicomm, conn, qvt, 0,
+                         p3, p3crefine, 0, &quadrant_local_id));
       SC3E_NULL_SET (e, p4est3_setup (p3refined));
       SC3E_NULL_SET (e, p4est3_destroy (&p3));
       SC3E_NULL_SET (e, p4est3_new_shortcut
-                        (&p3, alloc, mpicomm, conn, qvt, start_level,
-                         NULL, NULL, 1, &quadrant_local_id));
+                        (&p3, alloc, mpicomm, conn, qvt, 0,
+                         p3refined, NULL, 1, &quadrant_local_id));
       if (i == refine_level - 1) {
         sc_flops_snap (&fi, &snapshot);
         SC3E_NULL_SET (e, p4est3_setup (p3));
