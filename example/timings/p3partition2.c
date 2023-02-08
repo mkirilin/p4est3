@@ -433,6 +433,7 @@ main (int argc, char **argv)
                         (&p3, alloc, mpicomm, conn, qvt, 0,
                          p3refined, NULL, 1, &quadrant_local_id));
       if (i == refine_level - 1) {
+        SC3E_NULL_SET (e, sc3_MPI_Barrier (mpicomm));
         sc_flops_snap (&fi, &snapshot);
         SC3E_NULL_SET (e, p4est3_setup (p3));
         sc_flops_shot (&fi, &snapshot);
@@ -463,6 +464,7 @@ main (int argc, char **argv)
     for (i = 0; i < refine_level; ++i) {
       p4est_refine (p, 0, crefine, NULL);
       if ((i == refine_level - 1) && !write_vtk) {
+        SC3E_NULL_SET (e, sc3_MPI_Barrier (mpicomm));
         sc_flops_snap (&fi, &snapshot);
         p4est_partition (p, 0, NULL);
         sc_flops_shot (&fi, &snapshot);
