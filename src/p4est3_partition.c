@@ -62,7 +62,7 @@ p4est3_partition_allocations (const p4est3_t * p3,
                               p4est3_gloidx ** pnew_last_goffsets)
 {
   const p4est3_topidx num_send_trees
-    = p3->gftree[p3->mpirank + 1] - p3->gftree[p3->mpirank] + 1;
+    = p3->old->gftree[p3->mpirank + 1] - p3->old->gftree[p3->mpirank] + 1;
   char              **char_pprt;
   p4est3_locidx      *locidx_prt;
   p4est3_gloidx      *gloidx_prt;
@@ -331,8 +331,8 @@ p4est3_trees_new_boundaries (const p4est3_t * p3,
     if (num_recv_from[from_proc] == 0) {
       continue;
     }
-    first_from_tree = p3->gftree[from_proc];
-    last_from_tree = p3->gftree[from_proc + 1];
+    first_from_tree = p3->old->gftree[from_proc];
+    last_from_tree = p3->old->gftree[from_proc + 1];
     num_recv_trees = last_from_tree - first_from_tree + (p4est3_topidx) 1;
 
     num_per_tree_recv_buf = (from_proc == p3->mpirank) ?
@@ -408,6 +408,8 @@ p4est3_trees_local_reproduce (const p4est3_locidx * num_send_to,
   tree->last_tquad = tree->end_tquad - 1;
   tree->quad_offset = 0;
   tree->tquads = p3->quads;
+  /** TODO: Gather data from the other nodes */
+  p3->gftree[p3->mpirank] = p3->fltree;
   if (p3->nltrees == 1) {
     return NULL;
   }
@@ -698,7 +700,7 @@ p4est3_partition (p4est3_t * p3)
 {
   /* at this stage we have a completely setup refined forest */
   const p4est3_topidx num_send_trees
-    = p3->gftree[p3->mpirank + 1] - p3->gftree[p3->mpirank] + 1;
+    = p3->old->gftree[p3->mpirank + 1] - p3->old->gftree[p3->mpirank] + 1;
   /* We are going to send p4est3_tree::num_quads for each sent tree,
      p4est3_tree::first_tquad for the first sent tree and
      p4est3_tree::last_tquad for the last sent tree. */
@@ -859,7 +861,8 @@ p4est3_partition (p4est3_t * p3)
   for (from_proc = from_begin_global_quad;
        from_proc <= from_end_global_quad; ++from_proc) {
     if (from_proc != p3->mpirank && num_recv_from[from_proc]) {
-      num_recv_trees = p3->gftree[from_proc + 1] - p3->gftree[from_proc] + 1;
+      num_recv_trees =
+        p3->old->gftree[from_proc + 1] - p3->old->gftree[from_proc] + 1;
       /* We are going to recv p4est3_tree::num_quads for each received tree,
          p4est3_tree::first_tquad for the first received tree and
          p4est3_tree::last_tquad for the last received tree. */
