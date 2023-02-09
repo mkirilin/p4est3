@@ -282,9 +282,9 @@ p4est3_trees_send_to (const p4est3_gloidx * begin_send_to,
     num_per_tree_send_buf[which_tree - p3->fltree] = num_copy;
     if (num_copy > 0) {
       if (first_last_tquad[0] == -1) {
-        first_last_tquad[0] = tree_from_begin;
+        first_last_tquad[0] = tree_from_begin + tree->first_tquad;
       }
-      first_last_tquad[1] = tree_from_last;
+      first_last_tquad[1] = tree_from_last + tree->first_tquad;
     }
 
     if (to_proc == p3->mpirank) {
