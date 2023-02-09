@@ -253,7 +253,7 @@ p4est3_trees_send_to (const p4est3_gloidx * begin_send_to,
     - (p4est3_gloidx) 1 - my_base;
   p4est3_gloidx       my_begin = begin_send_to[to_proc] - my_base;
   p4est3_locidx       num_copy;
-  p4est3_gloidx       from_begin, from_end, tree_from_begin, tree_from_end,
+  p4est3_gloidx       from_begin, from_end, tree_from_begin, tree_from_last,
     num_copy_global;
   p4est3_topidx       which_tree;
   p4est3_tree_t      *tree;
@@ -274,8 +274,8 @@ p4est3_trees_send_to (const p4est3_gloidx * begin_send_to,
     }
     /* Need to copy from tree which_tree */
     tree_from_begin = SC3_MAX (my_begin, from_begin) - from_begin;
-    tree_from_end = SC3_MIN (my_end, from_end) - from_begin;
-    num_copy_global = tree_from_end - tree_from_begin + 1;
+    tree_from_last = SC3_MIN (my_end, from_end) - from_begin;
+    num_copy_global = tree_from_last - tree_from_begin + 1;
     SC3A_CHECK (num_copy_global >= 0);
     SC3A_CHECK (num_copy_global <= (p4est3_gloidx) P4EST3_LOCIDX_MAX);
     num_copy = (p4est3_locidx) num_copy_global;
@@ -284,7 +284,7 @@ p4est3_trees_send_to (const p4est3_gloidx * begin_send_to,
       if (first_last_tquad[0] == -1) {
         first_last_tquad[0] = tree_from_begin;
       }
-      first_last_tquad[1] = tree_from_end - 1;
+      first_last_tquad[1] = tree_from_last;
     }
 
     if (to_proc == p3->mpirank) {
@@ -313,6 +313,7 @@ p4est3_trees_new_boundaries (const p4est3_t * p3,
   p4est3_locidx      *num_per_tree_recv_buf;
   p4est3_topidx       first_from_tree, last_from_tree,
     num_recv_trees, it, from_tree;
+  p4est3_gloidx      *first_last_tquad;
 
 #ifdef P4EST_ENABLE_DEBUG
   p4est3_topidx       total_num_trees;
@@ -336,6 +337,8 @@ p4est3_trees_new_boundaries (const p4est3_t * p3,
 
     num_per_tree_recv_buf = (from_proc == p3->mpirank) ?
       num_per_tree_local : (p4est3_locidx *) recv_buf[from_proc];
+    first_last_tquad
+      = (p4est3_gloidx *) (&num_per_tree_recv_buf[num_recv_trees]);
 
     for (it = 0; it < num_recv_trees; ++it) {
 
@@ -357,9 +360,9 @@ p4est3_trees_new_boundaries (const p4est3_t * p3,
       new_local_tree_elem_count[from_tree] += num_per_tree_recv_buf[it];
     }
     if (*new_first_tquad == -1) {
-      *new_first_tquad = num_per_tree_recv_buf[num_recv_trees];
+      *new_first_tquad = first_last_tquad[0];
     }
-    *new_last_tquad = num_per_tree_recv_buf[num_recv_trees + 1];
+    *new_last_tquad = first_last_tquad[1];
   }
   if (*new_first_local_tree > *new_last_local_tree) {
     *new_first_local_tree = -1;
@@ -405,6 +408,9 @@ p4est3_trees_local_reproduce (const p4est3_locidx * num_send_to,
   tree->last_tquad = tree->end_tquad - 1;
   tree->quad_offset = 0;
   tree->tquads = p3->quads;
+  if (p3->nltrees == 1) {
+    return NULL;
+  }
   /* processing middle trees */
   for (tt = p3->fltree + 1, prev_tree = tree; tt < p3->lltree;
        ++tt, prev_tree = tree) {
@@ -421,10 +427,10 @@ p4est3_trees_local_reproduce (const p4est3_locidx * num_send_to,
   SC3E (p4est3_tree_index (p3, p3->lltree, &tree));
   tree->treeid = p3->lltree;
   tree->num_quads = new_local_tree_elem_count[p3->lltree];
-  tree->end_tquad = new_last_tquad;
-  tree->last_tquad = new_last_tquad - 1;
+  tree->last_tquad = new_last_tquad;
+  tree->end_tquad = tree->last_tquad + 1;
   tree->first_tquad = tree->end_tquad - tree->num_quads;
-  tree->quad_offset = prev_tree->quad_offset + prev_tree->quad_offset;
+  tree->quad_offset = prev_tree->quad_offset + prev_tree->num_quads;
   tree->tquads = p3->quads + p3->qsize * tree->quad_offset;
 
   return NULL;
