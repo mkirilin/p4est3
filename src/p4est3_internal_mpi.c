@@ -825,6 +825,8 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
     if (noderank == 0) {
       p3->gftree[p3->mpisize] = p3->num_trees;
     }
+    SC3E (sc3_MPI_Win_sync (p3->gtrees->gftreewin));
+    SC3E (sc3_MPI_Win_unlock (0, p3->gtrees->gftreewin));
   }
   if (p3->qvt == old->qvt) {
     /* global position of quadrants stays the same, so we just reference on it */
