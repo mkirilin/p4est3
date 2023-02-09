@@ -340,7 +340,7 @@ main (int argc, char **argv)
   int i, start_level, write_vtk, num_trees;
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e;
-  sc3_MPI_Comm_t      mpicomm = SC3_MPI_COMM_WORLD;
+  sc3_MPI_Comm_t      mpicomm;
   p4est3_t           *p3, *p3refined;
   p4est_t            *p;
   p4est3_connectivity_t *conn;
@@ -355,17 +355,17 @@ main (int argc, char **argv)
   char heading[80], ref_lvl_string[10];
   p4est3_locidx     quadrant_local_id = 0;
 
-
-  /* v3 standard procedure to isolate memory allocation contexts */
-  mainalloc = sc3_allocator_nothread ();
-
   /* this is generally needed for MPI */
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
+  mpicomm = SC3_MPI_COMM_WORLD;
   sc_init (mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
   p4est_init (NULL, SC_LP_DEFAULT);
 
   SC3E_NULL_SET (e, sc3_MPI_Comm_rank (mpicomm, &mpirank));
   SC3E_NULL_SET (e, sc3_MPI_Comm_size (mpicomm, &mpisize));
+
+  /* v3 standard procedure to isolate memory allocation contexts */
+  mainalloc = sc3_allocator_nothread ();
 
   /*** read command line parameters ***/
   opt = sc_options_new (argv[0]);
@@ -407,12 +407,9 @@ main (int argc, char **argv)
 #endif /* P4_TO_P8 */
 
   if (strcmp (opt_qtype, "P4EST2") != 0) {
-    SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
+   SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
     /* make the p4est3 style connectivity */
-    SC3E_NULL_SET (e, p4est3_connectivity_new (alloc, &conn));
-    SC3E_NULL_SET (e, p4est3_connectivity_set_dim (conn, P4EST_DIM));
-    SC3E_NULL_SET (e, p4est3_connectivity_set_num_trees (conn, num_trees));
-    SC3E_NULL_SET (e, p4est3_connectivity_setup (conn));
+    SC3E_NULL_SET (e, p4est3_connectivity_new_p4est (alloc, &conn, conn_old, 0));
     SC3E_NULL_SET (e, p4est3_new_shortcut
                       (&p3, alloc, mpicomm, conn, qvt, start_level,
                        NULL, NULL, 0, &quadrant_local_id));
@@ -420,14 +417,20 @@ main (int argc, char **argv)
 #ifdef P4EST_ENABLE_DEBUG
     p = p4est_new_ext
           (mpicomm, conn_old, 0, start_level, 1, 0, NULL, &quadrant_local_id);
+    SC3E_NULL_SET (e, compare_results (alloc, p3, p, qvt));
 #endif
- 
+
     /*** refine in a loop ***/
     for (i = 0; i < refine_level; ++i, quadrant_local_id = 0) {
       SC3E_NULL_SET (e, p4est3_new_shortcut
                         (&p3refined, alloc, mpicomm, conn, qvt, 0,
                          p3, p3crefine, 0, &quadrant_local_id));
       SC3E_NULL_SET (e, p4est3_setup (p3refined));
+#ifdef P4EST_ENABLE_DEBUG
+      quadrant_local_id = 0;
+      p4est_refine (p, 0, crefine, NULL);
+      SC3E_NULL_SET (e, compare_results (alloc, p3refined, p, qvt));
+#endif
       SC3E_NULL_SET (e, p4est3_destroy (&p3));
       SC3E_NULL_SET (e, p4est3_new_shortcut
                         (&p3, alloc, mpicomm, conn, qvt, 0,
@@ -443,10 +446,11 @@ main (int argc, char **argv)
       }
       else {
         SC3E_NULL_SET (e, p4est3_setup (p3));
+        SC3X (e);
       }
 #ifdef P4EST_ENABLE_DEBUG
       quadrant_local_id = 0;
-      p4est_refine (p, 0, crefine, NULL);
+      p4est_partition (p, 0, NULL);
       SC3E_NULL_SET (e, compare_results (alloc, p3, p, qvt));
 #endif
       SC3E_NULL_SET (e, p4est3_destroy (&p3refined));
