@@ -417,8 +417,8 @@ p4est3_trees_local_reproduce (const p4est3_locidx * num_send_to,
   for (tt = p3->fltree + 1, prev_tree = tree; tt < p3->lltree;
        ++tt, prev_tree = tree) {
     SC3E (p4est3_tree_index (p3, tt, &tree));
-    tree->treeid = p3->fltree + tt;
-    tree->num_quads = new_local_tree_elem_count[p3->fltree + tt];
+    tree->treeid = tt;
+    tree->num_quads = new_local_tree_elem_count[tt];
     tree->first_tquad = 0;
     tree->end_tquad = tree->num_quads;
     tree->last_tquad = tree->end_tquad - 1;
