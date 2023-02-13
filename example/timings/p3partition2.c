@@ -270,7 +270,9 @@ p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
   SC3E (p4est3_set_contiguous (*p3, 1));
   SC3E (p4est3_set_partition (*p3, is_partition, NULL));
   /*SC3E (p4est3_set_user_data (*p3, user_data));*/
-  (*p3)->user_data = user_data;
+  if ((*p3)->old != NULL) {
+    (*p3)->old->user_data = user_data;
+  }
 
   return NULL;
 }
