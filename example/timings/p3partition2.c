@@ -352,7 +352,7 @@ main (int argc, char **argv)
   p4est3_refine_callback_t p3crefine = refine_p3_pairs;
   sc_options_t       *opt;
   const char         *opt_pattern, *opt_qtype;
-  char heading[80], ref_lvl_string[10];
+  char heading[80], ref_lvl_string[10], ntrees[10];
   p4est3_locidx     quadrant_local_id = 0;
 
   /* this is generally needed for MPI */
@@ -390,11 +390,14 @@ main (int argc, char **argv)
 
   /*** set heading ***/
   sprintf(ref_lvl_string, "%d", refine_level);
+  sprintf(ntrees, "%d", num_trees);
   strcpy (heading, opt_pattern);
   strcat (heading, " ");
   strcat (heading, opt_qtype);
-  strcat (heading, " ");
+  strcat (heading, " L = ");
   strcat (heading, ref_lvl_string);
+  strcat (heading, " T = ");
+  strcat (heading, ntrees);
 
   /* we don't need init calls for v3.  Just to check legacy wrapping */
   /* must not use SC3_MPI_COMM_WORLD due to incompatible non-mpi wrapping */
