@@ -412,7 +412,7 @@ main (int argc, char **argv)
     SC3E_NULL_SET (e, p4est3_connectivity_new_p4est (alloc, &conn, conn_old, 0));
     SC3E_NULL_SET (e, p4est3_new_shortcut
                       (&p3, alloc, mpicomm, conn, qvt, start_level,
-                       NULL, NULL, 0, &quadrant_local_id));
+                       NULL, NULL, 0, NULL));
     SC3E_NULL_SET (e, p4est3_setup (p3));
 #ifdef P4EST_ENABLE_DEBUG
     p = p4est_new_ext
@@ -434,7 +434,7 @@ main (int argc, char **argv)
       SC3E_NULL_SET (e, p4est3_destroy (&p3));
       SC3E_NULL_SET (e, p4est3_new_shortcut
                         (&p3, alloc, mpicomm, conn, qvt, 0,
-                         p3refined, NULL, 1, &quadrant_local_id));
+                         p3refined, NULL, 1, NULL));
       if (i == refine_level - 1) {
         SC3E_NULL_SET (e, sc3_MPI_Barrier (mpicomm));
         sc_flops_snap (&fi, &snapshot);
@@ -449,7 +449,6 @@ main (int argc, char **argv)
         SC3X (e);
       }
 #ifdef P4EST_ENABLE_DEBUG
-      quadrant_local_id = 0;
       p4est_partition (p, 0, NULL);
       SC3E_NULL_SET (e, compare_results (alloc, p3, p, qvt));
 #endif
@@ -465,7 +464,7 @@ main (int argc, char **argv)
   else if ((strcmp (opt_qtype, "P4EST2") == 0) || write_vtk) {
     p = p4est_new_ext
           (mpicomm, conn_old, 0, start_level, 1, 0, NULL, &quadrant_local_id);
-    for (i = 0; i < refine_level; ++i) {
+    for (i = 0; i < refine_level; ++i, quadrant_local_id = 0) {
       p4est_refine (p, 0, crefine, NULL);
       if ((i == refine_level - 1) && !write_vtk) {
         SC3E_NULL_SET (e, sc3_MPI_Barrier (mpicomm));
