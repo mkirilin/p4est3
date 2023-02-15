@@ -197,7 +197,8 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
 {
   int                 noderank, nodesize, mpisize;
   int                 dispunit;
-  sc3_MPI_Aint_t      gftreebytes, gfposbytes, goffsetbytes, tempbytes;
+  sc3_MPI_Aint_t      gftreebytes = 0, gfposbytes = 0,
+                      goffsetbytes = 0, tempbytes;
   sc3_MPI_Comm_t      nodecomm;
   sc3_MPI_Info_t      info_noncontig;
   sc3_mpienv_t       *mpienv;

@@ -888,8 +888,13 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
    * p4est3_t::nodequads, local_num_quads, quadwin,
    * quads, trees, goffsetwin, goffset and global_num_quads.
   */
-  SC3E (p4est3_refine_coarsen_copy (p3));
-  SC3E (p4est3_partition (p3));
+  if ((p3->crefine != NULL || p3->ccoarse != NULL)
+    && !p3->partition) {
+    SC3E (p4est3_refine_coarsen_copy (p3));
+  }
+  if (p3->partition) {
+    SC3E (p4est3_partition (p3));
+  }
   p3->setup = 1;
   return NULL;
 }
