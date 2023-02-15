@@ -51,13 +51,42 @@ p4est3_part_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 }
 
 static sc3_error_t *
-p4est3_partition_allocations (const p4est3_t * p3,
-                              char ***precv_buf, char ***psend_buf,
-                              p4est3_locidx ** pnum_recv_from,
+p4est3_partition_allocations_prerecv (const p4est3_t * p3,
+                                      char ***precv_buf,
+                                      p4est3_locidx ** pnum_recv_from,
+                                      p4est3_gloidx ** plast_goffsets)
+{
+  char              **char_pprt;
+  p4est3_locidx      *locidx_prt;
+  p4est3_gloidx      *gloidx_prt;
+  p4est3_topidx       total_num_trees;
+
+  SC3E (p4est3_connectivity_get_num_trees (p3->conn, &total_num_trees));
+
+  char_pprt = NULL;
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, p3->mpisize * sizeof (char *), &char_pprt));
+  *precv_buf = char_pprt;
+
+  locidx_prt = NULL;
+  SC3E (sc3_allocator_calloc
+        (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &locidx_prt));
+  *pnum_recv_from = locidx_prt;
+
+  gloidx_prt = NULL;
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
+  *plast_goffsets = gloidx_prt;
+
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_partition_allocations_postrecv (const p4est3_t * p3,
+                              char ***psend_buf,
                               p4est3_locidx ** pnum_send_to,
                               p4est3_locidx ** pnum_per_tree_local,
                               p4est3_locidx ** pnew_local_tree_elem_count,
-                              p4est3_gloidx ** plast_goffsets,
                               p4est3_gloidx ** pbegin_send_to,
                               p4est3_gloidx ** pnew_last_goffsets)
 {
@@ -73,17 +102,7 @@ p4est3_partition_allocations (const p4est3_t * p3,
   char_pprt = NULL;
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (char *), &char_pprt));
-  *precv_buf = char_pprt;
-
-  char_pprt = NULL;
-  SC3E (sc3_allocator_malloc
-        (p3->alloc, p3->mpisize * sizeof (char *), &char_pprt));
   *psend_buf = char_pprt;
-
-  locidx_prt = NULL;
-  SC3E (sc3_allocator_calloc
-        (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &locidx_prt));
-  *pnum_recv_from = locidx_prt;
 
   locidx_prt = NULL;
   SC3E (sc3_allocator_calloc
@@ -100,11 +119,6 @@ p4est3_partition_allocations (const p4est3_t * p3,
   SC3E (sc3_allocator_calloc
         (p3->alloc, total_num_trees, sizeof (p4est3_locidx), &locidx_prt));
   *pnew_local_tree_elem_count = locidx_prt;
-
-  gloidx_prt = NULL;
-  SC3E (sc3_allocator_malloc
-        (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
-  *plast_goffsets = gloidx_prt;
 
   gloidx_prt = NULL;
   SC3E (sc3_allocator_malloc
@@ -806,10 +820,8 @@ p4est3_partition (p4est3_t * p3)
   SC3E (sc3_MPI_Barrier (nodecomm));
 
   /** TODO: Put some of the allocations after isend/irecv */
-  SC3E (p4est3_partition_allocations
-        (p3, &recv_buf, &send_buf, &num_recv_from, &num_send_to,
-         &num_per_tree_local, &new_local_tree_elem_count, &last_goffsets,
-         &begin_send_to, &new_last_goffsets));
+  SC3E (p4est3_partition_allocations_prerecv
+        (p3, &recv_buf, &num_recv_from, &last_goffsets));
 
   for (i = 0; i < p3->mpisize; ++i) {
     last_goffsets[i] = p3->old->goffset[i + 1] - 1;
@@ -888,6 +900,10 @@ p4est3_partition (p4est3_t * p3)
     recv_request[sk] = MPI_REQUEST_NULL;
   }
 #endif
+
+  SC3E (p4est3_partition_allocations_postrecv
+        (p3, &send_buf, &num_send_to, &num_per_tree_local,
+         &new_local_tree_elem_count, &begin_send_to, &new_last_goffsets));
 
   if (p3->contiguous) {
     /* start iterations with 1, since 0-th element stays the same */
