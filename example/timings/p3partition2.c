@@ -354,7 +354,7 @@ main (int argc, char **argv)
   p4est3_refine_callback_t p3crefine = refine_p3_pairs;
   sc_options_t       *opt;
   const char         *opt_pattern, *opt_qtype;
-  char heading[80], ref_lvl_string[10], ntrees[10];
+  char heading[80], ref_lvl_string[10], ntrees[10], vtk_before[80], vtk_after[80];
   p4est3_locidx     quadrant_local_id = 0;
 
   /* this is generally needed for MPI */
@@ -400,6 +400,13 @@ main (int argc, char **argv)
   strcat (heading, ref_lvl_string);
   strcat (heading, " T = ");
   strcat (heading, ntrees);
+
+  if (write_vtk) {
+    strcpy (vtk_before, "before_");
+    strcat (vtk_before, opt_pattern);
+    strcpy (vtk_after,  "after_");
+    strcat (vtk_after, opt_pattern);
+  }
 
   /* we don't need init calls for v3.  Just to check legacy wrapping */
   /* must not use SC3_MPI_COMM_WORLD due to incompatible non-mpi wrapping */
@@ -471,21 +478,25 @@ main (int argc, char **argv)
           (mpicomm, conn_old, 0, start_level, 1, 0, NULL, &quadrant_local_id);
     for (i = 0; i < refine_level; ++i, quadrant_local_id = 0) {
       p4est_refine (p, 0, crefine, NULL);
-      if ((i == refine_level - 1) && !write_vtk) {
-        SC3E_NULL_SET (e, sc3_MPI_Barrier (mpicomm));
-        sc_flops_snap (&fi, &snapshot);
-        p4est_partition (p, 0, NULL);
-        sc_flops_shot (&fi, &snapshot);
-        sc_stats_set1 (&stats, snapshot.iwtime, heading);
-        sc_stats_compute (mpicomm, 1, &stats);
-        sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+      if (!write_vtk) {
+        if (i == refine_level - 1) {
+          SC3E_NULL_SET (e, sc3_MPI_Barrier (mpicomm));
+          sc_flops_snap (&fi, &snapshot);
+          p4est_partition (p, 0, NULL);
+          sc_flops_shot (&fi, &snapshot);
+          sc_stats_set1 (&stats, snapshot.iwtime, heading);
+          sc_stats_compute (mpicomm, 1, &stats);
+          sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+        }
+        else {
+          p4est_partition (p, 0, NULL);
+        }
       }
-      else {
+      else if (i == refine_level - 1) {
+        p4est_vtk_write_file (p, NULL, vtk_before);
         p4est_partition (p, 0, NULL);
+        p4est_vtk_write_file (p, NULL, vtk_after);
       }
-    }
-    if (write_vtk) {
-      p4est_vtk_write_file (p, NULL, opt_pattern);
     }
     p4est_destroy (p);
   }
