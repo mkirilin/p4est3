@@ -256,7 +256,7 @@ p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
                      sc3_MPI_Comm_t mpicomm, p4est3_connectivity_t *conn,
                      const p4est3_quadrant_vtable_t * qvt, int start_level,
                      p4est3_t * src, p4est3_refine_callback_t p3crefine,
-                     int is_partition, void *user_data)
+                     int is_partition, int is_family, void *user_data)
 {
   SC3E (p4est3_new (alloc, p3));
   SC3E (p4est3_set_comm (*p3, mpicomm, 1));
@@ -268,6 +268,7 @@ p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
   SC3E (p4est3_set_source (*p3, src));
   SC3E (p4est3_set_shared (*p3, 1));
   SC3E (p4est3_set_contiguous (*p3, 1));
+  SC3E (p4est3_set_family (*p3, is_family));
   SC3E (p4est3_set_partition (*p3, is_partition, NULL));
   /*SC3E (p4est3_set_user_data (*p3, user_data));*/
   if ((*p3)->old != NULL) {
@@ -356,6 +357,7 @@ main (int argc, char **argv)
   const char         *opt_pattern, *opt_qtype;
   char heading[80], ref_lvl_string[10], ntrees[10], vtk_before[80], vtk_after[80];
   p4est3_locidx     quadrant_local_id = 0;
+  int               is_family;
 
   /* this is generally needed for MPI */
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
@@ -382,8 +384,10 @@ main (int argc, char **argv)
     (opt, 'L', "refine level", &refine_level, 10, "Highest level");
   sc_options_add_int
     (opt, 'T', "trees", &num_trees, 1, "Number of trees in a forest");
+  sc_options_add_bool
+    (opt, 'F', "family", &is_family, 0, "Partition for coarsening?");
   sc_options_add_switch (opt, 'V', "write-vtk", &write_vtk,
-                         "write vtk output");
+                         "Write vtk output");
   sc_options_parse (p4est_package_id, SC_LP_DEFAULT, opt, argc, argv);
 
   SC3E_NULL_SET (e, check_refinement_pattern
@@ -424,19 +428,19 @@ main (int argc, char **argv)
     SC3E_NULL_SET (e, p4est3_connectivity_new_p4est (alloc, &conn, conn_old, 0));
     SC3E_NULL_SET (e, p4est3_new_shortcut
                       (&p3, alloc, mpicomm, conn, qvt, start_level,
-                       NULL, NULL, 0, NULL));
+                       NULL, NULL, 0, 0, NULL));
     SC3E_NULL_SET (e, p4est3_setup (p3));
 #ifdef P4EST_ENABLE_DEBUG
     p = p4est_new_ext
           (mpicomm, conn_old, 0, start_level, 1, 0, NULL, &quadrant_local_id);
-    SC3E_NULL_SET (e, compare_results (alloc, p3, p, qvt));
+      SC3E_NULL_SET (e, compare_results (alloc, p3, p, qvt));
 #endif
 
     /*** refine in a loop ***/
     for (i = 0; i < refine_level; ++i, quadrant_local_id = 0) {
       SC3E_NULL_SET (e, p4est3_new_shortcut
                         (&p3refined, alloc, mpicomm, conn, qvt, 0,
-                         p3, p3crefine, 0, &quadrant_local_id));
+                         p3, p3crefine, 0, 0, &quadrant_local_id));
       SC3E_NULL_SET (e, p4est3_setup (p3refined));
 #ifdef P4EST_ENABLE_DEBUG
       quadrant_local_id = 0;
@@ -446,7 +450,7 @@ main (int argc, char **argv)
       SC3E_NULL_SET (e, p4est3_destroy (&p3));
       SC3E_NULL_SET (e, p4est3_new_shortcut
                         (&p3, alloc, mpicomm, conn, qvt, 0,
-                         p3refined, NULL, 1, NULL));
+                         p3refined, NULL, 1, is_family, NULL));
       if (i == refine_level - 1) {
         SC3E_NULL_SET (e, sc3_MPI_Barrier (mpicomm));
         sc_flops_snap (&fi, &snapshot);
@@ -461,7 +465,7 @@ main (int argc, char **argv)
         SC3X (e);
       }
 #ifdef P4EST_ENABLE_DEBUG
-      p4est_partition (p, 0, NULL);
+      p4est_partition (p, is_family, NULL);
       SC3E_NULL_SET (e, compare_results (alloc, p3, p, qvt));
 #endif
       SC3E_NULL_SET (e, p4est3_destroy (&p3refined));
@@ -482,19 +486,19 @@ main (int argc, char **argv)
         if (i == refine_level - 1) {
           SC3E_NULL_SET (e, sc3_MPI_Barrier (mpicomm));
           sc_flops_snap (&fi, &snapshot);
-          p4est_partition (p, 0, NULL);
+          p4est_partition (p, is_family, NULL);
           sc_flops_shot (&fi, &snapshot);
           sc_stats_set1 (&stats, snapshot.iwtime, heading);
           sc_stats_compute (mpicomm, 1, &stats);
           sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
         }
         else {
-          p4est_partition (p, 0, NULL);
+          p4est_partition (p, is_family, NULL);
         }
       }
       else if (i == refine_level - 1) {
         p4est_vtk_write_file (p, NULL, vtk_before);
-        p4est_partition (p, 0, NULL);
+        p4est_partition (p, is_family, NULL);
         p4est_vtk_write_file (p, NULL, vtk_after);
       }
     }

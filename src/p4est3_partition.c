@@ -525,7 +525,7 @@ p4est3_partition_correction (const p4est3_t * p3,
                              p4est3_locidx * correction)
 {
   int                 from_proc, level, is_parent;
-  int                 i, rk, rank_with_max_quads = p3->mpirank;
+  int                 i, rk, rank_with_max_quads;
   char               *cut_border_quad; /* first quadrant in the new uncorrected cut */
   char               *family_parent = p3->temp_quad[0];
   p4est3_locidx       qid, quad_begin, quad_end;
@@ -533,7 +533,8 @@ p4est3_partition_correction (const p4est3_t * p3,
   p4est3_gloidx       min_quadrant_id, max_quadrant_id, h;
   p4est3_gloidx       max_num_quadrants;
 
-  for (rk = 0; rk < p3->mpirank; ++rk) {
+  for (rk = 0; rk < p3->mpisize; ++rk) {
+    rank_with_max_quads = rk;
     /* Determine first and last global ids of a family on the process border */
     /* set minimum possible borders containing the target family inside */
     my_begin =
@@ -556,7 +557,7 @@ p4est3_partition_correction (const p4est3_t * p3,
       p3->old->nodequads[from_begin - node_offset] + qid * p3->qsize;
     SC3E (p4est3_quadrant_level (p3->qvt, cut_border_quad, &level));
     if (level == 0) {
-      return NULL;
+      continue;
     }
 
     /* find which processes new (but uncorrected) borders belong to */
@@ -589,7 +590,7 @@ p4est3_partition_correction (const p4est3_t * p3,
     /* Compute correction */
     /* no correction if num quadrants not sufficient for family */
     if (max_quadrant_id - min_quadrant_id + 1 != p3->num_children) {
-      return NULL;
+      continue;
     }
 
     max_num_quadrants =
@@ -833,7 +834,7 @@ p4est3_partition (p4est3_t * p3)
 
   if (p3->family) {
     SC3E (sc3_allocator_calloc
-        (p3->alloc, p3->mpisize, sizeof (p4est3_gloidx), &correction));
+        (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &correction));
     SC3E (p4est3_partition_correction
           (p3, node_offset, node_offset_next,
            last_goffsets, loc_offsets, correction));
