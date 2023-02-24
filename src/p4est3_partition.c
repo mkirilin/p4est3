@@ -635,8 +635,7 @@ p4est3_partition_correction (const p4est3_t * p3,
 static sc3_error_t *
 p4est3_weighted_new_boundaries (p4est3_t * p3, int nodesize,
                                 int node_offset, int noderank,
-                                sc3_MPI_Comm_t nodecomm,
-                                p4est3_gloidx * loc_offsets)
+                                sc3_MPI_Comm_t nodecomm)
 {
   int                 i;
   int64_t             weight, weight_sum, cut;
@@ -661,7 +660,7 @@ p4est3_weighted_new_boundaries (p4est3_t * p3, int nodesize,
   local_weights[0] = 0;
   for (nt = p3->old->fltree; nt <= p3->old->lltree; ++nt) {
     wi->ntree = nt;
-    SC3E (p4est3_tree_index (p3, nt, &tree));
+    SC3E (p4est3_tree_index (p3->old, nt, &tree));
     for (lz = 0; lz < tree->num_quads; ++lz, ++kl) {
       quad = tree->tquads + p3->qsize * lz;
       wi->quadrant = quad;
@@ -706,18 +705,17 @@ p4est3_weighted_new_boundaries (p4est3_t * p3, int nodesize,
   for (i = 0; i < nodesize; ++i) {
     cut = p4est3_uint64cut (weight_sum, nodesize, i);
 
-    /*comment this out since we use loc_offsets*/
-    /*if (global_weight_sums[noderank] > cut ||
+    if (global_weight_sums[noderank] > cut ||
         cut >= global_weight_sums[noderank + 1]) {
       continue;
-    }*/
+    }
     SC3E (p4est3_search_lower_bound64
           (cut, local_weights, (ssize_t) p3->old->local_num_quads + 1,
            &new_left_border));
     SC3A_CHECK (new_left_border >= 0
                 && (p4est3_locidx) new_left_border < p3->old->local_num_quads);
     /* shift new left border by goffset since we searched it in local array */
-    loc_offsets[node_offset + i] = new_left_border + goffset_current_rank;
+    p3->goffset[node_offset + i] = new_left_border + goffset_current_rank;
   }
   SC3E (sc3_allocator_free (p3->alloc, local_weights));
   SC3E (sc3_allocator_free (p3->alloc, global_weight_sums));
@@ -821,12 +819,26 @@ p4est3_partition (p4est3_t * p3)
     for (i = 0; i < p3->mpisize; ++i) {
       loc_offsets[i] = p4est3_glocut (qcount_node, nodesize, i);
     }
-    loc_offsets[p3->mpisize] = p3->global_num_quads;
   }
   else {
+    /* Allocate shared memory for global offsets */
+    SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
+    SC3E (p4est3_glopartition_set_mpienv
+          (NULL, NULL, p3->goffsets, p3->split_info));
+    SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets));
+    p3->goffset = p3->goffsets->goffset;
+    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->goffsets->goffsetwin));
     SC3E (p4est3_weighted_new_boundaries
-          (p3, nodesize, node_offset, noderank, nodecomm, loc_offsets));
+          (p3, nodesize, node_offset, noderank, nodecomm));
+    SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
+    SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+    SC3E (sc3_MPI_Barrier (nodecomm));
+    for (i = 0; i < p3->mpisize; ++i) {
+      loc_offsets[i] = p3->goffset[i];
+    }
   }
+  loc_offsets[p3->mpisize] = p3->global_num_quads;
 
   for (i = 0; i < p3->mpisize; ++i) {
     last_goffsets[i] = p3->old->goffset[i + 1] - 1;
@@ -1022,12 +1034,14 @@ p4est3_partition (p4est3_t * p3)
   SC3E (sc3_MPI_Win_sync (p3->gposition->gfposwin));
   SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
 
-  /* Allocate shared memory for global offsets */
-  SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
-  SC3E (p4est3_glopartition_set_mpienv
-        (NULL, NULL, p3->goffsets, p3->split_info));
-  SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets));
-  p3->goffset = p3->goffsets->goffset;
+  if (p3->cweight == NULL) {
+    /* Allocate shared memory for global offsets */
+    SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
+    SC3E (p4est3_glopartition_set_mpienv
+          (NULL, NULL, p3->goffsets, p3->split_info));
+    SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets));
+    p3->goffset = p3->goffsets->goffset;
+  }
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsets->goffsetwin));
   p3->goffset[p3->mpirank] = loc_offsets[p3->mpirank];
