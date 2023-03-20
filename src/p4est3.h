@@ -273,7 +273,7 @@ sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
  * and a mode to get this forest.
  * \param [in,out] p3       New forest object under construction.
  * \param [in] old          Source forest object that data will be used on
- *                          the setting up stage.
+ *                          the setting up stage. NULL is possible.
  * \param [in] mode         See \ref p4est3_source_setup_t type for
  *                          available options. Default value is
  *                          P4EST3_COPY_MODE.

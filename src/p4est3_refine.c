@@ -322,7 +322,8 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
   char               *quadmem, *nqmem;
   p4est3_locidx       lt_offset;
   p4est3_locidx      *local_num_quads;  /**< Array of the numbers of quadrants at every rank */
-  p4est3_locidx      *first_tree_quads; /**< Array of the numbers of quadrants at the first local tree */
+  p4est3_locidx      *last_tree_quads;  /**< Array of the numbers of quadrants at the last local tree */
+  p4est3_topidx      *lltrees2proc;     /**< Array of the numbers of lltree for each process */
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Comm_t      nodecomm;
   sc3_MPI_Aint_t      tempbytes;
@@ -346,7 +347,9 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
   SC3E (sc3_allocator_calloc
         (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &local_num_quads));
   SC3E (sc3_allocator_calloc
-        (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &first_tree_quads));
+        (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &last_tree_quads));
+  SC3E (sc3_allocator_calloc
+        (p3->alloc, p3->mpisize, sizeof (p4est3_topidx), &lltrees2proc));
 
   SC3E (p4est3_refine_array_new
         (p3->alloc, sizeof (char), 0, p3->old->local_num_quads, &pattern));
@@ -453,14 +456,18 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
   }
 
   /* This check here is only to avoid creating a new mpi datatype. */
+  /** TODO: write sc3_(I)Allgather and switch to them. */
   SC3A_CHECK (sizeof (p4est3_locidx) == sizeof (int));
-  SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
+  SC3E (p4est3_tree_index (p3, p3->lltree, &tree));
   SC3E (sc3_MPI_Allgather
         (&p3->local_num_quads, 1, SC3_MPI_INT,
          local_num_quads, 1, SC3_MPI_INT, p3->mpicomm));
   SC3E (sc3_MPI_Allgather
         (&tree->num_quads, 1, SC3_MPI_INT,
-         first_tree_quads, 1, SC3_MPI_INT, p3->mpicomm));
+         last_tree_quads, 1, SC3_MPI_INT, p3->mpicomm));
+  SC3E (sc3_MPI_Allgather
+        (&p3->lltree, 1, SC3_MPI_INT,
+         lltrees2proc, 1, SC3_MPI_INT, p3->mpicomm));
 
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsets->goffsetwin));
@@ -473,22 +480,23 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
   }
   SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
 
+  SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
   for (i = p3->mpirank - 1; i >= 0; --i) {
-    if (p3->gftree[i] != p3->fltree) {
+    if (lltrees2proc[i] != p3->fltree) {
       break;
     }
-    tree->first_tquad += first_tree_quads[p3->gftree[i]];
+    tree->first_tquad += last_tree_quads[i];
   }
   for (i = p3->fltree; i <= p3->lltree; ++i) {
     SC3E (p4est3_tree_index (p3, i, &tree));
     tree->end_tquad = tree->first_tquad + tree->num_quads;
-    tree->last_tquad =
-      (tree->end_tquad = tree->first_tquad + tree->num_quads) - 1;
+    tree->last_tquad = tree->end_tquad - 1;
   }
 
   SC3E (sc3_array_destroy (&pattern));
   SC3E (sc3_allocator_free (p3->alloc, local_num_quads));
-  SC3E (sc3_allocator_free (p3->alloc, first_tree_quads));
+  SC3E (sc3_allocator_free (p3->alloc, last_tree_quads));
+  SC3E (sc3_allocator_free (p3->alloc, lltrees2proc));
   if (p3->ccoarse != NULL) {
     SC3E (sc3_array_destroy (&family));
   }

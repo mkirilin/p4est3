@@ -245,6 +245,10 @@ sc3_error_t        *
 p4est3_set_source (p4est3_t * p3, p4est3_t * old)
 {
   SC3A_IS (p4est3_is_new, p3);
+  if (old == NULL) {
+    p3->old = NULL;
+    return NULL;
+  }
   SC3A_IS (p4est3_is_setup, old);
   SC3A_CHECK (p3 != old);
 

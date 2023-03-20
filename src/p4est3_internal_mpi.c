@@ -802,10 +802,32 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   p3->mpisize = old->mpisize;
   p3->mpirank = old->mpirank;
 
-  /* global partition of trees stays the same, so we just reference on it */
-  p3->gtrees = old->gtrees;
-  p3->gftree = old->gftree;
-  SC3E (p4est3_glotree_ref (old->gtrees));
+  if (!p3->partition) {
+  /* without repartition the global partition of trees stays the same,
+     so we just reference on it */
+    p3->gtrees = old->gtrees;
+    p3->gftree = old->gftree;
+    SC3E (p4est3_glotree_ref (old->gtrees));
+  }
+  else {
+    /* allocatete new shared memory and create new magic structure,
+     we fill onnly the last element, since the rest of them will be set
+     during the partition */
+
+    SC3E (p4est3_glotree_new (p3->alloc, &p3->gtrees));
+    SC3E (p4est3_glopartition_set_mpienv
+          (p3->gtrees, NULL, NULL, old->split_info));
+    SC3E (p4est3_glopartition_setup (p3->gtrees, NULL, NULL));
+    p3->gftree = p3->gtrees->gftree;
+
+    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                            p3->gtrees->gftreewin));
+    if (noderank == 0) {
+      p3->gftree[p3->mpisize] = p3->num_trees;
+    }
+    SC3E (sc3_MPI_Win_sync (p3->gtrees->gftreewin));
+    SC3E (sc3_MPI_Win_unlock (0, p3->gtrees->gftreewin));
+  }
   if (p3->qvt == old->qvt) {
     /* global position of quadrants stays the same, so we just reference on it */
     p3->gposition = old->gposition;
@@ -866,8 +888,13 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
    * p4est3_t::nodequads, local_num_quads, quadwin,
    * quads, trees, goffsetwin, goffset and global_num_quads.
   */
-  SC3E (p4est3_refine_coarsen_copy (p3));
-  SC3E (p4est3_partition (p3));
+  if ((p3->crefine != NULL || p3->ccoarse != NULL)
+    && !p3->partition) {
+    SC3E (p4est3_refine_coarsen_copy (p3));
+  }
+  if (p3->partition) {
+    SC3E (p4est3_partition (p3));
+  }
   p3->setup = 1;
   return NULL;
 }
