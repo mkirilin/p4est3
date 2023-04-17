@@ -423,8 +423,8 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
   /* Allocate shared memory for global offsets */
   SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
   SC3E (p4est3_glopartition_set_mpienv
-        (NULL, NULL, p3->goffsets, p3->split_info));
-  SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets));
+        (NULL, NULL, p3->goffsets, NULL, p3->split_info));
+  SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL));
   p3->goffset = p3->goffsets->goffset;
 
   /* We got a pattern of population, and now we populate it

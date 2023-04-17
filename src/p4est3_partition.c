@@ -824,8 +824,8 @@ p4est3_partition (p4est3_t * p3)
     /* Allocate shared memory for global offsets */
     SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
     SC3E (p4est3_glopartition_set_mpienv
-          (NULL, NULL, p3->goffsets, p3->split_info));
-    SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets));
+          (NULL, NULL, p3->goffsets, NULL, p3->split_info));
+    SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL));
     p3->goffset = p3->goffsets->goffset;
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsets->goffsetwin));
@@ -1038,8 +1038,8 @@ p4est3_partition (p4est3_t * p3)
     /* Allocate shared memory for global offsets */
     SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
     SC3E (p4est3_glopartition_set_mpienv
-          (NULL, NULL, p3->goffsets, p3->split_info));
-    SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets));
+          (NULL, NULL, p3->goffsets, NULL, p3->split_info));
+    SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL));
     p3->goffset = p3->goffsets->goffset;
   }
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,

@@ -80,9 +80,9 @@ p4est3_internal_setup_cut (p4est3_t * p3,
   SC3E (p4est3_glopos_new (p3->alloc, &p3->gposition));
   SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
   SC3E (p4est3_glopartition_set_mpienv
-        (p3->gtrees, p3->gposition, p3->goffsets, p3->split_info));
+        (p3->gtrees, p3->gposition, p3->goffsets, NULL, p3->split_info));
   SC3E (p4est3_glopos_set_qsize (p3->gposition, qsize));
-  SC3E (p4est3_glopartition_setup (p3->gtrees, p3->gposition, p3->goffsets));
+  SC3E (p4est3_glopartition_setup (p3->gtrees, p3->gposition, p3->goffsets, NULL));
 
   /* making shortcuts */
   p3->gftree = p3->gtrees->gftree;
@@ -816,8 +816,8 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
 
     SC3E (p4est3_glotree_new (p3->alloc, &p3->gtrees));
     SC3E (p4est3_glopartition_set_mpienv
-          (p3->gtrees, NULL, NULL, old->split_info));
-    SC3E (p4est3_glopartition_setup (p3->gtrees, NULL, NULL));
+          (p3->gtrees, NULL, NULL, NULL, old->split_info));
+    SC3E (p4est3_glopartition_setup (p3->gtrees, NULL, NULL, NULL));
     p3->gftree = p3->gtrees->gftree;
 
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
@@ -839,8 +839,8 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
     SC3E (p4est3_glopos_new (p3->alloc, &p3->gposition));
     SC3E (p4est3_glopos_set_qsize (p3->gposition, p3->qsize));
     SC3E (p4est3_glopartition_set_mpienv
-          (NULL, p3->gposition, NULL, old->split_info));
-    SC3E (p4est3_glopartition_setup (NULL, p3->gposition, NULL));
+          (NULL, p3->gposition, NULL, NULL, old->split_info));
+    SC3E (p4est3_glopartition_setup (NULL, p3->gposition, NULL, NULL));
     p3->gfpos = p3->gposition->gfpos;
 
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,

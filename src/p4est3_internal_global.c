@@ -246,7 +246,7 @@ p4est3_glopos_set_qsize (p4est3_glopos_t * m, int qsize)
 sc3_error_t        *
 p4est3_gtroffs_set_num_trees (p4est3_gtroffs_t * m, p4est3_topidx num_trees)
 {
-  SC3A_IS (p4est3_glopos_is_new, m);
+  SC3A_IS (p4est3_gtroffs_is_new, m);
   SC3A_CHECK (num_trees > 0);
   m->num_trees = num_trees;
   return NULL;
@@ -470,7 +470,7 @@ p4est3_glooffs_unref (p4est3_glooffs_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_glooffs_unref (p4est3_gtroffs_t ** mp)
+p4est3_gtroffs_unref (p4est3_gtroffs_t ** mp)
 {
   int                 waslast;
   p4est3_gtroffs_t   *m;
@@ -538,7 +538,7 @@ p4est3_glooffs_destroy (p4est3_glooffs_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_glooffs_destroy (p4est3_gtroffs_t ** mp)
+p4est3_gtroffs_destroy (p4est3_gtroffs_t ** mp)
 {
   sc3_error_t        *leak = NULL;
   p4est3_gtroffs_t   *m;
