@@ -129,6 +129,21 @@ typedef struct p4est3_glooffs
 }
 p4est3_glooffs_t;
 
+typedef struct p4est3_gtroffs
+{
+  sc3_refcount_t      rc;
+  int                 setup;
+  sc3_allocator_t    *mator;
+  sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
+                                              information. It should correspond
+                                              to the same forest as the current object. */
+  p4est3_topidx       num_trees;        /**< Number of trees in \ref conn. */
+  sc3_MPI_Win_t       gtreeoffsetwin;   /**< Array of (\ref num_trees + 1) \ref
+                                             p4est3_gloidx for global trees offsets. */
+  p4est3_gloidx      *gtreeoffset;      /**< Pointer to \ref gtreeoffsetwin's memory. */
+}
+p4est3_gtroffs_t;
+
 /** This internal structure holds the members of a forest object.
  * Don't rely on its declaration in code outside the library. */
 struct p4est3
@@ -175,6 +190,7 @@ struct p4est3
   p4est3_glotree_t   *gtrees;           /**< Store global tree partition. */
   p4est3_glopos_t    *gposition;        /**< Store global first quadrants. */
   p4est3_glooffs_t   *goffsets;         /**< Store global quadrants offsets. */
+  p4est3_gtroffs_t   *gtreeoffsets;     /**< Store global trees offsets. */
   int                 qsize;            /**< Store byte size of one quadrant. */
   int                 qmaxlevel;        /**< Maximum allowed refinement level. */
   int                 num_children;     /**< Number of children for a quadrant. */
@@ -187,6 +203,7 @@ struct p4est3
   p4est3_gloidx      *goffset;          /**< Pointer to \ref goffsetwin's memory. */
   p4est3_topidx      *gftree;           /**< Pointer to \ref gftreewin's memory. */
   char               *gfpos;            /**< Pointer to \ref gfposwin's memory. */
+  p4est3_gloidx      *gtroffset;        /**< Pointer to \ref gtreeoffsetwin's memory. */
 
   /* variables populated during p4est3_setup: tree and quadrant storage */
   sc3_MPI_Win_t       quadwin;          /**< Shared memory stores the quadrants
@@ -262,11 +279,15 @@ int                 p4est3_glopos_is_valid (const p4est3_glopos_t * m,
                                             char *reason);
 int                 p4est3_glooffs_is_valid (const p4est3_glooffs_t * m,
                                              char *reason);
+int                 p4est3_gtroffs_is_valid (const p4est3_gtroffs_t * m,
+                                             char *reason);
 int                 p4est3_glotree_is_new (const p4est3_glotree_t * m,
                                            char *reason);
 int                 p4est3_glopos_is_new (const p4est3_glopos_t * m,
                                           char *reason);
 int                 p4est3_glooffs_is_new (const p4est3_glooffs_t * m,
+                                           char *reason);
+int                 p4est3_gtroffs_is_new (const p4est3_gtroffs_t * m,
                                            char *reason);
 sc3_error_t        *p4est3_glotree_new (sc3_allocator_t * mator,
                                         p4est3_glotree_t ** mp);
@@ -274,23 +295,32 @@ sc3_error_t        *p4est3_glopos_new (sc3_allocator_t * mator,
                                        p4est3_glopos_t ** mp);
 sc3_error_t        *p4est3_glooffs_new (sc3_allocator_t * mator,
                                         p4est3_glooffs_t ** mp);
+sc3_error_t        *p4est3_gtroffs_new (sc3_allocator_t * mator,
+                                        p4est3_gtroffs_t ** mp);
 sc3_error_t        *p4est3_glopos_set_qsize (p4est3_glopos_t * m, int qsize);
+sc3_error_t        *p4est3_gtroffs_set_num_trees (p4est3_gtroffs_t * m,
+                                                  p4est3_topidx num_trees);
 sc3_error_t        *p4est3_glopartition_set_mpienv (p4est3_glotree_t * mt,
                                                     p4est3_glopos_t * mp,
                                                     p4est3_glooffs_t * mo,
+                                                    p4est3_gtroffs_t * mto,
                                                     sc3_mpienv_t * mpienv);
 sc3_error_t        *p4est3_glopartition_setup (p4est3_glotree_t * mt,
                                                p4est3_glopos_t * mp,
-                                               p4est3_glooffs_t * mo);
+                                               p4est3_glooffs_t * mo,
+                                               p4est3_gtroffs_t * mto);
 sc3_error_t        *p4est3_glotree_ref (p4est3_glotree_t * m);
 sc3_error_t        *p4est3_glopos_ref (p4est3_glopos_t * m);
 sc3_error_t        *p4est3_glooffs_ref (p4est3_glooffs_t * m);
+sc3_error_t        *p4est3_gtroffs_ref (p4est3_gtroffs_t * m);
 sc3_error_t        *p4est3_glotree_unref (p4est3_glotree_t ** mp);
 sc3_error_t        *p4est3_glopos_unref (p4est3_glopos_t ** mp);
 sc3_error_t        *p4est3_glooffs_unref (p4est3_glooffs_t ** mp);
+sc3_error_t        *p4est3_gtroffs_unref (p4est3_gtroffs_t ** mp);
 sc3_error_t        *p4est3_glotree_destroy (p4est3_glotree_t ** mp);
 sc3_error_t        *p4est3_glopos_destroy (p4est3_glopos_t ** mp);
 sc3_error_t        *p4est3_glooffs_destroy (p4est3_glooffs_t ** mp);
+sc3_error_t        *p4est3_gtroffs_destroy (p4est3_gtroffs_t ** mp);
 /** \endcond */
 
 /* TODO: document default value for all _set_ */
