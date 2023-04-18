@@ -137,7 +137,7 @@ typedef struct p4est3_gtroffs
   sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
                                               information. It should correspond
                                               to the same forest as the current object. */
-  p4est3_topidx       num_trees;        /**< Number of trees in \ref conn. */
+  p4est3_topidx       num_trees;        /**< Number of trees in node. */
   sc3_MPI_Win_t       gtreeoffsetwin;   /**< Array of (\ref num_trees + 1) \ref
                                              p4est3_gloidx for global trees offsets. */
   p4est3_gloidx      *gtreeoffset;      /**< Pointer to \ref gtreeoffsetwin's memory. */
@@ -223,6 +223,13 @@ struct p4est3
   p4est3_topidx       lltree;   /**< Number of last local tree inclusive,
                                      or -2 if process holds no quadrants. */
   p4est3_topidx       nltrees;  /**< Number of trees with local quadrants. */
+  p4est3_topidx       fntree;   /**< Number of first tree in node, or -1
+                                     if node holds no quadrants.
+                                     Relative to all trees in \ref conn. */
+  p4est3_topidx       lntree;   /**< Number of last tree in node inclusive,
+                                     or -2 if node holds no quadrants. */
+  p4est3_topidx       nntrees;  /**< Number of trees in node with quadrants in
+                                     shared memory. */
 
   /* functions set before p4est3_setup */
   p4est3_refine_callback_t crefine; /**< Refinemet callback function */
