@@ -137,9 +137,11 @@ typedef struct p4est3_gtroffs
   sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
                                               information. It should correspond
                                               to the same forest as the current object. */
-  p4est3_topidx       num_trees;        /**< Number of trees in node. */
+  p4est3_topidx       num_trees;        /**< Number of trees in connectivity. */
   sc3_MPI_Win_t       gtreeoffsetwin;   /**< Array of (\ref num_trees + 1) \ref
-                                             p4est3_gloidx for global trees offsets. */
+                                             p4est3_gloidx for global trees offsets.
+                                             We store offsets for those trees that are
+                                             local to shared memory node.*/
   p4est3_gloidx      *gtreeoffset;      /**< Pointer to \ref gtreeoffsetwin's memory. */
 }
 p4est3_gtroffs_t;

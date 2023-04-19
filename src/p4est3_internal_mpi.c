@@ -164,7 +164,7 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   int                 dispunit;
   int                 nodesize, noderank, node_frank;
   char               *quadmem, *nqmem;
-  p4est3_topidx       tt, beginr, endr;
+  p4est3_topidx       tt, beginr, endr, nodal_endr;
   p4est3_gloidx       first_quad, end_quad, tt_offset, next_offset;
   p4est3_gloidx       first_node_quad, end_node_quad;
   p4est3_tree_t      *tree;
@@ -225,8 +225,15 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
                           p3->gtreeoffsets->gtreeoffsetwin));
   beginr = sc3_intcut (p3->num_trees + 1, nodesize, noderank);
   endr = sc3_intcut (p3->num_trees + 1, nodesize, noderank + 1);
-  for (tt = beginr; tt < endr; ++tt) {
+  for (tt = beginr; tt < p3->fntree; ++tt) {
+    p3->gtroffset[tt] = -1;
+  }
+  nodal_endr = SC3_MIN (endr, p3->lntree + 1);
+  for (; tt < nodal_endr; ++tt) {
     p3->gtroffset[tt] = tt * num_uniform;
+  }
+  for (; tt < endr; ++tt) {
+    p3->gtroffset[tt] = -1;
   }
   SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->gtreeoffsetwin));
 
@@ -895,9 +902,6 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   p3->fltree = old->fltree;
   p3->lltree = old->lltree;
   p3->nltrees = old->nltrees;
-  p3->fntree = old->fntree;
-  p3->lntree = old->lntree;
-  p3->nntrees = old->nntrees;
 
   /* functions set before p4est3_setup */
   if (p3->user_data == NULL) {
