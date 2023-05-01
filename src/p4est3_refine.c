@@ -328,11 +328,15 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
   MPI_Status          status;
 #endif
   p4est3_locidx       recv_buf = -1, send_buf = -1;
-  p4est3_topidx       t;
+  p4est3_topidx       fl_resp_tree, ll_resp_tree;
   p4est3_topidx      *treecount, *treeoffset;
   p4est3_tree_t      *tree;
 
   /* A process is responsible for a tree, if it has tree's first quadrant. */
+  /* Every process is always responsible for its local trees in
+     range (fltree, lltree). */
+    fl_resp_tree = p3->fltree + 1;
+    ll_resp_tree = p3->lltree - 1;
   /* Determine process to receive from: the last process sharing the last
      mpirank's tree, mpirank is responsible for. */
   /* Check if mpirank is responsible for its last local tree. If it contains
@@ -362,6 +366,8 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
         MPI_Irecv (&recv_buf, 1, SC3_MPI_INT, --p, 0, nodecomm, &req_recv);
         SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
+      ll_resp_tree++;
+      SC3A_CHECK (ll_resp_tree == p3->lltree);
     }
   }
 
@@ -404,16 +410,18 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
       SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
     }
+    else {
+      fl_resp_tree--;
+      SC3A_CHECK (fl_resp_tree == p3->fltree);
+      SC3A_CHECK (p == p3->mpirank);
+    }
   }
   SC3E (sc3_allocator_free (p3->alloc, c));
 
-  /* Put a local value to a relative position of shared memory, since we a on
-      a single SM node so far. Every process is always responsible for its 
-      non-first local trees.*/
+  /* Put a local value to a relative position of shared memory. */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->gtreeoffsets->gtreeoffsetwin));
-  t = send_buf == -1 ? p3->fltree : p3->fltree + 1;
-  for (; t <= p3->lltree; ++t) {
+  for (t = fl_resp_tree; t <= ll_resp_tree; ++t) {
     SC3E (p4est3_tree_index (p3, t, &tree));
     p3->gtroffset[t + 1] = tree->num_quads;
   }
