@@ -225,15 +225,9 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
                           p3->gtreeoffsets->gtreeoffsetwin));
   beginr = sc3_intcut (p3->num_trees + 1, nodesize, noderank);
   endr = sc3_intcut (p3->num_trees + 1, nodesize, noderank + 1);
-  for (tt = beginr; tt < p3->fntree; ++tt) {
-    p3->gtroffset[tt] = -1;
-  }
   nodal_endr = SC3_MIN (endr, p3->lntree + 1);
   for (; tt < nodal_endr; ++tt) {
     p3->gtroffset[tt] = tt * num_uniform;
-  }
-  for (; tt < endr; ++tt) {
-    p3->gtroffset[tt] = -1;
   }
   SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->gtreeoffsetwin));
 
