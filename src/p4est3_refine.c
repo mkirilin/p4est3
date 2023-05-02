@@ -319,7 +319,7 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
 {
   /* So far we consider one shared memory node only,
      which means (almost) no sending messages */
-  int                 p, zero, i, *c;
+  int                 p, zero, i, is_recv = 0, *c;
 #ifdef P4EST_ENABLE_MPI
 #ifdef P4EST_ENABLE_DEBUG
   int                 mpiret;
@@ -327,9 +327,8 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
   MPI_Request         req_recv, req_send;
   MPI_Status          status;
 #endif
-  p4est3_locidx       recv_buf = -1, send_buf = -1;
-  p4est3_topidx       fl_resp_tree, ll_resp_tree;
-  p4est3_topidx      *treecount, *treeoffset;
+  p4est3_gloidx       recv_buf = -1, send_buf = -1;
+  p4est3_topidx       t, fl_resp_tree, ll_resp_tree;
   p4est3_tree_t      *tree;
 
   /* A process is responsible for a tree, if it has tree's first quadrant. */
@@ -363,7 +362,8 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
 #ifdef P4EST_ENABLE_DEBUG
       mpiret =
 #endif
-        MPI_Irecv (&recv_buf, 1, SC3_MPI_INT, --p, 0, nodecomm, &req_recv);
+        MPI_Irecv (&recv_buf, 1, SC3_MPI_LONG, --p, 0, nodecomm, &req_recv);
+        is_recv = 1;
         SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
       ll_resp_tree++;
@@ -400,13 +400,13 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
     SC3A_CHECK (0 <= p && p <= p3->mpirank);
     if (p < p3->mpirank) {
       SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
-      send_buf =
-        p3->goffset[p3->mpirank] - p3->goffset[p + 1] + tree->num_quads;
+      send_buf = p3->goffset[p3->mpirank] - p3->goffset[p + 1]
+                    + (p4est3_gloidx) tree->num_quads;
 #ifdef P4EST_ENABLE_MPI
 #ifdef P4EST_ENABLE_DEBUG
     mpiret =
 #endif
-      MPI_Isend (&send_buf, 1, SC3_MPI_INT, p, 0, nodecomm, &req_send);
+      MPI_Isend (&send_buf, 1, SC3_MPI_LONG, p, 0, nodecomm, &req_send);
       SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
     }
@@ -425,8 +425,42 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
     SC3E (p4est3_tree_index (p3, t, &tree));
     p3->gtroffset[t + 1] = tree->num_quads;
   }
-  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->gtreeoffsetwin));
 
+  if (is_recv) {
+#ifdef P4EST_ENABLE_MPI
+#ifdef P4EST_ENABLE_DEBUG
+    mpiret =
+#endif
+      MPI_Wait (&req_recv, &status);
+      SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
+      SC3E (p4est3_tree_index (p3, p3->lltree, &tree));
+      p3->gtroffset[p3->lltree + 1] =
+        (p4est3_gloidx) tree->num_quads + (p4est3_gloidx) recv_buf;
+#endif
+  }
+
+  if (send_buf >= 0) {
+#ifdef P4EST_ENABLE_MPI
+#ifdef P4EST_ENABLE_DEBUG
+    mpiret =
+#endif
+      MPI_Wait (&req_send, &status);
+      SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
+#endif
+  }
+
+  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->gtreeoffsetwin));
+  SC3E (sc3_MPI_Barrier (nodecomm));
+  if (noderank == 0) {
+    p3->gtroffset[0] = 0;
+    for (i = 1; i < p3->num_trees + 1; ++i) {
+      p3->gtroffset[i] = p3->gtroffset[i] + p3->gtroffset[i - 1];
+    }
+  }
+  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->gtreeoffsetwin));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->gtreeoffsetwin));
+  SC3E (sc3_MPI_Barrier (nodecomm));
+  return NULL;
 }
 
 sc3_error_t        *
@@ -437,9 +471,6 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
   int                 noderank;
   char               *quadmem, *nqmem;
   p4est3_locidx       lt_offset;
-  p4est3_locidx      *local_num_quads;  /**< Array of the numbers of quadrants at every rank */
-  p4est3_locidx      *last_tree_quads;  /**< Array of the numbers of quadrants at the last local tree */
-  p4est3_topidx      *lltrees2proc;     /**< Array of the numbers of lltree for each process */
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Comm_t      nodecomm;
   sc3_MPI_Aint_t      tempbytes;
@@ -459,13 +490,6 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
   SC3E (sc3_mpienv_get_noderank (p3->old->split_info, &noderank));
   SC3E (sc3_mpienv_get_nodecomm (p3->old->split_info, &nodecomm));
   SC3E (sc3_mpienv_get_info_noncont (p3->old->split_info, &info_noncontig));
-  /* Do some preliminary allocations */
-  SC3E (sc3_allocator_calloc
-        (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &local_num_quads));
-  SC3E (sc3_allocator_calloc
-        (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &last_tree_quads));
-  SC3E (sc3_allocator_calloc
-        (p3->alloc, p3->mpisize, sizeof (p4est3_topidx), &lltrees2proc));
 
   SC3E (p4est3_refine_array_new
         (p3->alloc, sizeof (char), 0, p3->old->local_num_quads, &pattern));
@@ -542,6 +566,20 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
         (NULL, NULL, p3->goffsets, NULL, p3->split_info));
   SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL));
   p3->goffset = p3->goffsets->goffset;
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->goffsets->goffsetwin));
+  SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
+  SC3E (sc3_MPI_Barrier (nodecomm));
+  p3->goffset[p3->mpirank + 1] = p3->local_num_quads;
+  if (noderank == 0) {
+    p3->goffset[0] = 0;
+    for (i = 1; i < p3->mpisize + 1; ++i) {
+      p3->goffset[i] = p3->goffset[i] + p3->goffset[i - 1];
+    }
+  }
+  SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
+  SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+  SC3E (sc3_MPI_Barrier (nodecomm));
 
   /* We got a pattern of population, and now we populate it
      and set p4est3_tree_t:: treeid, quad_offset and num_quads.
@@ -569,54 +607,28 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
     }
 #endif
     tree->first_tquad = 0;
-  }
-
-  /* This check here is only to avoid creating a new mpi datatype. */
-  /** TODO: write sc3_(I)Allgather and switch to them. */
-  SC3A_CHECK (sizeof (p4est3_locidx) == sizeof (int));
-  SC3E (p4est3_tree_index (p3, p3->lltree, &tree));
-  SC3E (sc3_MPI_Allgather
-        (&p3->local_num_quads, 1, SC3_MPI_INT,
-         local_num_quads, 1, SC3_MPI_INT, p3->mpicomm));
-  SC3E (sc3_MPI_Allgather
-        (&tree->num_quads, 1, SC3_MPI_INT,
-         last_tree_quads, 1, SC3_MPI_INT, p3->mpicomm));
-  SC3E (sc3_MPI_Allgather
-        (&p3->lltree, 1, SC3_MPI_INT,
-         lltrees2proc, 1, SC3_MPI_INT, p3->mpicomm));
-
-  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->goffsets->goffsetwin));
-  if (noderank == 0) {
-    p3->goffset[0] = 0;
-    for (i = 1; i < p3->mpisize + 1; ++i) {
-      p3->goffset[i] = p3->goffset[i - 1]
-        + (p4est3_gloidx) local_num_quads[i - 1];
-    }
-  }
-  SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
-
-  SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
-  for (i = p3->mpirank - 1; i >= 0; --i) {
-    if (lltrees2proc[i] != p3->fltree) {
-      break;
-    }
-    tree->first_tquad += last_tree_quads[i];
-  }
-  for (i = p3->fltree; i <= p3->lltree; ++i) {
-    SC3E (p4est3_tree_index (p3, i, &tree));
-    tree->end_tquad = tree->first_tquad + tree->num_quads;
+    tree->end_tquad = tree->num_quads;
     tree->last_tquad = tree->end_tquad - 1;
   }
+  /* Construct global trees offset shared memory array */
+  SC3E (p4est3_offsets_communication (p3, nodesize, noderank, nodecomm));
+
+  /* Adjust first_.., last_.. and end_tquad for the FIRST local tree */
+  SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
+  tree->first_tquad = p3->goffset[p3->mpirank] - p3->gtroffset[p3->fltree];
+  tree->end_tquad = tree->first_tquad + tree->num_quads;
+  tree->last_tquad = tree->end_tquad - 1;
+
+  /* Adjust first_.., last_.. and end_tquad for the LAST local tree */
+  SC3E (p4est3_tree_index (p3, p3->lltree, &tree));
+  tree->end_tquad = p3->goffset[p3->mpirank + 1] - p3->gtroffset[p3->lltree];
+  tree->last_tquad = tree->end_tquad - 1;
+  tree->first_tquad = tree->end_tquad - tree->num_quads;
 
   SC3E (sc3_array_destroy (&pattern));
-  SC3E (sc3_allocator_free (p3->alloc, local_num_quads));
-  SC3E (sc3_allocator_free (p3->alloc, last_tree_quads));
-  SC3E (sc3_allocator_free (p3->alloc, lltrees2proc));
   if (p3->ccoarse != NULL) {
     SC3E (sc3_array_destroy (&family));
   }
-  sc3_MPI_Barrier (p3->mpicomm);
   p3->global_num_quads = p3->goffset[p3->mpisize];
   return NULL;
 }

@@ -164,9 +164,8 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   int                 dispunit;
   int                 nodesize, noderank, node_frank;
   char               *quadmem, *nqmem;
-  p4est3_topidx       tt, beginr, endr, nodal_endr;
+  p4est3_topidx       tt, beginr, endr;
   p4est3_gloidx       first_quad, end_quad, tt_offset, next_offset;
-  p4est3_gloidx       first_node_quad, end_node_quad;
   p4est3_tree_t      *tree;
   sc3_MPI_Aint_t      quadbytes, tempbytes;
   sc3_MPI_Comm_t      nodecomm;
@@ -199,19 +198,6 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
     SC3A_CHECK (p3->fltree == p3->gftree[p3->mpirank]);
     p3->nltrees = p3->lltree - p3->fltree + 1;
   }
-  /* determine shared memmory node trees */
-  first_node_quad = p3->goffset[node_frank];
-  end_node_quad = p3->goffset[node_frank + 1];
-  if (end_node_quad - first_node_quad == 0) {
-    p3->fntree = -1;
-    p3->lntree = -2;
-    p3->nntrees = 0;
-  }
-  else {
-    p3->fntree = (p4est3_topidx) (first_node_quad / num_uniform);
-    p3->lntree = (p4est3_topidx) ((end_node_quad - 1) / num_uniform);
-    p3->nntrees = p3->lntree - p3->fntree + 1;
-  }
   /* create shared nodal trees offsets storage */
   SC3E (p4est3_gtroffs_new (p3->alloc, &p3->gtreeoffsets));
   SC3E (p4est3_glopartition_set_mpienv
@@ -225,8 +211,7 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
                           p3->gtreeoffsets->gtreeoffsetwin));
   beginr = sc3_intcut (p3->num_trees + 1, nodesize, noderank);
   endr = sc3_intcut (p3->num_trees + 1, nodesize, noderank + 1);
-  nodal_endr = SC3_MIN (endr, p3->lntree + 1);
-  for (; tt < nodal_endr; ++tt) {
+  for (tt = beginr; tt < endr; ++tt) {
     p3->gtroffset[tt] = tt * num_uniform;
   }
   SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->gtreeoffsetwin));

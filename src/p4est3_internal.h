@@ -223,13 +223,6 @@ struct p4est3
   p4est3_topidx       lltree;   /**< Number of last local tree inclusive,
                                      or -2 if process holds no quadrants. */
   p4est3_topidx       nltrees;  /**< Number of trees with local quadrants. */
-  p4est3_topidx       fntree;   /**< Number of first tree in node, or -1
-                                     if node holds no quadrants.
-                                     Relative to all trees in \ref conn. */
-  p4est3_topidx       lntree;   /**< Number of last tree in node inclusive,
-                                     or -2 if node holds no quadrants. */
-  p4est3_topidx       nntrees;  /**< Number of trees in node with quadrants in
-                                     shared memory. */
 
   /* functions set before p4est3_setup */
   p4est3_refine_callback_t crefine; /**< Refinemet callback function */
