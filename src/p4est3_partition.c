@@ -435,6 +435,9 @@ p4est3_trees_local_reproduce (const p4est3_locidx * num_send_to,
   tree->tquads = p3->quads;
   /** TODO: Gather data from the other nodes */
   p3->gftree[p3->mpirank] = p3->fltree;
+  if (p3->mpirank == 0) {
+      p3->gftree[p3->mpisize] = p3->num_trees;
+  }
   if (p3->nltrees == 1) {
     return NULL;
   }
@@ -821,12 +824,6 @@ p4est3_partition (p4est3_t * p3)
     }
   }
   else {
-    /* Allocate shared memory for global offsets */
-    SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
-    SC3E (p4est3_glopartition_set_mpienv
-          (NULL, NULL, p3->goffsets, NULL, p3->split_info));
-    SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL));
-    p3->goffset = p3->goffsets->goffset;
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsets->goffsetwin));
     SC3E (p4est3_weighted_new_boundaries
@@ -1031,17 +1028,7 @@ p4est3_partition (p4est3_t * p3)
   SC3E (p4est3_quadrant_first_descendant
         (p3->qvt, p3->nodequads[noderank],
          p3->qmaxlevel, p3->gfpos + p3->mpirank * p3->qsize));
-  SC3E (sc3_MPI_Win_sync (p3->gposition->gfposwin));
-  SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
 
-  if (p3->cweight == NULL) {
-    /* Allocate shared memory for global offsets */
-    SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
-    SC3E (p4est3_glopartition_set_mpienv
-          (NULL, NULL, p3->goffsets, NULL, p3->split_info));
-    SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL));
-    p3->goffset = p3->goffsets->goffset;
-  }
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsets->goffsetwin));
   p3->goffset[p3->mpirank] = loc_offsets[p3->mpirank];
@@ -1051,6 +1038,9 @@ p4est3_partition (p4est3_t * p3)
   SC3A_CHECK (p3->global_num_quads == loc_offsets[p3->mpisize]);
   SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
   SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+
+  SC3E (sc3_MPI_Win_sync (p3->gposition->gfposwin));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
 
   /* Free allocations */
   SC3E (p4est3_partition_cleanup

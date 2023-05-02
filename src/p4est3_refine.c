@@ -313,13 +313,33 @@ p4est3_populate_tree_cpy (p4est3_t * p3, p4est3_tree_t * tree,
   return NULL;
 }
 
-sc3_error_t *
+static sc3_error_t *
+p4est3_internal_translate_quadrant (p4est3_quadrant_vtable_t * qvt_old,
+                                    p4est3_quadrant_vtable_t * qvt_new,
+                                    const void *qin, void *qout,
+                                    int32_t * c, int level)
+{
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_old);
+  SC3A_IS (p4est3_quadrant_vtable_is_valid, qvt_new);
+  SC3A_IS2 (p4est3_quadrant_vtable_is2_valid, qvt_old, qin);
+  SC3A_CHECK (qvt_old->dim == qvt_new->dim);
+
+  SC3A_CHECK (level <= qvt_new->max_level);
+  SC3E (p4est3_quadrant_coordinates (qvt_old, qin, c));
+  SC3E (p4est3_quadrant_quadrant (qvt_new, c, level, qout));
+
+  SC3A_IS2 (p4est3_quadrant_vtable_is2_valid, qvt_new, qout);
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
                               sc3_MPI_Comm_t nodecomm)
 {
   /* So far we consider one shared memory node only,
      which means (almost) no sending messages */
   int                 p, zero, i, is_recv = 0, *c;
+  int                 beginr, endr;
 #ifdef P4EST_ENABLE_MPI
 #ifdef P4EST_ENABLE_DEBUG
   int                 mpiret;
@@ -330,6 +350,7 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
   p4est3_gloidx       recv_buf = -1, send_buf = -1;
   p4est3_topidx       t, fl_resp_tree, ll_resp_tree;
   p4est3_tree_t      *tree;
+  p4est3_t           *old = p3->old;
 
   /* A process is responsible for a tree, if it has tree's first quadrant. */
   /* Every process is always responsible for its local trees in
@@ -415,6 +436,22 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
       SC3A_CHECK (fl_resp_tree == p3->fltree);
       SC3A_CHECK (p == p3->mpirank);
     }
+  }
+
+  if (p3->qvt != old->qvt) {
+  /* Fill global trees position array by quadrants translation. */
+    SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                            p3->gposition->gfposwin));
+
+    beginr = sc3_intcut (old->mpisize + 1, nodesize, noderank);
+    endr = sc3_intcut (old->mpisize + 1, nodesize, noderank + 1);
+    for (i = 0; i < endr - beginr; ++i) {
+      SC3E (p4est3_internal_translate_quadrant
+            (old->qvt, p3->qvt, (void *) (old->gfpos + i * old->qsize),
+            (void *) (p3->gfpos + i * p3->qsize), c, p3->qvt->max_level));
+    }
+    SC3E (sc3_MPI_Win_sync (p3->gposition->gfposwin));
+    SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
   }
   SC3E (sc3_allocator_free (p3->alloc, c));
 
@@ -560,12 +597,7 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
   p3->quads = quadmem;
   SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
 
-  /* Allocate shared memory for global offsets */
-  SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
-  SC3E (p4est3_glopartition_set_mpienv
-        (NULL, NULL, p3->goffsets, NULL, p3->split_info));
-  SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL));
-  p3->goffset = p3->goffsets->goffset;
+  /* Fill global offsets. */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsets->goffsetwin));
   SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
