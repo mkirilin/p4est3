@@ -818,7 +818,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
     /* create shared trees offsets storage */
     SC3E (p4est3_gtroffs_new (p3->alloc, &p3->gtreeoffsets));
     SC3E (p4est3_glopartition_set_mpienv
-          (NULL, NULL, NULL, p3->gtreeoffsets, p3->split_info));
+          (NULL, NULL, NULL, p3->gtreeoffsets, old->split_info));
     SC3E (p4est3_gtroffs_set_num_trees (p3->gtreeoffsets, p3->num_trees));
     SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, p3->gtreeoffsets));
     p3->gtroffset = p3->gtreeoffsets->gtreeoffset;
@@ -846,7 +846,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   /* Allocate shared memory for global offsets */
   SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
   SC3E (p4est3_glopartition_set_mpienv
-        (NULL, NULL, p3->goffsets, NULL, p3->split_info));
+        (NULL, NULL, p3->goffsets, NULL, old->split_info));
   SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL));
   p3->goffset = p3->goffsets->goffset;
 

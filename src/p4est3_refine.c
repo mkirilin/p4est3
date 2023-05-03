@@ -401,11 +401,12 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
     }
     if (p >= 0) {
       /* Now p is the first rank that starts before the mpirank's fltree.
-         There are two possibilities: either p or p + 1 is responsible for 
+         There are two possibilities: either p or p + 1 are responsible for
          mpirank's fltree. Check if p + 1 is responsible for mpirank's fltree
          <=> (p + 1)'s 1-st quadrant coordinates are zeros. */
       zero = 0;
-      SC3E (p4est3_quadrant_coordinates (p3->qvt, p3->nodequads[p], c));
+      SC3A_CHECK (p < p3->mpirank);
+      SC3E (p4est3_quadrant_coordinates (p3->qvt, p3->nodequads[p + 1], c));
       for (i = 0; i < p3->qvt->dim; ++i) {
         zero |= c[i];
       }
@@ -423,6 +424,7 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
       SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
       send_buf = p3->goffset[p3->mpirank] - p3->goffset[p + 1]
                     + (p4est3_gloidx) tree->num_quads;
+      SC3A_CHECK (send_buf >= 0);
 #ifdef P4EST_ENABLE_MPI
 #ifdef P4EST_ENABLE_DEBUG
     mpiret =
@@ -600,9 +602,9 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
   /* Fill global offsets. */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsets->goffsetwin));
+  p3->goffset[p3->mpirank + 1] = p3->local_num_quads;
   SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
   SC3E (sc3_MPI_Barrier (nodecomm));
-  p3->goffset[p3->mpirank + 1] = p3->local_num_quads;
   if (noderank == 0) {
     p3->goffset[0] = 0;
     for (i = 1; i < p3->mpisize + 1; ++i) {

@@ -459,6 +459,7 @@ p4est3_destroy (p4est3_t ** pp3)
       SC3E (p4est3_glotree_unref (&p3->gtrees));
       SC3E (p4est3_glopos_unref (&p3->gposition));
       SC3E (p4est3_glooffs_unref (&p3->goffsets));
+      SC3E (p4est3_gtroffs_unref (&p3->gtreeoffsets));
 
       SC3E (sc3_MPI_Win_free (&p3->quadwin));
 
