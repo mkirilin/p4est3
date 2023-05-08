@@ -61,6 +61,8 @@ typedef struct p4est3_search_area
                                            greater than p3->num_children */
   sc3_array_t        *idx_vol_stack;    /* 2D stack storing arrays of indices,
                                            that are output of split_array */
+  sc3_array_t       **stack2proc;       /* C-array of pointers to a remote SM
+                                           related volume stacks. */
   p4est3_iterate_volume_info_t *vinfo;
 
   /* face section */
@@ -74,10 +76,8 @@ typedef struct p4est3_search_area
                                            be initiated by 0 */
   sc3_array_t        *idx_face_stack[2];        /* 2D stacks storing arrays of indices,
                                                    that are output of split_array */
-  sc3_array_t       **stack2proc;       /* C-array of pointers to a remote SM
-                                           related volume stacks. We place it is
-                                           the face section sice we use it to
-                                           iterate over a face on the proc boundary. */
+  sc3_array_t       **stack_face2proc[2]; /* 2 C-arrays of pointers to a remote SM
+                                           related faces stacks. */
   p4est3_gloidx       remote_first;     /* Id of the first remote proc that
                                            potentially contains the neighbor
                                            quadrants */
@@ -253,6 +253,10 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
              (sc3_array_t **) arr));
     }
     SC3E (sc3_array_resize (sa->idx_face_stack[side], 1));
+    SC3E (sc3_allocator_calloc
+          (p3->alloc, sizeof (sc3_array_t *), nodesize,
+           &(sa->stack_face2proc[side])));
+    sa->stack_face2proc[side][noderank] = sa->idx_face_stack[side];
   }
 
   /*temporarily set view on level2children array to be able to renew it later
@@ -278,7 +282,7 @@ p4est3_destroy_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
   }
   SC3E (sc3_array_destroy (&sa->idx_vol_stack));*/
 
-  for (side = 0; side < 2; ++side) {
+  /*for (side = 0; side < 2; ++side) {
     SC3E (sc3_array_resize (sa->idx_face_stack[side], p3->qvt->max_level));
     for (i = 0; i < p3->qvt->max_level; ++i) {
       SC3E (sc3_array_index (sa->idx_face_stack[side], i, &arr));
@@ -286,7 +290,7 @@ p4est3_destroy_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
     }
   }
   SC3E (sc3_array_destroy (&sa->idx_face_stack[0]));
-  SC3E (sc3_array_destroy (&sa->idx_face_stack[1]));
+  SC3E (sc3_array_destroy (&sa->idx_face_stack[1]));*/
   SC3E (sc3_array_destroy (&sa->view_quads));
   SC3E (sc3_array_destroy (&sa->finfo->sides));
   SC3E (sc3_allocator_free (p3->alloc, sa->vinfo));
@@ -301,6 +305,22 @@ p4est3_destroy_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
       SC3E (sc3_array_destroy ((sc3_array_t **) arr));
     }
     SC3E (sc3_array_unref (&sa->stack2proc[i]));
+  }
+  for (side = 0; side < 2; ++side) {
+    for (i = 0; i < p3->mpisize; ++i) {
+      if (sa->stack_face2proc[side][i] == NULL) {
+        continue;
+      }
+      SC3E (sc3_array_resize (sa->stack_face2proc[side][i], p3->qvt->max_level));
+      for (j = 0; j < p3->qvt->max_level; ++j) {
+        SC3E (sc3_array_index (sa->stack_face2proc[side][i], j, &arr));
+        SC3E (sc3_array_destroy ((sc3_array_t **) arr));
+      }
+      SC3E (sc3_array_unref (&sa->stack_face2proc[side][i]));
+    }
+  }
+  for (side = 0; side < 2; ++side) {
+    SC3E (sc3_allocator_free (p3->alloc, sa->stack_face2proc[side]));
   }
   SC3E (sc3_allocator_free (p3->alloc, sa->stack2proc));
 
@@ -440,7 +460,8 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
                                 p4est3_iterate_face_side_t * fside,
                                 int *is_lower)
 {
-  int                 orient;
+  const int           ntypes = p3->num_children + 1;
+  int                 i, j, orient;
   int                *Level_face = search_area->Level_face;
   int                *is_refine = search_area->is_refine;
   p4est3_topidx       tree_neighbor = tree;
@@ -487,6 +508,32 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
     *(end_face) = search_area->tree_face[side]->num_quads;
   }
   *is_lower = 0;
+  /* Make necessary allocs for remote indices stacks when necessary */
+  if (search_area->nsides == 1) {
+    /* We do not need additional remote face stacks */
+    return NULL;
+  }
+  for (i = search_area->remote_first; i <= search_area->remote_last; ++i) {
+    for (side = 0; side < search_area->nsides; ++side) {
+      if (search_area->stack_face2proc[side][i] != NULL) {
+        continue;
+      }
+      /* set 2d stacks (array of arrays) */
+      SC3E (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
+                              p3->qvt->max_level, p3->qvt->max_level, 1,
+                              &search_area->stack_face2proc[side][i]));
+      SC3E (sc3_array_index (search_area->stack_face2proc[side][i], 0, &arr));
+      SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_locidx), 2, 2, 1,
+                              (sc3_array_t **) arr));
+      for (j = 1; j < p3->qvt->max_level; ++j) {
+        SC3E (sc3_array_index (search_area->stack_face2proc[side][i], j, &arr));
+        SC3E (p4est3_array_new
+              (p3->alloc, sizeof (p4est3_locidx),
+                ntypes, ntypes, 1, (sc3_array_t **) arr));
+      }
+      SC3E (sc3_array_resize (search_area->stack_face2proc[side][i], 1));
+    }
+  }
   return NULL;
 }
 
@@ -612,6 +659,8 @@ p4est3_iterate_face_inner_init (p4est3_t * p3,
                                 p4est3_locidx * arr_it,
                                 int child, int neighbor)
 {
+  const int           ntypes = p3->num_children + 1;
+  int                 i, j, side;
   int                *Level_face = search_area->Level_face;
   int                *is_refine = search_area->is_refine;
 
@@ -639,6 +688,28 @@ p4est3_iterate_face_inner_init (p4est3_t * p3,
   *(begin_face) = *(arr_it + neighbor);
   *(end_face) = *(arr_it + neighbor + 1);
 
+  /* Make necessary allocs for remote indices stacks when necessary */
+  for (i = search_area->remote_first; i <= search_area->remote_last; ++i) {
+    for (side = 0; side < search_area->nsides; ++side) {
+      if (search_area->stack_face2proc[side][i] != NULL) {
+        continue;
+      }
+      /* set 2d stacks (array of arrays) */
+      SC3E (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
+                              p3->qvt->max_level, p3->qvt->max_level, 1,
+                              &search_area->stack_face2proc[side][i]));
+      SC3E (sc3_array_index (search_area->stack_face2proc[side][i], 0, &arr));
+      SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_locidx), 2, 2, 1,
+                              (sc3_array_t **) arr));
+      for (j = 1; j < p3->qvt->max_level; ++j) {
+        SC3E (sc3_array_index (search_area->stack_face2proc[side][i], j, &arr));
+        SC3E (p4est3_array_new
+              (p3->alloc, sizeof (p4est3_locidx),
+                ntypes, ntypes, 1, (sc3_array_t **) arr));
+      }
+      SC3E (sc3_array_resize (search_area->stack_face2proc[side][i], 1));
+    }
+  }
   return NULL;
 }
 
@@ -675,7 +746,7 @@ p4est3_iterate_volume_rec_init (p4est3_t * p3,
                                 p4est3_search_area_t * sa, p4est3_topidx tree)
 {
   const int           ntypes = p3->num_children + 1;
-  int                 i;
+  int                 i, j;
   void               *arr;
   p4est3_iterate_face_side_t *fside;
   p4est3_locidx      *begin, *end;
@@ -732,8 +803,8 @@ p4est3_iterate_volume_rec_init (p4est3_t * p3,
     SC3E (sc3_array_index (sa->stack2proc[i], 0, &arr));
     SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_locidx), 2, 2, 1,
                             (sc3_array_t **) arr));
-    for (i = 1; i < p3->qvt->max_level; ++i) {
-      SC3E (sc3_array_index (sa->stack2proc[i], i, &arr));
+    for (j = 1; j < p3->qvt->max_level; ++j) {
+      SC3E (sc3_array_index (sa->stack2proc[i], j, &arr));
       SC3E (p4est3_array_new
             (p3->alloc, sizeof (p4est3_locidx),
               ntypes, ntypes, 1, (sc3_array_t **) arr));
