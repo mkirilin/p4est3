@@ -396,12 +396,14 @@ p4est3_quadrant_array_split (const p4est3_quadrant_vtable_t * qvt,
 
 #ifdef P4EST_ENABLE_DEBUG
   SC3E (sc3_array_get_elem_count (array, &count));
-  SC3E (sc3_array_index (array, 0, &q1));
-  SC3E (p4est3_quadrant_level (qvt, q1, &l));
-  SC3A_CHECK (l > level);
-  SC3E (sc3_array_index (array, count - 1, &q2));
-  SC3E (p4est3_quadrant_level (qvt, q2, &l));
-  SC3A_CHECK (l > level);
+  if (count > 0) {
+    SC3E (sc3_array_index (array, 0, &q1));
+    SC3E (p4est3_quadrant_level (qvt, q1, &l));
+    SC3A_CHECK (l > level);
+    SC3E (sc3_array_index (array, count - 1, &q2));
+    SC3E (p4est3_quadrant_level (qvt, q2, &l));
+    SC3A_CHECK (l > level);
+  }
   /*TODO: check if l >= level, where l is a level of nearest
      common ancestor of q1 and q2.
    */
@@ -795,8 +797,7 @@ p4est3_iterate_volume_rec_init (p4est3_t * p3,
     *begin_remote =
       SC3_MAX (p3->gtroffset[tree], p3->goffset[i]) - p3->goffset[i];
     *end_remote =
-      SC3_MIN (p3->gtroffset[tree + 1], p3->goffset[i]) - p3->goffset[i];
-
+      SC3_MIN (p3->gtroffset[tree + 1], p3->goffset[i + 1]) - p3->goffset[i];
     for (j = 1; j < p3->qvt->max_level; ++j) {
       SC3E (sc3_array_index (sa->stack2proc[i], j, &arr));
       SC3E (p4est3_array_new
@@ -834,7 +835,7 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
                            p4est3_iterate_volume_t cvolume,
                            p4est3_iterate_face_t cface,
                            p4est3_iterate_codim_t ccodim,
-                           p4est3_search_area_t * search_area)
+                           p4est3_search_area_t * sa)
 {
   int                 i;
   void               *first_quad;       /*first quadrant in this search area */
@@ -843,20 +844,19 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
   p4est3_locidx      *arr_it;
 
   const int           max_children = p3->num_children;
-  int                *l2nch = search_area->level2nchildren;
-  int                *Level = &search_area->Level;
-  p4est3_locidx      *begin;
-  p4est3_locidx      *end;
-  p4est3_tree_t      *tree = search_area->tree;
-  sc3_array_t        *view_q = search_area->view_quads;
-  sc3_array_t        *idx_vol_stack = search_area->idx_vol_stack;
-  p4est3_iterate_volume_info_t *vinfo = search_area->vinfo;
+  int                *l2nch = sa->level2nchildren;
+  int                *Level = &sa->Level;
+  p4est3_locidx      *begin, *end, *begin_remote, *end_remote;
+  p4est3_tree_t      *tree = sa->tree;
+  sc3_array_t        *view_q = sa->view_quads;
+  sc3_array_t        *idx_vol_stack = sa->idx_vol_stack;
+  p4est3_iterate_volume_info_t *vinfo = sa->vinfo;
 
   SC3E (sc3_array_index (idx_vol_stack, *Level, &stack_it));
   SC3E (sc3_array_index
-        (*(sc3_array_t **) stack_it, search_area->child_id, &begin));
+        (*(sc3_array_t **) stack_it, sa->child_id, &begin));
   SC3E (sc3_array_index
-        (*(sc3_array_t **) stack_it, search_area->child_id + 1, &end));
+        (*(sc3_array_t **) stack_it, sa->child_id + 1, &end));
 
   /* Check if the considered search area intersect
      the area of the local process. If not, then skip it. */
@@ -877,8 +877,28 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
     return NULL;
   }
 
-  if (l2nch[search_area->start_level] > 0) {
+  if (l2nch[sa->start_level] > 0) {
     return NULL;
+  }
+
+  for (i = sa->remote_first; i <= sa->remote_last; ++i) {
+    if (i == p3->mpirank) {
+      continue;
+    }
+    SC3E (sc3_array_index (sa->stack2proc[i], *Level, &stack_it));
+    SC3E (sc3_array_index
+        (*(sc3_array_t **) stack_it, sa->child_id, &begin_remote));
+    SC3E (sc3_array_index
+        (*(sc3_array_t **) stack_it, sa->child_id + 1, &end_remote));
+    SC3E (sc3_array_push (sa->stack2proc[i], &stack_it));
+#ifdef P4EST_ENABLE_DEBUG
+    SC3E (p4est3_array_set_zero (*(sc3_array_t **) stack_it));
+#endif
+    SC3E (sc3_array_renew_data
+          (&view_q, p3->nodequads[i], p3->qsize,
+           *begin_remote, *end_remote - *begin_remote));
+    SC3E (p4est3_quadrant_array_split
+          (p3->qvt, view_q, *Level, *(sc3_array_t **) stack_it));
   }
 
   SC3E (sc3_array_push (idx_vol_stack, &stack_it));
@@ -899,12 +919,18 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
   }
   SC3E (sc3_array_index (*(sc3_array_t **) stack_it, 0, &arr_it));
   for (i = 0; i < max_children; ++i) {
-    search_area->child_id = i;
-    SC3E (p4est3_iterate_volume_rec (p3, cvolume, cface, ccodim, search_area));
+    sa->child_id = i;
+    SC3E (p4est3_iterate_volume_rec (p3, cvolume, cface, ccodim, sa));
   }
   SC3A_CHECK (l2nch[*Level] == max_children);
-  SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, search_area, arr_it));
+  SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, sa, arr_it));
   l2nch[--(*Level)]++;
+  for (i = sa->remote_first; i <= sa->remote_last; ++i) {
+    if (i == p3->mpirank) {
+      continue;
+    }
+    SC3E (sc3_array_pop (sa->stack2proc[i]));
+  }
   SC3E (sc3_array_pop (idx_vol_stack));
   return NULL;
 }
