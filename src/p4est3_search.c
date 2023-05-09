@@ -166,6 +166,87 @@ p4est3_search_lower_bound64 (int64_t target, const int64_t * array,
   return NULL;
 }
 
+/* Wrap cont qvt since sc3's sc3_array_is_sorted takes non-const user data. */
+typedef struct p4est3_qvt_non_const_wrapper
+{
+  const p4est3_quadrant_vtable_t *qvt;
+} p4est3_qvt_non_const_wrapper_t;
+
+/* Custom quadrant_compare function to align with sc3_array_is_sorted interface. */
+static sc3_error_t *
+p4est3_array_split_compare (const void * q1, const void * q2,
+                            void * wqvt, int * j)
+{
+  SC3E (p4est3_quadrant_compare
+          (((p4est3_qvt_non_const_wrapper_t *) wqvt)->qvt, q1, q2, j));
+  return NULL;
+}
+
+/* Wrap user data to pass into custom p4est3_array_split_ancestor_id function. */
+typedef struct p4est3_array_split_data
+{
+  p4est3_quadrant_ancestor_id_t quadrant_ancestor_id;
+  int                *level;
+}
+p4est3_array_split_data_t;
+
+/* Custom quadrant ancestor_id function to align with sc3_array_split interface. */
+static sc3_error_t *
+p4est3_array_split_ancestor_id (sc3_array_t * a, int index, void *data,
+                                int *type)
+{
+  SC3A_CHECK (data != NULL);
+
+  void               *q;
+  p4est3_array_split_data_t *d = (p4est3_array_split_data_t *) data;
+  SC3E (sc3_array_index (a, index, &q));
+
+  SC3E (d->quadrant_ancestor_id (q, *(d->level), type));
+  return NULL;
+}
+
+sc3_error_t         *
+p4est3_quadrant_array_split (const p4est3_quadrant_vtable_t * qvt,
+                             sc3_array_t * array, int level,
+                             sc3_array_t * indices)
+{
+  p4est3_array_split_data_t data;
+  p4est3_qvt_non_const_wrapper_t sqvtw, *qvtw = &sqvtw;
+#ifdef P4EST_ENABLE_DEBUG
+  void               *q1, *q2;
+  int                 l, count;
+#endif
+
+  qvtw->qvt = qvt;
+  SC3A_IS (sc3_array_is_setup, array);
+  SC3A_IS (sc3_array_is_setup, indices);
+  SC3A_CHECK (qvt != NULL);
+  SC3A_CHECK (0 <= level && level < qvt->max_level);
+  SC3A_IS3 (sc3_array_is_sorted, array, p4est3_array_split_compare, qvtw);
+
+#ifdef P4EST_ENABLE_DEBUG
+  SC3E (sc3_array_get_elem_count (array, &count));
+  if (count > 0) {
+    SC3E (sc3_array_index (array, 0, &q1));
+    SC3E (p4est3_quadrant_level (qvt, q1, &l));
+    SC3A_CHECK (l > level);
+    SC3E (sc3_array_index (array, count - 1, &q2));
+    SC3E (p4est3_quadrant_level (qvt, q2, &l));
+    SC3A_CHECK (l > level);
+  }
+  /*TODO: check if l >= level, where l is a level of nearest
+     common ancestor of q1 and q2.
+   */
+#endif
+
+  level++;
+  data.quadrant_ancestor_id = qvt->quadrant_ancestor_id;
+  data.level = &level;
+  SC3E (sc3_array_split (array, indices, p4est3_quadrant_num_children (qvt),
+                         p4est3_array_split_ancestor_id, &data));
+  return NULL;
+}
+
 #ifdef __cplusplus
 #if 0
 {
