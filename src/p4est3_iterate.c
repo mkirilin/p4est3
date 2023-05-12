@@ -372,7 +372,7 @@ p4est3_iterate_volume (p4est3_t * p3,
 
 static sc3_error_t *
 p4est3_iterate_face_bound_init (p4est3_t * p3,
-                                p4est3_search_area_t * search_area,
+                                p4est3_search_area_t * sa,
                                 p4est3_topidx tree,
                                 int face,
                                 p4est3_iterate_face_side_t * fside,
@@ -380,13 +380,13 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
 {
   const int           ntypes = p3->num_children + 1;
   int                 i, j, orient;
-  int                *Level_face = search_area->Level_face;
-  int                *is_refine = search_area->is_refine;
+  int                *Level_face = sa->Level_face;
+  int                *is_refine = sa->is_refine;
   p4est3_topidx       tree_neighbor = tree, tree_ids[2];
-  sc3_array_t       **idx_f_stack = search_area->idx_face_stack;
+  sc3_array_t       **idx_f_stack = sa->idx_face_stack;
   sc3_array_t        *arr;
-  p4est3_locidx      *begin_face, *end_face;
-  int                 side;
+  p4est3_locidx      *begin, *end;
+  int                 s;
 
   is_refine[0] = is_refine[1] = 0;
   fside[0].ntree = tree;
@@ -401,61 +401,68 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
     *is_lower = 1;
     return NULL;
   }
-  search_area->finfo->orientation = orient;
+  sa->finfo->orientation = orient;
 
   if (tree_neighbor == tree) {
     /* physical boundary */
-    search_area->nsides = 1;
+    sa->nsides = 1;
   }
   else {
-    search_area->nsides = 2;
+    sa->nsides = 2;
     fside[1].ntree = tree_neighbor;
-    SC3E (p4est3_tree_index (p3, tree_neighbor, &search_area->tree_face[1]));
+    SC3E (p4est3_tree_index (p3, tree_neighbor, &sa->tree_face[1]));
     fside[1].nface = face;
   }
-  SC3E (sc3_array_resize (search_area->finfo->sides, search_area->nsides));
+  SC3E (sc3_array_resize (sa->finfo->sides, sa->nsides));
   tree_ids[0] = tree;
   tree_ids[1] = tree_neighbor;
-  for (side = 0; side < search_area->nsides; ++side) {
-    Level_face[side] = 0;
-    is_refine[side] = 1;
-    search_area->child_id_face[side] = 0;
-    SC3E (sc3_array_resize (idx_f_stack[side], 1));
-    SC3E (sc3_array_index (idx_f_stack[side], 0, &arr));
-    SC3E (sc3_array_index (*(sc3_array_t **) arr, 0, &begin_face));
-    SC3E (sc3_array_index (*(sc3_array_t **) arr, 1, &end_face));
-    *(begin_face) =
-      SC3_MAX (p3->gtroffset[tree_ids[side]], p3->goffset[p3->mpirank])
+  for (s = 0; s < sa->nsides; ++s) {
+    Level_face[s] = 0;
+    is_refine[s] = 1;
+    sa->child_id_face[s] = 0;
+    SC3E (sc3_array_resize (idx_f_stack[s], 1));
+    SC3E (sc3_array_index (idx_f_stack[s], 0, &arr));
+    SC3E (sc3_array_index (*(sc3_array_t **) arr, 0, &begin));
+    SC3E (sc3_array_index (*(sc3_array_t **) arr, 1, &end));
+    *(begin) =
+      SC3_MAX (p3->gtroffset[tree_ids[s]], p3->goffset[p3->mpirank])
               - p3->goffset[p3->mpirank];
-    *(end_face) =
-      SC3_MIN (p3->gtroffset[tree_ids[side] + 1], p3->goffset[p3->mpirank + 1])
+    *(end) =
+      SC3_MIN (p3->gtroffset[tree_ids[s] + 1], p3->goffset[p3->mpirank + 1])
               - p3->goffset[p3->mpirank];
   }
   *is_lower = 0;
   /* Make necessary allocs for remote indices stacks when necessary */
-  if (search_area->nsides == 1) {
+  if (sa->nsides == 1) {
     /* We do not need additional remote face stacks */
     return NULL;
   }
-  for (i = search_area->remote_first; i <= search_area->remote_last; ++i) {
-    for (side = 0; side < search_area->nsides; ++side) {
-      if (search_area->stack_face2proc[side][i] != NULL) {
+  for (i = sa->remote_first; i <= sa->remote_last; ++i) {
+    for (s = 0; s < sa->nsides; ++s) {
+      if (sa->stack_face2proc[s][i] != NULL) {
         continue;
       }
       /* set 2d stacks (array of arrays) */
       SC3E (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
                               p3->qvt->max_level, p3->qvt->max_level, 1,
-                              &search_area->stack_face2proc[side][i]));
-      SC3E (sc3_array_index (search_area->stack_face2proc[side][i], 0, &arr));
+                              &sa->stack_face2proc[s][i]));
+      SC3E (sc3_array_index (sa->stack_face2proc[s][i], 0, &arr));
       SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_locidx), 2, 2, 1,
                               (sc3_array_t **) arr));
       for (j = 1; j < p3->qvt->max_level; ++j) {
-        SC3E (sc3_array_index (search_area->stack_face2proc[side][i], j, &arr));
+        SC3E (sc3_array_index (sa->stack_face2proc[s][i], j, &arr));
         SC3E (p4est3_array_new
               (p3->alloc, sizeof (p4est3_locidx),
                 ntypes, ntypes, 1, (sc3_array_t **) arr));
       }
-      SC3E (sc3_array_resize (search_area->stack_face2proc[side][i], 1));
+      SC3E (sc3_array_resize (sa->stack_face2proc[s][i], 1));
+      SC3E (sc3_array_index (sa->stack_face2proc[s][i], Level_face[s], &arr));
+      SC3E (sc3_array_index (*(sc3_array_t **) arr, 0, &begin));
+      SC3E (sc3_array_index (*(sc3_array_t **) arr, 1, &end));
+      *(begin) = SC3_MAX (p3->gtroffset[tree_ids[s]], p3->goffset[i])
+                  - p3->goffset[i];
+      *(end) = SC3_MIN (p3->gtroffset[tree_ids[s] + 1], p3->goffset[i + 1])
+                  - p3->goffset[i];
     }
   }
   return NULL;
