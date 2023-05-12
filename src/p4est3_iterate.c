@@ -579,37 +579,44 @@ p4est3_internal_iterate_face (p4est3_t * p3,
 
 static sc3_error_t *
 p4est3_iterate_face_inner_init (p4est3_t * p3,
-                                p4est3_search_area_t * search_area,
+                                p4est3_search_area_t * sa,
                                 p4est3_locidx * arr_it,
                                 int child, int neighbor)
 {
-  int                *Level_face = search_area->Level_face;
-  int                *is_refine = search_area->is_refine;
+  int                *Level_face = sa->Level_face;
+  int                *is_refine = sa->is_refine;
+  int                 ch_neigh[2] = {child, neighbor}, s, i;
 
-  sc3_array_t       **idx_f_stack = search_area->idx_face_stack;
+  sc3_array_t       **idx_f_stack = sa->idx_face_stack;
   void               *arr;
-  p4est3_locidx     *begin_face, *end_face;
+  p4est3_locidx      *begin, *end;
 
-  search_area->nsides = 2;
-  Level_face[0] = Level_face[1] = search_area->Level;
-  is_refine[0] = is_refine[1] = 1;
+  sa->nsides = 2;
+  for (s = 0; s < sa->nsides; ++s) {
+    Level_face[s] = sa->Level;
+    is_refine[s] = 1;
+    sa->child_id_face[s] = ch_neigh[s];
+    SC3E (sc3_array_resize (idx_f_stack[s], sa->Level + 1));
+    SC3E (sc3_array_index (idx_f_stack[s], Level_face[s], &arr));
+    SC3E (sc3_array_index (*(sc3_array_t **) arr, ch_neigh[s], &begin));
+    SC3E (sc3_array_index (*(sc3_array_t **) arr, ch_neigh[s] + 1, &end));
+    *(begin) = *(arr_it + ch_neigh[s]);
+    *(end) = *(arr_it + ch_neigh[s] + 1);
+  }
 
-  search_area->child_id_face[0] = child;
-  SC3E (sc3_array_resize (idx_f_stack[0], search_area->Level + 1));
-  SC3E (sc3_array_index (idx_f_stack[0], Level_face[0], &arr));
-  SC3E (sc3_array_index (*(sc3_array_t **) arr, child, &begin_face));
-  SC3E (sc3_array_index (*(sc3_array_t **) arr, child + 1, &end_face));
-  *(begin_face) = *(arr_it + child);
-  *(end_face) = *(arr_it + child + 1);
-
-  search_area->child_id_face[1] = neighbor;
-  SC3E (sc3_array_resize (idx_f_stack[1], search_area->Level + 1));
-  SC3E (sc3_array_index (idx_f_stack[1], Level_face[0], &arr));
-  SC3E (sc3_array_index (*(sc3_array_t **) arr, neighbor, &begin_face));
-  SC3E (sc3_array_index (*(sc3_array_t **) arr, neighbor + 1, &end_face));
-  *(begin_face) = *(arr_it + neighbor);
-  *(end_face) = *(arr_it + neighbor + 1);
-
+  for (s = 0; s < sa->nsides; ++s) {
+    for (i = sa->remote_first; i <= sa->remote_last; ++i) {
+      if (i == p3->mpirank) {
+        continue;
+      }
+      SC3E (sc3_array_resize (sa->stack_face2proc[s][i], sa->Level + 1));
+      SC3E (sc3_array_index (sa->stack_face2proc[s][i], Level_face[s], &arr));
+      SC3E (sc3_array_index (*(sc3_array_t **) arr, ch_neigh[s], &begin));
+      SC3E (sc3_array_index (*(sc3_array_t **) arr, ch_neigh[s] + 1, &end));
+      *(begin) = *(arr_it + ch_neigh[s]);
+      *(end) = *(arr_it + ch_neigh[s] + 1);
+    }
+  }
   return NULL;
 }
 
