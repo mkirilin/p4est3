@@ -71,10 +71,10 @@ typedef struct p4est3_search_area
                                                    that are output of split_array */
   sc3_array_t       **stack_face2proc[2]; /* 2 C-arrays of pointers to a remote SM
                                            related faces stacks. */
-  p4est3_gloidx       remote_first;     /* Id of the first remote proc that
+  p4est3_gloidx       remote_first[2];    /* Id of the first remote proc that
                                            potentially contains the neighbor
                                            quadrants */
-  p4est3_gloidx       remote_last;      /* Id of the last remote proc that
+  p4est3_gloidx       remote_last[2];     /* Id of the last remote proc that
                                            potentially contains the neighbor
                                            quadrants */
   p4est3_iterate_face_info_t *finfo;
@@ -388,6 +388,7 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
   p4est3_locidx      *begin, *end;
   int                 s;
 
+  SC3E_RETVAL (is_lower, 0);
   is_refine[0] = is_refine[1] = 0;
   fside[0].ntree = tree;
   fside[0].nface = face;
@@ -416,23 +417,27 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
   SC3E (sc3_array_resize (sa->finfo->sides, sa->nsides));
   tree_ids[0] = tree;
   tree_ids[1] = tree_neighbor;
-  /* Find here the range of procs that share the neighboring tree */
+  /* Find here two ranges of procs that:
+     0th -- shares 0th side
+     1st -- shares 1st side */
+  for (s = 0; s < sa->nsides; ++s) {
+    sa->remote_first[s] = -1;
+    sa->remote_last[s] = -2;
+  }
   if (sa->nsides == 2) {
     /* only if we probe not a physical boundary */
-    SC3E (p4est3_find_partition
-          (p3->alloc, p3->mpisize, p3->goffset, p3->gtroffset[tree_ids[1]],
-          p3->gtroffset[tree_ids[1] + 1] - 1,
-          &sa->remote_first, &sa->remote_last));
-    if (p3->goffset[sa->remote_first] > p3->gtroffset[tree_ids[1]]) {
-      sa->remote_first--;
+    for (s = 0; s < sa->nsides; ++s) {
+      SC3E (p4est3_find_partition
+            (p3->alloc, p3->mpisize, p3->goffset, p3->gtroffset[tree_ids[s]],
+            p3->gtroffset[tree_ids[s] + 1] - 1,
+            &sa->remote_first[s], &sa->remote_last[s]));
+      if (p3->goffset[sa->remote_first[s]] > p3->gtroffset[tree_ids[s]]) {
+        sa->remote_first[s]--;
+      }
+      if (p3->goffset[sa->remote_last[s]] > p3->gtroffset[tree_ids[s] + 1] - 1) {
+        sa->remote_last[s]--;
+      }
     }
-    if (p3->goffset[sa->remote_last] > p3->gtroffset[tree_ids[1] + 1] - 1) {
-      sa->remote_last--;
-    }
-  }
-  else {
-    sa->remote_first = -1;
-    sa->remote_last = -2;
   }
 
   for (s = 0; s < sa->nsides; ++s) {
@@ -450,14 +455,13 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
       SC3_MIN (p3->gtroffset[tree_ids[s] + 1], p3->goffset[p3->mpirank + 1])
               - p3->goffset[p3->mpirank];
   }
-  *is_lower = 0;
   /* Make necessary allocs for remote indices stacks when necessary */
   if (sa->nsides == 1) {
     /* We do not need additional remote face stacks */
     return NULL;
   }
-  for (i = sa->remote_first; i <= sa->remote_last; ++i) {
-    for (s = 0; s < sa->nsides; ++s) {
+  for (s = 0; s < sa->nsides; ++s) {
+    for (i = sa->remote_first[s]; i <= sa->remote_last[s]; ++i) {
       if (sa->stack_face2proc[s][i] == NULL) {
         /* allocate 2d stacks (array of arrays) */
         SC3E (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
@@ -535,7 +539,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     if (*(b_f[side]) == *(e_f[side])) {
       /* if we are on a physical boundary, this case is not possible */
       /* there is no local quadrants, so perform check for a remote face */
-      for (p = sa->remote_first; p <= sa->remote_last; ++p) {
+      for (p = sa->remote_first[side]; p <= sa->remote_last[side]; ++p) {
         if (p == p3->mpirank) {
           continue;
         }
@@ -598,7 +602,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       continue;
     }
     /* we split arrays for all the remote and local procs quads */
-    for (p = sa->remote_first; p <= sa->remote_last; ++p) {
+    for (p = sa->remote_first[side]; p <= sa->remote_last[side]; ++p) {
       if (p == p3->mpirank) {
         continue;
       }
@@ -668,7 +672,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     if (!is_refine[side]) {
       continue;
     }
-    for (p = sa->remote_first; p <= sa->remote_last; ++p) {
+    for (p = sa->remote_first[side]; p <= sa->remote_last[side]; ++p) {
       if (p == p3->mpirank) {
         continue;
       }
@@ -681,8 +685,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_iterate_face_inner_init (p4est3_t * p3,
-                                p4est3_search_area_t * sa,
+p4est3_iterate_face_inner_init (p4est3_t * p3, p4est3_search_area_t * sa,
                                 int child, int neighbor)
 {
   int                *Level_face = sa->Level_face;
@@ -710,10 +713,8 @@ p4est3_iterate_face_inner_init (p4est3_t * p3,
   }
 
   for (s = 0; s < sa->nsides; ++s) {
-    for (i = sa->remote_first; i <= sa->remote_last; ++i) {
-      if (i == p3->mpirank) {
-        continue;
-      }
+    for (i = sa->remote_first[s]; i <= sa->remote_last[s]; ++i) {
+      SC3A_CHECK (i != p3->mpirank);
       SC3E (sc3_array_resize (sa->stack_face2proc[s][i], sa->Level + 1));
       SC3E (sc3_array_index (sa->stack_face2proc[s][i], Level_face[s], &top));
       SC3E (sc3_array_index (*(sc3_array_t **) top, ch_neigh[s], &begin));
@@ -797,46 +798,74 @@ p4est3_iterate_volume_rec_init (p4est3_t * p3,
   }
 
   /* Find here the range of procs that share the same tree as noderank */
-  SC3E (p4est3_find_partition
-        (p3->alloc, p3->mpisize, p3->goffset, p3->gtroffset[tree],
-         p3->gtroffset[tree + 1] - 1, &sa->remote_first, &sa->remote_last));
-  if (p3->goffset[sa->remote_first] > p3->gtroffset[tree]) {
-    sa->remote_first--;
+  /* Since we process inner faces here:
+     The procs < mpirank are responsible for 0th sides,
+     the procs > mpirank are responsoble for 1st sides. */
+  for (side = 0; side < 2; ++side) {
+    sa->remote_first[side] = -1;
+    sa->remote_last[side] = -2;
   }
-  if (p3->goffset[sa->remote_last] > p3->gtroffset[tree + 1] - 1) {
-    sa->remote_last--;
+  if (tree == p3->fltree && p3->gtroffset[tree] != p3->goffset[p3->mpirank]) {
+    SC3E (p4est3_find_partition
+          (p3->alloc, p3->mpisize, p3->goffset, p3->gtroffset[tree],
+           p3->goffset[p3->mpirank] - 1,
+           &sa->remote_first[0], &sa->remote_last[0]));
+    if (p3->goffset[sa->remote_first[0]] > p3->gtroffset[tree]) {
+      sa->remote_first[0]--;
+    }
+    if (p3->goffset[sa->remote_last[0]] > p3->goffset[p3->mpirank] - 1) {
+      sa->remote_last[0]--;
+    }
+    SC3A_CHECK (sa->remote_last[0] < p3->mpirank);
   }
+  if (tree == p3->lltree
+      && p3->gtroffset[tree + 1] != p3->goffset[p3->mpirank + 1]) {
+    SC3E (p4est3_find_partition
+          (p3->alloc, p3->mpisize, p3->goffset, p3->goffset[p3->mpirank + 1],
+           p3->gtroffset[tree + 1] - 1,
+           &sa->remote_first[1], &sa->remote_last[1]));
+    if (p3->goffset[sa->remote_first[1]] > p3->goffset[p3->mpirank + 1]) {
+      sa->remote_first[1]--;
+    }
+    if (p3->goffset[sa->remote_last[1]] > p3->gtroffset[tree + 1] - 1) {
+      sa->remote_last[1]--;
+    }
+    SC3A_CHECK (sa->remote_first[1] > p3->mpirank);
+  }
+
   /* Make necessary allocs for remote indices stacks when necessary */
-  for (i = sa->remote_first; i <= sa->remote_last; ++i) {
-    if (sa->stack2proc[i] != NULL) {
-      continue;
+  for (side = 0; side < 2; ++side) {
+    for (i = sa->remote_first[side]; i <= sa->remote_last[side]; ++i) {
+      if (sa->stack2proc[i] != NULL) {
+        continue;
+      }
+      /* set 2d stacks (array of arrays) */
+      SC3E (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
+                              p3->qvt->max_level, p3->qvt->max_level, 1,
+                              &sa->stack2proc[i]));
+      SC3E (sc3_array_index (sa->stack2proc[i], 0, &arr));
+      SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_locidx), 2, 2, 1,
+                              (sc3_array_t **) arr));
+      /* init begin of the remote root */
+      SC3E (sc3_array_index
+            (*(sc3_array_t **) arr, sa->child_id, &begin_remote));
+      SC3E (sc3_array_index
+            (*(sc3_array_t **) arr, sa->child_id + 1, &end_remote));
+      *begin_remote =
+        SC3_MAX (p3->gtroffset[tree], p3->goffset[i]) - p3->goffset[i];
+      *end_remote =
+        SC3_MIN (p3->gtroffset[tree + 1], p3->goffset[i + 1]) - p3->goffset[i];
+      for (j = 1; j < p3->qvt->max_level; ++j) {
+        SC3E (sc3_array_index (sa->stack2proc[i], j, &arr));
+        SC3E (p4est3_array_new
+              (p3->alloc, sizeof (p4est3_locidx),
+                ntypes, ntypes, 1, (sc3_array_t **) arr));
+      }
+      SC3E (sc3_array_resize (sa->stack2proc[i], 1));
     }
-    /* set 2d stacks (array of arrays) */
-    SC3E (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
-                            p3->qvt->max_level, p3->qvt->max_level, 1,
-                            &sa->stack2proc[i]));
-    SC3E (sc3_array_index (sa->stack2proc[i], 0, &arr));
-    SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_locidx), 2, 2, 1,
-                            (sc3_array_t **) arr));
-    /* init begin of the remote root */
-    SC3E (sc3_array_index
-          (*(sc3_array_t **) arr, sa->child_id, &begin_remote));
-    SC3E (sc3_array_index
-          (*(sc3_array_t **) arr, sa->child_id + 1, &end_remote));
-    *begin_remote =
-      SC3_MAX (p3->gtroffset[tree], p3->goffset[i]) - p3->goffset[i];
-    *end_remote =
-      SC3_MIN (p3->gtroffset[tree + 1], p3->goffset[i + 1]) - p3->goffset[i];
-    for (j = 1; j < p3->qvt->max_level; ++j) {
-      SC3E (sc3_array_index (sa->stack2proc[i], j, &arr));
-      SC3E (p4est3_array_new
-            (p3->alloc, sizeof (p4est3_locidx),
-              ntypes, ntypes, 1, (sc3_array_t **) arr));
-    }
-    SC3E (sc3_array_resize (sa->stack2proc[i], 1));
   }
-  for (i = sa->remote_first; i <= sa->remote_last; ++i) {
-    for (side = 0; side < sa->nsides; ++side) {
+  for (side = 0; side < 2; ++side) {
+    for (i = sa->remote_first[side]; i <= sa->remote_last[side]; ++i) {
       if (sa->stack_face2proc[side][i] != NULL) {
         continue;
       }
@@ -866,7 +895,7 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
                            p4est3_iterate_codim_t ccodim,
                            p4est3_search_area_t * sa)
 {
-  int                 i;
+  int                 i, side;
   void               *first_quad;       /*first quadrant in this search area */
   int                 level;
   void               *stack_it;
@@ -910,29 +939,29 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
     return NULL;
   }
 
-  for (i = sa->remote_first; i <= sa->remote_last; ++i) {
-    if (i == p3->mpirank) {
-      continue;
-    }
-    SC3E (sc3_array_index (sa->stack2proc[i], *Level, &stack_it));
-    SC3E (sc3_array_index
-        (*(sc3_array_t **) stack_it, sa->child_id, &begin_remote));
-    SC3E (sc3_array_index
-        (*(sc3_array_t **) stack_it, sa->child_id + 1, &end_remote));
-    SC3E (sc3_array_push (sa->stack2proc[i], &stack_it));
-#ifdef P4EST_ENABLE_DEBUG
-    SC3E (p4est3_array_set_zero (*(sc3_array_t **) stack_it));
-#endif
-    SC3E (sc3_array_renew_data
-          (&view_q, p3->nodequads[i], p3->qsize,
-           *begin_remote, *end_remote - *begin_remote));
-    SC3E (p4est3_quadrant_array_split
-          (p3->qvt, view_q, *Level, *(sc3_array_t **) stack_it));
-  /* since array_split doesn't count shift from the beinning of quadrants
-     in a proc, we shift result indices at the loop below */
-    for (i = 0; i < max_children + 1; ++i) {
-      SC3E (sc3_array_index (*(sc3_array_t **) stack_it, i, &arr_it));
-      *arr_it += *begin_remote;
+  for (side = 0; side < 2; ++side) {
+    for (i = sa->remote_first[side]; i <= sa->remote_last[side]; ++i) {
+      SC3A_CHECK (i != p3->mpirank);
+      SC3E (sc3_array_index (sa->stack2proc[i], *Level, &stack_it));
+      SC3E (sc3_array_index
+          (*(sc3_array_t **) stack_it, sa->child_id, &begin_remote));
+      SC3E (sc3_array_index
+          (*(sc3_array_t **) stack_it, sa->child_id + 1, &end_remote));
+      SC3E (sc3_array_push (sa->stack2proc[i], &stack_it));
+  #ifdef P4EST_ENABLE_DEBUG
+      SC3E (p4est3_array_set_zero (*(sc3_array_t **) stack_it));
+  #endif
+      SC3E (sc3_array_renew_data
+            (&view_q, p3->nodequads[i], p3->qsize,
+            *begin_remote, *end_remote - *begin_remote));
+      SC3E (p4est3_quadrant_array_split
+            (p3->qvt, view_q, *Level, *(sc3_array_t **) stack_it));
+    /* since array_split doesn't count shift from the beinning of quadrants
+      in a proc, we shift result indices at the loop below */
+      for (i = 0; i < max_children + 1; ++i) {
+        SC3E (sc3_array_index (*(sc3_array_t **) stack_it, i, &arr_it));
+        *arr_it += *begin_remote;
+      }
     }
   }
 
@@ -960,11 +989,11 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
   SC3A_CHECK (l2nch[*Level] == max_children);
   SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, sa));
   l2nch[--(*Level)]++;
-  for (i = sa->remote_first; i <= sa->remote_last; ++i) {
-    if (i == p3->mpirank) {
-      continue;
+  for (side = 0; side < 2; ++side) {
+    for (i = sa->remote_first[side]; i <= sa->remote_last[side]; ++i) {
+      SC3A_CHECK (i != p3->mpirank);
+      SC3E (sc3_array_pop (sa->stack2proc[i]));
     }
-    SC3E (sc3_array_pop (sa->stack2proc[i]));
   }
   SC3E (sc3_array_pop (idx_vol_stack));
   return NULL;
