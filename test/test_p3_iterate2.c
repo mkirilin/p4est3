@@ -34,6 +34,9 @@
 #include <p4est3_quadrant_mort3d.h>
 #endif
 
+#define MAX_TEST_LEVEL 2
+#define TEST_QUADRANT_LEN(l) ((int32_t) 1 << (MAX_TEST_LEVEL - (l)))
+
 //#define DISABLE_TEST_FACES
 
 /* *INDENT-OFF* */
@@ -142,6 +145,24 @@ make_connectivity (setup_t * t, int dim, int l_face, int r_face, int ori)
 static sc3_error_t *
 volume_callback (p4est3_iterate_volume_info_t * vi)
 {
+  int i, nfaces = 1 << vi->p3->qvt->dim;
+  p4est3_tree_t *tree;
+  p4est3_locidx qid;
+  int qlevel, qlen;
+  int8_t *qinfo_array = (int8_t *) vi->user_data;
+
+  SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &qlevel));
+  qlen = TEST_QUADRANT_LEN (qlevel);
+  SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
+  qid = tree->quad_offset + vi->nquad;
+  SC3A_CHECK (qid < vi->p3->local_num_quads);
+  for (i = 0; i < nfaces; ++i) {
+    SC3E_DEMAND
+      (qinfo_array[qid + i] == NULL, "volume is visited the second time");
+    SC3E (sc3_allocator_calloc
+          (vi->p3->alloc, sizeof (int8_t), qlen, &qinfo_array[qid + i]));
+  }
+
   return NULL;
 }
 
@@ -149,6 +170,16 @@ static sc3_error_t *
 face_callback (p4est3_iterate_face_info_t * fi)
 {
   return NULL;
+}
+
+static sc3_error_t *
+allocate_test_tracking_array (p4est3_t *p3, void **ptr_qinfo_array)
+{
+  const size_t out_array_size = (1 << p3->qvt->dim) * p3->local_num_quads;
+  char * out_array;
+
+  SC3E (sc3_allocator_calloc
+        (p3->alloc, sizeof (int8_t *), out_array_size, &out_array));
 }
 
 static sc3_error_t *
