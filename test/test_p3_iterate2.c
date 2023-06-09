@@ -169,6 +169,27 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
 static sc3_error_t *
 face_callback (p4est3_iterate_face_info_t * fi)
 {
+  void *q0, *q1;
+  p4est3_iterate_face_side_t *sides[2];
+  int i, nsides, levels[2], level0;
+  SC3E (sc3_array_get_elem_count (fi->sides, &nsides));
+  SC3E_DEMAND ((nsides == 2) || ((nsides == 1) && fi->tree_boundary),
+               "one face's side not on a tree's boundary");
+
+  /* test adjacency */
+  for (i = 0; i < nsides; ++i) {
+    SC3E (sc3_array_index (fi->sides, 0, &sides[i]));
+    SC3E (p4est3_quadrant_level
+          (fi->p3->qvt, sides[i]->quadrant, &levels[i]));
+  }
+  if (nsides == 2) {
+    q0 = levels[0] > levels[1] ? sides[0]->quadrant : sides[1]->quadrant;
+    q1 = levels[0] <= levels[1] ? sides[1]->quadrant : sides[0]->quadrant;
+    level0 = SC3_MIN (levels[0], levels[1]);
+    SC3E (p4est3_quadrant_ancestor
+          (fi->p3->qvt, q0, level0, &fi->p3->temp_quad[0]));
+
+  }
   return NULL;
 }
 
