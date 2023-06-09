@@ -148,11 +148,11 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
   int i, nfaces = 1 << vi->p3->qvt->dim;
   p4est3_tree_t *tree;
   p4est3_locidx qid;
-  int qlevel, qlen;
+  int qlevel, face_len;
   int8_t *qinfo_array = (int8_t *) vi->user_data;
 
   SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &qlevel));
-  qlen = TEST_QUADRANT_LEN (qlevel);
+  face_len = TEST_QUADRANT_LEN (qlevel) * (vi->p3->qvt->dim - 1);
   SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
   qid = tree->quad_offset + vi->nquad;
   SC3A_CHECK (qid < vi->p3->local_num_quads);
@@ -160,7 +160,7 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
     SC3E_DEMAND
       (qinfo_array[qid + i] == NULL, "volume is visited the second time");
     SC3E (sc3_allocator_calloc
-          (vi->p3->alloc, sizeof (int8_t), qlen, &qinfo_array[qid + i]));
+          (vi->p3->alloc, sizeof (int8_t), face_len, &qinfo_array[qid + i]));
   }
 
   return NULL;
