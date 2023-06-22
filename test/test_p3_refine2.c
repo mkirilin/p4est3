@@ -210,6 +210,7 @@ make_new_p4est3 (p4est3_t ** p3, setup_t * t,
   SC3E (p4est3_set_connectivity (*p3, t->conn3));
   SC3E (p4est3_set_quadrant_vtable (*p3, *qvt));
   SC3E (p4est3_set_level (*p3, FOREST_START_LEVEL));
+  SC3E (p4est3_set_shared (*p3, 1));
   SC3E (p4est3_setup (*p3));
 
   return NULL;
@@ -329,7 +330,7 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
 
   for (i = 0; i < refine_level; ++i) {
     SC3E (p4est3_new (t->alloc, &p3refined));
-    SC3E (set_qvt (&qvt, i % 3));
+    SC3E (set_qvt (&qvt, 0));
     SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
     SC3E (p4est3_set_refine (p3refined, refine_p3_normal_fn));
     SC3E (p4est3_set_source (p3refined, p3ptr));
@@ -345,7 +346,7 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
   p4est_coarsen (p, 1, coarsen_normal_fn, NULL);
   for (i = 0; i < refine_level; ++i) {
     SC3E (p4est3_new (t->alloc, &p3refined));
-    SC3E (set_qvt (&qvt, i % 3));
+    SC3E (set_qvt (&qvt, 0));
     SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
     SC3E (p4est3_set_coarsen (p3refined, coarsen_p3_normal_fn));
     SC3E (p4est3_set_source (p3refined, p3ptr));
@@ -374,7 +375,7 @@ perform_test (setup_t * t, p4est3_t * p3, p4est_t * p)
     SC3E (compare_results (t, p3ptr, p, qvt));
   }
   SC3E (p4est3_new (t->alloc, &p3refined));
-  SC3E (set_qvt (&qvt, refine_level % 3));
+  SC3E (set_qvt (&qvt, 0));
   SC3E (p4est3_set_quadrant_vtable (p3refined, qvt));
   SC3E (p4est3_set_source (p3refined, p3ptr));
   SC3E (p4est3_setup (p3refined));

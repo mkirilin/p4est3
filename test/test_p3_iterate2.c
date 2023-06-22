@@ -130,6 +130,24 @@ make_allocator (setup_t * t)
 }
 
 static sc3_error_t *
+array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
+           int ecount, sc3_array_t ** arr)
+{
+  SC3E_RETVAL (arr, NULL);
+  SC3A_IS (sc3_allocator_is_setup, alloc);
+  SC3A_CHECK (ealloc >= 0);
+
+  SC3E (sc3_array_new (alloc, arr));
+  SC3E (sc3_array_set_elem_size (*arr, esize));
+  SC3E (sc3_array_set_elem_alloc (*arr, ealloc));
+  SC3E (sc3_array_set_elem_count (*arr, ecount));
+  SC3E (sc3_array_set_initzero (*arr, 1));
+  SC3E (sc3_array_setup (*arr));
+
+  return NULL;
+}
+
+static sc3_error_t *
 make_connectivity (setup_t * t, int dim, int l_face, int r_face, int ori)
 {
 /* SC3E (p4est3_connectivity_new (t->alloc, &t->conn));
@@ -169,9 +187,12 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
 static sc3_error_t *
 face_callback (p4est3_iterate_face_info_t * fi)
 {
-  void *q0, *q1;
+  void *q_small, *q_big;
+  char *tempq[2];
   p4est3_iterate_face_side_t *sides[2];
-  int i, nsides, levels[2], level0;
+  sc3_array_t *ftransform;
+  int i, nsides, levels[2], ss_id /* smaller side index */;
+  int ntree;
   SC3E (sc3_array_get_elem_count (fi->sides, &nsides));
   SC3E_DEMAND ((nsides == 2) || ((nsides == 1) && fi->tree_boundary),
                "one face's side not on a tree's boundary");
@@ -181,14 +202,30 @@ face_callback (p4est3_iterate_face_info_t * fi)
     SC3E (sc3_array_index (fi->sides, 0, &sides[i]));
     SC3E (p4est3_quadrant_level
           (fi->p3->qvt, sides[i]->quadrant, &levels[i]));
+    SC3E (sc3_allocator_calloc_one (fi->p3->alloc, fi->p3->qsize, &tempq[i]));
   }
   if (nsides == 2) {
-    q0 = levels[0] > levels[1] ? sides[0]->quadrant : sides[1]->quadrant;
-    q1 = levels[0] <= levels[1] ? sides[1]->quadrant : sides[0]->quadrant;
-    level0 = SC3_MIN (levels[0], levels[1]);
+    ss_id = levels[0] > levels[1] ? 0 : 1;
+    q_small = sides[ss_id]->quadrant;
+    q_big = sides[1 - ss_id]->quadrant;
     SC3E (p4est3_quadrant_ancestor
-          (fi->p3->qvt, q0, level0, &fi->p3->temp_quad[0]));
-
+          (fi->p3->qvt, q_small, levels[1 - ss_id], &tempq[0]));
+    if (sides[0]->ntree == sides[1]->ntree) {
+      SC3E (p4est3_quadrant_face_neighbor
+            (fi->p3->qvt, tempq[0], sides[ss_id]->nface, &tempq[1]));
+    }
+    else {
+      ntree = sides[ss_id]->ntree;
+      SC3E (array_new (fi->p3->alloc, sizeof (int), 9, 9, &ftransform));
+      SC3E (p4est3_connectivity_get_face_transform
+            (fi->p3->conn, sides[ss_id]->nface, &ntree, ftransform));
+      SC3E_DEMAND (ntree == sides[1 - ss_id]->ntree,
+                   "face transform trees mismatch");
+      SC3E (p4est3_quadrant_tree_face_neighbor
+            (fi->p3->qvt, tempq[0], ftransform,
+             sides[ss_id]->nface, &tempq[1]));
+    }
+    SC3E_DEMIS3 (p4est3_quadrant_is3_equal, fi->p3->qvt, tempq[1], q_big);
   }
   return NULL;
 }
@@ -216,24 +253,6 @@ make_new_p4est3 (p4est3_t ** p3, setup_t * t, const p4est3_quadrant_vtable_t * q
   SC3E (p4est3_set_level (*p3, t->level));
   SC3E (p4est3_set_shared (*p3, 1));
   SC3E (p4est3_setup (*p3));
-
-  return NULL;
-}
-
-static sc3_error_t *
-array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
-           int ecount, sc3_array_t ** arr)
-{
-  SC3E_RETVAL (arr, NULL);
-  SC3A_IS (sc3_allocator_is_setup, alloc);
-  SC3A_CHECK (ealloc >= 0);
-
-  SC3E (sc3_array_new (alloc, arr));
-  SC3E (sc3_array_set_elem_size (*arr, esize));
-  SC3E (sc3_array_set_elem_alloc (*arr, ealloc));
-  SC3E (sc3_array_set_elem_count (*arr, ecount));
-  SC3E (sc3_array_set_initzero (*arr, 1));
-  SC3E (sc3_array_setup (*arr));
 
   return NULL;
 }
