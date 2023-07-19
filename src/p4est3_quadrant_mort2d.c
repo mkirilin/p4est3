@@ -312,17 +312,12 @@ p4est3_quadrant_mort_child (const p4est3_quadrant_mort_t * q,
                             int32_t child_id, p4est3_quadrant_mort_t * r)
 {
   const int           level = P4EST3_MORT_EXT_LEVEL (*q);
-  const uint64_t      shift = P4EST3_QUADRANT_MORT_LEN (0x01, level + 1);
 
   SC3A_IS (p4est3_quadrant_mort_is_valid, q);
   SC3A_CHECK (level < P4EST3_MORT_QMAXLEVEL);
   SC3A_CHECK (child_id >= 0 && child_id < P4EST_CHILDREN);
 
-  *r = child_id & 0x01 ? (*q | shift) : *q;
-  *r = child_id & 0x02 ? (*r | (shift << 1)) : *r;
-#ifdef P4_TO_P8
-  *r = child_id & 0x04 ? (*r | (shift << 2)) : *r;
-#endif
+  *r = *q | P4EST3_QUADRANT_MORT_LEN (child_id, level + 1);
   *r += ((uint64_t) 1 << CRD_BITS);
   SC3A_IS2 (p4est3_quadrant_mort_is_parent_internal, q, r);
   return NULL;
