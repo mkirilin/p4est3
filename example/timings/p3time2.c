@@ -43,6 +43,7 @@ static const int neighbor_order2d[4] = {0, 1, 3, 2};
 typedef enum time_function
 {
   CHILD,
+  MORTON_F,
   PARENT,
   SIBLING,
   FNEIGBOR,
@@ -141,6 +142,9 @@ interpret_command_line (const int argc, char **argv, p4est3_time_t * t)
     }
     else if (strcmp (argv[1], "TBOUND") == 0) {
       t->func = TBOUND;
+    }
+    else if (strcmp (argv[1], "MORTON_F") == 0) {
+      t->func = MORTON_F;
     }
     SC3E_DEMAND (t->func != LAST_FUNC, "Wrong name of the test function");
   }
@@ -248,6 +252,26 @@ time_prepare (p4est3_time_t * t, int *retval)
 
   /* clean and successful return */
   *retval = 0;
+  return NULL;
+}
+
+static sc3_error_t *
+test_morton (const int ninit_quads, sc3_array_t * a,
+             p4est3_quadrant_vtable_t * qvt, int max_level)
+{
+  void *tmp;
+  int i;
+  p4est3_locidx nquad2level, q;
+
+  SC3E (sc3_array_index (a, 0, &tmp));
+  for (i = 0; i < ninit_quads; ++i) {
+    for (int i = 0; i <= max_level; ++i) {
+      nquad2level = (1 << (i * P4EST_DIM));
+      for (q = 0; q < nquad2level; ++q) {
+        SC3E (p4est3_quadrant_morton (qvt, i, q, tmp));
+      }
+    }
+  }
   return NULL;
 }
 
@@ -369,6 +393,12 @@ timeavx2_measure (p4est3_time_t * t)
   case CHILD:
     sc_flops_snap (&fi, &snapshot);
     SC3E (test_child (t->ninit_quads, t->qarr, t->qvt));
+    sc_flops_shot (&fi, &snapshot);
+    break;
+
+  case MORTON_F:
+    sc_flops_snap (&fi, &snapshot);
+    SC3E (test_morton (t->ninit_quads, t->qarr, t->qvt, t->max_level));
     sc_flops_shot (&fi, &snapshot);
     break;
 
