@@ -176,21 +176,46 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
   SC3A_CHECK (qid < vi->p3->local_num_quads);
   for (i = 0; i < nfaces; ++i) {
     SC3E_DEMAND
-      (qinfo_array[qid + i] == NULL, "volume is visited the second time");
+      (qinfo_array[qid * nfaces + i] == NULL,
+       "volume is visited the second time");
     SC3E (sc3_allocator_calloc
-          (vi->p3->alloc, sizeof (int8_t), face_area, &qinfo_array[qid + i]));
+          (vi->p3->alloc, sizeof (int8_t), face_area,
+           &qinfo_array[qid * nfaces + i]));
   }
 
   return NULL;
 }
 
+static int
+check_q_in_proc (const p4est3_t * p3, const p4est3_topidx t,
+                 const p4est3_locidx nquad)
+{
+  if (t < p3->fltree || p3->lltree < t) {
+    return 0;
+  }
+  if (p3->fltree < t && t < p3->lltree) {
+    return 1;
+  }
+  if (t == p3->fltree) {
+    return (nquad + p3->gtroffset[p3->fltree] >= p3->goffset[p3->mpirank]);
+  }
+  if (t == p3->lltree) {
+    return (nquad + p3->gtroffset[p3->lltree] < p3->goffset[p3->mpirank]);
+  }
+  return 0;
+}
+
 static sc3_error_t *
 face_callback (p4est3_iterate_face_info_t * fi)
 {
-  void *q_small, *q_big;
   char *tempq[2];
-  p4est3_iterate_face_side_t *sides[2];
+  int i, qlevel, face_area, nfaces = 1 << fi->p3->qvt->dim;
+  p4est3_locidx qid_loc;
+  p4est3_tree_t tree_small, tree_big; /* for bigger and smaller quadrant */
+  p4est3_iterate_face_side_t *sides[2], *side_small, *side_big;
   sc3_array_t *ftransform;
+  int8_t *qinfo_array = (int8_t *) fi->user_data;
+  int8_t *finfo_array;
   int i, nsides, levels[2], ss_id /* smaller side index */;
   int ntree;
   SC3E (sc3_array_get_elem_count (fi->sides, &nsides));
@@ -206,26 +231,46 @@ face_callback (p4est3_iterate_face_info_t * fi)
   }
   if (nsides == 2) {
     ss_id = levels[0] > levels[1] ? 0 : 1;
-    q_small = sides[ss_id]->quadrant;
-    q_big = sides[1 - ss_id]->quadrant;
+    side_small = sides[ss_id];
+    side_big = sides[1 - ss_id];
     SC3E (p4est3_quadrant_ancestor
-          (fi->p3->qvt, q_small, levels[1 - ss_id], &tempq[0]));
-    if (sides[0]->ntree == sides[1]->ntree) {
+          (fi->p3->qvt, side_small->quadrant, levels[1 - ss_id], &tempq[0]));
+    if (side_small->ntree == side_big->ntree) {
       SC3E (p4est3_quadrant_face_neighbor
-            (fi->p3->qvt, tempq[0], sides[ss_id]->nface, &tempq[1]));
+            (fi->p3->qvt, tempq[0], side_small, &tempq[1]));
     }
     else {
-      ntree = sides[ss_id]->ntree;
+      ntree = side_small->ntree;
       SC3E (array_new (fi->p3->alloc, sizeof (int), 9, 9, &ftransform));
       SC3E (p4est3_connectivity_get_face_transform
-            (fi->p3->conn, sides[ss_id]->nface, &ntree, ftransform));
-      SC3E_DEMAND (ntree == sides[1 - ss_id]->ntree,
+            (fi->p3->conn, side_small->nface, &ntree, ftransform));
+      SC3E_DEMAND (ntree == side_big->ntree,
                    "face transform trees mismatch");
       SC3E (p4est3_quadrant_tree_face_neighbor
             (fi->p3->qvt, tempq[0], ftransform,
-             sides[ss_id]->nface, &tempq[1]));
+             side_small->nface, &tempq[1]));
     }
-    SC3E_DEMIS3 (p4est3_quadrant_is3_equal, fi->p3->qvt, tempq[1], q_big);
+    SC3E_DEMIS3 (
+      p4est3_quadrant_is3_equal, fi->p3->qvt, tempq[1], side_big->quadrant);
+  } else { /* nsides == 1, nothing else is possible */
+    side_big = side_small = sides[0];
+  }
+  /* fill testing arrays */
+  /* for the smaller and/or one-sided quad we fill
+     the whole face-related (part of) array */
+  if (check_q_in_proc (fi->p3, side_small->ntree, side_small->nquad)) {
+    qid_loc = (p4est3_gloidx) side_small->nquad
+              + fi->p3->gtroffset[side_small->ntree]
+              - fi->p3->goffset[fi->p3->mpirank];
+    SC3E (p4est3_quadrant_level (fi->p3->qvt, side_small->quadrant, &qlevel));
+    face_area = sc3_intpow (TEST_QUADRANT_LEN (qlevel), fi->p3->qvt->dim - 1);
+    finfo_array = qinfo_array[qid_loc * nfaces + side_small->nface];
+    SC3A_CHECK (finfo_array != NULL);
+    for (i = 0; i < face_area; ++i) {
+      SC3E_DEMAND (finfo_array[i] == 0,
+                   "trying to write into non-empty face-info cell");
+      finfo_array[i] = nsides;
+    }
   }
   return NULL;
 }
