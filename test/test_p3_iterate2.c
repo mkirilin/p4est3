@@ -206,12 +206,34 @@ check_q_in_proc (const p4est3_t * p3, const p4est3_topidx t,
 }
 
 static sc3_error_t *
+fill_in_side_info_compl (const p4est3_t * p3, const int8_t *qinfo_array,
+                         const p4est3_iterate_face_side_t * side,
+                         const int nsides)
+{
+  int8_t *finfo_array;
+  p4est3_locidx qid_loc;
+  int i, qlevel, face_area, nfaces = 1 << p3->qvt->dim;
+
+
+  qid_loc = (p4est3_gloidx) side->nquad
+            + p3->gtroffset[side->ntree] - p3->goffset[p3->mpirank];
+  SC3E (p4est3_quadrant_level (p3->qvt, side->quadrant, &qlevel));
+  face_area = sc3_intpow (TEST_QUADRANT_LEN (qlevel), p3->qvt->dim - 1);
+  finfo_array = qinfo_array[qid_loc * nfaces + side->nface];
+  SC3A_CHECK (finfo_array != NULL);
+  for (i = 0; i < face_area; ++i) {
+    SC3E_DEMAND (finfo_array[i] == 0,
+                  "trying to write into non-empty face-info cell");
+    finfo_array[i] = nsides;
+  }
+  return NULL;
+}
+
+static sc3_error_t *
 face_callback (p4est3_iterate_face_info_t * fi)
 {
   char *tempq[2];
   int i, qlevel, face_area, nfaces = 1 << fi->p3->qvt->dim;
-  p4est3_locidx qid_loc;
-  p4est3_tree_t tree_small, tree_big; /* for bigger and smaller quadrant */
   p4est3_iterate_face_side_t *sides[2], *side_small, *side_big;
   sc3_array_t *ftransform;
   int8_t *qinfo_array = (int8_t *) fi->user_data;
@@ -259,17 +281,12 @@ face_callback (p4est3_iterate_face_info_t * fi)
   /* for the smaller and/or one-sided quad we fill
      the whole face-related (part of) array */
   if (check_q_in_proc (fi->p3, side_small->ntree, side_small->nquad)) {
-    qid_loc = (p4est3_gloidx) side_small->nquad
-              + fi->p3->gtroffset[side_small->ntree]
-              - fi->p3->goffset[fi->p3->mpirank];
-    SC3E (p4est3_quadrant_level (fi->p3->qvt, side_small->quadrant, &qlevel));
-    face_area = sc3_intpow (TEST_QUADRANT_LEN (qlevel), fi->p3->qvt->dim - 1);
-    finfo_array = qinfo_array[qid_loc * nfaces + side_small->nface];
-    SC3A_CHECK (finfo_array != NULL);
-    for (i = 0; i < face_area; ++i) {
-      SC3E_DEMAND (finfo_array[i] == 0,
-                   "trying to write into non-empty face-info cell");
-      finfo_array[i] = nsides;
+    SC3E (fill_in_side_info_compl (fi->p3, qinfo_array, side_small, nsides));
+  }
+  /* if quadrants are of equal size, we full the bigger one completely, too */
+  if (nsides == 2 && levels[0] == levels[1]) {
+    if (check_q_in_proc (fi->p3, side_big->ntree, side_big->nquad)) {
+      SC3E (fill_in_side_info_compl (fi->p3, qinfo_array, side_big, nsides));
     }
   }
   return NULL;
