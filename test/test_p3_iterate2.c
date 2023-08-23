@@ -167,7 +167,7 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
   p4est3_tree_t *tree;
   p4est3_locidx qid;
   int qlevel, face_area;
-  int8_t *qinfo_array = (int8_t *) vi->user_data;
+  int8_t **qinfo_array = (int8_t **) vi->user_data;
 
   SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &qlevel));
   face_area = sc3_intpow (TEST_QUADRANT_LEN (qlevel), vi->p3->qvt->dim - 1);
@@ -206,8 +206,8 @@ check_q_in_proc (const p4est3_t * p3, const p4est3_topidx t,
 }
 
 static sc3_error_t *
-fill_in_side_info_compl (const p4est3_t * p3, const int8_t *qinfo_array,
-                         const p4est3_iterate_face_side_t * side,
+fill_in_side_info_compl (const p4est3_t * p3, int8_t ** const qinfo_array,
+                         const p4est3_iterate_face_side_t * const side,
                          const int nsides)
 {
   int8_t *finfo_array;
@@ -236,10 +236,9 @@ face_callback (p4est3_iterate_face_info_t * fi)
   int i, qlevel, face_area, nfaces = 1 << fi->p3->qvt->dim;
   p4est3_iterate_face_side_t *sides[2], *side_small, *side_big;
   sc3_array_t *ftransform;
-  int8_t *qinfo_array = (int8_t *) fi->user_data;
+  int8_t **qinfo_array = (int8_t **) fi->user_data;
   int8_t *finfo_array;
-  int i, nsides, levels[2], ss_id /* smaller side index */;
-  int ntree;
+  int ntree, nsides, levels[2], ss_id /* smaller side index */;
   SC3E (sc3_array_get_elem_count (fi->sides, &nsides));
   SC3E_DEMAND ((nsides == 2) || ((nsides == 1) && fi->tree_boundary),
                "one face's side not on a tree's boundary");
@@ -259,7 +258,7 @@ face_callback (p4est3_iterate_face_info_t * fi)
           (fi->p3->qvt, side_small->quadrant, levels[1 - ss_id], &tempq[0]));
     if (side_small->ntree == side_big->ntree) {
       SC3E (p4est3_quadrant_face_neighbor
-            (fi->p3->qvt, tempq[0], side_small, &tempq[1]));
+            (fi->p3->qvt, tempq[0], side_small->nface, &tempq[1]));
     }
     else {
       ntree = side_small->ntree;
@@ -300,6 +299,7 @@ allocate_test_tracking_array (p4est3_t *p3, void **ptr_qinfo_array)
 
   SC3E (sc3_allocator_calloc
         (p3->alloc, sizeof (int8_t *), out_array_size, &out_array));
+  return NULL;
 }
 
 static sc3_error_t *
@@ -355,12 +355,12 @@ int
 main (int argc, char **argv)
 {
   setup_t             st, *t = &st;
-  const p4est3_quadrant_vtable_t *qvt, *qvt_avx, *qvt_mrt;
+  const p4est3_quadrant_vtable_t *qvt;
 
   SC3X (sc3_MPI_Init (&argc, &argv));
   t->mpicomm = SC3_MPI_COMM_WORLD;
   SC3X (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
-  SC3X (set_parameters (t, &qvt, &qvt_avx, &qvt_mrt));
+  SC3X (set_parameters (t, &qvt));
 
   SC3X (clean_up (t));
 
