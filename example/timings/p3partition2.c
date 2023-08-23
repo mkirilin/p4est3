@@ -518,10 +518,15 @@ main (int argc, char **argv)
           p4est_partition (p, is_family, cweight);
         }
       }
-      else if (i == refine_level - 1) {
-        p4est_vtk_write_file (p, NULL, vtk_before);
-        p4est_partition (p, is_family, cweight);
-        p4est_vtk_write_file (p, NULL, vtk_after);
+      else{
+        if (i < refine_level - 1) {
+          p4est_partition (p, is_family, cweight);
+        }
+        else {
+          p4est_vtk_write_file (p, NULL, vtk_before);
+          p4est_partition (p, is_family, cweight);
+          p4est_vtk_write_file (p, NULL, vtk_after);
+        }
       }
     }
     p4est_destroy (p);
