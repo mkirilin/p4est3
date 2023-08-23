@@ -36,6 +36,7 @@
 
 #define MAX_TEST_LEVEL 2
 #define TEST_QUADRANT_LEN(l) ((int32_t) 1 << (MAX_TEST_LEVEL - (l)))
+#define DIM2 2
 
 //#define DISABLE_TEST_FACES
 
@@ -118,6 +119,33 @@ typedef struct callback_data
   sc3_array_t        *faces;
 }
 callback_data_t;
+
+static sc3_error_t        *
+quadrant_set_morton2d (p4est_quadrant_t * quadrant,
+                       int level, uint64_t id)
+{
+  int                 i;
+
+  SC3A_CHECK (0 <= level && level <= MAX_TEST_LEVEL);
+  SC3A_CHECK (id < ((uint64_t) 1 << DIM2 * (level + 2)));
+
+  quadrant->level = (int8_t) level;
+  quadrant->x = 0;
+  quadrant->y = 0;
+
+  /* this may set the sign bit to create negative numbers */
+  for (i = 0; i < level + 2; ++i) {
+    quadrant->x |= (p4est_qcoord_t) ((id & (1ULL << (DIM2 * i)))
+                                     >> ((DIM2 - 1) * i));
+    quadrant->y |= (p4est_qcoord_t) ((id & (1ULL << (DIM2 * i + 1)))
+                                     >> ((DIM2 - 1) * i + 1));
+  }
+
+  quadrant->x <<= (MAX_TEST_LEVEL - level);
+  quadrant->y <<= (MAX_TEST_LEVEL - level);
+
+  return NULL;
+}
 
 static sc3_error_t *
 make_allocator (setup_t * t)
