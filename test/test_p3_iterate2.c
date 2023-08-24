@@ -120,31 +120,27 @@ typedef struct callback_data
 }
 callback_data_t;
 
-static sc3_error_t        *
-quadrant_set_morton2d (p4est_quadrant_t * quadrant,
-                       int level, uint64_t id)
+static sc3_error_t *
+quadrant_2d_mid (const p4est_quadrant_t * quadrant, int level,
+                 uint64_t * mid)
 {
   int                 i;
+  uint64_t            id;
+  uint64_t            x, y;
 
   SC3A_CHECK (0 <= level && level <= MAX_TEST_LEVEL);
-  SC3A_CHECK (id < ((uint64_t) 1 << DIM2 * (level + 2)));
 
-  quadrant->level = (int8_t) level;
-  quadrant->x = 0;
-  quadrant->y = 0;
+  /* this preserves the high bits from negative numbers */
+  x = quadrant->x >> (MAX_TEST_LEVEL - level);
+  y = quadrant->y >> (MAX_TEST_LEVEL - level);
 
-  /* this may set the sign bit to create negative numbers */
+  id = 0;
   for (i = 0; i < level + 2; ++i) {
-    quadrant->x |= (p4est_qcoord_t) ((id & (1ULL << (DIM2 * i)))
-                                     >> ((DIM2 - 1) * i));
-    quadrant->y |= (p4est_qcoord_t) ((id & (1ULL << (DIM2 * i + 1)))
-                                     >> ((DIM2 - 1) * i + 1));
+    id |= ((x & ((uint64_t) 1 << i)) << ((DIM2 - 1) * i));
+    id |= ((y & ((uint64_t) 1 << i)) << ((DIM2 - 1) * i + 1));
   }
 
-  quadrant->x <<= (MAX_TEST_LEVEL - level);
-  quadrant->y <<= (MAX_TEST_LEVEL - level);
-
-  return NULL;
+  *mid = id;
 }
 
 static sc3_error_t *
@@ -231,6 +227,13 @@ check_q_in_proc (const p4est3_t * p3, const p4est3_topidx t,
     return (nquad + p3->gtroffset[p3->lltree] < p3->goffset[p3->mpirank]);
   }
   return 0;
+}
+
+static sc3_error_t *
+convert_quad_to_mid (const p4est3_t * const p3, const void * q)
+{
+  /* convert a quadrant to d-1 morton index */
+  return NULL;
 }
 
 static sc3_error_t *
