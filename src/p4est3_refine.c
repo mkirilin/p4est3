@@ -346,8 +346,9 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
 #endif
   MPI_Request         req_recv, req_send;
   MPI_Status          status;
+  p4est3_gloidx       recv_buf = -1;
 #endif
-  p4est3_gloidx       recv_buf = -1, send_buf = -1;
+  p4est3_gloidx       send_buf = -1;
   p4est3_topidx       t, fl_resp_tree, ll_resp_tree;
   p4est3_tree_t      *tree;
   p4est3_t           *old = p3->old;
