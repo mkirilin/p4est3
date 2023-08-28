@@ -40,6 +40,7 @@
 
 //#define DISABLE_TEST_FACES
 
+#if 0
 /* *INDENT-OFF* */
 static const int    nface_predef_2d[4][2] =
 {{1, 0}, {3, 2}, {3, 2}, {1, 0}};
@@ -69,6 +70,7 @@ static const int    bound_dir_2d[4] =
 static const int    bound_dir_3d[12] =
 {0, 1, 2, 1, 2, 0, 2, 2, 0, 1, 1, 0};
 /* *INDENT-ON* */
+#endif
 
 sc3_error_t        *
 p4est3_connectivity_new_p4est_twotrees (sc3_allocator_t * alloc,
@@ -122,11 +124,14 @@ callback_data_t;
 
 static sc3_error_t *
 quadrant_to_mid (const uint64_t coords[P4EST_DIM - 1], int level,
-                 uint64_t * mid)
+                 uint64_t * const mid)
 {
   int                 i;
   uint64_t            id;
-  uint64_t            x, y;
+  uint64_t            x;
+#ifdef P4_TO_P8
+  uint64_t            y;
+#endif
 
   SC3A_CHECK (0 <= level && level <= MAX_TEST_LEVEL);
 
@@ -236,46 +241,69 @@ check_q_in_proc (const p4est3_t * p3, const p4est3_topidx t,
 
 static sc3_error_t *
 convert_quad_to_mid (const p4est3_t * const p3,
-                     const p4est3_iterate_face_side_t * const side)
+                     const p4est3_iterate_face_side_t * const side,
+                     const p4est3_iterate_face_side_t * const patch,
+                     uint64_t * const mid)
 {
   /* convert a quadrant to d-1 morton index */
   const int nfaces = 1 << p3->qvt->dim;
-  const int axis = side->nface / nfaces;
-  uint64_t coordsDIM[P4EST_DIM], coords[P4EST_DIM - 1], mid;
-  int i, c, level;
+  const int axis = patch->nface / nfaces;
+  uint64_t patch_crdDIM[P4EST_DIM], side_crdDIM[P4EST_DIM],
+           coords[P4EST_DIM - 1];
+  int i, c, patch_lvl;
+#ifdef P4EST_ENABLE_DEBUG
+  int side_lvl;
+#endif
 
-  SC3E (p4est3_quadrant_coordinates (p3->qvt, side->quadrant, coordsDIM));
-  SC3E (p4est3_quadrant_level (p3->qvt, side->quadrant, &level));
-  SC3A_CHECK (coordsDIM[axis] == 0);
+  SC3E (p4est3_quadrant_coordinates (p3->qvt, patch->quadrant, patch_crdDIM));
+  SC3E (p4est3_quadrant_coordinates (p3->qvt, side->quadrant, side_crdDIM));
+  SC3A_CHECK (patch_crdDIM[axis] == 0);
+  SC3A_CHECK (side_crdDIM[axis] == 0);
 
+  SC3E (p4est3_quadrant_level (p3->qvt, patch->quadrant, &patch_lvl));
+#ifdef P4EST_ENABLE_DEBUG
+  SC3E (p4est3_quadrant_level (p3->qvt, patch->quadrant, &side_lvl));
+  SC3A_CHECK (side_lvl >= patch_lvl);
+#endif
   /* DIM x d cooreds -> DIM-1 x d coords */
   for (i = 0, c = 0; i < p3->qvt->dim; ++i) {
     if (i == axis) {
       continue;
     }
-    coords[c++] = coordsDIM[i];
+    SC3A_CHECK ((side_lvl == patch_lvl && patch_crdDIM[i] == side_crdDIM[i])
+             || (side_lvl != patch_lvl && patch_crdDIM[i] >= side_crdDIM[i]));
+    coords[c++] = patch_crdDIM[i] - side_crdDIM[i];
   }
-  SC3E (quadrant_to_mid (coords, level, &mid));
+  SC3E (quadrant_to_mid (coords, patch_lvl, mid));
   return NULL;
 }
 
 static sc3_error_t *
-fill_in_side_info_compl (const p4est3_t * p3, int8_t ** const qinfo_array,
-                         const p4est3_iterate_face_side_t * const side,
-                         const int nsides)
+fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
+                   const p4est3_iterate_face_side_t * const side,
+                   const p4est3_iterate_face_side_t * const patch,
+                   const int nsides)
 {
+  const int nfaces = 1 << p3->qvt->dim;
   int8_t *finfo_array;
-  p4est3_locidx qid_loc;
-  int i, qlevel, face_area, nfaces = 1 << p3->qvt->dim;
+  p4est3_locidx side_qid_loc;
+  int i, patch_qlevel, patch_area;
+  uint64_t begin_mid;
 
+  SC3A_CHECK ((side == patch && nsides == 1)
+           || (side != patch && nsides == 2));
 
-  qid_loc = (p4est3_gloidx) side->nquad
+  side_qid_loc = (p4est3_gloidx) side->nquad
             + p3->gtroffset[side->ntree] - p3->goffset[p3->mpirank];
-  SC3E (p4est3_quadrant_level (p3->qvt, side->quadrant, &qlevel));
-  face_area = sc3_intpow (TEST_QUADRANT_LEN (qlevel), p3->qvt->dim - 1);
-  finfo_array = qinfo_array[qid_loc * nfaces + side->nface];
+
+  SC3E (p4est3_quadrant_level (p3->qvt, patch->quadrant, &patch_qlevel));
+  patch_area = sc3_intpow (TEST_QUADRANT_LEN (patch_qlevel), p3->qvt->dim - 1);
+  finfo_array = qinfo_array[side_qid_loc * nfaces + side->nface];
   SC3A_CHECK (finfo_array != NULL);
-  for (i = 0; i < face_area; ++i) {
+
+  SC3E (convert_quad_to_mid (p3, side, patch, &begin_mid));
+
+  for (i = begin_mid; i < patch_area; ++i) {
     SC3E_DEMAND (finfo_array[i] == 0,
                   "trying to write into non-empty face-info cell");
     finfo_array[i] = nsides;
@@ -287,12 +315,10 @@ static sc3_error_t *
 face_callback (p4est3_iterate_face_info_t * fi)
 {
   char *tempq[2];
-  int i, qlevel, face_area, nfaces = 1 << fi->p3->qvt->dim;
   p4est3_iterate_face_side_t *sides[2], *side_small, *side_big;
   sc3_array_t *ftransform;
   int8_t **qinfo_array = (int8_t **) fi->user_data;
-  int8_t *finfo_array;
-  int ntree, nsides, levels[2], ss_id /* smaller side index */;
+  int i, ntree, nsides, levels[2], ss_id /* smaller side index */;
   SC3E (sc3_array_get_elem_count (fi->sides, &nsides));
   SC3E_DEMAND ((nsides == 2) || ((nsides == 1) && fi->tree_boundary),
                "one face's side not on a tree's boundary");
@@ -334,12 +360,20 @@ face_callback (p4est3_iterate_face_info_t * fi)
   /* for the smaller and/or one-sided quad we fill
      the whole face-related (part of) array */
   if (check_q_in_proc (fi->p3, side_small->ntree, side_small->nquad)) {
-    SC3E (fill_in_side_info_compl (fi->p3, qinfo_array, side_small, nsides));
+    SC3E (fill_in_side_info
+            (fi->p3, qinfo_array, side_small, side_small, nsides));
   }
-  /* if quadrants are of equal size, we full the bigger one completely, too */
   if (nsides == 2 && levels[0] == levels[1]) {
+    /* if quadrants are of equal size, we full the bigger one completely, too */
     if (check_q_in_proc (fi->p3, side_big->ntree, side_big->nquad)) {
-      SC3E (fill_in_side_info_compl (fi->p3, qinfo_array, side_big, nsides));
+      SC3E (fill_in_side_info
+            (fi->p3, qinfo_array, side_big, side_big, nsides));
+    }
+  } else if (nsides == 2) {
+    /* if quads have different size, we fill the bigger one only partially */
+    if (check_q_in_proc (fi->p3, side_big->ntree, side_big->nquad)) {
+      SC3E (fill_in_side_info
+            (fi->p3, qinfo_array, side_big, side_small, nsides));
     }
   }
   return NULL;
