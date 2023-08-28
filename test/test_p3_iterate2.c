@@ -121,7 +121,7 @@ typedef struct callback_data
 callback_data_t;
 
 static sc3_error_t *
-quadrant_2d_mid (const p4est_quadrant_t * quadrant, int level,
+quadrant_to_mid (const uint64_t coords[P4EST_DIM - 1], int level,
                  uint64_t * mid)
 {
   int                 i;
@@ -131,16 +131,21 @@ quadrant_2d_mid (const p4est_quadrant_t * quadrant, int level,
   SC3A_CHECK (0 <= level && level <= MAX_TEST_LEVEL);
 
   /* this preserves the high bits from negative numbers */
-  x = quadrant->x >> (MAX_TEST_LEVEL - level);
-  y = quadrant->y >> (MAX_TEST_LEVEL - level);
+  x = coords[0] >> (MAX_TEST_LEVEL - level);
+#ifdef P4_TO_P8
+  y = coords[1] >> (MAX_TEST_LEVEL - level);
+#endif
 
   id = 0;
   for (i = 0; i < level + 2; ++i) {
-    id |= ((x & ((uint64_t) 1 << i)) << ((DIM2 - 1) * i));
-    id |= ((y & ((uint64_t) 1 << i)) << ((DIM2 - 1) * i + 1));
+    id |= ((x & ((uint64_t) 1 << i)) << (((P4EST_DIM - 1) - 1) * i));
+#ifdef P4_TO_P8
+    id |= ((y & ((uint64_t) 1 << i)) << (((P4EST_DIM - 1) - 1) * i + 1));
+#endif
   }
 
   *mid = id;
+  return NULL;
 }
 
 static sc3_error_t *
@@ -230,9 +235,27 @@ check_q_in_proc (const p4est3_t * p3, const p4est3_topidx t,
 }
 
 static sc3_error_t *
-convert_quad_to_mid (const p4est3_t * const p3, const void * q)
+convert_quad_to_mid (const p4est3_t * const p3,
+                     const p4est3_iterate_face_side_t * const side)
 {
   /* convert a quadrant to d-1 morton index */
+  const int nfaces = 1 << p3->qvt->dim;
+  const int axis = side->nface / nfaces;
+  uint64_t coordsDIM[P4EST_DIM], coords[P4EST_DIM - 1], mid;
+  int i, c, level;
+
+  SC3E (p4est3_quadrant_coordinates (p3->qvt, side->quadrant, coordsDIM));
+  SC3E (p4est3_quadrant_level (p3->qvt, side->quadrant, &level));
+  SC3A_CHECK (coordsDIM[axis] == 0);
+
+  /* DIM x d cooreds -> DIM-1 x d coords */
+  for (i = 0, c = 0; i < p3->qvt->dim; ++i) {
+    if (i == axis) {
+      continue;
+    }
+    coords[c++] = coordsDIM[i];
+  }
+  SC3E (quadrant_to_mid (coords, level, &mid));
   return NULL;
 }
 
