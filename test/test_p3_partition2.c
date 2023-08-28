@@ -39,8 +39,6 @@
 
 #define MAX_TEST_LEVEL 5
 
-static int          refine_level = 0;
-
 typedef struct setup
 {
   sc3_allocator_t    *alloc;
@@ -53,6 +51,9 @@ typedef struct setup
   int                 level;
 }
 setup_t;
+
+#if (defined(P4EST_ENABLE_MPICOMMSHARED) || !defined(P4EST_ENABLE_MPI))
+static int          refine_level = 0;
 
 static int
 refine_fn (p4est_t * p4est, p4est_topidx_t which_tree,
@@ -100,86 +101,6 @@ array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
   SC3E (sc3_array_set_initzero (*arr, 1));
   SC3E (sc3_array_setup (*arr));
 
-  return NULL;
-}
-
-static sc3_error_t *
-make_allocator (setup_t * t)
-{
-  SC3A_IS (sc3_allocator_is_setup, t->mainalloc);
-  SC3E (sc3_allocator_new (t->mainalloc, &t->alloc));
-  SC3E (sc3_allocator_setup (t->alloc));
-
-  return NULL;
-}
-
-static sc3_error_t *
-make_connectivity (setup_t * t)
-{
-  t->conn2 =
-#ifdef P4_TO_P8
-    p8est_connectivity_new_brick (t->mpisize, 1, 1, 0, 0, 0);
-#else
-    p4est_connectivity_new_brick (t->mpisize, 1, 0, 0);
-#endif
-  SC3E (p4est3_connectivity_new_p4est (t->alloc, &t->conn3, t->conn2, 1));
-  return NULL;
-}
-
-static sc3_error_t *
-make_new_p4est (p4est_t ** p, setup_t * t)
-{
-  *p = p4est_new_ext
-    (t->mpicomm, t->conn2, 0, 0, 1, 0, NULL, NULL);
-
-  return NULL;
-}
-
-static sc3_error_t *
-make_new_p4est3 (p4est3_t ** p3, setup_t * t,
-                 const p4est3_quadrant_vtable_t ** qvt)
-{
-  SC3A_IS (sc3_allocator_is_setup, t->alloc);
-
-  /* create p4est object with connectivity */
-  SC3E (p4est3_new (t->alloc, p3));
-  SC3E (p4est3_set_comm (*p3, t->mpicomm, 1));
-  SC3E (p4est3_set_connectivity (*p3, t->conn3));
-  SC3E (p4est3_set_quadrant_vtable (*p3, *qvt));
-  SC3E (p4est3_set_level (*p3, 0));
-  SC3E (p4est3_set_shared (*p3, 1));
-  SC3E (p4est3_set_contiguous (*p3, 0));
-  SC3E (p4est3_setup (*p3));
-
-  return NULL;
-}
-
-static sc3_error_t *
-prepare_objects (p4est3_t ** p3, p4est_t ** p, setup_t * t,
-                 const p4est3_quadrant_vtable_t ** qvt)
-{
-  t->mainalloc = sc3_allocator_nothread ();
-  SC3E (make_allocator (t));
-  SC3E (make_connectivity (t));
-  SC3E (p4est3_quadrant_vtable_p4est (qvt));
-  SC3E_DEMAND (*qvt != NULL, "p4est is not build neither in 2D nor 3D");
-  SC3E (make_new_p4est (p, t));
-  SC3E (make_new_p4est3 (p3, t, qvt));
-  return NULL;
-}
-
-static sc3_error_t *
-clean_up (p4est3_t * p3, p4est_t * p, setup_t * t)
-{
-  /*destroy forest, that was referenced for others */
-  SC3E (p4est3_destroy (&p3));
-  SC3E (p4est3_connectivity_destroy (&t->conn3));
-  p4est_destroy (p);
-  /* There is no need to destroy p4est2 connectivity,
-      since it is destroyed at p4est3 conn destroying stage */
-  /* p4est_connectivity_destroy (t->conn2); */
-  SC3A_IS (sc3_allocator_is_setup, t->alloc);
-  SC3E (sc3_allocator_destroy (&t->alloc));
   return NULL;
 }
 
@@ -316,6 +237,87 @@ perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
   SC3E (p4est3_destroy (&p3ptr));
   return NULL;
 }
+#endif /*(defined(P4EST_ENABLE_MPICOMMSHARED) || !defined(P4EST_ENABLE_MPI))*/
+
+static sc3_error_t *
+make_allocator (setup_t * t)
+{
+  SC3A_IS (sc3_allocator_is_setup, t->mainalloc);
+  SC3E (sc3_allocator_new (t->mainalloc, &t->alloc));
+  SC3E (sc3_allocator_setup (t->alloc));
+
+  return NULL;
+}
+
+static sc3_error_t *
+make_connectivity (setup_t * t)
+{
+  t->conn2 =
+#ifdef P4_TO_P8
+    p8est_connectivity_new_brick (t->mpisize, 1, 1, 0, 0, 0);
+#else
+    p4est_connectivity_new_brick (t->mpisize, 1, 0, 0);
+#endif
+  SC3E (p4est3_connectivity_new_p4est (t->alloc, &t->conn3, t->conn2, 1));
+  return NULL;
+}
+
+static sc3_error_t *
+make_new_p4est (p4est_t ** p, setup_t * t)
+{
+  *p = p4est_new_ext
+    (t->mpicomm, t->conn2, 0, 0, 1, 0, NULL, NULL);
+
+  return NULL;
+}
+
+static sc3_error_t *
+make_new_p4est3 (p4est3_t ** p3, setup_t * t,
+                 const p4est3_quadrant_vtable_t ** qvt)
+{
+  SC3A_IS (sc3_allocator_is_setup, t->alloc);
+
+  /* create p4est object with connectivity */
+  SC3E (p4est3_new (t->alloc, p3));
+  SC3E (p4est3_set_comm (*p3, t->mpicomm, 1));
+  SC3E (p4est3_set_connectivity (*p3, t->conn3));
+  SC3E (p4est3_set_quadrant_vtable (*p3, *qvt));
+  SC3E (p4est3_set_level (*p3, 0));
+  SC3E (p4est3_set_shared (*p3, 1));
+  SC3E (p4est3_set_contiguous (*p3, 0));
+  SC3E (p4est3_setup (*p3));
+
+  return NULL;
+}
+
+static sc3_error_t *
+prepare_objects (p4est3_t ** p3, p4est_t ** p, setup_t * t,
+                 const p4est3_quadrant_vtable_t ** qvt)
+{
+  t->mainalloc = sc3_allocator_nothread ();
+  SC3E (make_allocator (t));
+  SC3E (make_connectivity (t));
+  SC3E (p4est3_quadrant_vtable_p4est (qvt));
+  SC3E_DEMAND (*qvt != NULL, "p4est is not build neither in 2D nor 3D");
+  SC3E (make_new_p4est (p, t));
+  SC3E (make_new_p4est3 (p3, t, qvt));
+  return NULL;
+}
+
+static sc3_error_t *
+clean_up (p4est3_t * p3, p4est_t * p, setup_t * t)
+{
+  /*destroy forest, that was referenced for others */
+  SC3E (p4est3_destroy (&p3));
+  SC3E (p4est3_connectivity_destroy (&t->conn3));
+  p4est_destroy (p);
+  /* There is no need to destroy p4est2 connectivity,
+      since it is destroyed at p4est3 conn destroying stage */
+  /* p4est_connectivity_destroy (t->conn2); */
+  SC3A_IS (sc3_allocator_is_setup, t->alloc);
+  SC3E (sc3_allocator_destroy (&t->alloc));
+  return NULL;
+}
 
 int
 main (int argc, char **argv)
@@ -333,7 +335,7 @@ main (int argc, char **argv)
   p4est_init (NULL, SC_LP_DEFAULT);
 
   SC3X (prepare_objects (&p3, &p, t, &qvt));
-#ifdef P4EST_ENABLE_MPICOMMSHARED
+#if (defined(P4EST_ENABLE_MPICOMMSHARED) || !defined(P4EST_ENABLE_MPI))
   /* so far p3 partition works with shared memory only */
   SC3X (perform_test (p3, p, t, qvt));
 #endif
