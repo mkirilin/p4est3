@@ -380,6 +380,58 @@ face_callback (p4est3_iterate_face_info_t * fi)
 }
 
 static sc3_error_t *
+test_tracking_array (p4est3_t *p3, const int8_t ** const qinfo_array)
+{
+  const int nfaces = 1 << p3->qvt->dim;
+  int qlevel, face_area, is_boundary;
+  int i, f, p /* patch number */, nface, orient;
+  char * q;
+  int8_t *finfo_array;
+  p4est3_topidx t, which_tree;
+  p4est3_locidx qtid /* local number of quadrant within on a tree */;
+  p4est3_tree_t * tree;
+
+  for (t = p3->fltree; t <= p3->lltree; ++t) {
+    which_tree = t;
+    SC3E (p4est3_tree_index (p3, t, &tree));
+    for (qtid = 0; qtid < tree->num_quads; ++qtid) {
+      q = tree->tquads + qtid * p3->qvt->quadrant_size;
+      SC3E (p4est3_quadrant_level (p3->qvt, q, &qlevel));
+      face_area = sc3_intpow (TEST_QUADRANT_LEN (qlevel), p3->qvt->dim - 1);
+
+      for (f = 0; f < nfaces; ++f) {
+        nface = f;
+        finfo_array = qinfo_array[(qtid + tree->quad_offset) * nfaces + f];
+        SC3E_DEMAND (finfo_array != NULL, "face info array is not allocated");
+        SC3E_DEMAND (finfo_array[0] == 1 || finfo_array[0] == 2,
+                    "face info array has an illigal value");
+        SC3E (p4est3_connectivity_get_face
+              (p3->conn, &which_tree, &nface, &orient));
+        SC3E (p4est3_quadrant_get_tree_boundary (p3->qvt, q, f, &is_boundary));
+
+        for (p = 0; p < face_area; ++p) {
+          SC3E_DEMAND (finfo_array[p] == finfo_array[0],
+                      "face info array values differ");
+          if (finfo_array[p] == 1) {
+            /* iff it's a physical boundary */
+            SC3E_DEMAND (which_tree == t,
+                         "Neighbor tree exists => not a physical boundary");
+            SC3E_DEMAND (is_boundary,
+                         "Not a tree's boundary => not a physical boundary");
+          }
+          else if (finfo_array[p] == 2) {
+            /* iff it's not a physical boundary */
+            SC3E_DEMAND (!is_boundary || (is_boundary && which_tree == t),
+                         "A physical boundary");
+          }
+        }
+      }
+    }
+  }
+  return NULL;
+}
+
+static sc3_error_t *
 allocate_test_tracking_array (p4est3_t *p3, void **ptr_qinfo_array)
 {
   const size_t out_array_size = (1 << p3->qvt->dim) * p3->local_num_quads;
