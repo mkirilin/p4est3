@@ -24,11 +24,23 @@
 #include <p4est3_iterate.h>
 #include <p4est3_internal.h>
 #ifndef P4_TO_P8
+
+#ifdef P4EST_ENABLE_DEBUG
+#include <p4est_extended.h>
+#include <p4est_vtk.h>
+#endif /* P4EST_ENABLE_DEBUG */
+
 #include <p4est3_p4est.h>
 #include <p4est3_quadrant_yx.h>
 #include <p4est3_quadrant_mort2d.h>
 
 #else
+#ifdef P4EST_ENABLE_DEBUG
+#include <p4est_to_p8est.h>
+#include <p8est_extended.h>
+#include <p8est_vtk.h>
+#endif /* P4EST_ENABLE_DEBUG */
+
 #include <p4est3_p8est.h>
 #include <p4est3_quadrant_zyx.h>
 #include <p4est3_quadrant_mort3d.h>
@@ -38,7 +50,12 @@
 #define TEST_QUADRANT_LEN(l) ((int32_t) 1 << (MAX_TEST_LEVEL - (l)))
 #define DIM2 2
 
-//#define DISABLE_TEST_FACES
+static int          refine_level = 1;
+#ifdef P4_TO_P8
+static double       refinement_fraction = 1. / 7.;
+#else
+static double       refinement_fraction = 1. / 3.;
+#endif
 
 #if 0
 /* *INDENT-OFF* */
@@ -71,6 +88,79 @@ static const int    bound_dir_3d[12] =
 {0, 1, 2, 1, 2, 0, 2, 2, 0, 1, 1, 0};
 /* *INDENT-ON* */
 #endif
+
+static int
+refine_fractal (p4est_t * p, p4est_topidx_t which_tree,
+                p4est_quadrant_t * q)
+{
+  /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
+  p4est_locidx_t     *quadrant_local_id = (p4est_locidx_t *) p->user_pointer;
+
+  return
+    (((p->global_first_quadrant[p->mpirank] + (*quadrant_local_id)++) %
+#ifdef P4_TO_P8
+      7)
+#else
+      3)
+#endif
+     == 0);
+}
+
+static sc3_error_t *
+refine_p3_fractal (p4est3_refine_callback_info_t * ri, int *is_refine)
+{
+  /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
+  p4est3_locidx     *quadrant_local_id = (p4est3_locidx *) ri->user_data;
+  SC3A_CHECK (is_refine != NULL);
+
+  *is_refine =
+    (((ri->p3->goffset[ri->p3->mpirank] + (*quadrant_local_id)++) %
+#ifdef P4_TO_P8
+      7)
+#else
+      3)
+#endif
+     == 0);
+  return NULL;
+}
+
+static int
+refine_fraction (p4est_t * p, p4est_topidx_t which_tree,
+                 p4est_quadrant_t * q)
+{
+  /* The formula in the line below implies
+   * quadrant_fraction = 7 * refinement_fraction + 1.
+   * In particular we need for doubling the quadrants for a level increment
+   * refinment_factor = 1 / 7.
+  */
+  const p4est_locidx_t quad_count_refinement_threshold =
+    (p4est_locidx_t) (refinement_fraction * p->global_num_quadrants);
+  p4est_locidx_t     *quadrant_local_id = (p4est_locidx_t *) p->user_pointer;
+
+  return
+    ((p->global_first_quadrant[p->mpirank] + (*quadrant_local_id)++) <=
+      quad_count_refinement_threshold);
+}
+
+static sc3_error_t *
+refine_p3_fraction (p4est3_refine_callback_info_t * ri, int *is_refine)
+{
+  /* The formula in the line below implies
+   * quadrant_fraction = 7 * refinement_fraction + 1.
+   * In particular we need for doubling the quadrants for a level increment
+   * refinment_factor = 1 / 7.
+   */
+  /* p4est->global_num_quadrants is the old number of quadrants */
+  SC3A_CHECK (is_refine != NULL);
+  const p4est3_locidx quad_count_refinement_threshold =
+    (p4est3_locidx) (refinement_fraction * ri->p3->global_num_quads);
+  p4est3_locidx     *quadrant_local_id = (p4est3_locidx *) ri->user_data;
+  *is_refine =
+    ((ri->p3->goffset[ri->p3->mpirank] + (*quadrant_local_id)++) <=
+      quad_count_refinement_threshold);
+
+  return NULL;
+}
 
 sc3_error_t        *
 p4est3_connectivity_new_p4est_twotrees (sc3_allocator_t * alloc,
@@ -106,21 +196,9 @@ typedef struct setup
   sc3_allocator_t    *alloc;
   sc3_allocator_t    *mainalloc;
   p4est3_connectivity_t *conn;
-  sc3_MPI_Comm_t      mpicomm;
-  int                 mpirank;
   int                 level;
-  p4est3_topidx       num_trees;
-  sc3_array_t        *transform;
-  sc3_array_t        *nf;
 }
 setup_t;
-
-typedef struct callback_data
-{
-  sc3_array_t        *volumes;
-  sc3_array_t        *faces;
-}
-callback_data_t;
 
 static sc3_error_t *
 quadrant_to_mid (const uint64_t coords[P4EST_DIM - 1], int level,
@@ -177,19 +255,6 @@ array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
   SC3E (sc3_array_set_elem_count (*arr, ecount));
   SC3E (sc3_array_set_initzero (*arr, 1));
   SC3E (sc3_array_setup (*arr));
-
-  return NULL;
-}
-
-static sc3_error_t *
-make_connectivity (setup_t * t, int dim, int l_face, int r_face, int ori)
-{
-/* SC3E (p4est3_connectivity_new (t->alloc, &t->conn));
-  SC3E (p4est3_connectivity_set_dim (t->conn, dim));
-  SC3E (p4est3_connectivity_set_num_trees (t->conn, t->num_trees));
-  SC3E (p4est3_connectivity_setup (t->conn)); */
-  SC3E (p4est3_connectivity_new_p4est_twotrees
-        (t->alloc, &t->conn, l_face, r_face, ori));
 
   return NULL;
 }
@@ -380,13 +445,13 @@ face_callback (p4est3_iterate_face_info_t * fi)
 }
 
 static sc3_error_t *
-test_tracking_array (p4est3_t *p3, const int8_t ** const qinfo_array)
+test_tracking_array (p4est3_t *p3, int8_t ** const qinfo_array)
 {
   const int nfaces = 1 << p3->qvt->dim;
   int qlevel, face_area, is_boundary;
-  int i, f, p /* patch number */, nface, orient;
+  int f, p /* patch number */, nface, orient;
   char * q;
-  int8_t *finfo_array;
+  int8_t * finfo_array;
   p4est3_topidx t, which_tree;
   p4est3_locidx qtid /* local number of quadrant within on a tree */;
   p4est3_tree_t * tree;
@@ -443,18 +508,80 @@ allocate_test_tracking_array (p4est3_t *p3, void **ptr_qinfo_array)
 }
 
 static sc3_error_t *
-make_new_p4est3 (p4est3_t ** p3, setup_t * t, const p4est3_quadrant_vtable_t * qvt)
+p4est3_new_shortcut (p4est3_t ** p3, const setup_t * t, int start_level,
+                     const p4est3_quadrant_vtable_t * qvt,
+                     p4est3_t * src, p4est3_refine_callback_t p3crefine,
+                     int is_partition, void *user_data)
 {
-  SC3A_IS (sc3_allocator_is_setup, t->alloc);
-
-  /* create p4est object with connectivity */
   SC3E (p4est3_new (t->alloc, p3));
-  SC3E (p4est3_set_comm (*p3, t->mpicomm, 1));
+  SC3E (p4est3_set_comm (*p3, SC3_MPI_COMM_WORLD, 1));
   SC3E (p4est3_set_connectivity (*p3, t->conn));
   SC3E (p4est3_set_quadrant_vtable (*p3, qvt));
-  SC3E (p4est3_set_level (*p3, t->level));
+  SC3E (p4est3_set_level (*p3, start_level));
+  SC3E (p4est3_set_setup_mode (*p3, P4EST3_NEW_RECURSIVE));
+  SC3E (p4est3_set_refine (*p3, p3crefine));
+  SC3E (p4est3_set_source (*p3, src));
   SC3E (p4est3_set_shared (*p3, 1));
+  SC3E (p4est3_set_contiguous (*p3, 1));
+  SC3E (p4est3_set_family (*p3, 0));
+  SC3E (p4est3_set_partition (*p3, is_partition, NULL));
+  /*SC3E (p4est3_set_user_data (*p3, user_data));*/
+  if ((*p3)->old != NULL) {
+    (*p3)->old->user_data = user_data;
+  }
+
+  return NULL;
+}
+
+static sc3_error_t *
+make_forest_for_test (p4est3_t ** p3, setup_t * t,
+                      p4est3_quadrant_vtable_t * qvt)
+{
+  int i;
+  p4est3_locidx     quadrant_local_id = 0;
+  p4est3_t * p3refined;
+  p4est3_refine_callback_t p3crefine = refine_p3_fractal;
+#ifdef P4EST_ENABLE_DEBUG
+  p4est_t * p;
+  p4est_connectivity_t *conn_old; 
+  p4est_refine_t crefine = refine_fractal;
+#endif
+
+  SC3E (p4est3_new_shortcut (p3, t, t->level, qvt, NULL, NULL, 0, NULL));
   SC3E (p4est3_setup (*p3));
+#ifdef P4EST_ENABLE_DEBUG
+  conn_old = p4est_connectivity_new_twotrees (1, 0, 0);
+  p = p4est_new_ext
+        (sc_MPI_COMM_WORLD, conn_old, 0, t->level,
+         1, 0, NULL, &quadrant_local_id);
+#endif
+
+  /*** refine in a loop ***/
+  for (i = 0; i < refine_level; ++i, quadrant_local_id = 0) {
+    SC3E (p4est3_new_shortcut
+          (&p3refined, t, 0, qvt, *p3, p3crefine, 0, &quadrant_local_id));
+    SC3E (p4est3_setup (p3refined));
+#ifdef P4EST_ENABLE_DEBUG
+    quadrant_local_id = 0;
+    p4est_refine (p, 0, crefine, NULL);
+#endif
+
+    SC3E (p4est3_destroy (p3));
+    SC3E (p4est3_new_shortcut (p3, t, 0, qvt, p3refined, NULL, 1, NULL));
+    SC3E (p4est3_setup (*p3));
+#ifdef P4EST_ENABLE_DEBUG
+    p4est_partition (p, 0, NULL);
+    if (i == refine_level - 1) {
+      p4est_vtk_write_file (p, NULL, "p3_iter_test_");
+    }
+#endif
+
+    SC3E (p4est3_destroy (&p3refined));
+  }
+
+#ifdef P4EST_ENABLE_DEBUG
+  p4est_destroy (p);
+#endif
 
   return NULL;
 }
@@ -473,11 +600,9 @@ set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
   t->mainalloc = sc3_allocator_nothread ();
   SC3E (make_allocator (t));
   SC3E (p4est3_quadrant_vtable_p4est (qvt));
-  SC3E (array_new (t->alloc, sizeof (int), 9, 9, &t->transform));
-  SC3E (array_new (t->alloc, sizeof (int), (*qvt)->dim, (*qvt)->dim, &t->nf));
+  SC3E (p4est3_connectivity_new_p4est_twotrees (t->alloc, &t->conn, 1, 0, 0));
 
   t->level = 1;
-  t->num_trees = 2;
 
   return NULL;
 }
@@ -485,8 +610,6 @@ set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
 static sc3_error_t *
 clean_up (setup_t * t)
 {
-  SC3E (sc3_array_destroy (&t->transform));
-  SC3E (sc3_array_destroy (&t->nf));
   SC3E (free_allocator (&t->alloc));
   return NULL;
 }
@@ -498,8 +621,6 @@ main (int argc, char **argv)
   const p4est3_quadrant_vtable_t *qvt;
 
   SC3X (sc3_MPI_Init (&argc, &argv));
-  t->mpicomm = SC3_MPI_COMM_WORLD;
-  SC3X (sc3_MPI_Comm_rank (t->mpicomm, &t->mpirank));
   SC3X (set_parameters (t, &qvt));
 
   SC3X (clean_up (t));
