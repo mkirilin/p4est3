@@ -51,13 +51,13 @@
 #define DIM2 2
 
 static int          refine_level = 1;
+
+#if 0
 #ifdef P4_TO_P8
 static double       refinement_fraction = 1. / 7.;
 #else
 static double       refinement_fraction = 1. / 3.;
 #endif
-
-#if 0
 /* *INDENT-OFF* */
 static const int    nface_predef_2d[4][2] =
 {{1, 0}, {3, 2}, {3, 2}, {1, 0}};
@@ -87,42 +87,6 @@ static const int    bound_dir_2d[4] =
 static const int    bound_dir_3d[12] =
 {0, 1, 2, 1, 2, 0, 2, 2, 0, 1, 1, 0};
 /* *INDENT-ON* */
-#endif
-
-static int
-refine_fractal (p4est_t * p, p4est_topidx_t which_tree,
-                p4est_quadrant_t * q)
-{
-  /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
-  p4est_locidx_t     *quadrant_local_id = (p4est_locidx_t *) p->user_pointer;
-
-  return
-    (((p->global_first_quadrant[p->mpirank] + (*quadrant_local_id)++) %
-#ifdef P4_TO_P8
-      7)
-#else
-      3)
-#endif
-     == 0);
-}
-
-static sc3_error_t *
-refine_p3_fractal (p4est3_refine_callback_info_t * ri, int *is_refine)
-{
-  /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
-  p4est3_locidx     *quadrant_local_id = (p4est3_locidx *) ri->user_data;
-  SC3A_CHECK (is_refine != NULL);
-
-  *is_refine =
-    (((ri->p3->goffset[ri->p3->mpirank] + (*quadrant_local_id)++) %
-#ifdef P4_TO_P8
-      7)
-#else
-      3)
-#endif
-     == 0);
-  return NULL;
-}
 
 static int
 refine_fraction (p4est_t * p, p4est_topidx_t which_tree,
@@ -159,6 +123,42 @@ refine_p3_fraction (p4est3_refine_callback_info_t * ri, int *is_refine)
     ((ri->p3->goffset[ri->p3->mpirank] + (*quadrant_local_id)++) <=
       quad_count_refinement_threshold);
 
+  return NULL;
+}
+#endif
+
+static int
+refine_fractal (p4est_t * p, p4est_topidx_t which_tree,
+                p4est_quadrant_t * q)
+{
+  /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
+  p4est_locidx_t     *quadrant_local_id = (p4est_locidx_t *) p->user_pointer;
+
+  return
+    (((p->global_first_quadrant[p->mpirank] + (*quadrant_local_id)++) %
+#ifdef P4_TO_P8
+      7)
+#else
+      3)
+#endif
+     == 0);
+}
+
+static sc3_error_t *
+refine_p3_fractal (p4est3_refine_callback_info_t * ri, int *is_refine)
+{
+  /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
+  p4est3_locidx     *quadrant_local_id = (p4est3_locidx *) ri->user_data;
+  SC3A_CHECK (is_refine != NULL);
+
+  *is_refine =
+    (((ri->p3->goffset[ri->p3->mpirank] + (*quadrant_local_id)++) %
+#ifdef P4_TO_P8
+      7)
+#else
+      3)
+#endif
+     == 0);
   return NULL;
 }
 
@@ -262,6 +262,9 @@ array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 static sc3_error_t *
 volume_callback (p4est3_iterate_volume_info_t * vi)
 {
+  /* for every face of every volume we allocate
+     an array by the length of face's area */
+
   int i, nfaces = 1 << vi->p3->qvt->dim;
   p4est3_tree_t *tree;
   p4est3_locidx qid;
@@ -379,6 +382,9 @@ fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
 static sc3_error_t *
 face_callback (p4est3_iterate_face_info_t * fi)
 {
+  /* Test adjacency (necessity) and fill in
+     `test tracking array` to check later (sufficiency) */
+
   char *tempq[2];
   p4est3_iterate_face_side_t *sides[2], *side_small, *side_big;
   sc3_array_t *ftransform;
@@ -415,12 +421,13 @@ face_callback (p4est3_iterate_face_info_t * fi)
       SC3E (p4est3_quadrant_tree_face_neighbor
             (fi->p3->qvt, tempq[0], ftransform,
              side_small->nface, &tempq[1]));
+      SC3E (sc3_array_destroy (&ftransform));
     }
     SC3E_DEMIS3 (
       p4est3_quadrant_is3_equal, fi->p3->qvt, tempq[1], side_big->quadrant);
   } else { /* nsides == 1, nothing else is possible */
     side_big = side_small = sides[0];
-  }
+  }  
   /* fill testing arrays */
   /* for the smaller and/or one-sided quad we fill
      the whole face-related (part of) array */
@@ -440,6 +447,9 @@ face_callback (p4est3_iterate_face_info_t * fi)
       SC3E (fill_in_side_info
             (fi->p3, qinfo_array, side_big, side_small, nsides));
     }
+  }
+  for (i = 0; i < nsides; ++i) {
+    SC3E (sc3_allocator_free (fi->p3->alloc, tempq[i]));
   }
   return NULL;
 }
@@ -497,13 +507,14 @@ test_tracking_array (p4est3_t *p3, int8_t ** const qinfo_array)
 }
 
 static sc3_error_t *
-allocate_test_tracking_array (p4est3_t *p3, void **ptr_qinfo_array)
+allocate_test_tracking_array (p4est3_t *p3, int8_t ***ptr_qinfo_array)
 {
   const size_t out_array_size = (1 << p3->qvt->dim) * p3->local_num_quads;
-  char * out_array;
+  int8_t ** out_array;
 
   SC3E (sc3_allocator_calloc
         (p3->alloc, sizeof (int8_t *), out_array_size, &out_array));
+  *ptr_qinfo_array = out_array;
   return NULL;
 }
 
@@ -581,16 +592,9 @@ make_forest_for_test (p4est3_t ** p3, setup_t * t,
 
 #ifdef P4EST_ENABLE_DEBUG
   p4est_destroy (p);
+  p4est_connectivity_destroy (conn_old);
 #endif
 
-  return NULL;
-}
-
-static sc3_error_t *
-free_allocator (sc3_allocator_t ** alloc)
-{
-  SC3A_IS (sc3_allocator_is_setup, *alloc);
-  SC3E (sc3_allocator_destroy (alloc));
   return NULL;
 }
 
@@ -610,7 +614,38 @@ set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
 static sc3_error_t *
 clean_up (setup_t * t)
 {
-  SC3E (free_allocator (&t->alloc));
+  SC3E (p4est3_connectivity_destroy (&t->conn));
+  SC3E (sc3_allocator_destroy (&t->alloc));
+
+  return NULL;
+}
+
+static sc3_error_t *
+perform_test (setup_t * t, p4est3_quadrant_vtable_t * qvt)
+{
+  size_t i, out_array_size;
+  int8_t ** qinfo_array;
+  p4est3_t *p3;
+
+  /* preparations */
+  SC3E (make_forest_for_test (&p3, t, qvt));
+  SC3E (allocate_test_tracking_array (p3, &qinfo_array));
+
+  /* face iterator test run */
+  SC3E (p4est3_iterate_face (p3, volume_callback, face_callback, qinfo_array));
+
+  /* test arrays filled during iteration */
+  SC3E (test_tracking_array (p3, qinfo_array));
+
+  /* cleaning up */
+  out_array_size = (1 << qvt->dim) * p3->local_num_quads;
+  for (i = 0; i < out_array_size; ++i) {
+    SC3E_DEMAND (qinfo_array[i] != NULL,
+                 "Cleaning TRA error: array's cell is empty");
+    SC3E (sc3_allocator_free (p3->alloc, qinfo_array[i]));
+  }
+  SC3E (sc3_allocator_free (p3->alloc, &qinfo_array));
+  SC3E (p4est3_destroy (&p3));
   return NULL;
 }
 
@@ -618,13 +653,19 @@ int
 main (int argc, char **argv)
 {
   setup_t             st, *t = &st;
+  sc3_error_t        *e = NULL;
   const p4est3_quadrant_vtable_t *qvt;
 
-  SC3X (sc3_MPI_Init (&argc, &argv));
-  SC3X (set_parameters (t, &qvt));
+  SC3E_NULL_SET (e, sc3_MPI_Init (&argc, &argv));
+  sc_init (sc_MPI_COMM_WORLD, 1, 1, NULL, SC_LP_ESSENTIAL);
+  p4est_init (NULL, SC_LP_ESSENTIAL);
 
-  SC3X (clean_up (t));
+  SC3E_NULL_SET (e, set_parameters (t, &qvt));
+  SC3E_NULL_SET (e, perform_test (t, qvt));
+  SC3E_NULL_SET (e, clean_up (t));
 
-  SC3X (sc3_MPI_Finalize ());
+  SC3E_NULL_REQ (e, !sc_finalize_noabort ());
+  SC3E_NULL_SET (e, sc3_MPI_Finalize ());
+  SC3X (e);
   return 0;
 }
