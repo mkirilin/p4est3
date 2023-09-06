@@ -508,7 +508,7 @@ p4est3_quadrant_zyx_child_id (const __m128i * q, int *j)
 }
 
 static sc3_error_t *
-p4est3_quadrant_zyx_coordinates (const __m128i * q, int *j)
+p4est3_quadrant_zyx_coordinates (const __m128i * q, p4est_qcoord_t *j)
 {
   __m128i             r;
   int                 d = P4EST3_REF_MAXLEVEL - P4EST3_YX_MAXLEVEL;
