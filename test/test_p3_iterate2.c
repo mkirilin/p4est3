@@ -201,7 +201,7 @@ typedef struct setup
 setup_t;
 
 static sc3_error_t *
-quadrant_to_mid (const uint64_t coords[P4EST_DIM - 1], int level,
+quadrant_to_mid (const p4est_qcoord_t coords[P4EST_DIM - 1], int level,
                  uint64_t * const mid)
 {
   int                 i;
@@ -314,26 +314,34 @@ convert_quad_to_mid (const p4est3_t * const p3,
                      uint64_t * const mid)
 {
   /* convert a quadrant to d-1 morton index */
-  const int nfaces = 1 << p3->qvt->dim;
-  const int axis = patch->nface / nfaces;
-  uint64_t patch_crdDIM[P4EST_DIM], side_crdDIM[P4EST_DIM],
-           coords[P4EST_DIM - 1];
+  const int axis = patch->nface / P4EST_DIM;
+  p4est_qcoord_t patch_crdDIM[P4EST_DIM], side_crdDIM[P4EST_DIM],
+                 coords[P4EST_DIM - 1];
   int i, c, patch_lvl;
 #ifdef P4EST_ENABLE_DEBUG
+  int32_t patch_len, side_len;
   int side_lvl;
 #endif
 
   SC3E (p4est3_quadrant_coordinates (p3->qvt, patch->quadrant, patch_crdDIM));
   SC3E (p4est3_quadrant_coordinates (p3->qvt, side->quadrant, side_crdDIM));
-  SC3A_CHECK (patch_crdDIM[axis] == 0);
-  SC3A_CHECK (side_crdDIM[axis] == 0);
 
   SC3E (p4est3_quadrant_level (p3->qvt, patch->quadrant, &patch_lvl));
 #ifdef P4EST_ENABLE_DEBUG
   SC3E (p4est3_quadrant_level (p3->qvt, patch->quadrant, &side_lvl));
   SC3A_CHECK (side_lvl >= patch_lvl);
+
+  if (patch_crdDIM[axis] < side_crdDIM[axis]) {
+    patch_len = (int32_t) 1 << (p3->qvt->max_level - patch_lvl);
+    SC3A_CHECK (patch_crdDIM[axis] + patch_len == side_crdDIM[axis]);
+  }
+  else if (patch_crdDIM[axis] > side_crdDIM[axis]) {
+    side_len = (int32_t) 1 << (p3->qvt->max_level - side_lvl);
+    SC3A_CHECK (side_crdDIM[axis] + side_len == patch_crdDIM[axis]);
+  }
 #endif
-  /* DIM x d cooreds -> DIM-1 x d coords */
+
+  /* DIM x d coords -> DIM-1 x d coords */
   for (i = 0, c = 0; i < p3->qvt->dim; ++i) {
     if (i == axis) {
       continue;
@@ -358,8 +366,11 @@ fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
   int i, patch_qlevel, patch_area;
   uint64_t begin_mid;
 
-  SC3A_CHECK ((side == patch && nsides == 1)
-           || (side != patch && nsides == 2));
+#ifdef P4EST_ENABLE_DEBUG
+  if (side != patch) {
+    SC3A_CHECK (nsides == 2);
+  }
+#endif
 
   side_qid_loc = (p4est3_gloidx) side->nquad
             + p3->gtroffset[side->ntree] - p3->goffset[p3->mpirank];
@@ -396,7 +407,7 @@ face_callback (p4est3_iterate_face_info_t * fi)
 
   /* test adjacency */
   for (i = 0; i < nsides; ++i) {
-    SC3E (sc3_array_index (fi->sides, 0, &sides[i]));
+    SC3E (sc3_array_index (fi->sides, i, &sides[i]));
     SC3E (p4est3_quadrant_level
           (fi->p3->qvt, sides[i]->quadrant, &levels[i]));
     SC3E (sc3_allocator_calloc_one (fi->p3->alloc, fi->p3->qsize, &tempq[i]));
@@ -405,11 +416,17 @@ face_callback (p4est3_iterate_face_info_t * fi)
     ss_id = levels[0] > levels[1] ? 0 : 1;
     side_small = sides[ss_id];
     side_big = sides[1 - ss_id];
-    SC3E (p4est3_quadrant_ancestor
-          (fi->p3->qvt, side_small->quadrant, levels[1 - ss_id], &tempq[0]));
+    if (levels[0] == levels[1]) {
+      SC3E (p4est3_quadrant_copy
+            (fi->p3->qvt, side_small->quadrant, tempq[0]));
+    }
+    else {
+      SC3E (p4est3_quadrant_ancestor
+            (fi->p3->qvt, side_small->quadrant, levels[1 - ss_id], tempq[0]));
+    }
     if (side_small->ntree == side_big->ntree) {
       SC3E (p4est3_quadrant_face_neighbor
-            (fi->p3->qvt, tempq[0], side_small->nface, &tempq[1]));
+            (fi->p3->qvt, tempq[0], side_small->nface, tempq[1]));
     }
     else {
       ntree = side_small->ntree;
@@ -420,7 +437,7 @@ face_callback (p4est3_iterate_face_info_t * fi)
                    "face transform trees mismatch");
       SC3E (p4est3_quadrant_tree_face_neighbor
             (fi->p3->qvt, tempq[0], ftransform,
-             side_small->nface, &tempq[1]));
+             side_small->nface, tempq[1]));
       SC3E (sc3_array_destroy (&ftransform));
     }
     SC3E_DEMIS3 (
@@ -606,7 +623,7 @@ set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
   SC3E (p4est3_quadrant_vtable_p4est (qvt));
   SC3E (p4est3_connectivity_new_p4est_twotrees (t->alloc, &t->conn, 1, 0, 0));
 
-  t->level = 1;
+  t->level = 0;
 
   return NULL;
 }
