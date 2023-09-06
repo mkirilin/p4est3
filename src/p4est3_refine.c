@@ -388,9 +388,9 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
         is_recv = 1;
         SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
-      ll_resp_tree++;
-      SC3A_CHECK (ll_resp_tree == p3->lltree);
     }
+    ll_resp_tree++;
+    SC3A_CHECK (ll_resp_tree == p3->lltree);
   }
 
   /* Determine process to send to: the process responsible
