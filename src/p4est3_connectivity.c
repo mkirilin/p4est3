@@ -306,6 +306,8 @@ p4est3_connectivity_get_face_transform (const p4est3_connectivity_t * c,
     return NULL;
   }
 
+  *itree = itree_neighbor;
+
   SC3A_CHECK (0 <= iface_neighbor && iface_neighbor < c->num_faces);
   SC3A_CHECK (0 <= orient && orient <= c->half_children);
 
