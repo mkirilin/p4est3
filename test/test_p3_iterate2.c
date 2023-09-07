@@ -373,7 +373,7 @@ fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
 
   SC3E (convert_quad_to_mid (p3, side, patch, &begin_mid));
 
-  for (i = begin_mid; i < patch_area; ++i) {
+  for (i = begin_mid; i < begin_mid + patch_area; ++i) {
     SC3E_DEMAND (finfo_array[i] == 0,
                   "trying to write into non-empty face-info cell");
     finfo_array[i] = nsides;
@@ -391,7 +391,8 @@ face_callback (p4est3_iterate_face_info_t * fi)
   p4est3_iterate_face_side_t *sides[2], *side_small, *side_big;
   sc3_array_t *ftransform;
   int8_t **qinfo_array = (int8_t **) fi->user_data;
-  int i, ntree, nsides, levels[2], ss_id /* smaller side index */;
+  p4est3_topidx ntree;
+  int i, nsides, levels[2], ss_id /* smaller side index */;
   SC3E (sc3_array_get_elem_count (fi->sides, &nsides));
   SC3E_DEMAND ((nsides == 2) || ((nsides == 1) && fi->tree_boundary),
                "one face's side not on a tree's boundary");
@@ -475,7 +476,6 @@ test_tracking_array (p4est3_t *p3, int8_t ** const qinfo_array)
   p4est3_tree_t * tree;
 
   for (t = p3->fltree; t <= p3->lltree; ++t) {
-    which_tree = t;
     SC3E (p4est3_tree_index (p3, t, &tree));
     for (qtid = 0; qtid < tree->num_quads; ++qtid) {
       q = tree->tquads + qtid * p3->qvt->quadrant_size;
@@ -488,6 +488,7 @@ test_tracking_array (p4est3_t *p3, int8_t ** const qinfo_array)
         SC3E_DEMAND (finfo_array != NULL, "face info array is not allocated");
         SC3E_DEMAND (finfo_array[0] == 1 || finfo_array[0] == 2,
                     "face info array has an illigal value");
+        which_tree = t;
         SC3E (p4est3_connectivity_get_face
               (p3->conn, &which_tree, &nface, &orient));
         SC3E (p4est3_quadrant_get_tree_boundary (p3->qvt, q, f, &is_boundary));
@@ -504,7 +505,7 @@ test_tracking_array (p4est3_t *p3, int8_t ** const qinfo_array)
           }
           else if (finfo_array[p] == 2) {
             /* iff it's not a physical boundary */
-            SC3E_DEMAND (!is_boundary || (is_boundary && which_tree == t),
+            SC3E_DEMAND (!is_boundary || (is_boundary && which_tree != t),
                          "A physical boundary");
           }
         }
@@ -652,7 +653,7 @@ perform_test (setup_t * t, p4est3_quadrant_vtable_t * qvt)
                  "Cleaning TRA error: array's cell is empty");
     SC3E (sc3_allocator_free (p3->alloc, qinfo_array[i]));
   }
-  SC3E (sc3_allocator_free (p3->alloc, &qinfo_array));
+  SC3E (sc3_allocator_free (p3->alloc, qinfo_array));
   SC3E (p4est3_destroy (&p3));
   return NULL;
 }
