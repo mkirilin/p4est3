@@ -309,7 +309,7 @@ convert_quad_to_mid (const p4est3_t * const p3,
                  coords[P4EST_DIM - 1];
   int i, c, patch_lvl;
 #ifdef P4EST_ENABLE_DEBUG
-  int32_t patch_len, side_len;
+  /*int32_t patch_len, side_len;*/
   int side_lvl;
 #endif
 
@@ -318,17 +318,18 @@ convert_quad_to_mid (const p4est3_t * const p3,
 
   SC3E (p4est3_quadrant_level (p3->qvt, patch->quadrant, &patch_lvl));
 #ifdef P4EST_ENABLE_DEBUG
-  SC3E (p4est3_quadrant_level (p3->qvt, patch->quadrant, &side_lvl));
-  SC3A_CHECK (side_lvl >= patch_lvl);
+  SC3E (p4est3_quadrant_level (p3->qvt, side->quadrant, &side_lvl));
+  SC3A_CHECK (side_lvl <= patch_lvl);
 
-  if (patch_crdDIM[axis] < side_crdDIM[axis]) {
+  /* is not correct for inter tree border */
+  /*if (patch_crdDIM[axis] < side_crdDIM[axis]) {
     patch_len = (int32_t) 1 << (p3->qvt->max_level - patch_lvl);
     SC3A_CHECK (patch_crdDIM[axis] + patch_len == side_crdDIM[axis]);
   }
   else if (patch_crdDIM[axis] > side_crdDIM[axis]) {
     side_len = (int32_t) 1 << (p3->qvt->max_level - side_lvl);
     SC3A_CHECK (side_crdDIM[axis] + side_len == patch_crdDIM[axis]);
-  }
+  }*/
 #endif
 
   /* DIM x d coords -> DIM-1 x d coords */
