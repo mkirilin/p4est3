@@ -376,7 +376,7 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
                                 p4est3_topidx tree,
                                 int face,
                                 p4est3_iterate_face_side_t * fside,
-                                int *is_lower)
+                                int *is_iterate)
 {
   const int           ntypes = p3->num_children + 1;
   int                 i, j, orient;
@@ -388,18 +388,23 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
   p4est3_locidx      *begin, *end;
   int                 s;
 
-  SC3E_RETVAL (is_lower, 0);
+  SC3E_RETVAL (is_iterate, 1);
   is_refine[0] = is_refine[1] = 0;
   fside[0].ntree = tree;
   fside[0].nface = face;
   SC3E (p4est3_connectivity_get_face
         (p3->conn, &tree_neighbor, &face, &orient));
-  if (tree_neighbor > p3->lltree || tree_neighbor < p3->fltree) {
+  /*if (tree_neighbor > p3->lltree || tree_neighbor < p3->fltree) {
     *is_lower = 1;
     return NULL;
   }
   if (tree_neighbor < tree) {
     *is_lower = 1;
+    return NULL;
+  }*/
+  if (p3->fltree <= tree_neighbor && tree_neighbor <= p3->lltree
+      && tree_neighbor > tree) {
+    *is_iterate = 0;
     return NULL;
   }
   sa->finfo->orientation = orient;
@@ -1008,7 +1013,7 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
   p4est3_search_area_t ssa, *search_area = &ssa;
   p4est3_topidx       tree;
   p4est3_iterate_face_side_t *fside;
-  int                 face, is_lower = 0;
+  int                 face, is_iterate = 0;
 
   /* This iteration is w/o ghost layer and for volumes only */
   if (codims < 0 || codims >= P4EST3_ITERATE_LAST) {
@@ -1037,15 +1042,10 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
     search_area->tree_face[0] = search_area->tree;
     for (face = 0; face < search_area->nfaces; ++face) {
       SC3E (p4est3_iterate_face_bound_init
-            (p3, search_area, tree, face, fside, &is_lower));
-      if (is_lower) {
+            (p3, search_area, tree, face, fside, &is_iterate));
+      if (is_iterate) {
         /* we iterate over such trees that tree_neighbor < tree */
-        SC3E (sc3_array_pop (search_area->finfo->sides));
-        continue;
-      }
-      SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
-      if (is_lower) {
-        SC3E (sc3_array_push (search_area->finfo->sides, NULL));
+        SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
       }
     }
   }
