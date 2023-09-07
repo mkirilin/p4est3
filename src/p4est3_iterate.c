@@ -515,6 +515,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
   int                *Level = sa->Level_face;
   int                 i, side, level, idx, child_id, p;
   int                 ori = sa->finfo->orientation;
+  int                 is_lvl_increased[2] = {0, 0};
   void               *first_quad;
 
   for (side = 0; side < sa->nsides; ++side) {
@@ -597,9 +598,9 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     if (cface != NULL) {
       SC3E (cface (sa->finfo));
     }
-    for (side = 0; side < sa->nsides; ++side) {
+    /*for (side = 0; side < sa->nsides; ++side) {
       is_refine[side] = 1;
-    }
+    }*/
     return NULL;
   }
   for (side = 0; side < sa->nsides; ++side) {
@@ -653,12 +654,12 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     }
   }
   for (i = 0; i < half_ch; ++i) {
+    is_lvl_increased[0] = is_lvl_increased[1] = 0;
     for (side = 0; side < sa->nsides; ++side) {
-      idx = i;
-      SC3E (sc3_array_index (*(sc3_array_t **) (stack_it[side]), 0, &arr_it));
       if (!is_refine[side]) {
         continue;
       }
+      idx = i;
       if (side == 1) {
         SC3E (p4est3_connectivity_get_neighbor_face_corner
               (p3->conn, fside[0].nface, fside[1].nface, ori, &idx));
@@ -666,17 +667,21 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       SC3E (p4est3_connectivity_get_face_child_id
             (p3->conn, fside[side].nface, idx, &child_id));
       sa->child_id_face[side] = child_id;
+      Level[side]++;
+      is_lvl_increased[side] = 1;
     }
-    Level[0]++;
-    Level[1]++;
     SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, sa));
-    Level[0]--;
-    Level[1]--;
+    for (side = 0; side < sa->nsides; ++side) {
+      Level[side] = is_lvl_increased[side] ? Level[side] - 1 : Level[side];
+      if (i != half_ch - 1) {
+        is_refine[side] = is_lvl_increased[side];
+      }
+    }
   }
   for (side = 0; side < sa->nsides; ++side) {
-    if (!is_refine[side]) {
+    /*if (!is_refine[side]) {
       continue;
-    }
+    }*/
     for (p = sa->remote_first[side]; p <= sa->remote_last[side]; ++p) {
       if (p == p3->mpirank) {
         continue;
