@@ -292,19 +292,9 @@ static int
 check_q_in_proc (const p4est3_t * p3, const p4est3_topidx t,
                  const p4est3_locidx nquad)
 {
-  if (t < p3->fltree || p3->lltree < t) {
-    return 0;
-  }
-  if (p3->fltree < t && t < p3->lltree) {
-    return 1;
-  }
-  if (t == p3->fltree) {
-    return (nquad + p3->gtroffset[p3->fltree] >= p3->goffset[p3->mpirank]);
-  }
-  if (t == p3->lltree) {
-    return (nquad + p3->gtroffset[p3->lltree] < p3->goffset[p3->mpirank]);
-  }
-  return 0;
+  p4est3_gloidx nquad_glo = (p4est3_gloidx) nquad + p3->gtroffset[t];
+  return (p3->goffset[p3->mpirank] <= nquad_glo
+       && nquad_glo < p3->goffset[p3->mpirank + 1]);
 }
 
 static sc3_error_t *
