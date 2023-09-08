@@ -48,7 +48,6 @@
 
 #define MAX_TEST_LEVEL 2
 #define TEST_QUADRANT_LEN(l) ((int32_t) 1 << (MAX_TEST_LEVEL - (l)))
-#define DIM2 2
 
 static int          refine_level = 1;
 
@@ -127,6 +126,7 @@ refine_p3_fraction (p4est3_refine_callback_info_t * ri, int *is_refine)
 }
 #endif
 
+#ifdef P4EST_ENABLE_DEBUG
 static int
 refine_fractal (p4est_t * p, p4est_topidx_t which_tree,
                 p4est_quadrant_t * q)
@@ -143,6 +143,7 @@ refine_fractal (p4est_t * p, p4est_topidx_t which_tree,
 #endif
      == 0);
 }
+#endif /* P4EST_ENABLE_DEBUG */
 
 static sc3_error_t *
 refine_p3_fractal (p4est3_refine_callback_info_t * ri, int *is_refine)
@@ -265,7 +266,7 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
   /* for every face of every volume we allocate
      an array by the length of face's area */
 
-  int i, nfaces = 1 << vi->p3->qvt->dim;
+  int i;
   p4est3_tree_t *tree;
   p4est3_locidx qid;
   int qlevel, face_area;
@@ -276,13 +277,13 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
   SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
   qid = tree->quad_offset + vi->nquad;
   SC3A_CHECK (qid < vi->p3->local_num_quads);
-  for (i = 0; i < nfaces; ++i) {
+  for (i = 0; i < P4EST_FACES; ++i) {
     SC3E_DEMAND
-      (qinfo_array[qid * nfaces + i] == NULL,
+      (qinfo_array[qid * P4EST_FACES + i] == NULL,
        "volume is visited the second time");
     SC3E (sc3_allocator_calloc
           (vi->p3->alloc, sizeof (int8_t), face_area,
-           &qinfo_array[qid * nfaces + i]));
+           &qinfo_array[qid * P4EST_FACES + i]));
   }
 
   return NULL;
@@ -332,6 +333,10 @@ convert_quad_to_mid (const p4est3_t * const p3,
   }*/
 #endif
 
+  memset (coords, 0, sizeof (p4est_qcoord_t) * (P4EST_DIM - 1));
+  for (i = 0; i < p3->qvt->dim - 1; ++i) {
+    coords[i] = 0;
+  }
   /* DIM x d coords -> DIM-1 x d coords */
   for (i = 0, c = 0; i < p3->qvt->dim; ++i) {
     if (i == axis) {
@@ -353,11 +358,10 @@ fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
                    const p4est3_iterate_face_side_t * const patch,
                    const int nsides)
 {
-  const int nfaces = 1 << p3->qvt->dim;
   int8_t *finfo_array;
   p4est3_locidx side_qid_loc;
   int i, patch_qlevel, patch_area;
-  uint64_t begin_mid;
+  uint64_t begin_mid = 0;
 
 #ifdef P4EST_ENABLE_DEBUG
   if (side != patch) {
@@ -370,7 +374,7 @@ fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
 
   SC3E (p4est3_quadrant_level (p3->qvt, patch->quadrant, &patch_qlevel));
   patch_area = sc3_intpow (TEST_QUADRANT_LEN (patch_qlevel), p3->qvt->dim - 1);
-  finfo_array = qinfo_array[side_qid_loc * nfaces + side->nface];
+  finfo_array = qinfo_array[side_qid_loc * P4EST_FACES + side->nface];
   SC3A_CHECK (finfo_array != NULL);
 
   SC3E (convert_quad_to_mid (p3, side, patch, &begin_mid));
@@ -468,7 +472,6 @@ face_callback (p4est3_iterate_face_info_t * fi)
 static sc3_error_t *
 test_tracking_array (p4est3_t *p3, int8_t ** const qinfo_array)
 {
-  const int nfaces = 1 << p3->qvt->dim;
   int qlevel, face_area, is_boundary;
   int f, p /* patch number */, nface, orient;
   char * q;
@@ -484,9 +487,9 @@ test_tracking_array (p4est3_t *p3, int8_t ** const qinfo_array)
       SC3E (p4est3_quadrant_level (p3->qvt, q, &qlevel));
       face_area = sc3_intpow (TEST_QUADRANT_LEN (qlevel), p3->qvt->dim - 1);
 
-      for (f = 0; f < nfaces; ++f) {
+      for (f = 0; f < P4EST_FACES; ++f) {
         nface = f;
-        finfo_array = qinfo_array[(qtid + tree->quad_offset) * nfaces + f];
+        finfo_array = qinfo_array[(qtid + tree->quad_offset) * P4EST_FACES + f];
         SC3E_DEMAND (finfo_array != NULL, "face info array is not allocated");
         SC3E_DEMAND (finfo_array[0] == 1 || finfo_array[0] == 2,
                     "face info array has an illigal value");
@@ -520,7 +523,7 @@ test_tracking_array (p4est3_t *p3, int8_t ** const qinfo_array)
 static sc3_error_t *
 allocate_test_tracking_array (p4est3_t *p3, int8_t ***ptr_qinfo_array)
 {
-  const size_t out_array_size = (1 << p3->qvt->dim) * p3->local_num_quads;
+  const size_t out_array_size = P4EST_FACES * p3->local_num_quads;
   int8_t ** out_array;
 
   SC3E (sc3_allocator_calloc
@@ -635,7 +638,7 @@ static sc3_error_t *
 perform_test (setup_t * t, p4est3_quadrant_vtable_t * qvt)
 {
   size_t i, out_array_size;
-  int8_t ** qinfo_array;
+  int8_t ** qinfo_array = NULL;
   p4est3_t *p3;
 
   /* preparations */
@@ -649,7 +652,7 @@ perform_test (setup_t * t, p4est3_quadrant_vtable_t * qvt)
   SC3E (test_tracking_array (p3, qinfo_array));
 
   /* cleaning up */
-  out_array_size = (1 << qvt->dim) * p3->local_num_quads;
+  out_array_size = P4EST_FACES * p3->local_num_quads;
   for (i = 0; i < out_array_size; ++i) {
     SC3E_DEMAND (qinfo_array[i] != NULL,
                  "Cleaning TRA error: array's cell is empty");

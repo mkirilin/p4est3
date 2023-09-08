@@ -172,6 +172,7 @@ typedef struct p4est3_qvt_non_const_wrapper
   const p4est3_quadrant_vtable_t *qvt;
 } p4est3_qvt_non_const_wrapper_t;
 
+#ifdef P4EST_ENABLE_DEBUG
 /* Custom quadrant_compare function to align with sc3_array_is_sorted interface. */
 static sc3_error_t *
 p4est3_array_split_compare (const void * q1, const void * q2,
@@ -181,6 +182,7 @@ p4est3_array_split_compare (const void * q1, const void * q2,
           (((p4est3_qvt_non_const_wrapper_t *) wqvt)->qvt, q1, q2, j));
   return NULL;
 }
+#endif
 
 /* Wrap user data to pass into custom p4est3_array_split_ancestor_id function. */
 typedef struct p4est3_array_split_data
