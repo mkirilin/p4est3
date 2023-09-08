@@ -214,13 +214,13 @@ quadrant_to_mid (const p4est_qcoord_t coords[P4EST_DIM - 1], int level,
   SC3A_CHECK (0 <= level && level <= MAX_TEST_LEVEL);
 
   /* this preserves the high bits from negative numbers */
-  x = coords[0] >> (MAX_TEST_LEVEL - level);
+  x = coords[0];
 #ifdef P4_TO_P8
-  y = coords[1] >> (MAX_TEST_LEVEL - level);
+  y = coords[1];
 #endif
 
   id = 0;
-  for (i = 0; i < level + 2; ++i) {
+  for (i = 0; i <= level; ++i) {
     id |= ((x & ((uint64_t) 1 << i)) << (((P4EST_DIM - 1) - 1) * i));
 #ifdef P4_TO_P8
     id |= ((y & ((uint64_t) 1 << i)) << (((P4EST_DIM - 1) - 1) * i + 1));
@@ -337,9 +337,11 @@ convert_quad_to_mid (const p4est3_t * const p3,
     if (i == axis) {
       continue;
     }
-    SC3A_CHECK ((side_lvl == patch_lvl && patch_crdDIM[i] == side_crdDIM[i])
-             || (side_lvl != patch_lvl && patch_crdDIM[i] >= side_crdDIM[i]));
-    coords[c++] = patch_crdDIM[i] - side_crdDIM[i];
+    /* the ckech is invalid for inter-tree iteration */
+    /*SC3A_CHECK ((side_lvl == patch_lvl && patch_crdDIM[i] == side_crdDIM[i])
+             || (side_lvl != patch_lvl && patch_crdDIM[i] >= side_crdDIM[i]));*/
+    coords[c++] =
+      (patch_crdDIM[i] - side_crdDIM[i]) >> (P4EST3_REF_MAXLEVEL - MAX_TEST_LEVEL);
   }
   SC3E (quadrant_to_mid (coords, patch_lvl, mid));
   return NULL;
@@ -592,7 +594,7 @@ make_forest_for_test (p4est3_t ** p3, setup_t * t,
 #ifdef P4EST_ENABLE_DEBUG
     p4est_partition (p, 0, NULL);
     if (i == refine_level - 1) {
-      p4est_vtk_write_file (p, NULL, "p3_iter_test_");
+      p4est_vtk_write_file (p, NULL, "p3_iter_test");
     }
 #endif
 
