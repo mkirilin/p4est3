@@ -674,9 +674,11 @@ main (int argc, char **argv)
   sc_init (sc_MPI_COMM_WORLD, 1, 1, NULL, SC_LP_ESSENTIAL);
   p4est_init (NULL, SC_LP_ESSENTIAL);
 
-  SC3E_NULL_SET (e, set_parameters (t, &qvt));
-  SC3E_NULL_SET (e, perform_test (t, qvt));
-  SC3E_NULL_SET (e, clean_up (t));
+  if (!P4EST_ENABLE_MPI) {
+    SC3E_NULL_SET (e, set_parameters (t, &qvt));
+    SC3E_NULL_SET (e, perform_test (t, qvt));
+    SC3E_NULL_SET (e, clean_up (t));
+  }
 
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
