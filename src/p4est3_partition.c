@@ -32,6 +32,10 @@ extern              "C"
 #endif
 #endif
 
+/* disable code responsible for sending trees info,
+   since we are in shared memory now */
+#define SENDRECV_TREES 0
+
 static sc3_error_t *
 p4est3_part_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
                        int ecount, sc3_array_t ** arr)
@@ -863,6 +867,8 @@ p4est3_partition (p4est3_t * p3)
 
   from_begin_global_quad = from_begin;
   from_end_global_quad = from_end;
+
+#if SENDRECV_TREES
   /* Post receives for the trees */
 #ifdef P4EST_ENABLE_MPI
   SC3E (sc3_allocator_malloc (p3->alloc,
@@ -963,6 +969,9 @@ p4est3_partition (p4est3_t * p3)
   MPI_Waitall (num_proc_recv_from, recv_request, MPI_STATUSES_IGNORE);
   SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
+
+#endif /* SENDRECV_TREES */
+
   /* Allocate new shared memory to store quadrants */
   quadbytes = (sc3_MPI_Aint_t) p3->local_num_quads * p3->qsize;
   SC3E (sc3_mpienv_get_info_noncont (p3->split_info, &info_noncontig));
@@ -987,6 +996,8 @@ p4est3_partition (p4est3_t * p3)
   p3->quadwin = new_quadwin;
   SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
 
+#if SENDRECV_TREES
+
   /* Calculate the local index of the end of each tree in the repartition */
   SC3E (p4est3_trees_new_boundaries (p3, num_recv_from, recv_buf,
                                      num_per_tree_local,
@@ -1008,6 +1019,8 @@ p4est3_partition (p4est3_t * p3)
   MPI_Waitall (num_proc_send_to, send_request, MPI_STATUSES_IGNORE);
   SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
+
+#endif /* SENDRECV_TREES */
 
   /*Warning! This works only when qvt for p3 and p3->old are the same*/
   if (p3->contiguous) {
