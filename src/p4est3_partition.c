@@ -58,13 +58,11 @@ static sc3_error_t *
 p4est3_partition_allocations_prerecv (const p4est3_t * p3,
                                       p4est3_locidx ** pnum_recv_from,
                                       p4est3_gloidx ** plast_goffsets,
+                                      p4est3_gloidx ** plast_tree_goffsets,
                                       p4est3_gloidx ** ploc_offsets)
 {
   p4est3_locidx      *locidx_prt;
   p4est3_gloidx      *gloidx_prt;
-  p4est3_topidx       total_num_trees;
-
-  SC3E (p4est3_connectivity_get_num_trees (p3->conn, &total_num_trees));
 
   locidx_prt = NULL;
   SC3E (sc3_allocator_calloc
@@ -75,6 +73,11 @@ p4est3_partition_allocations_prerecv (const p4est3_t * p3,
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->mpisize * sizeof (p4est3_gloidx), &gloidx_prt));
   *plast_goffsets = gloidx_prt;
+
+  gloidx_prt = NULL;
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, p3->num_trees * sizeof (p4est3_gloidx), &gloidx_prt));
+  *plast_tree_goffsets = gloidx_prt;
 
   gloidx_prt = NULL;
   SC3E (sc3_allocator_malloc
@@ -395,9 +398,12 @@ p4est3_partition (p4est3_t * p3)
   p4est3_gloidx       from_begin, from_end;
   p4est3_gloidx       qcount_node;
   p4est3_gloidx      *last_goffsets = NULL;
-                                                    /**< Offsets of last quadrant in a process */
+                                  /**< Offsets of last quadrant in a process */
+  p4est3_gloidx      *last_gtree_offsets = NULL;
+                                  /**< Offsets of last quadrant in a tree */
   sc3_MPI_Comm_t      nodecomm;
   p4est3_gloidx      *loc_offsets = NULL;
+  p4est3_topidx       t;
 
   /* new shared memory variables block */
 #ifdef P4EST_ENABLE_DEBUG
@@ -432,7 +438,8 @@ p4est3_partition (p4est3_t * p3)
   SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
   SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
   SC3E (p4est3_partition_allocations_prerecv
-        (p3, &num_recv_from, &last_goffsets, &loc_offsets));
+        (p3, &num_recv_from, &last_goffsets,
+         &last_gtree_offsets, &loc_offsets));
   p3->global_num_quads = p3->old->global_num_quads;
 
   node_offset = node_offsets[node_num];
@@ -467,6 +474,9 @@ p4est3_partition (p4est3_t * p3)
 
   for (i = 0; i < p3->mpisize; ++i) {
     last_goffsets[i] = p3->old->goffset[i + 1] - 1;
+  }
+  for (t = 0; t < p3->num_trees; ++t) {
+    last_gtree_offsets[t] = p3->gtroffset[i + 1] - 1;
   }
 
   if (p3->family) {
@@ -550,6 +560,8 @@ p4est3_partition (p4est3_t * p3)
   SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
 
   SC3E (sc3_allocator_free (p3->alloc, loc_offsets));
+  SC3E (sc3_allocator_free (p3->alloc, last_goffsets));
+  SC3E (sc3_allocator_free (p3->alloc, last_gtree_offsets));
   return NULL;
 }
 
