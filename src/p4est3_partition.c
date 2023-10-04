@@ -64,10 +64,12 @@ p4est3_partition_allocations_prerecv (const p4est3_t * p3,
   p4est3_locidx      *locidx_prt;
   p4est3_gloidx      *gloidx_prt;
 
-  locidx_prt = NULL;
-  SC3E (sc3_allocator_calloc
-        (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &locidx_prt));
-  *pnum_recv_from = locidx_prt;
+  if (!p3->contiguous) {
+    locidx_prt = NULL;
+    SC3E (sc3_allocator_calloc
+          (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &locidx_prt));
+    *pnum_recv_from = locidx_prt;
+  }
 
   gloidx_prt = NULL;
   SC3E (sc3_allocator_malloc
@@ -93,14 +95,13 @@ p4est3_procs_recv_from (const p4est3_t * p3,
                         p4est3_gloidx * last_goffsets,
                         p4est3_locidx * num_recv_from,
                         p4est3_gloidx * from_begin, p4est3_gloidx * from_end,
-                        p4est3_gloidx * loc_offsets, int *num_proc_recv_from)
+                        p4est3_gloidx * loc_offsets)
 {
   int                 from_proc;
   p4est3_gloidx       my_begin, my_end, lower_bound;
 
   my_begin = loc_offsets[p3->mpirank];
   my_end = loc_offsets[p3->mpirank + 1] - (p4est3_gloidx) 1;
-  *num_proc_recv_from = 0;
 
   if (my_begin > my_end) {
     /* my_begin == my_end requires a search is legal for find_partition */
@@ -123,7 +124,6 @@ p4est3_procs_recv_from (const p4est3_t * p3,
       if (from_proc == p3->mpirank) {
         continue;
       }
-      (*num_proc_recv_from)++;
     }
   }
   return NULL;
@@ -132,7 +132,6 @@ p4est3_procs_recv_from (const p4est3_t * p3,
 static sc3_error_t *
 p4est3_quads_copy_from (const p4est3_t * p3, p4est3_locidx * num_recv_from,
                         p4est3_gloidx from_begin, p4est3_gloidx from_end,
-                        char *new_nodequad, sc3_MPI_Win_t * new_quadwin,
                         p4est3_gloidx * loc_offsets, int noderank)
 {
   const p4est3_gloidx my_begin = loc_offsets[p3->mpirank];
@@ -140,8 +139,6 @@ p4est3_quads_copy_from (const p4est3_t * p3, p4est3_locidx * num_recv_from,
   p4est3_locidx       from_begin_copy, to_qid = 0;
   p4est3_gloidx       lower_bound;
 
-  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, noderank,
-                          SC3_MPI_MODE_NOCHECK, *new_quadwin));
   for (from_proc = from_begin; from_proc <= from_end; ++from_proc) {
     if (num_recv_from[from_proc] == 0) {
       continue;
@@ -150,7 +147,7 @@ p4est3_quads_copy_from (const p4est3_t * p3, p4est3_locidx * num_recv_from,
     from_begin_copy =
       (p4est3_locidx) (SC3_MAX (my_begin, lower_bound) - lower_bound);
     //from_end_copy = from_begin_copy + num_recv_from[from_proc];
-    memcpy (new_nodequad + to_qid * p3->qsize,
+    memcpy (p3->quads + to_qid * p3->qsize,
             p3->old->nodequads[from_proc] + from_begin_copy * p3->qsize,
             num_recv_from[from_proc] * p3->qsize);
     to_qid += num_recv_from[from_proc];
@@ -161,7 +158,6 @@ p4est3_quads_copy_from (const p4est3_t * p3, p4est3_locidx * num_recv_from,
        new_nodequad + (to_qid++) * p3->qsize));
        } */
   }
-  SC3E (sc3_MPI_Win_unlock (noderank, *new_quadwin));
   return NULL;
 }
 
@@ -480,9 +476,7 @@ p4est3_partition (p4est3_t * p3)
   int                 nodesize, noderank, node_num, node_offset,
     node_offset_next;
   const int          *node_offsets;
-  int                 num_proc_recv_from;
   p4est3_locidx      *correction;
-  p4est3_locidx       from_begin_global_quad, from_end_global_quad;
   p4est3_locidx      *num_recv_from = NULL;
                                 /**< Numbers of quadrants coming from the i-th process */
   p4est3_gloidx       from_begin, from_end;
@@ -585,14 +579,6 @@ p4est3_partition (p4est3_t * p3)
   p3->local_num_quads =
     loc_offsets[p3->mpirank + 1] - loc_offsets[p3->mpirank];
 
-  /* Adjust trees partition information of the forest */
-  SC3E (p4est3_procs_recv_from
-        (p3, last_goffsets, num_recv_from,
-         &from_begin, &from_end, loc_offsets, &num_proc_recv_from));
-
-  from_begin_global_quad = from_begin;
-  from_end_global_quad = from_end;
-
   SC3E (sc3_allocator_malloc
         (p3->alloc, nodesize * sizeof (char *), &p3->nodequads));
 
@@ -620,6 +606,8 @@ p4est3_partition (p4est3_t * p3)
   p3->quadwin = new_quadwin;
   SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
 
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, noderank,
+                          SC3_MPI_MODE_NOCHECK, p3->quadwin));
   /*Warning! This works only when qvt for p3 and p3->old are the same */
   if (p3->contiguous) {
     memcpy (p3->quads,
@@ -627,9 +615,12 @@ p4est3_partition (p4est3_t * p3)
             p3->local_num_quads * p3->qsize);
   }
   else {
+    SC3E (p4est3_procs_recv_from
+          (p3, last_goffsets, num_recv_from,
+           &from_begin, &from_end, loc_offsets));
     SC3E (p4est3_quads_copy_from
-          (p3, num_recv_from, from_begin_global_quad, from_end_global_quad,
-           new_quadmem, &new_quadwin, loc_offsets, noderank));
+          (p3, num_recv_from, from_begin, from_end, loc_offsets, noderank));
+    SC3E (sc3_allocator_free (p3->alloc, num_recv_from));
   }
 
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
@@ -650,7 +641,9 @@ p4est3_partition (p4est3_t * p3)
 
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->gtreeoffsets->gtreeoffsetwin));
+
   SC3E (p4est3_local_trees_reproduce (p3, last_gtree_offsets, loc_offsets));
+
   SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->gtreeoffsetwin));
   SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->gtreeoffsetwin));
 
@@ -660,10 +653,12 @@ p4est3_partition (p4est3_t * p3)
   SC3E (sc3_MPI_Win_sync (p3->gposition->gfposwin));
   SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
 
+  SC3E (sc3_MPI_Win_sync (p3->quadwin));
+  SC3E (sc3_MPI_Win_unlock (noderank, p3->quadwin));
+
   SC3E (sc3_allocator_free (p3->alloc, loc_offsets));
   SC3E (sc3_allocator_free (p3->alloc, last_goffsets));
   SC3E (sc3_allocator_free (p3->alloc, last_gtree_offsets));
-  SC3E (sc3_allocator_free (p3->alloc, num_recv_from));
   SC3E (sc3_MPI_Barrier (nodecomm));
   return NULL;
 }
