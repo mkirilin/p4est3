@@ -884,6 +884,5 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   else {
     SC3E (p4est3_partition (p3));
   }
-  p3->setup = 1;
   return NULL;
 }
