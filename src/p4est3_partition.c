@@ -136,7 +136,7 @@ p4est3_quads_copy_from (const p4est3_t * p3, p4est3_locidx * num_recv_from,
 {
   const p4est3_gloidx my_begin = loc_offsets[p3->mpirank];
   int                 from_proc;
-  p4est3_locidx       from_begin_copy, to_qid = 0;
+  p4est3_locidx       from_begin_copy, to_qid = 0, li;
   p4est3_gloidx       lower_bound;
 
   for (from_proc = from_begin; from_proc <= from_end; ++from_proc) {
@@ -147,9 +147,19 @@ p4est3_quads_copy_from (const p4est3_t * p3, p4est3_locidx * num_recv_from,
     from_begin_copy =
       (p4est3_locidx) (SC3_MAX (my_begin, lower_bound) - lower_bound);
     //from_end_copy = from_begin_copy + num_recv_from[from_proc];
-    memcpy (p3->quads + to_qid * p3->qsize,
-            p3->old->nodequads[from_proc] + from_begin_copy * p3->qsize,
-            num_recv_from[from_proc] * p3->qsize);
+    if (p3->qvt == p3->old->qvt) {
+      memcpy (p3->quads + to_qid * p3->qsize,
+              p3->old->nodequads[from_proc] + from_begin_copy * p3->qsize,
+              num_recv_from[from_proc] * p3->qsize);
+    }
+    else {
+      for (li = 0; li < num_recv_from[from_proc]; ++li) {
+        SC3E (p4est3_quadrant_translate (p3->old->qvt,
+              p3->old->nodequads[from_proc]
+                + (from_begin_copy + li) * p3->old->qsize,
+              p3->qvt, p3->quads + (to_qid + li) * p3->qsize));
+      }
+    }
     to_qid += num_recv_from[from_proc];
     /*for (from_qid = from_begin_copy; from_qid < from_end_copy; ++from_qid) {
        SC3E (p4est3_quadrant_copy
@@ -487,6 +497,7 @@ p4est3_partition (p4est3_t * p3)
                                   /**< Offsets of last quadrant in a tree */
   sc3_MPI_Comm_t      nodecomm;
   p4est3_gloidx      *loc_offsets = NULL;
+  p4est3_locidx       li;
   p4est3_topidx       t;
 
   /* new shared memory variables block */
@@ -610,9 +621,20 @@ p4est3_partition (p4est3_t * p3)
                           SC3_MPI_MODE_NOCHECK, p3->quadwin));
   /*Warning! This works only when qvt for p3 and p3->old are the same */
   if (p3->contiguous) {
-    memcpy (p3->quads,
-            p3->old->nodequads[0] + loc_offsets[p3->mpirank] * p3->qsize,
-            p3->local_num_quads * p3->qsize);
+    if (p3->qvt == p3->old->qvt) {
+      memcpy (p3->quads,
+              p3->old->nodequads[0] + loc_offsets[p3->mpirank] * p3->qsize,
+              p3->local_num_quads * p3->qsize);
+    }
+    else {
+      for (li = 0; li < p3->local_num_quads; ++li) {
+        qcount_node = loc_offsets[p3->mpirank] + (p4est3_gloidx) li;
+        SC3E (p4est3_quadrant_translate (p3->old->qvt,
+               p3->old->nodequads[0]
+                + qcount_node * (p4est3_gloidx) p3->old->qsize,
+               p3->qvt, p3->quads + li * p3->qsize));
+      }
+    }
   }
   else {
     SC3E (p4est3_procs_recv_from
