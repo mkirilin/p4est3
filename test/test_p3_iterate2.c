@@ -49,6 +49,8 @@
 #define MAX_TEST_LEVEL 2
 #define TEST_QUADRANT_LEN(l) ((int32_t) 1 << (MAX_TEST_LEVEL - (l)))
 
+#if !defined(P4EST_ENABLE_MPI)
+
 static int          refine_level = 1;
 
 #if 0
@@ -360,8 +362,8 @@ fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
 {
   int8_t *finfo_array;
   p4est3_locidx side_qid_loc;
-  int i, patch_qlevel, patch_area;
-  uint64_t begin_mid = 0;
+  int patch_qlevel, patch_area;
+  uint64_t i, begin_mid = 0;
 
 #ifdef P4EST_ENABLE_DEBUG
   if (side != patch) {
@@ -663,22 +665,26 @@ perform_test (setup_t * t, p4est3_quadrant_vtable_t * qvt)
   return NULL;
 }
 
+#endif
+
 int
 main (int argc, char **argv)
 {
+#if !defined(P4EST_ENABLE_MPI)
   setup_t             st, *t = &st;
-  sc3_error_t        *e = NULL;
   const p4est3_quadrant_vtable_t *qvt;
+#endif
+  sc3_error_t        *e = NULL;
 
   SC3E_NULL_SET (e, sc3_MPI_Init (&argc, &argv));
   sc_init (sc_MPI_COMM_WORLD, 1, 1, NULL, SC_LP_ESSENTIAL);
   p4est_init (NULL, SC_LP_ESSENTIAL);
 
-  if (!P4EST_ENABLE_MPI) {
+#if !defined(P4EST_ENABLE_MPI)
     SC3E_NULL_SET (e, set_parameters (t, &qvt));
     SC3E_NULL_SET (e, perform_test (t, qvt));
     SC3E_NULL_SET (e, clean_up (t));
-  }
+#endif
 
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
