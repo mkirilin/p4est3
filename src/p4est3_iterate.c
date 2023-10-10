@@ -60,7 +60,7 @@ typedef struct p4est3_search_area
 
   /* face section */
   int                 nsides;
-  p4est3_tree_t      *tree_face[2];
+  p4est3_topidx       treeid_face[2];
   int                 child_id_face[2];
   int                 Level_face[2];    /* array of 2, storing the level of
                                            current size */
@@ -227,7 +227,7 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
   sa->finfo->p3 = p3;
   sa->finfo->user_data = user_data;
   for (side = 0; side < 2; ++side) {
-    sa->tree_face[side] = NULL;
+    sa->treeid_face[side] = -1;
     sa->child_id_face[side] = -1;
     sa->Level_face[side] = 0;
     sa->is_refine[side] = 1;
@@ -416,7 +416,7 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
   else {
     sa->nsides = 2;
     fside[1].ntree = tree_neighbor;
-    SC3E (p4est3_tree_index (p3, tree_neighbor, &sa->tree_face[1]));
+    sa->treeid_face[1] = tree_neighbor;
     fside[1].nface = face;
   }
   SC3E (sc3_array_resize (sa->finfo->sides, sa->nsides));
@@ -504,7 +504,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
 {
   const int           max_children = p3->num_children;
   const int           half_ch = max_children / 2;
-  p4est3_tree_t     **trees = sa->tree_face;
+  p4est3_topidx      *trees = sa->treeid_face;
   p4est3_locidx      *b_f[2], *e_f[2], *b_f_remote[2], *e_f_remote[2];
   void               *stack_it[2];
   p4est3_locidx      *arr_it;
@@ -572,7 +572,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
           is_refine[side] = 0;
           fside[side].nquad =
             *(b_f_remote[side]) + p3->goffset[p]
-              - p3->gtroffset[trees[side]->treeid];
+              - p3->gtroffset[trees[side]];
           fside[side].quadrant = first_quad;
         }
         /* no matter if the found on this iteration quad passes or not,
@@ -589,7 +589,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
         is_refine[side] = 0;
         fside[side].nquad =
           *(b_f[side]) + p3->goffset[p3->mpirank]
-            - p3->gtroffset[trees[side]->treeid];
+            - p3->gtroffset[trees[side]];
         fside[side].quadrant = first_quad;
       }
     }
@@ -747,7 +747,8 @@ p4est3_iterate_face_inner (p4est3_t * p3,
 
   int                 child, face, nb_id;
   p4est3_iterate_face_side_t *fside;
-  search_area->tree_face[0] = search_area->tree_face[1] = search_area->tree;
+  search_area->treeid_face[0] = search_area->treeid_face[1]
+    = search_area->tree->treeid;
   SC3E (sc3_array_index (search_area->finfo->sides, 0, &fside));
   for (child = 0; child < search_area->max_children; ++child) {
     for (face = 0; face < search_area->nfaces; ++face) {
@@ -1044,7 +1045,7 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
 
     /* frame faces part */
     search_area->finfo->tree_boundary = 1;
-    search_area->tree_face[0] = search_area->tree;
+    search_area->treeid_face[0] = search_area->tree->treeid;
     for (face = 0; face < search_area->nfaces; ++face) {
       SC3E (p4est3_iterate_face_bound_init
             (p3, search_area, tree, face, fside, &is_iterate));
