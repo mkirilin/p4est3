@@ -49,8 +49,6 @@
 #define MAX_TEST_LEVEL 2
 #define TEST_QUADRANT_LEN(l) ((int32_t) 1 << (MAX_TEST_LEVEL - (l)))
 
-#if !defined(P4EST_ENABLE_MPI)
-
 static int          refine_level = 1;
 
 #if 0
@@ -277,7 +275,10 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
   SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &qlevel));
   face_area = sc3_intpow (TEST_QUADRANT_LEN (qlevel), vi->p3->qvt->dim - 1);
   SC3E (p4est3_tree_index (vi->p3, vi->ntree, &tree));
-  qid = tree->quad_offset + vi->nquad;
+  SC3A_CHECK (vi->ntree == tree->treeid);
+  qid = (p4est3_locidx)
+    ((p4est3_gloidx) vi->nquad + vi->p3->gtroffset[tree->treeid])
+      - vi->p3->goffset[vi->p3->mpirank];
   SC3A_CHECK (qid < vi->p3->local_num_quads);
   for (i = 0; i < P4EST_FACES; ++i) {
     SC3E_DEMAND
@@ -665,26 +666,20 @@ perform_test (setup_t * t, p4est3_quadrant_vtable_t * qvt)
   return NULL;
 }
 
-#endif
-
 int
 main (int argc, char **argv)
 {
-#if !defined(P4EST_ENABLE_MPI)
   setup_t             st, *t = &st;
   const p4est3_quadrant_vtable_t *qvt;
-#endif
   sc3_error_t        *e = NULL;
 
   SC3E_NULL_SET (e, sc3_MPI_Init (&argc, &argv));
   sc_init (sc_MPI_COMM_WORLD, 1, 1, NULL, SC_LP_ESSENTIAL);
   p4est_init (NULL, SC_LP_ESSENTIAL);
 
-#if !defined(P4EST_ENABLE_MPI)
-    SC3E_NULL_SET (e, set_parameters (t, &qvt));
-    SC3E_NULL_SET (e, perform_test (t, qvt));
-    SC3E_NULL_SET (e, clean_up (t));
-#endif
+  SC3E_NULL_SET (e, set_parameters (t, &qvt));
+  SC3E_NULL_SET (e, perform_test (t, qvt));
+  SC3E_NULL_SET (e, clean_up (t));
 
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
   SC3E_NULL_SET (e, sc3_MPI_Finalize ());
