@@ -88,21 +88,20 @@ static const int    bound_dir_3d[12] =
 /* *INDENT-ON* */
 
 static int
-refine_fraction (p4est_t * p, p4est_topidx_t which_tree,
-                 p4est_quadrant_t * q)
+refine_fraction (p4est_t * p, p4est_topidx_t which_tree, p4est_quadrant_t * q)
 {
   /* The formula in the line below implies
    * quadrant_fraction = 7 * refinement_fraction + 1.
    * In particular we need for doubling the quadrants for a level increment
    * refinment_factor = 1 / 7.
-  */
+   */
   const p4est_locidx_t quad_count_refinement_threshold =
     (p4est_locidx_t) (refinement_fraction * p->global_num_quadrants);
   p4est_locidx_t     *quadrant_local_id = (p4est_locidx_t *) p->user_pointer;
 
   return
     ((p->global_first_quadrant[p->mpirank] + (*quadrant_local_id)++) <=
-      quad_count_refinement_threshold);
+     quad_count_refinement_threshold);
 }
 
 static sc3_error_t *
@@ -117,10 +116,10 @@ refine_p3_fraction (p4est3_refine_callback_info_t * ri, int *is_refine)
   SC3A_CHECK (is_refine != NULL);
   const p4est3_locidx quad_count_refinement_threshold =
     (p4est3_locidx) (refinement_fraction * ri->p3->global_num_quads);
-  p4est3_locidx     *quadrant_local_id = (p4est3_locidx *) ri->user_data;
+  p4est3_locidx      *quadrant_local_id = (p4est3_locidx *) ri->user_data;
   *is_refine =
     ((ri->p3->goffset[ri->p3->mpirank] + (*quadrant_local_id)++) <=
-      quad_count_refinement_threshold);
+     quad_count_refinement_threshold);
 
   return NULL;
 }
@@ -128,20 +127,18 @@ refine_p3_fraction (p4est3_refine_callback_info_t * ri, int *is_refine)
 
 #ifdef P4EST_ENABLE_DEBUG
 static int
-refine_fractal (p4est_t * p, p4est_topidx_t which_tree,
-                p4est_quadrant_t * q)
+refine_fractal (p4est_t * p, p4est_topidx_t which_tree, p4est_quadrant_t * q)
 {
   /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
   p4est_locidx_t     *quadrant_local_id = (p4est_locidx_t *) p->user_pointer;
 
-  return
-    (((p->global_first_quadrant[p->mpirank] + (*quadrant_local_id)++) %
+  return (((p->global_first_quadrant[p->mpirank] + (*quadrant_local_id)++) %
 #ifdef P4_TO_P8
-      7)
+           7)
 #else
-      3)
+           3)
 #endif
-     == 0);
+          == 0);
 }
 #endif /* P4EST_ENABLE_DEBUG */
 
@@ -149,17 +146,16 @@ static sc3_error_t *
 refine_p3_fractal (p4est3_refine_callback_info_t * ri, int *is_refine)
 {
   /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
-  p4est3_locidx     *quadrant_local_id = (p4est3_locidx *) ri->user_data;
+  p4est3_locidx      *quadrant_local_id = (p4est3_locidx *) ri->user_data;
   SC3A_CHECK (is_refine != NULL);
 
-  *is_refine =
-    (((ri->p3->goffset[ri->p3->mpirank] + (*quadrant_local_id)++) %
+  *is_refine = (((ri->p3->goffset[ri->p3->mpirank] + (*quadrant_local_id)++) %
 #ifdef P4_TO_P8
-      7)
+                 7)
 #else
-      3)
+                 3)
 #endif
-     == 0);
+                == 0);
   return NULL;
 }
 
@@ -266,11 +262,11 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
   /* for every face of every volume we allocate
      an array by the length of face's area */
 
-  int i;
-  p4est3_tree_t *tree;
-  p4est3_locidx qid;
-  int qlevel, face_area;
-  int8_t **qinfo_array = (int8_t **) vi->user_data;
+  int                 i;
+  p4est3_tree_t      *tree;
+  p4est3_locidx       qid;
+  int                 qlevel, face_area;
+  int8_t            **qinfo_array = (int8_t **) vi->user_data;
 
   SC3E (p4est3_quadrant_level (vi->p3->qvt, vi->quadrant, &qlevel));
   face_area = sc3_intpow (TEST_QUADRANT_LEN (qlevel), vi->p3->qvt->dim - 1);
@@ -278,7 +274,7 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
   SC3A_CHECK (vi->ntree == tree->treeid);
   qid = (p4est3_locidx)
     ((p4est3_gloidx) vi->nquad + vi->p3->gtroffset[tree->treeid])
-      - vi->p3->goffset[vi->p3->mpirank];
+    - vi->p3->goffset[vi->p3->mpirank];
   SC3A_CHECK (qid < vi->p3->local_num_quads);
   for (i = 0; i < P4EST_FACES; ++i) {
     SC3E_DEMAND
@@ -296,9 +292,9 @@ static int
 check_q_in_proc (const p4est3_t * p3, const p4est3_topidx t,
                  const p4est3_locidx nquad)
 {
-  p4est3_gloidx nquad_glo = (p4est3_gloidx) nquad + p3->gtroffset[t];
+  p4est3_gloidx       nquad_glo = (p4est3_gloidx) nquad + p3->gtroffset[t];
   return (p3->goffset[p3->mpirank] <= nquad_glo
-       && nquad_glo < p3->goffset[p3->mpirank + 1]);
+          && nquad_glo < p3->goffset[p3->mpirank + 1]);
 }
 
 static sc3_error_t *
@@ -308,13 +304,13 @@ convert_quad_to_mid (const p4est3_t * const p3,
                      uint64_t * const mid)
 {
   /* convert a quadrant to d-1 morton index */
-  const int axis = patch->nface / P4EST_DIM;
-  p4est_qcoord_t patch_crdDIM[P4EST_DIM], side_crdDIM[P4EST_DIM],
-                 coords[P4EST_DIM - 1];
-  int i, c, patch_lvl;
+  const int           axis = patch->nface / P4EST_DIM;
+  p4est_qcoord_t      patch_crdDIM[P4EST_DIM], side_crdDIM[P4EST_DIM],
+    coords[P4EST_DIM - 1];
+  int                 i, c, patch_lvl;
 #ifdef P4EST_ENABLE_DEBUG
-  /*int32_t patch_len, side_len;*/
-  int side_lvl;
+  /*int32_t patch_len, side_len; */
+  int                 side_lvl;
 #endif
 
   SC3E (p4est3_quadrant_coordinates (p3->qvt, patch->quadrant, patch_crdDIM));
@@ -327,13 +323,13 @@ convert_quad_to_mid (const p4est3_t * const p3,
 
   /* is not correct for inter tree border */
   /*if (patch_crdDIM[axis] < side_crdDIM[axis]) {
-    patch_len = (int32_t) 1 << (p3->qvt->max_level - patch_lvl);
-    SC3A_CHECK (patch_crdDIM[axis] + patch_len == side_crdDIM[axis]);
-  }
-  else if (patch_crdDIM[axis] > side_crdDIM[axis]) {
-    side_len = (int32_t) 1 << (p3->qvt->max_level - side_lvl);
-    SC3A_CHECK (side_crdDIM[axis] + side_len == patch_crdDIM[axis]);
-  }*/
+     patch_len = (int32_t) 1 << (p3->qvt->max_level - patch_lvl);
+     SC3A_CHECK (patch_crdDIM[axis] + patch_len == side_crdDIM[axis]);
+     }
+     else if (patch_crdDIM[axis] > side_crdDIM[axis]) {
+     side_len = (int32_t) 1 << (p3->qvt->max_level - side_lvl);
+     SC3A_CHECK (side_crdDIM[axis] + side_len == patch_crdDIM[axis]);
+     } */
 #endif
 
   memset (coords, 0, sizeof (p4est_qcoord_t) * (P4EST_DIM - 1));
@@ -347,9 +343,10 @@ convert_quad_to_mid (const p4est3_t * const p3,
     }
     /* the ckech is invalid for inter-tree iteration */
     /*SC3A_CHECK ((side_lvl == patch_lvl && patch_crdDIM[i] == side_crdDIM[i])
-             || (side_lvl != patch_lvl && patch_crdDIM[i] >= side_crdDIM[i]));*/
+       || (side_lvl != patch_lvl && patch_crdDIM[i] >= side_crdDIM[i])); */
     coords[c++] =
-      (patch_crdDIM[i] - side_crdDIM[i]) >> (P4EST3_REF_MAXLEVEL - MAX_TEST_LEVEL);
+      (patch_crdDIM[i] - side_crdDIM[i]) >> (P4EST3_REF_MAXLEVEL -
+                                             MAX_TEST_LEVEL);
   }
   SC3E (quadrant_to_mid (coords, patch_lvl, mid));
   return NULL;
@@ -361,10 +358,10 @@ fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
                    const p4est3_iterate_face_side_t * const patch,
                    const int nsides)
 {
-  int8_t *finfo_array;
-  p4est3_locidx side_qid_loc;
-  int patch_qlevel, patch_area;
-  uint64_t i, begin_mid = 0;
+  int8_t             *finfo_array;
+  p4est3_locidx       side_qid_loc;
+  int                 patch_qlevel, patch_area;
+  uint64_t            i, begin_mid = 0;
 
 #ifdef P4EST_ENABLE_DEBUG
   if (side != patch) {
@@ -373,10 +370,11 @@ fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
 #endif
 
   side_qid_loc = (p4est3_gloidx) side->nquad
-            + p3->gtroffset[side->ntree] - p3->goffset[p3->mpirank];
+    + p3->gtroffset[side->ntree] - p3->goffset[p3->mpirank];
 
   SC3E (p4est3_quadrant_level (p3->qvt, patch->quadrant, &patch_qlevel));
-  patch_area = sc3_intpow (TEST_QUADRANT_LEN (patch_qlevel), p3->qvt->dim - 1);
+  patch_area =
+    sc3_intpow (TEST_QUADRANT_LEN (patch_qlevel), p3->qvt->dim - 1);
   finfo_array = qinfo_array[side_qid_loc * P4EST_FACES + side->nface];
   SC3A_CHECK (finfo_array != NULL);
 
@@ -384,7 +382,7 @@ fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
 
   for (i = begin_mid; i < begin_mid + patch_area; ++i) {
     SC3E_DEMAND (finfo_array[i] == 0,
-                  "trying to write into non-empty face-info cell");
+                 "trying to write into non-empty face-info cell");
     finfo_array[i] = nsides;
   }
   return NULL;
@@ -396,12 +394,12 @@ face_callback (p4est3_iterate_face_info_t * fi)
   /* Test adjacency (necessity) and fill in
      `test tracking array` to check later (sufficiency) */
 
-  char *tempq[2];
+  char               *tempq[2];
   p4est3_iterate_face_side_t *sides[2], *side_small, *side_big;
-  sc3_array_t *ftransform;
-  int8_t **qinfo_array = (int8_t **) fi->user_data;
-  p4est3_topidx ntree;
-  int i, nsides, levels[2], ss_id /* smaller side index */;
+  sc3_array_t        *ftransform;
+  int8_t            **qinfo_array = (int8_t **) fi->user_data;
+  p4est3_topidx       ntree;
+  int                 i, nsides, levels[2], ss_id /* smaller side index */ ;
   SC3E (sc3_array_get_elem_count (fi->sides, &nsides));
   SC3E_DEMAND ((nsides == 2) || ((nsides == 1) && fi->tree_boundary),
                "one face's side not on a tree's boundary");
@@ -434,24 +432,23 @@ face_callback (p4est3_iterate_face_info_t * fi)
       SC3E (array_new (fi->p3->alloc, sizeof (int), 9, 9, &ftransform));
       SC3E (p4est3_connectivity_get_face_transform
             (fi->p3->conn, side_small->nface, &ntree, ftransform));
-      SC3E_DEMAND (ntree == side_big->ntree,
-                   "face transform trees mismatch");
+      SC3E_DEMAND (ntree == side_big->ntree, "face transform trees mismatch");
       SC3E (p4est3_quadrant_tree_face_neighbor
-            (fi->p3->qvt, tempq[0], ftransform,
-             side_small->nface, tempq[1]));
+            (fi->p3->qvt, tempq[0], ftransform, side_small->nface, tempq[1]));
       SC3E (sc3_array_destroy (&ftransform));
     }
-    SC3E_DEMIS3 (
-      p4est3_quadrant_is3_equal, fi->p3->qvt, tempq[1], side_big->quadrant);
-  } else { /* nsides == 1, nothing else is possible */
+    SC3E_DEMIS3 (p4est3_quadrant_is3_equal, fi->p3->qvt, tempq[1],
+                 side_big->quadrant);
+  }
+  else {                        /* nsides == 1, nothing else is possible */
     side_big = side_small = sides[0];
-  }  
+  }
   /* fill testing arrays */
   /* for the smaller and/or one-sided quad we fill
      the whole face-related (part of) array */
   if (check_q_in_proc (fi->p3, side_small->ntree, side_small->nquad)) {
     SC3E (fill_in_side_info
-            (fi->p3, qinfo_array, side_small, side_small, nsides));
+          (fi->p3, qinfo_array, side_small, side_small, nsides));
   }
   if (nsides == 2 && levels[0] == levels[1]) {
     /* if quadrants are of equal size, we full the bigger one completely, too */
@@ -459,7 +456,8 @@ face_callback (p4est3_iterate_face_info_t * fi)
       SC3E (fill_in_side_info
             (fi->p3, qinfo_array, side_big, side_big, nsides));
     }
-  } else if (nsides == 2) {
+  }
+  else if (nsides == 2) {
     /* if quads have different size, we fill the bigger one only partially */
     if (check_q_in_proc (fi->p3, side_big->ntree, side_big->nquad)) {
       SC3E (fill_in_side_info
@@ -473,15 +471,15 @@ face_callback (p4est3_iterate_face_info_t * fi)
 }
 
 static sc3_error_t *
-test_tracking_array (p4est3_t *p3, int8_t ** const qinfo_array)
+test_tracking_array (p4est3_t * p3, int8_t ** const qinfo_array)
 {
-  int qlevel, face_area, is_boundary;
-  int f, p /* patch number */, nface, orient;
-  char * q;
-  int8_t * finfo_array;
-  p4est3_topidx t, which_tree;
-  p4est3_locidx qtid /* local number of quadrant within on a tree */;
-  p4est3_tree_t * tree;
+  int                 qlevel, face_area, is_boundary;
+  int                 f, p /* patch number */ , nface, orient;
+  char               *q;
+  int8_t             *finfo_array;
+  p4est3_topidx       t, which_tree;
+  p4est3_locidx       qtid /* local number of quadrant within on a tree */ ;
+  p4est3_tree_t      *tree;
 
   for (t = p3->fltree; t <= p3->lltree; ++t) {
     SC3E (p4est3_tree_index (p3, t, &tree));
@@ -492,18 +490,20 @@ test_tracking_array (p4est3_t *p3, int8_t ** const qinfo_array)
 
       for (f = 0; f < P4EST_FACES; ++f) {
         nface = f;
-        finfo_array = qinfo_array[(qtid + tree->quad_offset) * P4EST_FACES + f];
+        finfo_array =
+          qinfo_array[(qtid + tree->quad_offset) * P4EST_FACES + f];
         SC3E_DEMAND (finfo_array != NULL, "face info array is not allocated");
         SC3E_DEMAND (finfo_array[0] == 1 || finfo_array[0] == 2,
-                    "face info array has an illigal value");
+                     "face info array has an illigal value");
         which_tree = t;
         SC3E (p4est3_connectivity_get_face
               (p3->conn, &which_tree, &nface, &orient));
-        SC3E (p4est3_quadrant_get_tree_boundary (p3->qvt, q, f, &is_boundary));
+        SC3E (p4est3_quadrant_get_tree_boundary
+              (p3->qvt, q, f, &is_boundary));
 
         for (p = 0; p < face_area; ++p) {
           SC3E_DEMAND (finfo_array[p] == finfo_array[0],
-                      "face info array values differ");
+                       "face info array values differ");
           if (finfo_array[p] == 1) {
             /* iff it's a physical boundary */
             SC3E_DEMAND (which_tree == t,
@@ -524,10 +524,10 @@ test_tracking_array (p4est3_t *p3, int8_t ** const qinfo_array)
 }
 
 static sc3_error_t *
-allocate_test_tracking_array (p4est3_t *p3, int8_t ***ptr_qinfo_array)
+allocate_test_tracking_array (p4est3_t * p3, int8_t *** ptr_qinfo_array)
 {
-  const size_t out_array_size = P4EST_FACES * p3->local_num_quads;
-  int8_t ** out_array;
+  const size_t        out_array_size = P4EST_FACES * p3->local_num_quads;
+  int8_t            **out_array;
 
   SC3E (sc3_allocator_calloc
         (p3->alloc, sizeof (int8_t *), out_array_size, &out_array));
@@ -553,7 +553,7 @@ p4est3_new_shortcut (p4est3_t ** p3, const setup_t * t, int start_level,
   SC3E (p4est3_set_contiguous (*p3, 1));
   SC3E (p4est3_set_family (*p3, 0));
   SC3E (p4est3_set_partition (*p3, is_partition, NULL));
-  /*SC3E (p4est3_set_user_data (*p3, user_data));*/
+  /*SC3E (p4est3_set_user_data (*p3, user_data)); */
   if ((*p3)->old != NULL) {
     (*p3)->old->user_data = user_data;
   }
@@ -565,14 +565,14 @@ static sc3_error_t *
 make_forest_for_test (p4est3_t ** p3, setup_t * t,
                       p4est3_quadrant_vtable_t * qvt)
 {
-  int i;
-  p4est3_locidx     quadrant_local_id = 0;
-  p4est3_t * p3refined;
+  int                 i;
+  p4est3_locidx       quadrant_local_id = 0;
+  p4est3_t           *p3refined;
   p4est3_refine_callback_t p3crefine = refine_p3_fractal;
 #ifdef P4EST_ENABLE_DEBUG
-  p4est_t * p;
-  p4est_connectivity_t *conn_old; 
-  p4est_refine_t crefine = refine_fractal;
+  p4est_t            *p;
+  p4est_connectivity_t *conn_old;
+  p4est_refine_t      crefine = refine_fractal;
 #endif
 
   SC3E (p4est3_new_shortcut (p3, t, t->level, qvt, NULL, NULL, 0, NULL));
@@ -580,8 +580,8 @@ make_forest_for_test (p4est3_t ** p3, setup_t * t,
 #ifdef P4EST_ENABLE_DEBUG
   conn_old = p4est_connectivity_new_twotrees (1, 0, 0);
   p = p4est_new_ext
-        (sc_MPI_COMM_WORLD, conn_old, 0, t->level,
-         1, 0, NULL, &quadrant_local_id);
+    (sc_MPI_COMM_WORLD, conn_old, 0, t->level,
+     1, 0, NULL, &quadrant_local_id);
 #endif
 
   /*** refine in a loop ***/
@@ -640,16 +640,17 @@ clean_up (setup_t * t)
 static sc3_error_t *
 perform_test (setup_t * t, p4est3_quadrant_vtable_t * qvt)
 {
-  size_t i, out_array_size;
-  int8_t ** qinfo_array = NULL;
-  p4est3_t *p3;
+  size_t              i, out_array_size;
+  int8_t            **qinfo_array = NULL;
+  p4est3_t           *p3;
 
   /* preparations */
   SC3E (make_forest_for_test (&p3, t, qvt));
   SC3E (allocate_test_tracking_array (p3, &qinfo_array));
 
   /* face iterator test run */
-  SC3E (p4est3_iterate_face (p3, volume_callback, face_callback, qinfo_array));
+  SC3E (p4est3_iterate_face
+        (p3, volume_callback, face_callback, qinfo_array));
 
   /* test arrays filled during iteration */
   SC3E (test_tracking_array (p3, qinfo_array));
