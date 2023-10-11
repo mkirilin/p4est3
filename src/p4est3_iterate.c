@@ -678,19 +678,16 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       if (i != half_ch - 1) {
         is_refine[side] = is_lvl_increased[side];
       }
-    }
-  }
-  for (side = 0; side < sa->nsides; ++side) {
-    /*if (!is_refine[side]) {
-       continue;
-       } */
-    for (p = sa->remote_first[side]; p <= sa->remote_last[side]; ++p) {
-      if (p == p3->mpirank) {
-        continue;
+      else if (is_lvl_increased[side]) {
+        SC3E (sc3_array_pop (idx_face_stack[side]));
+        for (p = sa->remote_first[side]; p <= sa->remote_last[side]; ++p) {
+          if (p == p3->mpirank) {
+            continue;
+          }
+          SC3E (sc3_array_pop (sa->stack_face2proc[side][p]));
+        }
       }
-      SC3E (sc3_array_pop (sa->stack_face2proc[side][p]));
     }
-    SC3E (sc3_array_pop (idx_face_stack[side]));
   }
 
   return NULL;
