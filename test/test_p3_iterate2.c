@@ -224,7 +224,7 @@ quadrant_to_mid (const p4est_qcoord_t coords[P4EST_DIM - 1], int level,
 #endif
   }
 
-  *mid = id * (1 << (MAX_TEST_LEVEL - level));
+  *mid = id * (1 << ((P4EST_DIM - 1) * (MAX_TEST_LEVEL - level)));
   return NULL;
 }
 
@@ -304,7 +304,7 @@ convert_quad_to_mid (const p4est3_t * const p3,
                      uint64_t * const mid)
 {
   /* convert a quadrant to d-1 morton index */
-  const int           axis = patch->nface / P4EST_DIM;
+  const int           axis = patch->nface / 2;
   p4est_qcoord_t      patch_crdDIM[P4EST_DIM], side_crdDIM[P4EST_DIM],
     coords[P4EST_DIM - 1];
   int                 i, c, patch_lvl;
