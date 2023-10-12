@@ -455,11 +455,17 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
     SC3E (sc3_array_index (idx_f_stack[s], 0, &arr));
     SC3E (sc3_array_index (*(sc3_array_t **) arr, 0, &begin));
     SC3E (sc3_array_index (*(sc3_array_t **) arr, 1, &end));
-    *(begin) = SC3_MAX (p3->gtroffset[tree_ids[s]], p3->goffset[p3->mpirank])
+    *begin = SC3_MAX (p3->gtroffset[tree_ids[s]], p3->goffset[p3->mpirank])
       - p3->goffset[p3->mpirank];
-    *(end) =
-      SC3_MIN (p3->gtroffset[tree_ids[s] + 1], p3->goffset[p3->mpirank + 1])
-      - p3->goffset[p3->mpirank];
+    if (tree_neighbor < p3->fltree || tree_neighbor > p3->lltree) {
+      /* in case a (neighbor)-tree exists remotely only, we set local 
+         begin == end equal to global id of the begin of (neighbor-)tree */
+      *end = *begin;
+    } else {
+      *end =
+        SC3_MIN (p3->gtroffset[tree_ids[s] + 1], p3->goffset[p3->mpirank + 1])
+        - p3->goffset[p3->mpirank];
+    }
   }
   /* Make necessary allocs for remote indices stacks when necessary */
   if (sa->nsides == 1) {
