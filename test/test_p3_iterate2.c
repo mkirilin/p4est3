@@ -46,10 +46,10 @@
 #include <p4est3_quadrant_mort3d.h>
 #endif
 
-#define MAX_TEST_LEVEL 2
+#define MAX_TEST_LEVEL 10
 #define TEST_QUADRANT_LEN(l) ((int32_t) 1 << (MAX_TEST_LEVEL - (l)))
 
-static int          refine_level = 1;
+static int          refine_level = 5;
 
 #if 0
 #ifdef P4_TO_P8
@@ -211,9 +211,9 @@ quadrant_to_mid (const p4est_qcoord_t coords[P4EST_DIM - 1], int level,
   SC3A_CHECK (0 <= level && level <= MAX_TEST_LEVEL);
 
   /* this preserves the high bits from negative numbers */
-  x = coords[0];
+  x = coords[0] >> (MAX_TEST_LEVEL - level);
 #ifdef P4_TO_P8
-  y = coords[1];
+  y = coords[1] >> (MAX_TEST_LEVEL - level);
 #endif
 
   id = 0;
@@ -224,7 +224,7 @@ quadrant_to_mid (const p4est_qcoord_t coords[P4EST_DIM - 1], int level,
 #endif
   }
 
-  *mid = id;
+  *mid = id * (1 << (MAX_TEST_LEVEL - level));
   return NULL;
 }
 
@@ -623,7 +623,7 @@ set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
   SC3E (p4est3_quadrant_vtable_p4est (qvt));
   SC3E (p4est3_connectivity_new_p4est_twotrees (t->alloc, &t->conn, 1, 0, 0));
 
-  t->level = 0;
+  t->level = 2;
 
   return NULL;
 }
