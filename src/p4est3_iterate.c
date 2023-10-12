@@ -911,7 +911,7 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
                            p4est3_iterate_codim_t ccodim,
                            p4est3_search_area_t * sa)
 {
-  int                 i, side;
+  int                 i, j, side;
   void               *first_quad;       /*first quadrant in this search area */
   int                 level;
   void               *stack_it;
@@ -972,8 +972,8 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
             (p3->qvt, view_q, *Level, *(sc3_array_t **) stack_it));
       /* since array_split doesn't count shift from the beinning of quadrants
          in a proc, we shift result indices at the loop below */
-      for (i = 0; i < max_children + 1; ++i) {
-        SC3E (sc3_array_index (*(sc3_array_t **) stack_it, i, &arr_it));
+      for (j = 0; j < max_children + 1; ++j) {
+        SC3E (sc3_array_index (*(sc3_array_t **) stack_it, j, &arr_it));
         *arr_it += *begin_remote;
       }
     }
