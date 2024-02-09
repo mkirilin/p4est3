@@ -27,7 +27,7 @@ jobs:
             zlib1g-dev libmpich-dev mpich
 
     - name: Checkout source code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: true
 
@@ -63,7 +63,7 @@ jobs:
 
     - name: Upload log files
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: linux_multi1_log
         path: |
@@ -83,7 +83,7 @@ jobs:
             zlib1g-dev libmpich-dev mpich
 
     - name: Checkout source code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: true
 
@@ -108,7 +108,7 @@ jobs:
 
     - name: Upload log files
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: linux_multi2_log
         path: |
@@ -128,16 +128,18 @@ jobs:
             zlib1g-dev libmpich-dev mpich
 
     - name: Checkout source code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: true
         fetch-depth: 0
 
-    - name: Fix libsc to a specific version
+    - name: Fix libsc to specific version
       shell: bash
       run: |
         cd sc
-        git checkout -b test-branch 51b57ef00d0396d709c455261782acfbc85f08ab
+        git fetch --tags
+        # git checkout v2.8.5
+        git checkout -b test-branch a007593f8adab93bca82da017f37b67cf1fdd4b9
 
     - name: Run bootstrap script
       run: ./bootstrap
@@ -167,7 +169,7 @@ jobs:
 
     - name: Upload log files
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: linux_install_log
         path: |
@@ -187,7 +189,7 @@ jobs:
             zlib1g-dev libmpich-dev mpich
 
     - name: Checkout source code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: true
         fetch-depth: 0
@@ -214,14 +216,14 @@ jobs:
         mv p4est-*.tar.gz ..
 
     - name: Upload tarball
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: p4est_tarball
         path: ./p4est-*.tar.gz
 
     - name: Upload log files
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: linux_tarball_log
         path: |

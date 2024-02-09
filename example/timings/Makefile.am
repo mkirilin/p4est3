@@ -18,14 +18,6 @@ example_timings_p4est_loadconn_SOURCES = example/timings/loadconn2.c
 example_timings_p4est3_setup_SOURCES = example/timings/setup2.c
 example_timings_p4est3_p3time_SOURCES = example/timings/p3time2.c
 example_timings_p4est3_p3partition_SOURCES = example/timings/p3partition2.c
-
-LINT_CSOURCES += \
-        $(example_timings_p4est_timings_SOURCES) \
-        $(example_timings_p4est_bricks_SOURCES) \
-        $(example_timings_p4est_loadconn_SOURCES) \
-        $(example_timings_p4est3_setup_SOURCES) \
-        $(example_timings_p4est3_p3time_SOURCES) \
-        $(example_timings_p4est3_p3partition_SOURCES)
 endif
 
 if P4EST_ENABLE_BUILD_3D
@@ -45,15 +37,6 @@ example_timings_p8est_tsearch_SOURCES = example/timings/tsearch3.c
 example_timings_p8est3_setup_SOURCES = example/timings/setup3.c
 example_timings_p8est3_p3time_SOURCES = example/timings/p3time3.c
 example_timings_p8est3_p3partition_SOURCES = example/timings/p3partition3.c
-
-LINT_CSOURCES += \
-        $(example_timings_p8est_timings_SOURCES) \
-        $(example_timings_p8est_bricks_SOURCES) \
-        $(example_timings_p8est_loadconn_SOURCES) \
-        $(example_timings_p8est_tsearch_SOURCES) \
-        $(example_timings_p8est3_setup_SOURCES) \
-        $(example_timings_p8est3_p3time_SOURCES) \
-        $(example_timings_p8est3_p3partition_SOURCES)
 endif
 
 EXTRA_DIST += example/timings/timana.awk example/timings/timana.sh
