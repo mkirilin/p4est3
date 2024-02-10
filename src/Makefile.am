@@ -7,9 +7,9 @@ libp4est_generated_headers = config/p4est_config.h
 libp4est_installed_headers = src/p4est_base.h src/p4est3_base.h \
         src/p4est3_connectivity.h \
         src/p4est3_quadrant_vtable.h src/p4est3.h \
-        src/p4est3_internal.h src/p4est3_iterate.h \
+        src/p4est3_iterate.h \
         src/p4est3_search.h
-libp4est_internal_headers =
+libp4est_internal_headers = src/p4est3_internal.h
 libp4est_compiled_sources = src/p4est_base.c \
         src/p4est3_connectivity.c \
         src/p4est3_quadrant_vtable.c src/p4est3.c \
