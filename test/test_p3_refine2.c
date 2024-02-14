@@ -40,6 +40,9 @@
 #define MAX_TEST_TREES 5
 #define FOREST_START_LEVEL 1
 
+#ifndef P4EST_ENABLE_VALGRIND
+  /* Valgrind might indicate false-positiv errors
+     with some MPI shared memory implementations */
 static int          refine_level = 0;
 
 typedef struct setup
@@ -54,6 +57,67 @@ typedef struct setup
   p4est3_topidx       num_trees;
 }
 setup_t;
+
+static sc3_error_t *
+make_allocator (setup_t * t)
+{
+  SC3A_IS (sc3_allocator_is_setup, t->mainalloc);
+  SC3E (sc3_allocator_new (t->mainalloc, &t->alloc));
+  SC3E (sc3_allocator_setup (t->alloc));
+
+  return NULL;
+}
+
+static sc3_error_t *
+set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
+{
+  t->mainalloc = sc3_allocator_nothread ();
+  SC3E (make_allocator (t));
+  SC3E (p4est3_quadrant_vtable_p4est (qvt));
+  SC3E_DEMAND (*qvt != NULL, "p4est is not build neither in 2D nor 3D");
+  return NULL;
+}
+
+static sc3_error_t *
+make_connectivity (setup_t * t)
+{
+  t->conn2 =
+#ifdef P4_TO_P8
+    p8est_connectivity_new_brick (t->num_trees, 1, 1, 0, 0, 0);
+#else
+    p4est_connectivity_new_brick (t->num_trees, 1, 0, 0);
+#endif
+  SC3E (p4est3_connectivity_new_p4est (t->alloc, &t->conn3, t->conn2, 1));
+  return NULL;
+}
+
+static sc3_error_t *
+make_new_p4est (p4est_t ** p, setup_t * t)
+{
+  *p = p4est_new_ext
+    (t->mpicomm, t->conn2, 0, FOREST_START_LEVEL, 1, 0, NULL, NULL);
+
+  return NULL;
+}
+
+static sc3_error_t *
+make_new_p4est3 (p4est3_t ** p3, setup_t * t,
+                 const p4est3_quadrant_vtable_t ** qvt)
+{
+  SC3A_IS (sc3_allocator_is_setup, t->alloc);
+
+  /* create p4est object with connectivity */
+  SC3E (p4est3_new (t->alloc, p3));
+  SC3E (p4est3_set_comm (*p3, t->mpicomm, 1));
+  SC3E (p4est3_set_connectivity (*p3, t->conn3));
+  SC3E (p4est3_set_quadrant_vtable (*p3, *qvt));
+  SC3E (p4est3_set_level (*p3, FOREST_START_LEVEL));
+  SC3E (p4est3_set_shared (*p3, 1));
+  SC3E (p4est3_setup (*p3));
+
+  return NULL;
+}
+
 
 static int
 refine_normal_fn (p4est_t * p4est, p4est_topidx_t which_tree,
@@ -138,26 +202,34 @@ coarsen_p3_normal_fn (p4est3_coarsen_callback_info_t * ci, int *is_coarse)
   return NULL;
 }
 
+/**
+ * 0 - Classic
+ * 1 - AVX
+ * 2 - Morton
+*/
 static sc3_error_t *
-make_allocator (setup_t * t)
+set_qvt (const p4est3_quadrant_vtable_t ** qvt, int i)
 {
-  SC3A_IS (sc3_allocator_is_setup, t->mainalloc);
-  SC3E (sc3_allocator_new (t->mainalloc, &t->alloc));
-  SC3E (sc3_allocator_setup (t->alloc));
-
-  return NULL;
-}
-
-static sc3_error_t *
-make_connectivity (setup_t * t)
-{
-  t->conn2 =
-#ifdef P4_TO_P8
-    p8est_connectivity_new_brick (t->num_trees, 1, 1, 0, 0, 0);
+  SC3A_CHECK (0 <= i && i <= 2);
+  switch (i) {
+  case 0:
+    SC3E (p4est3_quadrant_vtable_p4est (qvt));
+    break;
+  case 1:
+#ifdef P4EST_ENABLE_AVX2
+    SC3E (p4est3_quadrant_yx_vtable (qvt));
 #else
-    p4est_connectivity_new_brick (t->num_trees, 1, 0, 0);
+    SC3E (p4est3_quadrant_vtable_p4est (qvt));
 #endif
-  SC3E (p4est3_connectivity_new_p4est (t->alloc, &t->conn3, t->conn2, 1));
+    break;
+  case 2:
+    SC3E (p4est3_quadrant_mort2d_vtable (qvt));
+    break;
+  default:
+    SC3E_UNREACH ("wrong qvt mode");
+  }
+  SC3E_DEMAND (*qvt != NULL, "AVX is not supported by hardware "
+               "p4est is not build neither in 2D nor 3D");
   return NULL;
 }
 
@@ -176,51 +248,6 @@ array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
   SC3E (sc3_array_set_initzero (*arr, 1));
   SC3E (sc3_array_setup (*arr));
 
-  return NULL;
-}
-
-static sc3_error_t *
-set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
-{
-  t->mainalloc = sc3_allocator_nothread ();
-  SC3E (make_allocator (t));
-  SC3E (p4est3_quadrant_vtable_p4est (qvt));
-  SC3E_DEMAND (*qvt != NULL, "p4est is not build neither in 2D nor 3D");
-  return NULL;
-}
-
-static sc3_error_t *
-make_new_p4est (p4est_t ** p, setup_t * t)
-{
-  *p = p4est_new_ext
-    (t->mpicomm, t->conn2, 0, FOREST_START_LEVEL, 1, 0, NULL, NULL);
-
-  return NULL;
-}
-
-static sc3_error_t *
-make_new_p4est3 (p4est3_t ** p3, setup_t * t,
-                 const p4est3_quadrant_vtable_t ** qvt)
-{
-  SC3A_IS (sc3_allocator_is_setup, t->alloc);
-
-  /* create p4est object with connectivity */
-  SC3E (p4est3_new (t->alloc, p3));
-  SC3E (p4est3_set_comm (*p3, t->mpicomm, 1));
-  SC3E (p4est3_set_connectivity (*p3, t->conn3));
-  SC3E (p4est3_set_quadrant_vtable (*p3, *qvt));
-  SC3E (p4est3_set_level (*p3, FOREST_START_LEVEL));
-  SC3E (p4est3_set_shared (*p3, 1));
-  SC3E (p4est3_setup (*p3));
-
-  return NULL;
-}
-
-static sc3_error_t *
-free_allocator (sc3_allocator_t ** alloc)
-{
-  SC3A_IS (sc3_allocator_is_setup, *alloc);
-  SC3E (sc3_allocator_destroy (alloc));
   return NULL;
 }
 
@@ -284,37 +311,6 @@ compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
 
   SC3E (sc3_array_destroy (&p3levels));
   SC3E (sc3_array_destroy (&levels));
-  return NULL;
-}
-
-/**
- * 0 - Classic
- * 1 - AVX
- * 2 - Morton
-*/
-static sc3_error_t *
-set_qvt (const p4est3_quadrant_vtable_t ** qvt, int i)
-{
-  SC3A_CHECK (0 <= i && i <= 2);
-  switch (i) {
-  case 0:
-    SC3E (p4est3_quadrant_vtable_p4est (qvt));
-    break;
-  case 1:
-#ifdef P4EST_ENABLE_AVX2
-    SC3E (p4est3_quadrant_yx_vtable (qvt));
-#else
-    SC3E (p4est3_quadrant_vtable_p4est (qvt));
-#endif
-    break;
-  case 2:
-    SC3E (p4est3_quadrant_mort2d_vtable (qvt));
-    break;
-  default:
-    SC3E_UNREACH ("wrong qvt mode");
-  }
-  SC3E_DEMAND (*qvt != NULL, "AVX is not supported by hardware "
-               "p4est is not build neither in 2D nor 3D");
   return NULL;
 }
 
@@ -419,9 +415,21 @@ perform_tests (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
   return NULL;
 }
 
+static sc3_error_t *
+free_allocator (sc3_allocator_t ** alloc)
+{
+  SC3A_IS (sc3_allocator_is_setup, *alloc);
+  SC3E (sc3_allocator_destroy (alloc));
+  return NULL;
+}
+#endif /* P4EST_ENABLE_VALGRIND */
+
 int
 main (int argc, char **argv)
 {
+#ifndef P4EST_ENABLE_VALGRIND
+  /* Valgrind might indicate false-positiv errors
+     with some MPI shared memory implementations */
   setup_t             st, *t = &st;
   const p4est3_quadrant_vtable_t *qvt;
 
@@ -436,5 +444,6 @@ main (int argc, char **argv)
   SC3X (free_allocator (&t->alloc));
   sc_finalize_noabort ();
   SC3X (sc3_MPI_Finalize ());
+#endif
   return 0;
 }

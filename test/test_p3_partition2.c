@@ -21,7 +21,6 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#include <p4est3.h>
 #include <p4est3_internal.h>
 #ifndef P4_TO_P8
 #include <p4est_extended.h>
@@ -39,6 +38,9 @@
 
 #define MAX_TEST_LEVEL 5
 
+#ifndef P4EST_ENABLE_VALGRIND
+  /* Valgrind might indicate false-positiv errors
+     with some MPI shared memory implementations */
 typedef struct setup
 {
   sc3_allocator_t    *alloc;
@@ -51,6 +53,71 @@ typedef struct setup
   int                 level;
 }
 setup_t;
+
+static sc3_error_t *
+make_allocator (setup_t * t)
+{
+  SC3A_IS (sc3_allocator_is_setup, t->mainalloc);
+  SC3E (sc3_allocator_new (t->mainalloc, &t->alloc));
+  SC3E (sc3_allocator_setup (t->alloc));
+
+  return NULL;
+}
+
+static sc3_error_t *
+make_connectivity (setup_t * t)
+{
+  t->conn2 =
+#ifdef P4_TO_P8
+    p8est_connectivity_new_brick (t->mpisize, 1, 1, 0, 0, 0);
+#else
+    p4est_connectivity_new_brick (t->mpisize, 1, 0, 0);
+#endif
+  SC3E (p4est3_connectivity_new_p4est (t->alloc, &t->conn3, t->conn2, 1));
+  return NULL;
+}
+
+static sc3_error_t *
+make_new_p4est (p4est_t ** p, setup_t * t)
+{
+  *p = p4est_new_ext
+    (t->mpicomm, t->conn2, 0, 0, 1, 0, NULL, NULL);
+
+  return NULL;
+}
+
+static sc3_error_t *
+make_new_p4est3 (p4est3_t ** p3, setup_t * t,
+                 const p4est3_quadrant_vtable_t ** qvt)
+{
+  SC3A_IS (sc3_allocator_is_setup, t->alloc);
+
+  /* create p4est object with connectivity */
+  SC3E (p4est3_new (t->alloc, p3));
+  SC3E (p4est3_set_comm (*p3, t->mpicomm, 1));
+  SC3E (p4est3_set_connectivity (*p3, t->conn3));
+  SC3E (p4est3_set_quadrant_vtable (*p3, *qvt));
+  SC3E (p4est3_set_level (*p3, 0));
+  SC3E (p4est3_set_shared (*p3, 1));
+  SC3E (p4est3_set_contiguous (*p3, 0));
+  SC3E (p4est3_setup (*p3));
+
+  return NULL;
+}
+
+static sc3_error_t *
+prepare_objects (p4est3_t ** p3, p4est_t ** p, setup_t * t,
+                 const p4est3_quadrant_vtable_t ** qvt)
+{
+  t->mainalloc = sc3_allocator_nothread ();
+  SC3E (make_allocator (t));
+  SC3E (make_connectivity (t));
+  SC3E (p4est3_quadrant_vtable_p4est (qvt));
+  SC3E_DEMAND (*qvt != NULL, "p4est is not build neither in 2D nor 3D");
+  SC3E (make_new_p4est (p, t));
+  SC3E (make_new_p4est3 (p3, t, qvt));
+  return NULL;
+}
 
 #if (defined(P4EST_ENABLE_MPICOMMSHARED) || !defined(P4EST_ENABLE_MPI))
 static int          refine_level = 0;
@@ -76,6 +143,33 @@ refine_p3_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
     *is_refine = 0;
     return NULL;
   }
+  return NULL;
+}
+
+/**
+ * 0 - Classic
+ * 1 - AVX
+ * 2 - Morton
+*/
+static sc3_error_t *
+set_qvt (const p4est3_quadrant_vtable_t ** qvt, int i)
+{
+  SC3A_CHECK (0 <= i && i <= 2);
+  switch (i) {
+  case 0:
+    SC3E (p4est3_quadrant_vtable_p4est (qvt));
+    break;
+  case 1:
+    SC3E (p4est3_quadrant_yx_vtable (qvt));
+    break;
+  case 2:
+    SC3E (p4est3_quadrant_mort2d_vtable (qvt));
+    break;
+  default:
+    SC3E_UNREACH ("wrong qvt mode");
+  }
+  SC3E_DEMAND (*qvt != NULL, "AVX is not supported by hardware "
+               "p4est is not build neither in 2D nor 3D");
   return NULL;
 }
 
@@ -167,33 +261,6 @@ compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
   return NULL;
 }
 
-/**
- * 0 - Classic
- * 1 - AVX
- * 2 - Morton
-*/
-static sc3_error_t *
-set_qvt (const p4est3_quadrant_vtable_t ** qvt, int i)
-{
-  SC3A_CHECK (0 <= i && i <= 2);
-  switch (i) {
-  case 0:
-    SC3E (p4est3_quadrant_vtable_p4est (qvt));
-    break;
-  case 1:
-    SC3E (p4est3_quadrant_yx_vtable (qvt));
-    break;
-  case 2:
-    SC3E (p4est3_quadrant_mort2d_vtable (qvt));
-    break;
-  default:
-    SC3E_UNREACH ("wrong qvt mode");
-  }
-  SC3E_DEMAND (*qvt != NULL, "AVX is not supported by hardware "
-               "p4est is not build neither in 2D nor 3D");
-  return NULL;
-}
-
 static sc3_error_t *
 perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
               const p4est3_quadrant_vtable_t * qvt)
@@ -240,71 +307,6 @@ perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
 #endif /*(defined(P4EST_ENABLE_MPICOMMSHARED) || !defined(P4EST_ENABLE_MPI))*/
 
 static sc3_error_t *
-make_allocator (setup_t * t)
-{
-  SC3A_IS (sc3_allocator_is_setup, t->mainalloc);
-  SC3E (sc3_allocator_new (t->mainalloc, &t->alloc));
-  SC3E (sc3_allocator_setup (t->alloc));
-
-  return NULL;
-}
-
-static sc3_error_t *
-make_connectivity (setup_t * t)
-{
-  t->conn2 =
-#ifdef P4_TO_P8
-    p8est_connectivity_new_brick (t->mpisize, 1, 1, 0, 0, 0);
-#else
-    p4est_connectivity_new_brick (t->mpisize, 1, 0, 0);
-#endif
-  SC3E (p4est3_connectivity_new_p4est (t->alloc, &t->conn3, t->conn2, 1));
-  return NULL;
-}
-
-static sc3_error_t *
-make_new_p4est (p4est_t ** p, setup_t * t)
-{
-  *p = p4est_new_ext
-    (t->mpicomm, t->conn2, 0, 0, 1, 0, NULL, NULL);
-
-  return NULL;
-}
-
-static sc3_error_t *
-make_new_p4est3 (p4est3_t ** p3, setup_t * t,
-                 const p4est3_quadrant_vtable_t ** qvt)
-{
-  SC3A_IS (sc3_allocator_is_setup, t->alloc);
-
-  /* create p4est object with connectivity */
-  SC3E (p4est3_new (t->alloc, p3));
-  SC3E (p4est3_set_comm (*p3, t->mpicomm, 1));
-  SC3E (p4est3_set_connectivity (*p3, t->conn3));
-  SC3E (p4est3_set_quadrant_vtable (*p3, *qvt));
-  SC3E (p4est3_set_level (*p3, 0));
-  SC3E (p4est3_set_shared (*p3, 1));
-  SC3E (p4est3_set_contiguous (*p3, 0));
-  SC3E (p4est3_setup (*p3));
-
-  return NULL;
-}
-
-static sc3_error_t *
-prepare_objects (p4est3_t ** p3, p4est_t ** p, setup_t * t,
-                 const p4est3_quadrant_vtable_t ** qvt)
-{
-  t->mainalloc = sc3_allocator_nothread ();
-  SC3E (make_allocator (t));
-  SC3E (make_connectivity (t));
-  SC3E (p4est3_quadrant_vtable_p4est (qvt));
-  SC3E_DEMAND (*qvt != NULL, "p4est is not build neither in 2D nor 3D");
-  SC3E (make_new_p4est (p, t));
-  SC3E (make_new_p4est3 (p3, t, qvt));
-  return NULL;
-}
-
-static sc3_error_t *
 clean_up (p4est3_t * p3, p4est_t * p, setup_t * t)
 {
   /*destroy forest, that was referenced for others */
@@ -318,14 +320,18 @@ clean_up (p4est3_t * p3, p4est_t * p, setup_t * t)
   SC3E (sc3_allocator_destroy (&t->alloc));
   return NULL;
 }
+#endif /* P4EST_ENABLE_VALGRIND */
 
 int
 main (int argc, char **argv)
 {
+#ifndef P4EST_ENABLE_VALGRIND
+  /* Valgrind might indicate false-positiv errors
+     with some MPI shared memory implementations */
   p4est3_t *p3;
   p4est_t *p = NULL;
-  setup_t             st, *t = &st;
   const p4est3_quadrant_vtable_t *qvt;
+  setup_t             st, *t = &st;
 
   SC3X (sc3_MPI_Init (&argc, &argv));
   t->mpicomm = SC3_MPI_COMM_WORLD;
@@ -334,6 +340,9 @@ main (int argc, char **argv)
   sc_init (t->mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
   p4est_init (NULL, SC_LP_DEFAULT);
 
+
+  /* Valgrind might indicate false-positiv errors
+     with some MPI shared memory implementations */
   SC3X (prepare_objects (&p3, &p, t, &qvt));
 #if (defined(P4EST_ENABLE_MPICOMMSHARED) || !defined(P4EST_ENABLE_MPI))
   /* so far p3 partition works with shared memory only */
@@ -343,5 +352,6 @@ main (int argc, char **argv)
 
   sc_finalize_noabort ();
   SC3X (sc3_MPI_Finalize ());
+#endif /* P4EST_ENABLE_VALGRIND */
   return 0;
 }

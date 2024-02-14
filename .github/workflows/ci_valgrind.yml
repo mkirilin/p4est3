@@ -21,7 +21,7 @@ jobs:
             zlib1g-dev libmpich-dev mpich valgrind
 
     - name: Checkout source code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: true
 
@@ -38,11 +38,11 @@ jobs:
         ../configure --enable-mpi --disable-shared --enable-valgrind \
             CFLAGS="-O2 -Wall -Wextra -Wno-unused-parameter"
         make -j V=0
-        make -j check V=0
+        make -j1 check V=0
 
     - name: Upload log files
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: linux_autotools_valgrind_log
         path: |
@@ -62,7 +62,7 @@ jobs:
             zlib1g-dev libmpich-dev mpich valgrind
 
     - name: Checkout source code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: true
 
@@ -76,7 +76,7 @@ jobs:
 
     - name: Upload log files
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: linux_cmake_valgrind_log
         path: |
