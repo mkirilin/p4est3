@@ -75,7 +75,7 @@ endif()
 
 if(P4EST_HAVE_GETOPT_H)
 
-foreach(n setup p3partition)
+foreach(n setup p3partition p3time)
   p4est_example(${n}2 timings/${n}2.c "" "")
   if(TARGET P4EST::P8EST)
     p8est_example(${n}3 timings/${n}3.c "" "")
