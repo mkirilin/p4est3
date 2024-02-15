@@ -38,9 +38,6 @@
 
 #define MAX_TEST_LEVEL 5
 
-#ifndef P4EST_ENABLE_VALGRIND
-  /* Valgrind might indicate false-positiv errors
-     with some MPI shared memory implementations */
 typedef struct setup
 {
   sc3_allocator_t    *alloc;
@@ -54,6 +51,9 @@ typedef struct setup
 }
 setup_t;
 
+#ifndef P4EST_ENABLE_VALGRIND
+  /* Valgrind might indicate false-positiv errors
+     with some MPI shared memory implementations */
 static sc3_error_t *
 make_allocator (setup_t * t)
 {
@@ -331,6 +331,7 @@ main (int argc, char **argv)
   p4est3_t *p3;
   p4est_t *p = NULL;
   const p4est3_quadrant_vtable_t *qvt;
+#endif /* P4EST_ENABLE_VALGRIND */
   setup_t             st, *t = &st;
 
   SC3X (sc3_MPI_Init (&argc, &argv));
@@ -340,7 +341,7 @@ main (int argc, char **argv)
   sc_init (t->mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
   p4est_init (NULL, SC_LP_DEFAULT);
 
-
+#ifndef P4EST_ENABLE_VALGRIND
   /* Valgrind might indicate false-positiv errors
      with some MPI shared memory implementations */
   SC3X (prepare_objects (&p3, &p, t, &qvt));
@@ -349,9 +350,9 @@ main (int argc, char **argv)
   SC3X (perform_test (p3, p, t, qvt));
 #endif
   SC3X (clean_up (p3, p, t));
+#endif /* P4EST_ENABLE_VALGRIND */
 
   sc_finalize_noabort ();
   SC3X (sc3_MPI_Finalize ());
-#endif /* P4EST_ENABLE_VALGRIND */
   return 0;
 }

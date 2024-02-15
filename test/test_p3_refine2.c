@@ -40,10 +40,6 @@
 #define MAX_TEST_TREES 5
 #define FOREST_START_LEVEL 1
 
-#ifndef P4EST_ENABLE_VALGRIND
-  /* Valgrind might indicate false-positiv errors
-     with some MPI shared memory implementations */
-static int          refine_level = 0;
 
 typedef struct setup
 {
@@ -77,6 +73,11 @@ set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
   SC3E_DEMAND (*qvt != NULL, "p4est is not build neither in 2D nor 3D");
   return NULL;
 }
+
+#ifndef P4EST_ENABLE_VALGRIND
+  /* Valgrind might indicate false-positiv errors
+     with some MPI shared memory implementations */
+static int          refine_level = 0;
 
 static sc3_error_t *
 make_connectivity (setup_t * t)
@@ -414,6 +415,7 @@ perform_tests (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
   }
   return NULL;
 }
+#endif /* P4EST_ENABLE_VALGRIND */
 
 static sc3_error_t *
 free_allocator (sc3_allocator_t ** alloc)
@@ -422,14 +424,10 @@ free_allocator (sc3_allocator_t ** alloc)
   SC3E (sc3_allocator_destroy (alloc));
   return NULL;
 }
-#endif /* P4EST_ENABLE_VALGRIND */
 
 int
 main (int argc, char **argv)
 {
-#ifndef P4EST_ENABLE_VALGRIND
-  /* Valgrind might indicate false-positiv errors
-     with some MPI shared memory implementations */
   setup_t             st, *t = &st;
   const p4est3_quadrant_vtable_t *qvt;
 
@@ -440,10 +438,13 @@ main (int argc, char **argv)
   p4est_init (NULL, SC_LP_DEFAULT);
 
   SC3X (set_parameters (t, &qvt));
+#ifndef P4EST_ENABLE_VALGRIND
+  /* Valgrind might indicate false-positiv errors
+     with some MPI shared memory implementations */
   SC3X (perform_tests (t, &qvt));
+#endif
   SC3X (free_allocator (&t->alloc));
   sc_finalize_noabort ();
   SC3X (sc3_MPI_Finalize ());
-#endif
   return 0;
 }
