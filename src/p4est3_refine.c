@@ -444,7 +444,7 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
   if (p3->qvt != old->qvt) {
   /* Fill global trees position array by quadrants translation. */
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                            p3->gposition->gfposwin));
+                            p3->gposition->meta->win));
 
     beginr = sc3_intcut (old->mpisize + 1, nodesize, noderank);
     endr = sc3_intcut (old->mpisize + 1, nodesize, noderank + 1);
@@ -453,14 +453,14 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
             (old->qvt, p3->qvt, (void *) (old->gfpos + i * old->qsize),
             (void *) (p3->gfpos + i * p3->qsize), c, p3->qvt->max_level));
     }
-    SC3E (sc3_MPI_Win_sync (p3->gposition->gfposwin));
-    SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
+    SC3E (sc3_MPI_Win_sync (p3->gposition->meta->win));
+    SC3E (sc3_MPI_Win_unlock (0, p3->gposition->meta->win));
   }
   SC3E (sc3_allocator_free (p3->alloc, c));
 
   /* Put a local value to a relative position of shared memory. */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->gtreeoffsets->gtreeoffsetwin));
+                          p3->gtreeoffsets->meta->win));
   for (t = fl_resp_tree; t <= ll_resp_tree; ++t) {
     SC3E (p4est3_tree_index (p3, t, &tree));
     p3->gtroffset[t + 1] = tree->num_quads;
@@ -489,7 +489,7 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
 #endif
   }
 
-  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->gtreeoffsetwin));
+  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->meta->win));
   SC3E (sc3_MPI_Barrier (nodecomm));
   if (noderank == 0) {
     p3->gtroffset[0] = 0;
@@ -497,8 +497,8 @@ p4est3_offsets_communication (p4est3_t *p3, int nodesize, int noderank,
       p3->gtroffset[i] = p3->gtroffset[i] + p3->gtroffset[i - 1];
     }
   }
-  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->gtreeoffsetwin));
-  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->gtreeoffsetwin));
+  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->meta->win));
   SC3E (sc3_MPI_Barrier (nodecomm));
   return NULL;
 }
@@ -602,9 +602,9 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
 
   /* Fill global offsets. */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->goffsets->goffsetwin));
+                          p3->goffsets->meta->win));
   p3->goffset[p3->mpirank + 1] = p3->local_num_quads;
-  SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
+  SC3E (sc3_MPI_Win_sync (p3->goffsets->meta->win));
   SC3E (sc3_MPI_Barrier (nodecomm));
   if (noderank == 0) {
     p3->goffset[0] = 0;
@@ -612,8 +612,8 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
       p3->goffset[i] = p3->goffset[i] + p3->goffset[i - 1];
     }
   }
-  SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
-  SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+  SC3E (sc3_MPI_Win_sync (p3->goffsets->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->meta->win));
   SC3E (sc3_MPI_Barrier (nodecomm));
 
   /* We got a pattern of population, and now we populate it

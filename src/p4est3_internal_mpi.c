@@ -91,11 +91,11 @@ p4est3_internal_setup_cut (p4est3_t * p3,
 
   /* compute global partition information fairly across node ranks */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->gtrees->gftreewin));
+                          p3->gtrees->meta->win));
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->gposition->gfposwin));
+                          p3->gposition->meta->win));
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->goffsets->goffsetwin));
+                          p3->goffsets->meta->win));
   num_global = p3->num_trees * num_uniform;
   beginr = sc3_intcut (p3->mpisize + 1, nodesize, noderank);
   endr = sc3_intcut (p3->mpisize + 1, nodesize, noderank + 1);
@@ -129,9 +129,9 @@ p4est3_internal_setup_cut (p4est3_t * p3,
           (p3->qvt, temp, p3->qmaxlevel, qptr));
     qptr += qsize;
   }
-  SC3E (sc3_MPI_Win_unlock (0, p3->gtrees->gftreewin));
-  SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
-  SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gtrees->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gposition->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->meta->win));
   SC3E (sc3_MPI_Barrier (nodecomm));
   SC3A_CHECK (p3->gftree[p3->mpisize] == p3->num_trees);
   SC3A_CHECK (p3->goffset[p3->mpisize] == num_global);
@@ -208,13 +208,13 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
 
   /* compute nodal trees offsets information fairly across node ranks */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK, 
-                          p3->gtreeoffsets->gtreeoffsetwin));
+                          p3->gtreeoffsets->meta->win));
   beginr = sc3_intcut (p3->num_trees + 1, nodesize, noderank);
   endr = sc3_intcut (p3->num_trees + 1, nodesize, noderank + 1);
   for (tt = beginr; tt < endr; ++tt) {
     p3->gtroffset[tt] = tt * num_uniform;
   }
-  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->gtreeoffsetwin));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->meta->win));
 
   /* create shared quadrant storage */
   SC3E (sc3_allocator_malloc (p3->alloc, nodesize * sizeof (char *),

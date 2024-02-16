@@ -23,18 +23,79 @@
 
 #include <p4est3_internal.h>
 
+static int
+p4est3_magic_base_is_valid (const p4est3_magic_base_t * m, char *reason)
+{
+  SC3E_IS (sc3_refcount_is_valid, &m->rc, reason);
+  SC3E_IS (sc3_allocator_is_setup, m->mator, reason);
+
+  if (m->setup) {
+    SC3E_IS (sc3_mpienv_is_setup, m->mpienv, reason);
+  }
+  SC3E_YES (reason);
+}
+
+#ifdef P4EST_ENABLE_DEBUG
+static int
+p4est3_magic_base_is_new (const p4est3_magic_base_t * m, char *reason)
+{
+  SC3E_IS (p4est3_magic_base_is_valid, m, reason);
+  SC3E_TEST (!m->setup, reason);
+  SC3E_YES (reason);
+}
+#endif /* P4EST_ENABLE_DEBUG */
+
+static sc3_error_t *
+p4est3_magic_base_new (sc3_allocator_t * mator, p4est3_magic_base_t ** mp)
+{
+  p4est3_magic_base_t *m;
+
+  SC3E_RETVAL (mp, NULL);
+  SC3A_IS (sc3_allocator_is_setup, mator);
+
+  SC3E (sc3_allocator_ref (mator));
+  SC3E (sc3_allocator_calloc_one (mator, sizeof (p4est3_magic_base_t), &m));
+  SC3E (sc3_refcount_init (&m->rc));
+  m->mator = mator;
+
+  SC3A_IS (p4est3_magic_base_is_new, m);
+  *mp = m;
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_magic_base_destroy (p4est3_magic_base_t ** mp)
+{
+  p4est3_magic_base_t *m;
+  sc3_allocator_t    *mator;
+  sc3_error_t        *leak = NULL;
+
+  SC3E_INOUTP (mp, m);
+
+  *mp = NULL;
+  mator = m->mator;
+  if (m->setup) {
+    /* deallocate data created on setup here */
+    SC3E (sc3_MPI_Win_free (&m->win));
+  }
+  /* deallocate data knonw on setup here */
+  SC3L (&leak, sc3_mpienv_unref (&m->mpienv));
+  SC3E (sc3_allocator_free (mator, m));
+
+  return leak;
+}
+
 int
 p4est3_glotree_is_valid (const p4est3_glotree_t * m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);
-  SC3E_IS (sc3_refcount_is_valid, &m->rc, reason);
-  SC3E_IS (sc3_allocator_is_setup, m->mator, reason);
+  SC3E_TEST (m->meta != NULL, reason);
 
-  if (!m->setup) {
+  if (!m->meta->setup) {
     SC3E_TEST (m->gftree == NULL, reason);
   }
   else {
-    SC3E_IS (sc3_mpienv_is_setup, m->mpienv, reason);
+    SC3E_IS (p4est3_magic_base_is_valid, m->meta, reason);
     SC3E_TEST (m->gftree != NULL, reason);
   }
   SC3E_YES (reason);
@@ -44,14 +105,13 @@ int
 p4est3_glopos_is_valid (const p4est3_glopos_t * m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);
-  SC3E_IS (sc3_refcount_is_valid, &m->rc, reason);
-  SC3E_IS (sc3_allocator_is_setup, m->mator, reason);
+  SC3E_TEST (m->meta != NULL, reason);
 
-  if (!m->setup) {
+  if (!m->meta->setup) {
     SC3E_TEST (m->gfpos == NULL, reason);
   }
   else {
-    SC3E_IS (sc3_mpienv_is_setup, m->mpienv, reason);
+    SC3E_IS (p4est3_magic_base_is_valid, m->meta, reason);
     SC3E_TEST (m->gfpos != NULL, reason);
     SC3E_TEST (m->qsize > 0, reason);
   }
@@ -62,14 +122,13 @@ int
 p4est3_glooffs_is_valid (const p4est3_glooffs_t * m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);
-  SC3E_IS (sc3_refcount_is_valid, &m->rc, reason);
-  SC3E_IS (sc3_allocator_is_setup, m->mator, reason);
+  SC3E_TEST (m->meta != NULL, reason);
 
-  if (!m->setup) {
+  if (!m->meta->setup) {
     SC3E_TEST (m->goffset == NULL, reason);
   }
   else {
-    SC3E_IS (sc3_mpienv_is_setup, m->mpienv, reason);
+    SC3E_IS (p4est3_magic_base_is_valid, m->meta, reason);
     SC3E_TEST (m->goffset != NULL, reason);
   }
   SC3E_YES (reason);
@@ -79,14 +138,13 @@ int
 p4est3_gtroffs_is_valid (const p4est3_gtroffs_t * m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);
-  SC3E_IS (sc3_refcount_is_valid, &m->rc, reason);
-  SC3E_IS (sc3_allocator_is_setup, m->mator, reason);
+  SC3E_TEST (m->meta != NULL, reason);
 
-  if (!m->setup) {
+  if (!m->meta->setup) {
     SC3E_TEST (m->gtreeoffset == NULL, reason);
   }
   else {
-    SC3E_IS (sc3_mpienv_is_setup, m->mpienv, reason);
+    SC3E_IS (p4est3_magic_base_is_valid, m->meta, reason);
     SC3E_TEST (m->gtreeoffset != NULL, reason);
     SC3E_TEST (m->num_trees > 0, reason);
   }
@@ -97,7 +155,7 @@ int
 p4est3_glotree_is_new (const p4est3_glotree_t * m, char *reason)
 {
   SC3E_IS (p4est3_glotree_is_valid, m, reason);
-  SC3E_TEST (!m->setup, reason);
+  SC3E_TEST (!m->meta->setup, reason);
   SC3E_YES (reason);
 }
 
@@ -105,7 +163,7 @@ int
 p4est3_glopos_is_new (const p4est3_glopos_t * m, char *reason)
 {
   SC3E_IS (p4est3_glopos_is_valid, m, reason);
-  SC3E_TEST (!m->setup, reason);
+  SC3E_TEST (!m->meta->setup, reason);
   SC3E_YES (reason);
 }
 
@@ -113,7 +171,7 @@ int
 p4est3_glooffs_is_new (const p4est3_glooffs_t * m, char *reason)
 {
   SC3E_IS (p4est3_glooffs_is_valid, m, reason);
-  SC3E_TEST (!m->setup, reason);
+  SC3E_TEST (!m->meta->setup, reason);
   SC3E_YES (reason);
 }
 
@@ -121,23 +179,23 @@ int
 p4est3_gtroffs_is_new (const p4est3_gtroffs_t * m, char *reason)
 {
   SC3E_IS (p4est3_gtroffs_is_valid, m, reason);
-  SC3E_TEST (!m->setup, reason);
+  SC3E_TEST (!m->meta->setup, reason);
   SC3E_YES (reason);
 }
 
 sc3_error_t        *
 p4est3_glotree_new (sc3_allocator_t * mator, p4est3_glotree_t ** mp)
 {
+  p4est3_magic_base_t *b;
   p4est3_glotree_t   *m;
 
   SC3E_RETVAL (mp, NULL);
-  SC3A_IS (sc3_allocator_is_setup, mator);
 
-  SC3E (sc3_allocator_ref (mator));
+  SC3E (p4est3_magic_base_new (mator, &b));
   SC3E (sc3_allocator_calloc_one (mator, sizeof (p4est3_glotree_t), &m));
-  SC3E (sc3_refcount_init (&m->rc));
-  m->mator = mator;
+  m->meta = b;
   m->gftree = NULL;
+  m->meta = b;
 
   SC3A_IS (p4est3_glotree_is_new, m);
   *mp = m;
@@ -147,15 +205,14 @@ p4est3_glotree_new (sc3_allocator_t * mator, p4est3_glotree_t ** mp)
 sc3_error_t        *
 p4est3_glopos_new (sc3_allocator_t * mator, p4est3_glopos_t ** mp)
 {
+  p4est3_magic_base_t *b;
   p4est3_glopos_t    *m;
 
   SC3E_RETVAL (mp, NULL);
-  SC3A_IS (sc3_allocator_is_setup, mator);
 
-  SC3E (sc3_allocator_ref (mator));
+  SC3E (p4est3_magic_base_new (mator, &b));
   SC3E (sc3_allocator_calloc_one (mator, sizeof (p4est3_glopos_t), &m));
-  SC3E (sc3_refcount_init (&m->rc));
-  m->mator = mator;
+  m->meta = b;
   m->gfpos = NULL;
   m->qsize = 0;
 
@@ -167,15 +224,14 @@ p4est3_glopos_new (sc3_allocator_t * mator, p4est3_glopos_t ** mp)
 sc3_error_t        *
 p4est3_glooffs_new (sc3_allocator_t * mator, p4est3_glooffs_t ** mp)
 {
+  p4est3_magic_base_t *b;
   p4est3_glooffs_t   *m;
 
   SC3E_RETVAL (mp, NULL);
-  SC3A_IS (sc3_allocator_is_setup, mator);
 
-  SC3E (sc3_allocator_ref (mator));
+  SC3E (p4est3_magic_base_new (mator, &b));
   SC3E (sc3_allocator_calloc_one (mator, sizeof (p4est3_glooffs_t), &m));
-  SC3E (sc3_refcount_init (&m->rc));
-  m->mator = mator;
+  m->meta = b;
   m->goffset = NULL;
 
   SC3A_IS (p4est3_glooffs_is_new, m);
@@ -186,15 +242,14 @@ p4est3_glooffs_new (sc3_allocator_t * mator, p4est3_glooffs_t ** mp)
 sc3_error_t        *
 p4est3_gtroffs_new (sc3_allocator_t * mator, p4est3_gtroffs_t ** mp)
 {
+  p4est3_magic_base_t *b;
   p4est3_gtroffs_t   *m;
 
   SC3E_RETVAL (mp, NULL);
-  SC3A_IS (sc3_allocator_is_setup, mator);
 
-  SC3E (sc3_allocator_ref (mator));
+  SC3E (p4est3_magic_base_new (mator, &b));
   SC3E (sc3_allocator_calloc_one (mator, sizeof (p4est3_gtroffs_t), &m));
-  SC3E (sc3_refcount_init (&m->rc));
-  m->mator = mator;
+  m->meta = b;
   m->gtreeoffset = NULL;
   m->num_trees = 0;
 
@@ -214,22 +269,22 @@ p4est3_glopartition_set_mpienv (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
   if (mt != NULL) {
     SC3A_IS (p4est3_glotree_is_new, mt);
     SC3E (sc3_mpienv_ref (mpienv));
-    mt->mpienv = mpienv;
+    mt->meta->mpienv = mpienv;
   }
   if (mp != NULL) {
     SC3A_IS (p4est3_glopos_is_new, mp);
     SC3E (sc3_mpienv_ref (mpienv));
-    mp->mpienv = mpienv;
+    mp->meta->mpienv = mpienv;
   }
   if (mo != NULL) {
     SC3A_IS (p4est3_glooffs_is_new, mo);
     SC3E (sc3_mpienv_ref (mpienv));
-    mo->mpienv = mpienv;
+    mo->meta->mpienv = mpienv;
   }
   if (mto != NULL) {
     SC3A_IS (p4est3_gtroffs_is_new, mto);
     SC3E (sc3_mpienv_ref (mpienv));
-    mto->mpienv = mpienv;
+    mto->meta->mpienv = mpienv;
   }
   return NULL;
 }
@@ -267,16 +322,16 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
   SC3E_DEMAND (mt != NULL || mp != NULL || mo != NULL || mto != NULL,
                "At least one global partition object should not be NULL");
   if (mt != NULL) {
-    mpienv = mt->mpienv;
+    mpienv = mt->meta->mpienv;
   }
   else if (mp != NULL) {
-    mpienv = mp->mpienv;
+    mpienv = mp->meta->mpienv;
   }
   else if (mo != NULL) {
-    mpienv = mo->mpienv;
+    mpienv = mo->meta->mpienv;
   }
   else {
-    mpienv = mto->mpienv;
+    mpienv = mto->meta->mpienv;
   }
 
   SC3E (sc3_mpienv_get_noderank (mpienv, &noderank));
@@ -293,7 +348,7 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
     gftreebytes = (mpisize + 1) * sizeof (p4est3_topidx);
     SC3E (sc3_MPI_Win_allocate_shared
           (noderank == 0 ? gftreebytes : 0, sizeof (p4est3_topidx),
-           info_noncontig, nodecomm, &mt->gftree, &mt->gftreewin));
+           info_noncontig, nodecomm, &mt->gftree, &mt->meta->win));
   }
   if (mp != NULL) {
     SC3A_IS (p4est3_glopos_is_new, mp);
@@ -301,14 +356,14 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
     gfposbytes = (mpisize + 1) * mp->qsize;
     SC3E (sc3_MPI_Win_allocate_shared
           (noderank == 0 ? gfposbytes : 0, mp->qsize,
-           info_noncontig, nodecomm, &mp->gfpos, &mp->gfposwin));
+           info_noncontig, nodecomm, &mp->gfpos, &mp->meta->win));
   }
   if (mo != NULL) {
     SC3A_IS (p4est3_glooffs_is_new, mo);
     goffsetbytes = (mpisize + 1) * sizeof (p4est3_gloidx);
     SC3E (sc3_MPI_Win_allocate_shared
           (noderank == 0 ? goffsetbytes : 0, sizeof (p4est3_gloidx),
-           info_noncontig, nodecomm, &mo->goffset, &mo->goffsetwin));
+           info_noncontig, nodecomm, &mo->goffset, &mo->meta->win));
   }
   if (mto != NULL) {
     SC3A_IS (p4est3_gtroffs_is_new, mto);
@@ -316,49 +371,49 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
     goffsetbytes = (mto->num_trees + 1) * sizeof (p4est3_gloidx);
     SC3E (sc3_MPI_Win_allocate_shared
           (noderank == 0 ? goffsetbytes : 0, sizeof (p4est3_gloidx),
-           info_noncontig, nodecomm, &mto->gtreeoffset, &mto->gtreeoffsetwin));
+           info_noncontig, nodecomm, &mto->gtreeoffset, &mto->meta->win));
   }
   if (noderank > 0) {
     if (mt != NULL) {
       SC3E (sc3_MPI_Win_shared_query
-            (mt->gftreewin, 0, &tempbytes, &dispunit, &mt->gftree));
+            (mt->meta->win, 0, &tempbytes, &dispunit, &mt->gftree));
       SC3A_CHECK (tempbytes >= gftreebytes);
       SC3A_CHECK (dispunit == sizeof (p4est3_topidx));
       SC3A_CHECK (mt->gftree != NULL);
     }
     if (mp != NULL) {
       SC3E (sc3_MPI_Win_shared_query
-            (mp->gfposwin, 0, &tempbytes, &dispunit, &mp->gfpos));
+            (mp->meta->win, 0, &tempbytes, &dispunit, &mp->gfpos));
       SC3A_CHECK (tempbytes >= gfposbytes);
       SC3A_CHECK (dispunit == mp->qsize);
       SC3A_CHECK (mp->gfpos != NULL);
     }
     if (mo != NULL) {
       SC3E (sc3_MPI_Win_shared_query
-            (mo->goffsetwin, 0, &tempbytes, &dispunit, &mo->goffset));
+            (mo->meta->win, 0, &tempbytes, &dispunit, &mo->goffset));
       SC3A_CHECK (tempbytes >= goffsetbytes);
       SC3A_CHECK (dispunit == (int) sizeof (p4est3_gloidx));
       SC3A_CHECK (mo->goffset != NULL);
     }
     if (mto != NULL) {
       SC3E (sc3_MPI_Win_shared_query
-            (mto->gtreeoffsetwin, 0, &tempbytes, &dispunit, &mto->gtreeoffset));
+            (mto->meta->win, 0, &tempbytes, &dispunit, &mto->gtreeoffset));
       SC3A_CHECK (tempbytes >= goffsetbytes);
       SC3A_CHECK (dispunit == (int) sizeof (p4est3_gloidx));
       SC3A_CHECK (mto->gtreeoffset != NULL);
     }
   }
   if (mt != NULL) {
-    mt->setup = 1;
+    mt->meta->setup = 1;
   }
   if (mp != NULL) {
-    mp->setup = 1;
+    mp->meta->setup = 1;
   }
   if (mo != NULL) {
-    mo->setup = 1;
+    mo->meta->setup = 1;
   }
   if (mto != NULL) {
-    mto->setup = 1;
+    mto->meta->setup = 1;
   }
   return NULL;
 }
@@ -366,28 +421,28 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
 sc3_error_t        *
 p4est3_glotree_ref (p4est3_glotree_t * m)
 {
-  SC3E (sc3_refcount_ref (&m->rc));
+  SC3E (sc3_refcount_ref (&m->meta->rc));
   return NULL;
 }
 
 sc3_error_t        *
 p4est3_glopos_ref (p4est3_glopos_t * m)
 {
-  SC3E (sc3_refcount_ref (&m->rc));
+  SC3E (sc3_refcount_ref (&m->meta->rc));
   return NULL;
 }
 
 sc3_error_t        *
 p4est3_glooffs_ref (p4est3_glooffs_t * m)
 {
-  SC3E (sc3_refcount_ref (&m->rc));
+  SC3E (sc3_refcount_ref (&m->meta->rc));
   return NULL;
 }
 
 sc3_error_t        *
 p4est3_gtroffs_ref (p4est3_gtroffs_t * m)
 {
-  SC3E (sc3_refcount_ref (&m->rc));
+  SC3E (sc3_refcount_ref (&m->meta->rc));
   return NULL;
 }
 
@@ -401,16 +456,11 @@ p4est3_glotree_unref (p4est3_glotree_t ** mp)
 
   SC3E_INOUTP (mp, m);
   SC3A_IS (p4est3_glotree_is_valid, m);
-  SC3E (sc3_refcount_unref (&m->rc, &waslast));
+  SC3E (sc3_refcount_unref (&m->meta->rc, &waslast));
   if (waslast) {
     *mp = NULL;
-    mator = m->mator;
-    if (m->setup) {
-      /* deallocate data created on setup here */
-      SC3E (sc3_MPI_Win_free (&m->gftreewin));
-    }
-    /* deallocate data knonw on setup here */
-    SC3L (&leak, sc3_mpienv_unref (&m->mpienv));
+    mator = m->meta->mator;
+    SC3L (&leak, p4est3_magic_base_destroy (&m->meta));
     SC3E (sc3_allocator_free (mator, m));
     SC3L (&leak, sc3_allocator_unref (&mator));
   }
@@ -427,16 +477,11 @@ p4est3_glopos_unref (p4est3_glopos_t ** mp)
 
   SC3E_INOUTP (mp, m);
   SC3A_IS (p4est3_glopos_is_valid, m);
-  SC3E (sc3_refcount_unref (&m->rc, &waslast));
+  SC3E (sc3_refcount_unref (&m->meta->rc, &waslast));
   if (waslast) {
     *mp = NULL;
-    mator = m->mator;
-    if (m->setup) {
-      /* deallocate data created on setup here */
-      SC3E (sc3_MPI_Win_free (&m->gfposwin));
-    }
-    /* deallocate data knonw on setup here */
-    SC3L (&leak, sc3_mpienv_unref (&m->mpienv));
+    mator = m->meta->mator;
+    SC3L (&leak, p4est3_magic_base_destroy (&m->meta));
     SC3E (sc3_allocator_free (mator, m));
     SC3L (&leak, sc3_allocator_unref (&mator));
   }
@@ -453,16 +498,11 @@ p4est3_glooffs_unref (p4est3_glooffs_t ** mp)
 
   SC3E_INOUTP (mp, m);
   SC3A_IS (p4est3_glooffs_is_valid, m);
-  SC3E (sc3_refcount_unref (&m->rc, &waslast));
+  SC3E (sc3_refcount_unref (&m->meta->rc, &waslast));
   if (waslast) {
     *mp = NULL;
-    mator = m->mator;
-    if (m->setup) {
-      /* deallocate data created on setup here */
-      SC3E (sc3_MPI_Win_free (&m->goffsetwin));
-    }
-    /* deallocate data knonw on setup here */
-    SC3L (&leak, sc3_mpienv_unref (&m->mpienv));
+    mator = m->meta->mator;
+    SC3L (&leak, p4est3_magic_base_destroy (&m->meta));
     SC3E (sc3_allocator_free (mator, m));
     SC3L (&leak, sc3_allocator_unref (&mator));
   }
@@ -479,16 +519,11 @@ p4est3_gtroffs_unref (p4est3_gtroffs_t ** mp)
 
   SC3E_INOUTP (mp, m);
   SC3A_IS (p4est3_gtroffs_is_valid, m);
-  SC3E (sc3_refcount_unref (&m->rc, &waslast));
+  SC3E (sc3_refcount_unref (&m->meta->rc, &waslast));
   if (waslast) {
     *mp = NULL;
-    mator = m->mator;
-    if (m->setup) {
-      /* deallocate data created on setup here */
-      SC3E (sc3_MPI_Win_free (&m->gtreeoffsetwin));
-    }
-    /* deallocate data knonw on setup here */
-    SC3L (&leak, sc3_mpienv_unref (&m->mpienv));
+    mator = m->meta->mator;
+    SC3L (&leak, p4est3_magic_base_destroy (&m->meta));
     SC3E (sc3_allocator_free (mator, m));
     SC3L (&leak, sc3_allocator_unref (&mator));
   }
@@ -502,8 +537,8 @@ p4est3_glotree_destroy (p4est3_glotree_t ** mp)
   p4est3_glotree_t   *m;
 
   SC3E_INULLP (mp, m);
-  SC3L_DEMAND (&leak, sc3_refcount_is_last (&m->rc, NULL));
-  SC3L (&leak, sc3_mpienv_unref (&m->mpienv));
+  SC3L_DEMAND (&leak, sc3_refcount_is_last (&m->meta->rc, NULL));
+  SC3L (&leak, p4est3_glotree_unref (&m));
 
   SC3A_CHECK (m == NULL || leak != NULL);
   return leak;
@@ -516,8 +551,8 @@ p4est3_glopos_destroy (p4est3_glopos_t ** mp)
   p4est3_glopos_t    *m;
 
   SC3E_INULLP (mp, m);
-  SC3L_DEMAND (&leak, sc3_refcount_is_last (&m->rc, NULL));
-  SC3L (&leak, sc3_mpienv_unref (&m->mpienv));
+  SC3L_DEMAND (&leak, sc3_refcount_is_last (&m->meta->rc, NULL));
+  SC3L (&leak, p4est3_glopos_unref (&m));
 
   SC3A_CHECK (m == NULL || leak != NULL);
   return leak;
@@ -530,8 +565,8 @@ p4est3_glooffs_destroy (p4est3_glooffs_t ** mp)
   p4est3_glooffs_t   *m;
 
   SC3E_INULLP (mp, m);
-  SC3L_DEMAND (&leak, sc3_refcount_is_last (&m->rc, NULL));
-  SC3L (&leak, sc3_mpienv_unref (&m->mpienv));
+  SC3L_DEMAND (&leak, sc3_refcount_is_last (&m->meta->rc, NULL));
+  SC3L (&leak, p4est3_glooffs_unref (&m));
 
   SC3A_CHECK (m == NULL || leak != NULL);
   return leak;
@@ -544,8 +579,8 @@ p4est3_gtroffs_destroy (p4est3_gtroffs_t ** mp)
   p4est3_gtroffs_t   *m;
 
   SC3E_INULLP (mp, m);
-  SC3L_DEMAND (&leak, sc3_refcount_is_last (&m->rc, NULL));
-  SC3L (&leak, sc3_mpienv_unref (&m->mpienv));
+  SC3L_DEMAND (&leak, sc3_refcount_is_last (&m->meta->rc, NULL));
+  SC3L (&leak, p4est3_gtroffs_unref (&m));
 
   SC3A_CHECK (m == NULL || leak != NULL);
   return leak;

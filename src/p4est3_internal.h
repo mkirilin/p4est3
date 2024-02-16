@@ -85,7 +85,7 @@ typedef struct p4est3_tree
 }
 p4est3_tree_t;
 
-typedef struct p4est3_glotree
+typedef struct p4est3_magic_base
 {
   sc3_refcount_t      rc;
   int                 setup;
@@ -93,56 +93,66 @@ typedef struct p4est3_glotree
   sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
                                               information. It should correspond
                                               to the same forest as the current object. */
-  sc3_MPI_Win_t       gftreewin;        /**< Array of (\ref mpisize + 1) \ref
+  sc3_MPI_Win_t       win;              /**< General shared memory window to store
+                                             partition data or quadrants */
+}
+p4est3_magic_base_t;
+
+typedef struct p4est3_glotree
+{
+  p4est3_magic_base_t *meta;            /**< Matadata for maintaining referencing
+                                             counting functional for shared memory. */
+  p4est3_topidx      *gftree;           /**< Pointer to \ref gftreewin's memory.
+                                             The memory is an array of (\ref mpisize + 1) \ref
                                              p4est3_topidx integers for the
                                              global partition of trees. */
-  p4est3_topidx      *gftree;           /**< Pointer to \ref gftreewin's memory. */
 }
 p4est3_glotree_t;
 
 typedef struct p4est3_glopos
 {
-  sc3_refcount_t      rc;
-  int                 setup;
-  sc3_allocator_t    *mator;
-  sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
-                                              information. It should correspond
-                                              to the same forest as the current object. */
+  p4est3_magic_base_t *meta;            /**< Matadata for maintaining referencing
+                                             counting functional for shared memory. */
   int                 qsize;            /**< Size of quadrants stored in \ref gfposwin. */
-  sc3_MPI_Win_t       gfposwin;         /**< Array of (\ref mpisize + 1) times \ref
-                                        qsize bytes for global first quadrant. */
-  char               *gfpos;            /**< Pointer to \ref gfposwin's memory. */
+  char               *gfpos;            /**< Pointer to \ref gfposwin's memory.
+                                             The memory is an array of (\ref mpisize + 1) times \ref
+                                             qsize bytes for global first quadrant. */
 }
 p4est3_glopos_t;
 
 typedef struct p4est3_glooffs
 {
-  sc3_refcount_t      rc;
-  int                 setup;
-  sc3_allocator_t    *mator;
-  sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
-                                              information. It should correspond
-                                              to the same forest as the current object. */
-  sc3_MPI_Win_t       goffsetwin;       /**< Array of (\ref mpisize + 1) \ref
-                                        p4est3_gloidx for global quadrant offsets. */
-  p4est3_gloidx      *goffset;          /**< Pointer to \ref goffsetwin's memory. */
+  p4est3_magic_base_t *meta;            /**< Matadata for maintaining referencing
+                                             counting functional for shared memory. */
+  p4est3_gloidx      *goffset;          /**< Pointer to \ref goffsetwin's memory.
+                                             The memory is an array of (\ref mpisize + 1) \ref
+                                             p4est3_gloidx for global quadrant offsets. */
 }
 p4est3_glooffs_t;
 
 typedef struct p4est3_gtroffs
 {
-  sc3_refcount_t      rc;
-  int                 setup;
-  sc3_allocator_t    *mator;
-  sc3_mpienv_t       *mpienv;           /**<  Reference to a pre setup p4est3 split
-                                              information. It should correspond
-                                              to the same forest as the current object. */
+  p4est3_magic_base_t *meta;            /**< Matadata for maintaining referencing
+                                             counting functional for shared memory. */
   p4est3_topidx       num_trees;        /**< Number of trees in connectivity. */
-  sc3_MPI_Win_t       gtreeoffsetwin;   /**< Array of (\ref num_trees + 1) \ref
+  p4est3_gloidx      *gtreeoffset;      /**< Pointer to \ref gtreeoffsetwin's memory.
+                                             the memory is an array of (\ref num_trees + 1) \ref
                                              p4est3_gloidx for global trees offsets. */
-  p4est3_gloidx      *gtreeoffset;      /**< Pointer to \ref gtreeoffsetwin's memory. */
 }
 p4est3_gtroffs_t;
+
+typedef struct p4est3_quadrants
+{
+  p4est3_magic_base_t *meta;            /**< Matadata for maintaining referencing
+                                             counting functional for shared memory. */
+  char              **nodequads;        /**< Array of \ref nodesize holds pointers
+                                        to their respective first quadrants in
+                                        the storage of shared memory on this node.*/
+  char               *quads;            /**< Pointer to first quadrant local
+                                             to his process equals \ref
+                                             nodequads[\ref noderank]. */
+}
+p4est3_quadrants_t;
 
 /** This internal structure holds the members of a forest object.
  * Don't rely on its declaration in code outside the library. */

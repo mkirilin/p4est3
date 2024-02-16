@@ -556,11 +556,11 @@ p4est3_partition (p4est3_t * p3)
   }
   else {
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                            p3->goffsets->goffsetwin));
+                            p3->goffsets->meta->win));
     SC3E (p4est3_weighted_new_boundaries
           (p3, nodesize, node_offset, noderank, nodecomm));
-    SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
-    SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+    SC3E (sc3_MPI_Win_sync (p3->goffsets->meta->win));
+    SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->meta->win));
     SC3E (sc3_MPI_Barrier (nodecomm));
     for (i = 0; i < p3->mpisize; ++i) {
       loc_offsets[i] = p3->goffset[i];
@@ -646,7 +646,7 @@ p4est3_partition (p4est3_t * p3)
   }
 
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->gposition->gfposwin));
+                          p3->gposition->meta->win));
   /* potentially, the member of gfpos with the (nodesize + 1) index
      should not be changed, so we edit the nodesize number of quads */
   SC3E (p4est3_quadrant_first_descendant
@@ -654,7 +654,7 @@ p4est3_partition (p4est3_t * p3)
          p3->qmaxlevel, p3->gfpos + p3->mpirank * p3->qsize));
 
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->goffsets->goffsetwin));
+                          p3->goffsets->meta->win));
   p3->goffset[p3->mpirank] = loc_offsets[p3->mpirank];
   if (p3->mpirank == 0) {
     p3->goffset[p3->mpisize] = p3->global_num_quads;
@@ -662,18 +662,18 @@ p4est3_partition (p4est3_t * p3)
   SC3A_CHECK (p3->global_num_quads == loc_offsets[p3->mpisize]);
 
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->gtreeoffsets->gtreeoffsetwin));
+                          p3->gtreeoffsets->meta->win));
 
   SC3E (p4est3_local_trees_reproduce (p3, last_gtree_offsets, loc_offsets));
 
-  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->gtreeoffsetwin));
-  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->gtreeoffsetwin));
+  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->meta->win));
 
-  SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
-  SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
+  SC3E (sc3_MPI_Win_sync (p3->goffsets->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->meta->win));
 
-  SC3E (sc3_MPI_Win_sync (p3->gposition->gfposwin));
-  SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
+  SC3E (sc3_MPI_Win_sync (p3->gposition->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gposition->meta->win));
 
   SC3E (sc3_MPI_Win_sync (p3->quadwin));
   SC3E (sc3_MPI_Win_unlock (noderank, p3->quadwin));
