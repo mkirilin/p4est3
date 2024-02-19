@@ -469,6 +469,7 @@ p4est3_destroy (p4est3_t ** pp3)
       SC3E (sc3_allocator_free (p3->alloc, p3->temp_quad));
 
       SC3E (sc3_array_destroy (&p3->trees));
+      SC3E (sc3_allocator_free (p3->alloc, p3->nodequads));
     }
 
     /* release data that has been referenced before setup */

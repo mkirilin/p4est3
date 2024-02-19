@@ -161,10 +161,12 @@ p4est3_tree_index (p4est3_t * p3, p4est3_topidx tt, p4est3_tree_t ** tree)
 sc3_error_t        *
 p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
 {
-  int                 nodesize, noderank, node_frank;
+  int                 n, nodesize, noderank, node_frank;
+  int                 dispunit;
   p4est3_topidx       tt, beginr, endr;
   p4est3_gloidx       first_quad, end_quad, tt_offset, next_offset;
   p4est3_tree_t      *tree;
+  sc3_MPI_Aint_t      tempbytes;
   sc3_MPI_Comm_t      nodecomm;
   sc3_MPI_Info_t      info_noncontig;
 
@@ -222,7 +224,19 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
   SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, NULL, p3->quadrants));
   p3->quads = p3->quadrants->quads;
-  p3->nodequads = p3->quadrants->nodequads;
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, nodesize * sizeof (char *), &p3->nodequads));
+  for (n = 0; n < nodesize; ++n) {
+      SC3E (sc3_MPI_Win_shared_query
+            (p3->quadrants->meta->win, n, &tempbytes, &dispunit,
+             &p3->nodequads[n]));
+      SC3A_CHECK (tempbytes >= (sc3_MPI_Aint_t)
+                  (p3->goffset[node_frank + n + 1] -
+                   p3->goffset[node_frank + n]) * p3->qsize);
+      SC3A_CHECK (dispunit == p3->qsize);
+      SC3A_CHECK (p3->nodequads[n] != NULL || tempbytes == 0);
+  }
+  SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
 
   /* populate tree metadata */
   SC3E (sc3_array_new (p3->alloc, &p3->trees));

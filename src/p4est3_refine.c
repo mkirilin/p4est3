@@ -508,9 +508,11 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
 {
   int                 i, nodesize;
   int                 noderank;
+  int                 dispunit;
   p4est3_locidx       lt_offset;
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Comm_t      nodecomm;
+  sc3_MPI_Aint_t      tempbytes;
   p4est3_tree_t      *tree;
   sc3_array_t        *pattern; /**< Every number in this array encodes ref/coar behaviour */
   sc3_array_t        *family;
@@ -591,7 +593,15 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
   SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
   SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, NULL, p3->quadrants));
   p3->quads = p3->quadrants->quads;
-  p3->nodequads = p3->quadrants->nodequads;
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, nodesize * sizeof (char *), &p3->nodequads));
+  for (i = 0; i < nodesize; ++i) {
+    SC3E (sc3_MPI_Win_shared_query (p3->quadrants->meta->win, i,
+                                    &tempbytes, &dispunit, &p3->nodequads[i]));
+    SC3A_CHECK (dispunit == p3->qsize);
+    SC3A_CHECK (p3->nodequads[i] != NULL || tempbytes == 0);
+  }
+  SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
 
   /* Fill global offsets. */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,

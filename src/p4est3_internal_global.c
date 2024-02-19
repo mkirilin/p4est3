@@ -158,12 +158,10 @@ p4est3_quadrants_is_valid (const p4est3_quadrants_t * m, char *reason)
   SC3E_TEST (m->meta != NULL, reason);
   if (!m->meta->setup) {
     SC3E_TEST (m->quads == NULL, reason);
-    SC3E_TEST (m->nodequads == NULL, reason);
   }
   else {
     SC3E_IS (p4est3_magic_base_is_valid, m->meta, reason);
     SC3E_TEST (m->quads != NULL, reason);
-    SC3E_TEST (m->nodequads != NULL, reason);
     SC3E_TEST (m->local_num_quads >= 0, reason);
     SC3E_TEST (m->qsize > 0, reason);
   }
@@ -297,7 +295,6 @@ p4est3_quadrants_new (sc3_allocator_t * mator, p4est3_quadrants_t ** mp)
   SC3E (sc3_allocator_calloc_one (mator, sizeof (p4est3_quadrants_t), &m));
   m->meta = b;
   m->quads = NULL;
-  m->nodequads = NULL;
   m->local_num_quads = -1;
   m->qsize = 0;
 
@@ -385,10 +382,7 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
                            p4est3_glooffs_t * mo, p4est3_gtroffs_t * mto,
                            p4est3_quadrants_t * mq)
 {
-  int                 n, noderank, nodesize, mpisize;
-#ifdef P4EST_ENABLE_DEBUG
-  int                 node_frank;
-#endif
+  int                 noderank, nodesize, mpisize;
   int                 dispunit;
   sc3_MPI_Aint_t      gftreebytes = 0, gfposbytes = 0,
                       goffsetbytes = 0, quadbytes = 0, tempbytes;
@@ -458,9 +452,7 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
     SC3A_IS (p4est3_quadrants_is_new, mq);
     SC3A_CHECK (mq->local_num_quads >= 0);
     /* create shared quadrant storage */
-    SC3E (sc3_allocator_malloc
-            (mq->meta->mator, nodesize * sizeof (char *), &mq->nodequads));
-    quadbytes = (sc3_MPI_Aint_t) mq->local_num_quads * mq->qsize;
+    quadbytes = ((sc3_MPI_Aint_t) (mq->local_num_quads)) * mq->qsize;
     SC3E (sc3_MPI_Win_allocate_shared
           (quadbytes, mq->qsize, info_noncontig, nodecomm, &mq->quads,
            &mq->meta->win));
@@ -494,23 +486,6 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
       SC3A_CHECK (dispunit == (int) sizeof (p4est3_gloidx));
       SC3A_CHECK (mto->gtreeoffset != NULL);
     }
-  }
-  if (mq != NULL) {
-      for (n = 0; n < nodesize; ++n) {
-      SC3E (sc3_MPI_Win_shared_query
-            (mq->meta->win, n, &tempbytes, &dispunit, &mq->nodequads[n]));
-#ifdef P4EST_ENABLE_DEBUG
-      if (mo != NULL) {
-        SC3E (sc3_mpienv_get_node_frank (mpienv, &node_frank));
-        SC3A_CHECK (tempbytes >= (sc3_MPI_Aint_t)
-                    (mo->goffset[node_frank + n + 1] -
-                     mo->goffset[node_frank + n]) * mq->qsize);
-      }
-#endif
-      SC3A_CHECK (dispunit == mq->qsize);
-      SC3A_CHECK (mq->nodequads[n] != NULL || tempbytes == 0);
-    }
-    SC3A_CHECK (mq->nodequads[noderank] == mq->quads);
   }
 
   if (mt != NULL) {
@@ -665,7 +640,6 @@ p4est3_quadrants_unref (p4est3_quadrants_t ** mp)
     *mp = NULL;
     mator = m->meta->mator;
     SC3L (&leak, p4est3_magic_base_destroy (&m->meta));
-    SC3E (sc3_allocator_free (mator, m->nodequads));
     SC3E (sc3_allocator_free (mator, m));
     SC3L (&leak, sc3_allocator_unref (&mator));
   }

@@ -145,13 +145,16 @@ typedef struct p4est3_quadrants
 {
   p4est3_magic_base_t *meta;            /**< Matadata for maintaining referencing
                                              counting functional for shared memory. */
-  char              **nodequads;        /**< Array of \ref nodesize holds pointers
-                                        to their respective first quadrants in
-                                        the storage of shared memory on this node.*/
   char               *quads;            /**< Pointer to first quadrant local
-                                             to his process equals \ref
+                                             to his process for a forest
+                                             the object was initially created.
+                                             For a referencing forest it may
+                                             differ. Equals \ref
                                              nodequads[\ref noderank]. */
-  p4est3_locidx       local_num_quads;  /**< Count process-local quadrants. */
+  p4est3_locidx       local_num_quads;  /**< Count process-local quadrants for
+                                             a forest the object was initially
+                                             created. For a referencing forest
+                                             it may differ. */
   int                 qsize;            /**< Size of quadrants stored in the forest. */
 }
 p4est3_quadrants_t;
