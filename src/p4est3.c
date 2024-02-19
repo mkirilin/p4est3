@@ -460,8 +460,7 @@ p4est3_destroy (p4est3_t ** pp3)
       SC3E (p4est3_glopos_unref (&p3->gposition));
       SC3E (p4est3_glooffs_unref (&p3->goffsets));
       SC3E (p4est3_gtroffs_unref (&p3->gtreeoffsets));
-
-      SC3E (sc3_MPI_Win_free (&p3->quadwin));
+      SC3E (p4est3_quadrants_unref (&p3->quadrants));
 
       /* deallocate internal storage */
       for (ti = 0; ti < p3->max_threads; ++ti) {
@@ -470,7 +469,6 @@ p4est3_destroy (p4est3_t ** pp3)
       SC3E (sc3_allocator_free (p3->alloc, p3->temp_quad));
 
       SC3E (sc3_array_destroy (&p3->trees));
-      SC3E (sc3_allocator_free (p3->alloc, p3->nodequads));
     }
 
     /* release data that has been referenced before setup */

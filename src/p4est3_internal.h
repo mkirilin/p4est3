@@ -151,6 +151,8 @@ typedef struct p4est3_quadrants
   char               *quads;            /**< Pointer to first quadrant local
                                              to his process equals \ref
                                              nodequads[\ref noderank]. */
+  p4est3_locidx       local_num_quads;  /**< Count process-local quadrants. */
+  int                 qsize;            /**< Size of quadrants stored in the forest. */
 }
 p4est3_quadrants_t;
 
@@ -216,10 +218,10 @@ struct p4est3
   p4est3_gloidx      *gtroffset;        /**< Pointer to \ref gtreeoffsetwin's memory. */
 
   /* variables populated during p4est3_setup: tree and quadrant storage */
-  sc3_MPI_Win_t       quadwin;          /**< Shared memory stores the quadrants
-                                        for all ranks on this node in order.
-                                        Each node rank's local subwindow is
-                                        associated with its rank. */
+  p4est3_quadrants_t *quadrants;   /**< The object providing storing in
+                                        shared memory the quadrants for all ranks
+                                        on this node in order. Each node rank's
+                                        local subwindow is associated with its rank. */
   char              **nodequads;        /**< Array of \ref nodesize holds pointers
                                         to their respective first quadrants in
                                         the storage of \ref quadwin. */
@@ -291,6 +293,8 @@ int                 p4est3_glooffs_is_valid (const p4est3_glooffs_t * m,
                                              char *reason);
 int                 p4est3_gtroffs_is_valid (const p4est3_gtroffs_t * m,
                                              char *reason);
+int                 p4est3_quadrants_is_valid (const p4est3_quadrants_t * m,
+                                               char *reason);
 int                 p4est3_glotree_is_new (const p4est3_glotree_t * m,
                                            char *reason);
 int                 p4est3_glopos_is_new (const p4est3_glopos_t * m,
@@ -299,6 +303,8 @@ int                 p4est3_glooffs_is_new (const p4est3_glooffs_t * m,
                                            char *reason);
 int                 p4est3_gtroffs_is_new (const p4est3_gtroffs_t * m,
                                            char *reason);
+int                p4est3_quadrants_is_new (const p4est3_quadrants_t * m,
+                                             char *reason);
 sc3_error_t        *p4est3_glotree_new (sc3_allocator_t * mator,
                                         p4est3_glotree_t ** mp);
 sc3_error_t        *p4est3_glopos_new (sc3_allocator_t * mator,
@@ -307,30 +313,41 @@ sc3_error_t        *p4est3_glooffs_new (sc3_allocator_t * mator,
                                         p4est3_glooffs_t ** mp);
 sc3_error_t        *p4est3_gtroffs_new (sc3_allocator_t * mator,
                                         p4est3_gtroffs_t ** mp);
+sc3_error_t        *p4est3_quadrants_new (sc3_allocator_t * mator,
+                                          p4est3_quadrants_t ** mp);
 sc3_error_t        *p4est3_glopos_set_qsize (p4est3_glopos_t * m, int qsize);
 sc3_error_t        *p4est3_gtroffs_set_num_trees (p4est3_gtroffs_t * m,
                                                   p4est3_topidx num_trees);
+sc3_error_t        *p4est3_quadrants_set_local_num_quads
+                     (p4est3_quadrants_t * m, p4est3_locidx local_num_quads);
+sc3_error_t        *p4est3_quadrants_set_qsize
+                     (p4est3_quadrants_t * m, int qsize);
 sc3_error_t        *p4est3_glopartition_set_mpienv (p4est3_glotree_t * mt,
                                                     p4est3_glopos_t * mp,
                                                     p4est3_glooffs_t * mo,
                                                     p4est3_gtroffs_t * mto,
+                                                    p4est3_quadrants_t * mq,
                                                     sc3_mpienv_t * mpienv);
 sc3_error_t        *p4est3_glopartition_setup (p4est3_glotree_t * mt,
                                                p4est3_glopos_t * mp,
                                                p4est3_glooffs_t * mo,
-                                               p4est3_gtroffs_t * mto);
+                                               p4est3_gtroffs_t * mto,
+                                               p4est3_quadrants_t * mq);
 sc3_error_t        *p4est3_glotree_ref (p4est3_glotree_t * m);
 sc3_error_t        *p4est3_glopos_ref (p4est3_glopos_t * m);
 sc3_error_t        *p4est3_glooffs_ref (p4est3_glooffs_t * m);
 sc3_error_t        *p4est3_gtroffs_ref (p4est3_gtroffs_t * m);
+sc3_error_t        *p4est3_quadrants_ref (p4est3_quadrants_t * m);
 sc3_error_t        *p4est3_glotree_unref (p4est3_glotree_t ** mp);
 sc3_error_t        *p4est3_glopos_unref (p4est3_glopos_t ** mp);
 sc3_error_t        *p4est3_glooffs_unref (p4est3_glooffs_t ** mp);
 sc3_error_t        *p4est3_gtroffs_unref (p4est3_gtroffs_t ** mp);
+sc3_error_t        *p4est3_quadrants_unref (p4est3_quadrants_t ** mp);
 sc3_error_t        *p4est3_glotree_destroy (p4est3_glotree_t ** mp);
 sc3_error_t        *p4est3_glopos_destroy (p4est3_glopos_t ** mp);
 sc3_error_t        *p4est3_glooffs_destroy (p4est3_glooffs_t ** mp);
 sc3_error_t        *p4est3_gtroffs_destroy (p4est3_gtroffs_t ** mp);
+sc3_error_t        *p4est3_quadrants_destroy (p4est3_quadrants_t ** mp);
 /** \endcond */
 
 /* TODO: document default value for all _set_ */

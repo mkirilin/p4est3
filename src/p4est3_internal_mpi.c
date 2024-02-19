@@ -80,9 +80,10 @@ p4est3_internal_setup_cut (p4est3_t * p3,
   SC3E (p4est3_glopos_new (p3->alloc, &p3->gposition));
   SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
   SC3E (p4est3_glopartition_set_mpienv
-        (p3->gtrees, p3->gposition, p3->goffsets, NULL, p3->split_info));
+        (p3->gtrees, p3->gposition, p3->goffsets, NULL, NULL, p3->split_info));
   SC3E (p4est3_glopos_set_qsize (p3->gposition, qsize));
-  SC3E (p4est3_glopartition_setup (p3->gtrees, p3->gposition, p3->goffsets, NULL));
+  SC3E (p4est3_glopartition_setup
+        (p3->gtrees, p3->gposition, p3->goffsets, NULL, NULL));
 
   /* making shortcuts */
   p3->gftree = p3->gtrees->gftree;
@@ -160,14 +161,10 @@ p4est3_tree_index (p4est3_t * p3, p4est3_topidx tt, p4est3_tree_t ** tree)
 sc3_error_t        *
 p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
 {
-  int                 n;
-  int                 dispunit;
   int                 nodesize, noderank, node_frank;
-  char               *quadmem, *nqmem;
   p4est3_topidx       tt, beginr, endr;
   p4est3_gloidx       first_quad, end_quad, tt_offset, next_offset;
   p4est3_tree_t      *tree;
-  sc3_MPI_Aint_t      quadbytes, tempbytes;
   sc3_MPI_Comm_t      nodecomm;
   sc3_MPI_Info_t      info_noncontig;
 
@@ -201,9 +198,9 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   /* create shared trees offsets storage */
   SC3E (p4est3_gtroffs_new (p3->alloc, &p3->gtreeoffsets));
   SC3E (p4est3_glopartition_set_mpienv
-        (NULL, NULL, NULL, p3->gtreeoffsets, p3->split_info));
+        (NULL, NULL, NULL, p3->gtreeoffsets, NULL, p3->split_info));
   SC3E (p4est3_gtroffs_set_num_trees (p3->gtreeoffsets, p3->num_trees));
-  SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, p3->gtreeoffsets));
+  SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, p3->gtreeoffsets, NULL));
   p3->gtroffset = p3->gtreeoffsets->gtreeoffset;
 
   /* compute nodal trees offsets information fairly across node ranks */
@@ -217,24 +214,15 @@ p4est3_internal_setup_tree (p4est3_t * p3, p4est3_gloidx num_uniform)
   SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->meta->win));
 
   /* create shared quadrant storage */
-  SC3E (sc3_allocator_malloc (p3->alloc, nodesize * sizeof (char *),
-                              &p3->nodequads));
-  quadbytes = (sc3_MPI_Aint_t) p3->local_num_quads * p3->qsize;
-  SC3E (sc3_MPI_Win_allocate_shared
-        (quadbytes, p3->qsize,
-         info_noncontig, nodecomm, &quadmem, &p3->quadwin));
-  for (n = 0; n < nodesize; ++n) {
-    SC3E (sc3_MPI_Win_shared_query (p3->quadwin, n,
-                                    &tempbytes, &dispunit, &nqmem));
-    SC3A_CHECK (tempbytes >= (sc3_MPI_Aint_t)
-                ((p3->goffset[node_frank + n + 1] -
-                  p3->goffset[node_frank + n]) * p3->qsize));
-    SC3A_CHECK (dispunit == p3->qsize);
-    SC3A_CHECK (nqmem != NULL || tempbytes == 0);
-    p3->nodequads[n] = nqmem;
-  }
-  p3->quads = quadmem;
-  SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
+  SC3E (p4est3_quadrants_new (p3->alloc, &p3->quadrants));
+  SC3E (p4est3_glopartition_set_mpienv
+        (NULL, NULL, NULL, NULL, p3->quadrants, p3->split_info));
+  SC3E (p4est3_quadrants_set_local_num_quads
+        (p3->quadrants, p3->local_num_quads));
+  SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
+  SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, NULL, p3->quadrants));
+  p3->quads = p3->quadrants->quads;
+  p3->nodequads = p3->quadrants->nodequads;
 
   /* populate tree metadata */
   SC3E (sc3_array_new (p3->alloc, &p3->trees));
@@ -690,7 +678,7 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
 
   /* we work on the process-local window onte the quadrants */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, noderank,
-                          SC3_MPI_MODE_NOCHECK, p3->quadwin));
+                          SC3_MPI_MODE_NOCHECK, p3->quadrants->meta->win));
   char               *charq;
   p4est3_locidx       tmine, tq;
   p4est3_gloidx       gq, num_uniform;
@@ -732,7 +720,7 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
       gq = 0;
     }
   }
-  SC3E (sc3_MPI_Win_unlock (noderank, p3->quadwin));
+  SC3E (sc3_MPI_Win_unlock (noderank, p3->quadrants->meta->win));
   SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
   SC3E (sc3_MPI_Barrier (nodecomm));
   return NULL;
@@ -810,17 +798,17 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
       SC3E (p4est3_glopos_new (p3->alloc, &p3->gposition));
       SC3E (p4est3_glopos_set_qsize (p3->gposition, p3->qsize));
       SC3E (p4est3_glopartition_set_mpienv
-            (NULL, p3->gposition, NULL, NULL, old->split_info));
-      SC3E (p4est3_glopartition_setup (NULL, p3->gposition, NULL, NULL));
+            (NULL, p3->gposition, NULL, NULL, NULL, old->split_info));
+      SC3E (p4est3_glopartition_setup (NULL, p3->gposition, NULL, NULL, NULL));
       p3->gfpos = p3->gposition->gfpos;
     }
 
     /* create shared trees offsets storage */
     SC3E (p4est3_gtroffs_new (p3->alloc, &p3->gtreeoffsets));
     SC3E (p4est3_glopartition_set_mpienv
-          (NULL, NULL, NULL, p3->gtreeoffsets, old->split_info));
+          (NULL, NULL, NULL, p3->gtreeoffsets, NULL, old->split_info));
     SC3E (p4est3_gtroffs_set_num_trees (p3->gtreeoffsets, p3->num_trees));
-    SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, p3->gtreeoffsets));
+    SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, p3->gtreeoffsets, NULL));
     p3->gtroffset = p3->gtreeoffsets->gtreeoffset;
   }
   else {
@@ -832,9 +820,10 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
     SC3E (p4est3_glopos_new (p3->alloc, &p3->gposition));
     SC3E (p4est3_glopos_set_qsize (p3->gposition, p3->qsize));
     SC3E (p4est3_glopartition_set_mpienv
-          (p3->gtrees, p3->gposition, NULL, NULL, old->split_info));
+          (p3->gtrees, p3->gposition, NULL, NULL, NULL, old->split_info));
 
-    SC3E (p4est3_glopartition_setup (p3->gtrees, p3->gposition, NULL, NULL));
+    SC3E (p4est3_glopartition_setup
+          (p3->gtrees, p3->gposition, NULL, NULL, NULL));
     p3->gftree = p3->gtrees->gftree;
     p3->gfpos = p3->gposition->gfpos;
 
@@ -846,8 +835,8 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   /* Allocate shared memory for global offsets */
   SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
   SC3E (p4est3_glopartition_set_mpienv
-        (NULL, NULL, p3->goffsets, NULL, old->split_info));
-  SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL));
+        (NULL, NULL, p3->goffsets, NULL, NULL, old->split_info));
+  SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL, NULL));
   p3->goffset = p3->goffsets->goffset;
 
   SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),

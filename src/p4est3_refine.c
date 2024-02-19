@@ -507,13 +507,10 @@ sc3_error_t        *
 p4est3_refine_coarsen_copy (p4est3_t * p3)
 {
   int                 i, nodesize;
-  int                 dispunit;
   int                 noderank;
-  char               *quadmem, *nqmem;
   p4est3_locidx       lt_offset;
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Comm_t      nodecomm;
-  sc3_MPI_Aint_t      tempbytes;
   p4est3_tree_t      *tree;
   sc3_array_t        *pattern; /**< Every number in this array encodes ref/coar behaviour */
   sc3_array_t        *family;
@@ -585,20 +582,16 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
 
   /* Here we allocate shared p4est3_t::quadwin and p4est3_t::nodequads.
      We will fill in the latter later. */
-  SC3E (sc3_allocator_malloc (p3->alloc, nodesize * sizeof (char *),
-                              &p3->nodequads));
-  SC3E (sc3_MPI_Win_allocate_shared
-        ((sc3_MPI_Aint_t) (p3->local_num_quads * p3->qsize), p3->qsize,
-         info_noncontig, nodecomm, &quadmem, &p3->quadwin));
-  for (i = 0; i < nodesize; ++i) {
-    SC3E (sc3_MPI_Win_shared_query (p3->quadwin, i,
-                                    &tempbytes, &dispunit, &nqmem));
-    SC3A_CHECK (dispunit == p3->qsize);
-    SC3A_CHECK (nqmem != NULL || tempbytes == 0);
-    p3->nodequads[i] = nqmem;
-  }
-  p3->quads = quadmem;
-  SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
+  /* create shared quadrant storage */
+  SC3E (p4est3_quadrants_new (p3->alloc, &p3->quadrants));
+  SC3E (p4est3_glopartition_set_mpienv
+        (NULL, NULL, NULL, NULL, p3->quadrants, p3->split_info));
+  SC3E (p4est3_quadrants_set_local_num_quads
+        (p3->quadrants, p3->local_num_quads));
+  SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
+  SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, NULL, p3->quadrants));
+  p3->quads = p3->quadrants->quads;
+  p3->nodequads = p3->quadrants->nodequads;
 
   /* Fill global offsets. */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,

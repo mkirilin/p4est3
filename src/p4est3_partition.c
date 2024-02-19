@@ -500,16 +500,6 @@ p4est3_partition (p4est3_t * p3)
   p4est3_locidx       li;
   p4est3_topidx       t;
 
-  /* new shared memory variables block */
-#ifdef P4EST_ENABLE_DEBUG
-  int                 node_frank;
-#endif
-  int                 dispunit;
-  char               *new_quadmem, *nqmem;
-  sc3_MPI_Aint_t      quadbytes, tempbytes;
-  sc3_MPI_Info_t      info_noncontig;
-  sc3_MPI_Win_t       new_quadwin;
-
   /* We suppose to call this function after setting up routine */
   SC3A_CHECK (p3->old != NULL);
   SC3A_IS (p4est3_is_setup, p3->old);
@@ -590,35 +580,19 @@ p4est3_partition (p4est3_t * p3)
   p3->local_num_quads =
     loc_offsets[p3->mpirank + 1] - loc_offsets[p3->mpirank];
 
-  SC3E (sc3_allocator_malloc
-        (p3->alloc, nodesize * sizeof (char *), &p3->nodequads));
-
   /* Allocate new shared memory to store quadrants */
-  quadbytes = (sc3_MPI_Aint_t) p3->local_num_quads * p3->qsize;
-  SC3E (sc3_mpienv_get_info_noncont (p3->split_info, &info_noncontig));
-  SC3E (sc3_MPI_Win_allocate_shared
-        (quadbytes, p3->qsize, info_noncontig,
-         nodecomm, &new_quadmem, &new_quadwin));
-
-  for (i = 0; i < nodesize; ++i) {
-    SC3E (sc3_MPI_Win_shared_query (new_quadwin, i,
-                                    &tempbytes, &dispunit, &nqmem));
-#ifdef P4EST_ENABLE_DEBUG
-    SC3E (sc3_mpienv_get_node_frank (p3->split_info, &node_frank));
-    SC3A_CHECK (tempbytes >= (sc3_MPI_Aint_t)
-                ((loc_offsets[node_frank + i + 1] -
-                  loc_offsets[node_frank + i]) * p3->qsize));
-#endif
-    SC3A_CHECK (dispunit == p3->qsize);
-    SC3A_CHECK (nqmem != NULL || tempbytes == 0);
-    p3->nodequads[i] = nqmem;
-  }
-  p3->quads = new_quadmem;
-  p3->quadwin = new_quadwin;
-  SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
+  SC3E (p4est3_quadrants_new (p3->alloc, &p3->quadrants));
+  SC3E (p4est3_glopartition_set_mpienv
+        (NULL, NULL, NULL, NULL, p3->quadrants, p3->split_info));
+  SC3E (p4est3_quadrants_set_local_num_quads
+        (p3->quadrants, p3->local_num_quads));
+  SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
+  SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, NULL, p3->quadrants));
+  p3->quads = p3->quadrants->quads;
+  p3->nodequads = p3->quadrants->nodequads;
 
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, noderank,
-                          SC3_MPI_MODE_NOCHECK, p3->quadwin));
+                          SC3_MPI_MODE_NOCHECK, p3->quadrants->meta->win));
   /*Warning! This works only when qvt for p3 and p3->old are the same */
   if (p3->contiguous) {
     if (p3->qvt == p3->old->qvt) {
@@ -675,8 +649,8 @@ p4est3_partition (p4est3_t * p3)
   SC3E (sc3_MPI_Win_sync (p3->gposition->meta->win));
   SC3E (sc3_MPI_Win_unlock (0, p3->gposition->meta->win));
 
-  SC3E (sc3_MPI_Win_sync (p3->quadwin));
-  SC3E (sc3_MPI_Win_unlock (noderank, p3->quadwin));
+  SC3E (sc3_MPI_Win_sync (p3->quadrants->meta->win));
+  SC3E (sc3_MPI_Win_unlock (noderank, p3->quadrants->meta->win));
 
   SC3E (sc3_allocator_free (p3->alloc, loc_offsets));
   SC3E (sc3_allocator_free (p3->alloc, last_goffsets));
