@@ -117,6 +117,8 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   p3->gtroffset = p3->gtreeoffsets->gtreeoffset;
 
   /* fill in gfpos */
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gposition->gfposwin));
   if (p3->qvt == qvt) {
     /* just copy */
     SC3E (p4est3_quadrant_copy
@@ -144,8 +146,12 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
             p3->qvt, p3->gfpos + p3->mpisize * p3->qsize));
     }
   }
+  SC3E (sc3_MPI_Win_sync (p3->gposition->gfposwin));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
 
   /* fill in goffset */
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->goffsets->goffsetwin));
   p3->goffset[p3->mpirank]
     = (p4est3_gloidx) p->global_first_quadrant[p->mpirank];
   if (p3->mpirank == 0) {
@@ -153,12 +159,18 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
     p3->goffset[p3->mpisize]
       = (p4est3_gloidx) p->global_first_quadrant[p->mpisize];
   }
+  SC3E (sc3_MPI_Win_sync (p3->goffsets->goffsetwin));
+  SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->goffsetwin));
 
   /* fill in gftree */
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gtrees->gftreewin));
   p3->gftree[p3->mpirank] = (p4est3_topidx) p->first_local_tree;
   if (p3->mpirank == 0) {
     p3->gftree[p3->mpisize] = p3->num_trees;
   }
+  SC3E (sc3_MPI_Win_sync (p3->gtrees->gftreewin));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gtrees->gftreewin));
 
   /* allocate shared memory quadrant storage and copy quadrants from p4est_t */
   p3->local_num_quads = p->local_num_quadrants;
@@ -225,7 +237,7 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   p3->nltrees = p->last_local_tree - p->first_local_tree + 1;
 
   /* allocate and fill in trees and trees offsets */
-
+  SC3E (p4est3_tree_offsets_communication (p3, noderank, nodecomm));
 
   return NULL;
 }
