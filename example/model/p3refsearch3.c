@@ -22,8 +22,12 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+#include <p4est3_internal.h>
 #include <p8est_extended.h>
+#include <p4est3_p8est.h>
 #include <p8est_search.h>
+#include <p4est3_quadrant_zyx.h>
+#include <p4est3_quadrant_mort3d.h>
 #include <p8est_vtk.h>
 #include <sc_options.h>
 #include "model.h"
@@ -406,33 +410,44 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
   for (zz = 0; zz < model->num_prim; ++zz) {
     *(size_t *) sc_array_index (primitives, zz) = zz;
   }
-  snprintf (filename, BUFSIZ, "p4est_%s_%02d",
+  /* snprintf (filename, BUFSIZ, "p4est_%s_%02d",
             model->output_prefix, start_level);
-  p4est_vtk_write_file (p4est, model->geom, filename);
+  p4est_vtk_write_file (p4est, model->geom, filename); */
   for (level = start_level; level < max_ref_level; ++level) {
-    P4EST_GLOBAL_PRODUCTIONF ("Into refinement iteration %d\n", level);
+#ifdef P4EST_ENABLE_DEBUG
+    if (p4est->mpirank == 0) {
+      P4EST_GLOBAL_PRODUCTIONF ("Into refinement iteration %d\n", level);
+      P4EST_GLOBAL_PRODUCTION ("Run object search\n");
+    }
+#endif
 
-    P4EST_GLOBAL_PRODUCTION ("Run object search\n");
     p4est_search_local (p4est, 0, NULL, p4est_model_intersect, primitives);
     /*p4est_search_reorder
       (p4est, 1, NULL, NULL, NULL, p4est_model_intersect, primitives);*/
 
-    P4EST_GLOBAL_PRODUCTION ("Run mesh refinement\n");
+#ifdef P4EST_ENABLE_DEBUG
+    if (p4est->mpirank == 0) {
+      P4EST_GLOBAL_PRODUCTION ("Run mesh refinement\n");
+    }
+#endif
 
     p4est_refine (p4est, 0, p4est_model_refine, p4est_model_quad_init);
     /*p4est_refine_ext
       (p4est, 0, -1, p4est_model_refine, p4est_model_quad_init, NULL);*/
 
-    p4est_partition (p4est, 0, NULL);
-    snprintf (filename, BUFSIZ, "p4est_%s_%02d",
-              model->output_prefix, level + 1);
-    p4est_vtk_write_file (p4est, model->geom, filename);
+    if (level == max_ref_level - 1) {
+      snprintf (filename, BUFSIZ, "p4est_%s_%02d_before_partition",
+                model->output_prefix, level + 1);
+      p4est_vtk_write_file (p4est, model->geom, filename);
+      p4est_partition (p4est, 0, NULL);
+      snprintf (filename, BUFSIZ, "p4est_%s_%02d_after_partition",
+                model->output_prefix, level + 1);
+      p4est_vtk_write_file (p4est, model->geom, filename);
+    }
   }
-  sc_array_destroy (primitives);
-
-  p4est_vtk_write_file (p4est, model->geom, filename);
 
   /* cleanup */
+  sc_array_destroy (primitives);
   p4est_destroy (p4est);
 }
 
