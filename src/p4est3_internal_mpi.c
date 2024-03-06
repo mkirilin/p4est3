@@ -743,10 +743,8 @@ p4est3_internal_setup_quadrants (p4est3_t * p3)
 sc3_error_t        *
 p4est3_internal_setup_from_source (p4est3_t * p3)
 {
-  int                 i, noderank;
+  int                 i;
   p4est3_t           *old = p3->old;
-  sc3_MPI_Info_t      info_noncontig;
-  sc3_MPI_Comm_t      nodecomm;
 
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (p3->old != NULL);
@@ -786,10 +784,6 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   p3->qmaxlevel = p3->qvt->max_level;
   p3->num_children = old->num_children;
   p3->max_threads = old->max_threads;
-
-  SC3E (sc3_mpienv_get_noderank (old->split_info, &noderank));
-  SC3E (sc3_mpienv_get_info_noncont (old->split_info, &info_noncontig));
-  SC3E (sc3_mpienv_get_nodecomm (old->split_info, &nodecomm));
 
   p3->mpisize = old->mpisize;
   p3->mpirank = old->mpirank;
