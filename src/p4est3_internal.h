@@ -277,6 +277,13 @@ sc3_error_t        *p4est3_refine_coarsen_copy (p4est3_t * p3);
 /** Make a repartition of the input forest when set it up from source. */
 sc3_error_t        *p4est3_partition (p4est3_t * p3);
 
+/** Compute global tree offset and fill in into shared memory array
+ * p4est3_t::gtreeoffsets, that is preallocated.
+ * It is the only field of p4est3_t object to be changed.
+ */
+sc3_error_t        *p4est3_tree_offsets_communication
+                     (p4est3_t *p3, int noderank, sc3_MPI_Comm_t nodecomm);
+
 /** \cond P4EST_FALSE */
 /* these functions are not documented on purpose */
 sc3_error_t        *p4est3_internal_setup_comm (p4est3_t * p3);
