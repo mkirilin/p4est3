@@ -34,6 +34,24 @@ extern              "C"
 #endif
 #endif
 
+static sc3_error_t *
+p4est3_conv_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
+                       int ecount, sc3_array_t ** arr)
+{
+  SC3E_RETVAL (arr, NULL);
+  SC3A_IS (sc3_allocator_is_setup, alloc);
+  SC3A_CHECK (ealloc >= 0);
+
+  SC3E (sc3_array_new (alloc, arr));
+  SC3E (sc3_array_set_elem_size (*arr, esize));
+  SC3E (sc3_array_set_elem_alloc (*arr, ealloc));
+  SC3E (sc3_array_set_elem_count (*arr, ecount));
+  SC3E (sc3_array_set_initzero (*arr, 1));
+  SC3E (sc3_array_setup (*arr));
+
+  return NULL;
+}
+
 sc3_error_t        *
 p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
 {
@@ -41,6 +59,7 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   int                 dispunit;
   int nodesize, node_frank, noderank;
   p4est_topidx_t ti;
+  p4est3_topidx ti3;
   p4est3_locidx locq_it;
   size_t i;
   p4est3_connectivity_t *conn;
@@ -50,6 +69,7 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   sc3_MPI_Comm_t      nodecomm;
   sc3_MPI_Info_t      info_noncontig;
   p4est_tree_t *t;
+  p4est3_tree_t *t3;
   SC3A_IS (p4est3_is_new, p3);
   SC3E_DEMAND (sc_MPI_Comm_compare (p3->mpicomm, p->mpicomm, &is_comm_same)
                 == sc_MPI_SUCCESS, "Cannot compare p2 and p3 mpi comms");
@@ -238,6 +258,41 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
 
   /* allocate and fill in trees and trees offsets */
   SC3E (p4est3_tree_offsets_communication (p3, noderank, nodecomm));
+
+  /* fill in trees */
+  SC3E (p4est3_conv_array_new (p3->alloc, sizeof (p4est3_tree_t),
+                               p3->nltrees, p3->nltrees, &p3->trees));
+  for (ti3 = p3->fltree; ti3 <= p3->lltree; ++ti3) {
+    SC3E (p4est3_tree_index (p3, ti3, &t3));
+    t = p4est_tree_array_index (p->trees, ti3 - p->first_local_tree);
+
+    t3->treeid = ti3;
+    t3->num_quads = t->quadrants.elem_count;
+    t3->quad_offset = t->quadrants_offset;
+    t3->tquads = p3->quads + p3->qsize * t3->quad_offset;
+    t3->first_tquad = p3->goffset[p3->mpirank] -  p3->gtroffset[ti3];
+    t3->end_tquad = t3->first_tquad + t3->num_quads;
+    t3->last_tquad = t3->end_tquad - 1;
+  }
+
+  /* inherited user data stays as a sc_mempool_t, we leave it to user how to
+   manage them */
+  p3->user_data = p->user_data_pool;
+
+  /* since refinement, coarsening and partitioning are not available upon
+    convertion stage, we do not need these callback functions */
+  p3->crefine = NULL;
+  p3->ccoarse = NULL;
+  p3->cweight = NULL;
+  p3->old = NULL;
+
+  /* the following parameters manipulates p4est3_t object on setup stage only,
+     so we do not need them */
+  p3->partition = 0;
+  p3->family = 0;
+
+  p3->setup = 1;
+  SC3A_IS (p4est3_is_setup, p3);
 
   return NULL;
 }
