@@ -36,9 +36,15 @@ extern              "C"
 sc3_error_t        *
 p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
 {
-  int is_comm_same;
+  int n, is_comm_same;
+  int                 dispunit;
+  int nodesize, node_frank, noderank;
   p4est3_connectivity_t *conn;
+  char               *quadmem, *nqmem;
   const p4est3_quadrant_vtable_t *qvt;
+  sc3_MPI_Aint_t quadbytes, tempbytes;
+  sc3_MPI_Comm_t      nodecomm;
+  sc3_MPI_Info_t      info_noncontig;
   p4est_tree_t *t;
   SC3A_IS (p4est3_is_new, p3);
   SC3E_DEMAND (sc_MPI_Comm_compare (p3->mpicomm, p->mpicomm, &is_comm_same)
@@ -58,9 +64,9 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   SC3E_DEMAND (p3->pvt == NULL && p3->slf == NULL, "Forest vtable exists");
 
   /* if qvt is not seup in advance, we set up the one for classical quads */
+  SC3E (p4est3_quadrant_vtable_p4est (&qvt));
   if (p3->qvt == NULL) {
     /* this call also sets p4est3_t::sqvt */
-    SC3E (p4est3_quadrant_vtable_p4est (&qvt));
     SC3E (p4est3_set_quadrant_vtable (p3, qvt));
   }
 
@@ -90,6 +96,96 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   p3->mpisize = p->mpisize;
   p3->mpirank = p->mpirank;
 
+  p3->num_trees = p->trees->elem_count;
+
+  /* allocate magic structures */
+  SC3E (p4est3_glotree_new (p3->alloc, &p3->gtrees));
+  SC3E (p4est3_glopos_new (p3->alloc, &p3->gposition));
+  SC3E (p4est3_glopos_set_qsize (p3->gposition, p3->qsize));
+  SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
+  SC3E (p4est3_gtroffs_new (p3->alloc, &p3->gtreeoffsets));
+  SC3E (p4est3_gtroffs_set_num_trees (p3->gtreeoffsets, p3->num_trees));
+  SC3E (p4est3_glopartition_setup
+        (p3->gtrees, p3->gposition, p3->goffsets, p3->gtreeoffsets));
+  p3->gftree = p3->gtrees->gftree;
+  p3->gfpos = p3->gposition->gfpos;
+  p3->goffset = p3->goffsets->goffset;
+  p3->gtroffset = p3->gtreeoffsets->gtreeoffset;
+
+  /* fill in gfpos */
+  if (p3->qvt == qvt) {
+    /* just copy */
+    SC3E (p4est3_quadrant_copy
+          (p3->qvt, &p->global_first_position[p->mpirank],
+           p3->gfpos + p3->mpirank * p3->qsize));
+  }
+  else {
+    /* translate */
+    SC3E (p4est3_quadrant_translate
+          (qvt, &p->global_first_position[p->mpirank],
+          p3->qvt, p3->gfpos + p3->mpirank * p3->qsize));
+  }
+  if (p3->mpirank == 0) {
+    /* same but for the (mpisize)'th element */
+    if (p3->qvt == qvt) {
+    /* just copy */
+    SC3E (p4est3_quadrant_copy
+          (p3->qvt, &p->global_first_position[p->mpisize],
+           p3->gfpos + p3->mpisize * p3->qsize));
+    }
+    else {
+      /* translate */
+      SC3E (p4est3_quadrant_translate
+            (qvt, &p->global_first_position[p->mpisize],
+            p3->qvt, p3->gfpos + p3->mpisize * p3->qsize));
+    }
+  }
+
+  /* fill in goffset */
+  p3->goffset[p3->mpirank]
+    = (p4est3_gloidx) p->global_first_quadrant[p->mpirank];
+  if (p3->mpirank == 0) {
+  /* same but for the (mpisize)'th element */
+    p3->goffset[p3->mpisize]
+      = (p4est3_gloidx) p->global_first_quadrant[p->mpisize];
+  }
+
+  /* fill in gftree */
+  p3->gftree[p3->mpirank] = (p4est3_topidx) p->first_local_tree;
+  if (p3->mpirank == 0) {
+    p3->gftree[p3->mpisize] = p3->num_trees;
+  }
+
+  /* allocate shared memory quadrant storage and copy quadrants from p4est_t */
+  p3->local_num_quads = p->local_num_quadrants;
+  p3->global_num_quads = p->global_num_quadrants;
+
+  SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
+  SC3E (sc3_mpienv_get_node_frank (p3->split_info, &node_frank));
+  SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
+
+  SC3E (sc3_allocator_malloc (p3->alloc, nodesize * sizeof (char *),
+                              &p3->nodequads));
+  quadbytes = (sc3_MPI_Aint_t) p3->local_num_quads * p3->qsize;
+  SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
+  SC3E (sc3_mpienv_get_info_noncont (p3->split_info, &info_noncontig));
+  SC3E (sc3_MPI_Win_allocate_shared
+        (quadbytes, p3->qsize, info_noncontig,
+         nodecomm, &quadmem, &p3->quadwin));
+  for (n = 0; n < nodesize; ++n) {
+    SC3E (sc3_MPI_Win_shared_query (p3->quadwin, n,
+                                    &tempbytes, &dispunit, &nqmem));
+    SC3A_CHECK (tempbytes >= (sc3_MPI_Aint_t)
+                ((p3->goffset[node_frank + n + 1] -
+                  p3->goffset[node_frank + n]) * p3->qsize));
+    SC3A_CHECK (dispunit == p3->qsize);
+    SC3A_CHECK (nqmem != NULL || tempbytes == 0);
+    p3->nodequads[n] = nqmem;
+  }
+  p3->quads = quadmem;
+  SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
+
+  /*TODO: fill in quadrants*/
 
   return NULL;
 }
