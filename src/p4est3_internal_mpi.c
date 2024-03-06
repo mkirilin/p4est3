@@ -850,7 +850,7 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
 
   /* Put a local value to a relative position of shared memory. */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->gtreeoffsets->gtreeoffsetwin));
+                          p3->gtreeoffsets->meta->win));
   for (t = fl_resp_tree; t <= ll_resp_tree; ++t) {
     SC3E (p4est3_tree_index (p3, t, &tree));
     p3->gtroffset[t + 1] = tree->num_quads;
@@ -879,7 +879,7 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
 #endif
   }
 
-  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->gtreeoffsetwin));
+  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->meta->win));
   SC3E (sc3_MPI_Barrier (nodecomm));
   if (noderank == 0) {
     p3->gtroffset[0] = 0;
@@ -887,8 +887,8 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
       p3->gtroffset[i] = p3->gtroffset[i] + p3->gtroffset[i - 1];
     }
   }
-  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->gtreeoffsetwin));
-  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->gtreeoffsetwin));
+  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->meta->win));
   SC3E (sc3_MPI_Barrier (nodecomm));
   return NULL;
 }
@@ -989,7 +989,7 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
 
       /* Fill global proc position array by quadrants translation. */
       SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                              p3->gposition->gfposwin));
+                              p3->gposition->meta->win));
 
       beginr = sc3_intcut (old->mpisize + 1, nodesize, noderank);
       endr = sc3_intcut (old->mpisize + 1, nodesize, noderank + 1);
@@ -998,8 +998,8 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
               (old->qvt, p3->qvt, (void *) (old->gfpos + i * old->qsize),
               (void *) (p3->gfpos + i * p3->qsize), c, p3->qvt->max_level));
       }
-      SC3E (sc3_MPI_Win_sync (p3->gposition->gfposwin));
-      SC3E (sc3_MPI_Win_unlock (0, p3->gposition->gfposwin));
+      SC3E (sc3_MPI_Win_sync (p3->gposition->meta->win));
+      SC3E (sc3_MPI_Win_unlock (0, p3->gposition->meta->win));
       SC3E (sc3_allocator_free (p3->alloc, c));
     }
 
