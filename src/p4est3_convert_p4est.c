@@ -21,7 +21,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#include <p4est3_convert.h>
+#include <p4est3_convert_p4est.h>
 #include <p4est3_internal.h>
 #include <p4est3_p4est.h>
 #include <sc3_omp.h>

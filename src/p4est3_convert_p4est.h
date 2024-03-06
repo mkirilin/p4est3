@@ -21,14 +21,14 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-/** \file p4est3_convert.h
+/** \file p4est3_convert_p4est.h
  * Convert \ref p4est_t data type into \ref p4est3_t
  *
  * \ingroup p4est3
  */
 
-#ifndef P4EST3_CONVERT_H
-#define P4EST3_CONVERT_H
+#ifndef P4EST3_CONVERT_P4EST_H
+#define P4EST3_CONVERT_P4EST_H
 
 #include <p4est.h>
 #include <p4est3.h>
@@ -59,4 +59,4 @@ sc3_error_t        *p4est3_convert_p4est (p4est_t * p, p4est3_t * p3);
 }
 #endif
 
-#endif /* !P4EST3_CONVERT_H */
+#endif /* !P4EST3_CONVERT_P4EST_H */
