@@ -42,7 +42,9 @@ extern              "C"
 #endif
 
 /** Convert all the available data from \ref p4est_t object into preallocated
- *  \ref p4est3_t one. The \ref p4est3_t stays unsetup.
+ *  \ref p4est3_t one. The \ref p4est3_t is return setup. Thus all preliminary
+ * p4est3's manipulation parameters should be set. If they conflict with the
+ * donor p4est_t object, then they will be overwritten.
  * \param [in] p            Ponter to \ref p4est_t object that must be setup.
  * \param [in,out] p3       Pointer to new allocated \ref p4est3_t object.
  *
