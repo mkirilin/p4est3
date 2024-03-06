@@ -24,6 +24,7 @@
 #include <p4est3_convert.h>
 #include <p4est3_internal.h>
 #include <p4est3_p4est.h>
+#include <sc3_omp.h>
 
 #ifdef __cplusplus
 extern              "C"
@@ -39,6 +40,9 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   int n, is_comm_same;
   int                 dispunit;
   int nodesize, node_frank, noderank;
+  p4est_topidx_t ti;
+  p4est3_locidx locq_it;
+  size_t i;
   p4est3_connectivity_t *conn;
   char               *quadmem, *nqmem;
   const p4est3_quadrant_vtable_t *qvt;
@@ -54,7 +58,7 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   /* inherit p4est_t's connectivity and set it up */
   p3->accessed_conn = 0;
   SC3E (p4est3_connectivity_new_p4est
-        (p3->alloc, conn, p->connectivity, 1));
+        (p3->alloc, &conn, p->connectivity, 1));
   if (p3->conn != NULL) {
     SC3E (p4est3_connectivity_unref (p3->conn));
   }
@@ -185,7 +189,43 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   p3->quads = quadmem;
   SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
 
-  /*TODO: fill in quadrants*/
+  /* copy quadrants in shared memory */
+  if (p3->qvt == qvt) {
+    for (ti = p->first_local_tree, locq_it = 0; ti <= p->last_local_tree; ++ti)
+    {
+      t = p4est_tree_array_index (p->trees, ti - p->first_local_tree);
+      for (i = 0; i < t->quadrants.elem_count; ++i) {
+        SC3E (p4est3_quadrant_copy
+              (p3->qvt, p4est_quadrant_array_index (&t->quadrants, i),
+               p3->quads + p3->qsize * (locq_it++)));
+      }
+    }
+  }
+  else {
+    for (ti = p->first_local_tree, locq_it = 0; ti <= p->last_local_tree; ++ti)
+    {
+      t = p4est_tree_array_index (p->trees, ti - p->first_local_tree);
+      for (i = 0; i < t->quadrants.elem_count; ++i) {
+        SC3E (p4est3_quadrant_translate
+              (qvt, p4est_quadrant_array_index (&t->quadrants, i),
+               p3->qvt, p3->quads + p3->qsize * (locq_it++)));
+      }
+    }
+  }
+  SC3A_CHECK (locq_it == p3->local_num_quads);
+
+  SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),
+                              &p3->temp_quad));
+  for (i = 0; i < p3->max_threads; ++i) {
+    SC3E (sc3_allocator_malloc (p3->alloc, p3->qsize, &p3->temp_quad[i]));
+  }
+  /* variables populated during p4est3_setup: tree and quadrant storage */
+  p3->fltree = p->first_local_tree;
+  p3->lltree = p->last_local_tree;
+  p3->nltrees = p->last_local_tree - p->first_local_tree + 1;
+
+  /* allocate and fill in trees and trees offsets */
+
 
   return NULL;
 }
