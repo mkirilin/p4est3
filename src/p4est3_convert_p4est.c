@@ -60,7 +60,7 @@ p4est3_conv_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 sc3_error_t        *
 p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
 {
-  int n, is_comm_same;
+  int n;
   int                 dispunit;
   int nodesize, node_frank, noderank;
   p4est_topidx_t ti;
@@ -74,14 +74,12 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   p4est_tree_t *t;
   p4est3_tree_t *t3;
   SC3A_IS (p4est3_is_new, p3);
-  SC3E_DEMAND (sc_MPI_Comm_compare (p3->mpicomm, p->mpicomm, &is_comm_same)
-                == sc_MPI_SUCCESS, "Cannot compare p2 and p3 mpi comms");
-  SC3E_DEMAND (is_comm_same, "p2 and p3 mpi communicators are different");
+  SC3E (p4est3_set_comm (p3, p->mpicomm, 1));
 
   /* inherit p4est_t's connectivity and set it up */
   p3->accessed_conn = 0;
   SC3E (p4est3_connectivity_new_p4est
-        (p3->alloc, &conn, p->connectivity, 1));
+        (p3->alloc, &conn, p->connectivity, 0));
   if (p3->conn != NULL) {
     SC3E (p4est3_connectivity_unref (p3->conn));
   }
@@ -118,10 +116,9 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   p3->max_threads = sc3_omp_max_threads ();
 
   /* setup mpi, this call also sets p4est3_t::commdup */
-  SC3E (p4est3_set_comm (p3, p->mpicomm, 1));
   SC3E (p4est3_internal_setup_comm (p3));
-  p3->mpisize = p->mpisize;
-  p3->mpirank = p->mpirank;
+  SC3E_DEMAND (p3->mpisize == p->mpisize, "MPI size mismatch");
+  SC3E_DEMAND (p3->mpirank == p->mpirank, "MPI rank mismatch");
 
   p3->num_trees = p->trees->elem_count;
 
@@ -219,9 +216,10 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
     SC3E (sc3_MPI_Win_shared_query
           (p3->quadrants->meta->win, n, &tempbytes, &dispunit,
            &p3->nodequads[n]));
+    SC3A_CHECK (sc3_MPI_Barrier (p3->mpicomm) == NULL);
     SC3A_CHECK (tempbytes >= (sc3_MPI_Aint_t)
-                ((p3->goffset[node_frank + n + 1] -
-                  p3->goffset[node_frank + n]) * p3->qsize));
+                (p3->goffset[node_frank + n + 1] -
+                  p3->goffset[node_frank + n]) * p3->qsize);
     SC3A_CHECK (dispunit == p3->qsize);
     SC3A_CHECK (p3->nodequads[n] != NULL || tempbytes == 0);
   }
@@ -262,9 +260,6 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   p3->lltree = p->last_local_tree;
   p3->nltrees = p->last_local_tree - p->first_local_tree + 1;
 
-  /* allocate and fill in trees and trees offsets */
-  SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
-  SC3E (p4est3_tree_offsets_communication (p3, noderank, nodecomm));
 
   /* fill in trees */
   SC3E (p4est3_conv_array_new (p3->alloc, sizeof (p4est3_tree_t),
@@ -281,6 +276,10 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
     t3->end_tquad = t3->first_tquad + t3->num_quads;
     t3->last_tquad = t3->end_tquad - 1;
   }
+  /* allocate and fill in trees and trees offsets */
+  SC3E (sc3_mpienv_get_nodecomm (p3->split_info, &nodecomm));
+  SC3E (sc3_MPI_Barrier (nodecomm));
+  SC3E (p4est3_tree_offsets_communication (p3, noderank, nodecomm));
 
   /* inherited user data stays as a sc_mempool_t, we leave it to user how to
    manage them */
