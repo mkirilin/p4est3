@@ -38,7 +38,6 @@ p4est3_internal_setup_comm (p4est3_t * p3)
 
   /* set the same mpi environment's members as the current p4est has */
   SC3E (sc3_mpienv_set_comm (p3->split_info, p3->mpicomm, 0));
-  SC3E (sc3_mpienv_set_shared (p3->split_info, p3->shared));
 
   /* query input communicator */
   SC3E (sc3_MPI_Comm_size (p3->mpicomm, &p3->mpisize));
