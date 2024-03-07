@@ -23,12 +23,16 @@
 */
 
 #include <p4est3_internal.h>
+#include <p4est3_convert_p8est.h>
 #include <p8est_extended.h>
 #include <p4est3_p8est.h>
 #include <p8est_search.h>
 #include <p4est3_quadrant_zyx.h>
 #include <p4est3_quadrant_mort3d.h>
 #include <p8est_vtk.h>
+
+#include <sc_statistics.h>
+#include <sc_flops.h>
 #include <sc_options.h>
 #include "model.h"
 #include "tribox.h"
@@ -387,21 +391,67 @@ triangulation_setup_model (p4est_model_t ** m, const char * filename)
   return 1;
 }
 
-void
+static sc3_error_t *
+make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
+{
+  SC3A_IS (sc3_allocator_is_setup, oa);
+  SC3E (sc3_allocator_new (oa, alloc));
+  SC3E (sc3_allocator_setup (*alloc));
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
+                     sc3_MPI_Comm_t mpicomm, p4est3_connectivity_t *conn,
+                     const p4est3_quadrant_vtable_t * qvt,
+                     p4est3_t * src, int is_partition, int is_family,
+                     p4est3_weight_callback_t cweight, void *user_data)
+{
+  SC3E (p4est3_new (alloc, p3));
+  SC3E (p4est3_set_comm (*p3, mpicomm, 1));
+  SC3E (p4est3_set_connectivity (*p3, conn));
+  SC3E (p4est3_set_quadrant_vtable (*p3, qvt));
+  SC3E (p4est3_set_setup_mode (*p3, P4EST3_NEW_RECURSIVE_CHILD));
+  SC3E (p4est3_set_source (*p3, src));
+  SC3E (p4est3_set_shared (*p3, 1));
+  SC3E (p4est3_set_contiguous (*p3, 0));
+  SC3E (p4est3_set_family (*p3, is_family));
+  SC3E (p4est3_set_partition (*p3, is_partition, cweight));
+  /*SC3E (p4est3_set_user_data (*p3, user_data));*/
+  if ((*p3)->old != NULL) {
+    (*p3)->old->user_data = user_data;
+  }
+
+  return NULL;
+}
+
+static sc3_error_t *
 run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
 {
   size_t              zz;
   char                filename[BUFSIZ];
   sc_array_t         *primitives;
   p4est_t            *p4est;
+  p4est3_t           *p4est3, *p3part;
+  sc3_allocator_t    *alloc, *mainalloc;
   const size_t        quad_data_size = 0;
   const int           start_level = 3;
   int                 level;
+  p4est3_connectivity_t *conn;
+
+  sc_flopinfo_t       fi, snapshot;
+  sc_statinfo_t       stats;
 
   /* create mesh */
   P4EST_GLOBAL_PRODUCTION ("Create initial mesh\n");
   p4est = p4est_new_ext (*mpicomm, model->conn, 0, start_level, 1,
                          quad_data_size, p4est_model_quad_init, model);
+
+  mainalloc = sc3_allocator_nothread ();
+  SC3E (make_allocator (mainalloc, &alloc));
+  SC3E (p4est3_new (alloc, &p4est3));
+  SC3E (p4est3_set_shared (p4est3, 1));
+  SC3E (p4est3_set_contiguous (p4est3, 0));
 
   /* run mesh refinement based on data */
   P4EST_GLOBAL_PRODUCTIONF ("Setting up %lld search objects\n",
@@ -439,7 +489,20 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
       snprintf (filename, BUFSIZ, "p4est_%s_%02d_before_partition",
                 model->output_prefix, level + 1);
       p4est_vtk_write_file (p4est, model->geom, filename);
+    
+      SC3E (p4est3_convert_p8est (p4est, p4est3));
+
       p4est_partition (p4est, 0, NULL);
+      SC3E (p4est3_new_shortcut (&p3part, alloc, *mpicomm, p4est3->conn,
+                                 p4est3->qvt, p4est3, 1, 1, NULL, NULL));
+      SC3E (sc3_MPI_Barrier (SC3_MPI_COMM_WORLD));
+      sc_flops_snap (&fi, &snapshot);
+      SC3E (p4est3_setup (p3part));
+      sc_flops_shot (&fi, &snapshot);
+      sc_stats_set1 (&stats, snapshot.iwtime, "");
+      sc_stats_compute (*mpicomm, 1, &stats);
+      sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+
       snprintf (filename, BUFSIZ, "p4est_%s_%02d_after_partition",
                 model->output_prefix, level + 1);
       p4est_vtk_write_file (p4est, model->geom, filename);
@@ -449,6 +512,12 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
   /* cleanup */
   sc_array_destroy (primitives);
   p4est_destroy (p4est);
+  conn = p4est3->conn;
+  SC3E (p4est3_destroy (&p4est3));
+  SC3E (p4est3_destroy (&p3part));
+  SC3E (p4est3_connectivity_destroy (&conn));
+  SC3E (sc3_allocator_destroy (&alloc));
+  return NULL;
 }
 
 static int
@@ -533,7 +602,7 @@ main (int argc, char **argv)
   /* execute application model */
   if (!ue) {
     P4EST_ASSERT (model != NULL);
-    run_program (&mpicomm, model);
+    SC3X (run_program (&mpicomm, model));
   }
 
   /* cleanup application model */
