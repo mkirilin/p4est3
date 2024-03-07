@@ -495,7 +495,7 @@ p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
   SC3E (p4est3_set_setup_mode (*p3, P4EST3_NEW_RECURSIVE_CHILD));
   SC3E (p4est3_set_source (*p3, src));
   SC3E (p4est3_set_shared (*p3, 1));
-  SC3E (p4est3_set_contiguous (*p3, 0));
+  SC3E (p4est3_set_contiguous (*p3, 1));
   SC3E (p4est3_set_family (*p3, is_family));
   SC3E (p4est3_set_partition (*p3, is_partition, cweight));
   /*SC3E (p4est3_set_user_data (*p3, user_data));*/
@@ -532,7 +532,7 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
   SC3E (make_allocator (mainalloc, &alloc));
   SC3E (p4est3_new (alloc, &p4est3));
   SC3E (p4est3_set_shared (p4est3, 1));
-  SC3E (p4est3_set_contiguous (p4est3, 0));
+  SC3E (p4est3_set_contiguous (p4est3, 1));
 
   /* run mesh refinement based on data */
   P4EST_GLOBAL_PRODUCTIONF ("Setting up %lld search objects\n",
@@ -574,14 +574,20 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
       SC3E (p4est3_convert_p8est (p4est, p4est3));
       SC3E (compare_results (alloc, p4est3, p4est, p4est3->qvt));
 
+      sc_flops_snap (&fi, &snapshot);
       p4est_partition (p4est, 0, NULL);
+      sc_flops_shot (&fi, &snapshot);
+      sc_stats_set1 (&stats, snapshot.iwtime, "p4est");
+      sc_stats_compute (*mpicomm, 1, &stats);
+      sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+
       SC3E (p4est3_new_shortcut (&p3part, alloc, *mpicomm, p4est3->conn,
                                  p4est3->qvt, p4est3, 1, 0, NULL, NULL));
       SC3E (sc3_MPI_Barrier (SC3_MPI_COMM_WORLD));
       sc_flops_snap (&fi, &snapshot);
       SC3E (p4est3_setup (p3part));
       sc_flops_shot (&fi, &snapshot);
-      sc_stats_set1 (&stats, snapshot.iwtime, "");
+      sc_stats_set1 (&stats, snapshot.iwtime, "p4est3");
       sc_stats_compute (*mpicomm, 1, &stats);
       sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
       SC3E (compare_results (alloc, p3part, p4est, p3part->qvt));
