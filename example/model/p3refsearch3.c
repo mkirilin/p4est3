@@ -23,10 +23,10 @@
 */
 
 #include <p4est3_internal.h>
-#include <p4est3_convert_p8est.h>
 #include <p8est_extended.h>
-#include <p4est3_p8est.h>
 #include <p8est_search.h>
+#include <p4est3_convert_p8est.h>
+#include <p4est3_p8est.h>
 #include <p4est3_quadrant_zyx.h>
 #include <p4est3_quadrant_mort3d.h>
 #include <p8est_vtk.h>
@@ -401,6 +401,87 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
 }
 
 static sc3_error_t *
+array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
+           int ecount, sc3_array_t ** arr)
+{
+  SC3E_RETVAL (arr, NULL);
+  SC3A_IS (sc3_allocator_is_setup, alloc);
+  SC3A_CHECK (ealloc >= 0);
+
+  SC3E (sc3_array_new (alloc, arr));
+  SC3E (sc3_array_set_elem_size (*arr, esize));
+  SC3E (sc3_array_set_elem_alloc (*arr, ealloc));
+  SC3E (sc3_array_set_elem_count (*arr, ecount));
+  SC3E (sc3_array_set_initzero (*arr, 1));
+  SC3E (sc3_array_setup (*arr));
+
+  return NULL;
+}
+
+static sc3_error_t *
+compare_results (sc3_allocator_t *alloc, p4est3_t * p3, p4est_t * p,
+                 const p4est3_quadrant_vtable_t * qvt)
+{
+
+  char               *q3;
+  int                *level, *p3level;
+  p4est_quadrant_t   *q;
+  p4est3_topidx       i, tt;
+  size_t              nq;
+  p4est3_topidx       fltree, lltree;
+  p4est3_gloidx       num_glo_quads;
+  p4est3_locidx       num_loc_quads;
+  p4est3_locidx       processed_quads, processed_quads_p3;
+  p4est_tree_t       *tree;
+  sc3_array_t        *p3levels, *levels;
+
+  SC3E (p4est3_get_local_num_trees (p3, &fltree, &lltree));
+  SC3E (p4est3_get_global_num_quads (p3, &num_glo_quads));
+  SC3E (p4est3_get_local_num_quads (p3, &num_loc_quads));
+  SC3E_DEMAND (fltree == p->first_local_tree && lltree == p->last_local_tree,
+               "Different trees at processor");
+  SC3E_DEMAND (num_glo_quads == p->global_num_quadrants,
+               "different #global quadrants");
+  SC3E_DEMAND (num_loc_quads == p->local_num_quadrants,
+               "different #local quadrants");
+  SC3E (array_new (alloc, sizeof (int), num_loc_quads, 0, &p3levels));
+  SC3E (array_new
+        (alloc, sizeof (int), p->local_num_quadrants, 0, &levels));
+  for (tt = p->first_local_tree; tt <= p->last_local_tree; ++tt) {
+    tree = p4est_tree_array_index (p->trees, tt);
+    for (nq = 0; nq < tree->quadrants.elem_count; ++nq) {
+      q = (p4est_quadrant_t *) sc_array_index (&tree->quadrants, nq);
+      SC3E (sc3_array_push (levels, &level));
+      *level = q->level;
+    }
+  }
+
+  SC3E (p4est3_get_quadrants (p3, &q3));
+  if (num_loc_quads > 0) {
+    SC3E (sc3_array_push (p3levels, &level));
+    SC3E (p4est3_quadrant_level (qvt, q3, level));
+  }
+  for (i = 1; i < num_loc_quads; ++i) {
+    q3 += qvt->quadrant_size;
+    SC3E (sc3_array_push (p3levels, &level));
+    SC3E (p4est3_quadrant_level (qvt, q3, level));
+  }
+  SC3E (sc3_array_get_elem_count (p3levels, &processed_quads_p3));
+  SC3E (sc3_array_get_elem_count (levels, &processed_quads));
+  SC3E_DEMAND (processed_quads_p3 == processed_quads, "wrong #p3levels");
+  SC3E_DEMAND (processed_quads == num_loc_quads, "wrong #levels");
+  for (i = 0; i < num_loc_quads; ++i) {
+    SC3E (sc3_array_index (p3levels, i, &p3level));
+    SC3E (sc3_array_index (levels, i, &level));
+    SC3E_DEMAND (*level == *p3level, "levels mismatch");
+  }
+
+  SC3E (sc3_array_destroy (&p3levels));
+  SC3E (sc3_array_destroy (&levels));
+  return NULL;
+}
+
+static sc3_error_t *
 p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
                      sc3_MPI_Comm_t mpicomm, p4est3_connectivity_t *conn,
                      const p4est3_quadrant_vtable_t * qvt,
@@ -491,10 +572,11 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
       p4est_vtk_write_file (p4est, model->geom, filename);
     
       SC3E (p4est3_convert_p8est (p4est, p4est3));
+      SC3E (compare_results (alloc, p4est3, p4est, p4est3->qvt));
 
       p4est_partition (p4est, 0, NULL);
       SC3E (p4est3_new_shortcut (&p3part, alloc, *mpicomm, p4est3->conn,
-                                 p4est3->qvt, p4est3, 1, 1, NULL, NULL));
+                                 p4est3->qvt, p4est3, 1, 0, NULL, NULL));
       SC3E (sc3_MPI_Barrier (SC3_MPI_COMM_WORLD));
       sc_flops_snap (&fi, &snapshot);
       SC3E (p4est3_setup (p3part));
@@ -502,6 +584,7 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
       sc_stats_set1 (&stats, snapshot.iwtime, "");
       sc_stats_compute (*mpicomm, 1, &stats);
       sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+      SC3E (compare_results (alloc, p3part, p4est, p3part->qvt));
 
       snprintf (filename, BUFSIZ, "p4est_%s_%02d_after_partition",
                 model->output_prefix, level + 1);
