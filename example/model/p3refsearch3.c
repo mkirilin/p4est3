@@ -36,6 +36,7 @@
 #include <sc_options.h>
 #include "model.h"
 #include "tribox.h"
+#include <string.h>
 
 static int max_ref_level = 1;
 
@@ -371,10 +372,10 @@ triangulation_desroy_primitives (void * primitives)
 }
 
 static int
-triangulation_setup_model (p4est_model_t ** m, const char * filename)
+triangulation_setup_model (p4est_model_t ** m, const char * filename,
+                           const char * model_name)
 {
   p4est_model_t  *model = P4EST_ALLOC_ZERO (p4est_model_t, 1);
-  model->output_prefix = "triangulation";
   model->conn = p8est_connectivity_new_unitcube ();
   if (model->conn == NULL) {
     P4EST_LERROR ("Failed to create a model's connectivity");
@@ -386,6 +387,7 @@ triangulation_setup_model (p4est_model_t ** m, const char * filename)
     P4EST_LERRORF ("Failed to read a valid model from %s\n", filename);
     return 0;
   }
+  model->output_prefix = model_name;
   model->destroy_primitives = triangulation_desroy_primitives;
   *m = model;
   return 1;
@@ -567,7 +569,7 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
       (p4est, 0, -1, p4est_model_refine, p4est_model_quad_init, NULL);*/
 
     if (level == max_ref_level - 1) {
-      snprintf (filename, BUFSIZ, "p4est_%s_%02d_before_partition",
+      snprintf (filename, BUFSIZ, "%s_%02d_before",
                 model->output_prefix, level + 1);
       p4est_vtk_write_file (p4est, model->geom, filename);
     
@@ -592,7 +594,7 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
       sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
       SC3E (compare_results (alloc, p3part, p4est, p3part->qvt));
 
-      snprintf (filename, BUFSIZ, "p4est_%s_%02d_after_partition",
+      snprintf (filename, BUFSIZ, "%s_%02d_after",
                 model->output_prefix, level + 1);
       p4est_vtk_write_file (p4est, model->geom, filename);
     }
@@ -639,7 +641,9 @@ main (int argc, char **argv)
   int                 ue, fa;
   sc_options_t       *opt;
   p4est_model_t * model = NULL;
-  const char * filename;
+  const char         *fn_par;
+  char               *model_name;
+  char                filename[BUFSIZ], filename_temp[BUFSIZ];
 
   /* initialize MPI */
   mpiret = sc_MPI_Init (&argc, &argv);
@@ -656,7 +660,7 @@ main (int argc, char **argv)
   opt = sc_options_new (argv[0]);
   sc_options_add_int (opt, 'L', "maxlevel", &max_ref_level, P4EST_QMAXLEVEL,
                       "Maximum refinement level");
-  sc_options_add_string (opt, 'F', "filename", &filename, "model.off",
+  sc_options_add_string (opt, 'F', "filename", &fn_par, "model.off",
                         "Input file in .off format");
 
     /* proceed in run-once loop for cleaner error checking */
@@ -681,9 +685,12 @@ main (int argc, char **argv)
   if (ue) {
     sc_options_print_usage (p4est_package_id, SC_LP_ERROR, opt, NULL);
   }
+  strcpy (filename, fn_par);
+  strcpy (filename_temp, fn_par);
+  model_name = strtok (filename_temp, ".");
 
   /* setup appplication model */
-  if (!ue && !triangulation_setup_model (&model, filename)) {
+  if (!ue && !triangulation_setup_model (&model, filename, model_name)) {
     P4EST_ASSERT (model == NULL);
     ue = usagerr (opt, "model-specific initialization error");
   }
