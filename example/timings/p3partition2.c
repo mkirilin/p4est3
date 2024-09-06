@@ -380,8 +380,8 @@ main (int argc, char **argv)
   /* this is generally needed for MPI */
   SC3E_SET (e, sc3_MPI_Init (&argc, &argv));
   mpicomm = SC3_MPI_COMM_WORLD;
-  sc_init (mpicomm, 1, 1, NULL, SC_LP_ESSENTIAL);
-  p4est_init (NULL, SC_LP_ESSENTIAL);
+  sc_init (mpicomm, 1, 1, NULL, SC_LP_INFO);
+  p4est_init (NULL, SC_LP_INFO);
 
   SC3E_NULL_SET (e, sc3_MPI_Comm_rank (mpicomm, &mpirank));
   SC3E_NULL_SET (e, sc3_MPI_Comm_size (mpicomm, &mpisize));
@@ -408,7 +408,7 @@ main (int argc, char **argv)
     (opt, 'W', "weight", &is_weighted, 0, "Weighted partition?");
   sc_options_add_switch (opt, 'V', "write-vtk", &write_vtk,
                          "Write vtk output");
-  sc_options_parse (p4est_package_id, SC_LP_DEFAULT, opt, argc, argv);
+  sc_options_parse (p4est_package_id, SC_LP_INFO, opt, argc, argv);
 
   SC3E_NULL_SET (e, check_refinement_pattern
                     (opt_pattern, &crefine, &p3crefine));
@@ -480,7 +480,7 @@ main (int argc, char **argv)
         sc_flops_shot (&fi, &snapshot);
         sc_stats_set1 (&stats, snapshot.iwtime, heading);
         sc_stats_compute (mpicomm, 1, &stats);
-        sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+        sc_stats_print (p4est_package_id, SC_LP_INFO, 1, &stats, 1, 1);
       }
       else {
         SC3E_NULL_SET (e, p4est3_setup (p3));
@@ -512,7 +512,7 @@ main (int argc, char **argv)
           sc_flops_shot (&fi, &snapshot);
           sc_stats_set1 (&stats, snapshot.iwtime, heading);
           sc_stats_compute (mpicomm, 1, &stats);
-          sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+          sc_stats_print (p4est_package_id, SC_LP_INFO, 1, &stats, 1, 1);
         }
         else {
           p4est_partition (p, is_family, cweight);

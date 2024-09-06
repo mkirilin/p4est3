@@ -522,13 +522,10 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
   int                 level;
   p4est3_connectivity_t *conn;
 
-  sc_flopinfo_t       fi, snapshot;
+  sc_flopinfo_t       fi, sshot_total, sshot_new, sshot_convert,
+                      sshot_part_p4est, sshot_part_p4est3;
   sc_statinfo_t       stats;
 
-  /* create mesh */
-  P4EST_GLOBAL_PRODUCTION ("Create initial mesh\n");
-  p4est = p4est_new_ext (*mpicomm, model->conn, 0, start_level, 1,
-                         quad_data_size, p4est_model_quad_init, model);
 
   mainalloc = sc3_allocator_nothread ();
   SC3E (make_allocator (mainalloc, &alloc));
@@ -543,62 +540,64 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
   for (zz = 0; zz < model->num_prim; ++zz) {
     *(size_t *) sc_array_index (primitives, zz) = zz;
   }
-  /* snprintf (filename, BUFSIZ, "p4est_%s_%02d",
-            model->output_prefix, start_level);
-  p4est_vtk_write_file (p4est, model->geom, filename); */
+
+  /* create mesh */
+  P4EST_GLOBAL_PRODUCTION ("Create initial mesh\n");
+  sc_flops_snap (&fi, &sshot_total);
+  sc_flops_snap (&fi, &sshot_new);
+  p4est = p4est_new_ext (*mpicomm, model->conn, 0, start_level, 1,
+                         quad_data_size, p4est_model_quad_init, model);
+  sc_flops_shot (&fi, &sshot_new);
   for (level = start_level; level < max_ref_level; ++level) {
-#ifdef P4EST_ENABLE_DEBUG
-    if (p4est->mpirank == 0) {
-      P4EST_GLOBAL_PRODUCTIONF ("Into refinement iteration %d\n", level);
-      P4EST_GLOBAL_PRODUCTION ("Run object search\n");
-    }
-#endif
 
     p4est_search_local (p4est, 0, NULL, p4est_model_intersect, primitives);
-    /*p4est_search_reorder
-      (p4est, 1, NULL, NULL, NULL, p4est_model_intersect, primitives);*/
-
-#ifdef P4EST_ENABLE_DEBUG
-    if (p4est->mpirank == 0) {
-      P4EST_GLOBAL_PRODUCTION ("Run mesh refinement\n");
-    }
-#endif
-
     p4est_refine (p4est, 0, p4est_model_refine, p4est_model_quad_init);
-    /*p4est_refine_ext
-      (p4est, 0, -1, p4est_model_refine, p4est_model_quad_init, NULL);*/
 
     if (level == max_ref_level - 1) {
-      snprintf (filename, BUFSIZ, "%s_%02d_before",
+      
+      snprintf (filename, BUFSIZ, "./%s/%d/before",
                 model->output_prefix, level + 1);
       p4est_vtk_write_file (p4est, model->geom, filename);
-    
+
+      sc_flops_snap (&fi, &sshot_convert);
       SC3E (p4est3_convert_p8est (p4est, p4est3));
-      SC3E (compare_results (alloc, p4est3, p4est, p4est3->qvt));
+      sc_flops_shot (&fi, &sshot_convert);
 
-      sc_flops_snap (&fi, &snapshot);
+      sc_flops_snap (&fi, &sshot_part_p4est);
       p4est_partition (p4est, 0, NULL);
-      sc_flops_shot (&fi, &snapshot);
-      sc_stats_set1 (&stats, snapshot.iwtime, "p4est");
-      sc_stats_compute (*mpicomm, 1, &stats);
-      sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+      sc_flops_shot (&fi, &sshot_part_p4est);
 
+      sc_flops_snap (&fi, &sshot_part_p4est3);
       SC3E (p4est3_new_shortcut (&p3part, alloc, *mpicomm, p4est3->conn,
                                  p4est3->qvt, p4est3, 1, 0, NULL, NULL));
-      SC3E (sc3_MPI_Barrier (SC3_MPI_COMM_WORLD));
-      sc_flops_snap (&fi, &snapshot);
       SC3E (p4est3_setup (p3part));
-      sc_flops_shot (&fi, &snapshot);
-      sc_stats_set1 (&stats, snapshot.iwtime, "p4est3");
-      sc_stats_compute (*mpicomm, 1, &stats);
-      sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
-      SC3E (compare_results (alloc, p3part, p4est, p3part->qvt));
+      sc_flops_shot (&fi, &sshot_part_p4est3);
 
-      snprintf (filename, BUFSIZ, "%s_%02d_after",
-                model->output_prefix, level + 1);
+      snprintf (filename, BUFSIZ, "./%s/%d/after",
+              model->output_prefix, level + 1);
       p4est_vtk_write_file (p4est, model->geom, filename);
     }
   }
+  sc_flops_shot (&fi, &sshot_total);
+  sc_stats_set1 (&stats, sshot_total.iwtime, "Total");
+  sc_stats_compute (*mpicomm, 1, &stats);
+  sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+
+  sc_stats_set1 (&stats, sshot_new.iwtime, "p4est_new");
+  sc_stats_compute (*mpicomm, 1, &stats);
+  sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+
+  sc_stats_set1 (&stats, sshot_convert.iwtime, "Conversion p4est -> p4est3");
+  sc_stats_compute (*mpicomm, 1, &stats);
+  sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+
+  sc_stats_set1 (&stats, sshot_part_p4est.iwtime, "p4est_partition");
+  sc_stats_compute (*mpicomm, 1, &stats);
+  sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
+
+  sc_stats_set1 (&stats, sshot_part_p4est3.iwtime, "p4est3_partition");
+  sc_stats_compute (*mpicomm, 1, &stats);
+  sc_stats_print (p4est_package_id, SC_LP_ESSENTIAL, 1, &stats, 1, 1);
 
   /* cleanup */
   sc_array_destroy (primitives);
