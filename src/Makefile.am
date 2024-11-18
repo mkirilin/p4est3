@@ -30,7 +30,8 @@ libp4est_installed_headers += \
         src/p4est_empty.h \
         src/p4est3_p4est.h \
         src/p4est3_quadrant_yx.h \
-        src/p4est3_quadrant_mort2d.h
+        src/p4est3_quadrant_mort2d.h \
+        src/p4est3_convert_p4est.h
 libp4est_compiled_sources += \
         src/p4est_connectivity.c src/p4est.c \
         src/p4est_bits.c src/p4est_search.c src/p4est_build.c \
@@ -44,7 +45,8 @@ libp4est_compiled_sources += \
         src/p4est_empty.c \
         src/p4est3_p4est.c \
         src/p4est3_quadrant_yx.c \
-        src/p4est3_quadrant_mort2d.c
+        src/p4est3_quadrant_mort2d.c \
+        src/p4est3_convert_p4est.c
 endif
 if P4EST_ENABLE_BUILD_3D
 libp4est_installed_headers += \
@@ -61,7 +63,8 @@ libp4est_installed_headers += \
         src/p8est_empty.h src/p4est_to_p8est_empty.h \
         src/p4est3_p8est.h \
         src/p4est3_quadrant_zyx.h \
-        src/p4est3_quadrant_mort3d.h
+        src/p4est3_quadrant_mort3d.h \
+        src/p4est3_convert_p8est.h
 libp4est_compiled_sources += \
         src/p8est_connectivity.c src/p8est.c \
         src/p8est_bits.c src/p8est_search.c src/p8est_build.c  \
@@ -75,7 +78,8 @@ libp4est_compiled_sources += \
         src/p8est_empty.c \
         src/p4est3_p8est.c \
         src/p4est3_quadrant_zyx.c \
-        src/p4est3_quadrant_mort3d.c
+        src/p4est3_quadrant_mort3d.c \
+        src/p4est3_convert_p8est.c
 endif
 if P4EST_ENABLE_BUILD_2D
 if P4EST_ENABLE_BUILD_3D
