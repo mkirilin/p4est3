@@ -402,6 +402,7 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
   return NULL;
 }
 
+#ifndef P4EST_ENABLE_DEBUG
 static sc3_error_t *
 array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
            int ecount, sc3_array_t ** arr)
@@ -482,6 +483,7 @@ compare_results (sc3_allocator_t *alloc, p4est3_t * p3, p4est_t * p,
   SC3E (sc3_array_destroy (&levels));
   return NULL;
 }
+#endif /* P4EST_ENABLE_DEBUG */
 
 static sc3_error_t *
 p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
