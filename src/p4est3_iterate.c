@@ -251,7 +251,7 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
 static sc3_error_t *
 p4est3_destroy_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
 {
-  int                 i, j, side;
+  int                 i, side;
   void               *arr;
   SC3E (sc3_allocator_free (p3->alloc, sa->children_face_neighbors));
   SC3E (sc3_allocator_free (p3->alloc, sa->face_dual));
@@ -339,8 +339,7 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
                                 p4est3_iterate_face_side_t * fside,
                                 int *is_iterate)
 {
-  const int           ntypes = p3->num_children + 1;
-  int                 i, j, orient;
+  int                 orient;
   int                *Level_face = sa->Level_face;
   int                *is_refine = sa->is_refine;
   p4est3_topidx       tree_neighbor = tree, tree_ids[2];
@@ -444,7 +443,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
   const int           max_children = p3->num_children;
   const int           half_ch = max_children / 2;
   p4est3_topidx      *trees = sa->treeid_face;
-  p4est3_locidx      *b_f[2], *e_f[2], *b_f_remote[2], *e_f_remote[2];
+  p4est3_locidx      *b_f[2], *e_f[2];
   void               *stack_it[2];
   p4est3_locidx      *arr_it;
   sc3_array_t        *view_q = sa->view_quads;
@@ -452,7 +451,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
   p4est3_iterate_face_side_t *fside;
   int                *is_refine = sa->is_refine;
   int                *Level = sa->Level_face;
-  int                 i, side, level, idx, child_id, p;
+  int                 i, side, level, idx, child_id;
   int                 ori = sa->finfo->orientation;
   int                 is_lvl_increased[2] = { 0, 0 };
   void               *first_quad;
@@ -569,7 +568,7 @@ p4est3_iterate_face_inner_init (p4est3_t * p3, p4est3_search_area_t * sa,
 {
   int                *Level_face = sa->Level_face;
   int                *is_refine = sa->is_refine;
-  int                 ch_neigh[2] = { child, neighbor }, s, i;
+  int                 ch_neigh[2] = { child, neighbor }, s;
 
   sc3_array_t       **idx_f_stack = sa->idx_face_stack;
   void               *top;      /* generic top of a stack */
@@ -625,8 +624,7 @@ static sc3_error_t *
 p4est3_iterate_volume_rec_init (p4est3_t * p3,
                                 p4est3_search_area_t * sa, p4est3_topidx tree)
 {
-  const int           ntypes = p3->num_children + 1;
-  int                 i, j, side;
+  int                 side;
   void               *arr;
   p4est3_iterate_face_side_t *fside;
   p4est3_locidx      *begin, *end;
@@ -709,7 +707,7 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
                            p4est3_iterate_codim_t ccodim,
                            p4est3_search_area_t * sa)
 {
-  int                 i, j, side;
+  int                 i;
   void               *first_quad;       /*first quadrant in this search area */
   int                 level;
   void               *stack_it;
