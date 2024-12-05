@@ -211,7 +211,7 @@ compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
   p4est3_topidx       fltree, lltree;
   p4est3_gloidx       num_glo_quads;
   p4est3_locidx       num_loc_quads;
-  p4est3_locidx       processed_quads, processed_quads_p3;
+  size_t              processed_quads, processed_quads_p3;
   p4est_tree_t       *tree;
   sc3_array_t        *p3levels, *levels;
 
@@ -249,7 +249,7 @@ compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
   SC3E (sc3_array_get_elem_count (p3levels, &processed_quads_p3));
   SC3E (sc3_array_get_elem_count (levels, &processed_quads));
   SC3E_DEMAND (processed_quads_p3 == processed_quads, "wrong #p3levels");
-  SC3E_DEMAND (processed_quads == num_loc_quads, "wrong #levels");
+  SC3E_DEMAND (processed_quads == (size_t) num_loc_quads, "wrong #levels");
   for (i = 0; i < num_loc_quads; ++i) {
     SC3E (sc3_array_index (p3levels, i, &p3level));
     SC3E (sc3_array_index (levels, i, &level));

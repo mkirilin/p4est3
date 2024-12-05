@@ -312,7 +312,7 @@ p4est3_connectivity_get_face_transform (const p4est3_connectivity_t * c,
   SC3A_CHECK (0 <= orient && orient <= c->half_children);
 
 #ifdef P4EST_ENABLE_DEBUG
-  int                 ecount;
+  size_t              ecount;
   SC3E (sc3_array_get_elem_count (transform, &ecount));
   /* check is transform has a desired length */
   SC3A_CHECK (ecount == 9);

@@ -376,7 +376,8 @@ static sc3_error_t *
 p4est3_region (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
 {
   int                 la, lb, lc;
-  int                 i, j, j1, j2, ecount;
+  int                 j, j1, j2;
+  size_t              ecount, i;
   p4est3_gloidx       aid, bid, cid;
   void               *c, *q;
   sc3_array_t        *testq, *buff;
@@ -402,12 +403,12 @@ p4est3_region (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
   SC3A_CHECK (j1 < 0);
   SC3E (sc3_array_push (testq, &c));
   SC3E (p4est3_nearest_common_ancestor (p3->qvt, a, b, c));
-  for (i = 0; i < p3->num_children; ++i) {
+  for (j = 0; j < p3->num_children; ++j) {
     SC3E (sc3_array_push (testq, &q));
-    SC3E (p4est3_quadrant_child (p3->qvt, c, i, q));
+    SC3E (p4est3_quadrant_child (p3->qvt, c, j, q));
   }
   SC3E (sc3_array_get_elem_count (testq, &ecount));
-  SC3A_CHECK (ecount == p3->num_children + 1);
+  SC3A_CHECK (ecount == (size_t) (p3->num_children + 1));
   for (i = 1; i < ecount; ++i) {
     SC3E (sc3_array_index (testq, i, &c));
     SC3E (p4est3_quadrant_linear_id (p3->qvt, c, p3->level, &cid));
@@ -440,7 +441,8 @@ static sc3_error_t *
 p4est3_region_end (p4est3_t * p3, void *a, void *b, sc3_array_t * region)
 {
   int                 la, lc;
-  int                 i, j, j1, ecount;
+  int                 j, j1;
+  size_t              ecount, i;
   p4est3_gloidx       aid, cid;
   void               *c, *q;
   sc3_array_t        *testq, *buff;
@@ -497,7 +499,7 @@ p4est3_recursive_partition_region (p4est3_t * p3, int is_region_end,
   sc3_array_t        *region;
   void               *a, *b;
   char               *threadq_ptr;
-  int                 rcount, i;
+  size_t              rcount, i;
   p4est3_gloidx       id;
 
   SC3E (sc3_array_index (levelq, 0, &a));

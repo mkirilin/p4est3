@@ -508,7 +508,8 @@ face_callback (p4est3_iterate_face_info_t * fi)
   sc3_array_t        *ftransform;
   int8_t            **qinfo_array = (int8_t **) fi->user_data;
   p4est3_topidx       ntree;
-  int                 i, nsides, levels[2], ss_id /* smaller side index */ ;
+  int                 levels[2], ss_id /* smaller side index */ ;
+  size_t              nsides, i;
   SC3E (sc3_array_get_elem_count (fi->sides, &nsides));
   SC3E_DEMAND ((nsides == 2) || ((nsides == 1) && fi->tree_boundary),
                "one face's side not on a tree's boundary");

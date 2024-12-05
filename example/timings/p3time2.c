@@ -186,7 +186,8 @@ static sc3_error_t *
 time_fill_test_array (sc3_array_t * a, p4est3_quadrant_vtable_t * qvt)
 {
   int                 i;
-  p4est3_locidx       quad, child_place, n_quads;
+  p4est3_locidx       quad;
+  size_t              n_quads, child_place;
   void               *cp, *q;
 
   SC3E (sc3_array_get_elem_count (a, &n_quads));
@@ -279,7 +280,7 @@ static sc3_error_t *
 test_child (const int ninit_quads, sc3_array_t * a,
             p4est3_quadrant_vtable_t * qvt)
 {
-  p4est3_locidx       quad, n_quads;
+  size_t              quad, n_quads;
   void               *q, *tmp;
   int i, c;
 
@@ -300,7 +301,7 @@ static sc3_error_t *
 test_parent (const int ninit_quads, sc3_array_t * a,
              p4est3_quadrant_vtable_t * qvt)
 {
-  p4est3_locidx       quad, n_quads;
+  size_t              quad, n_quads;
   void               *q, *tmp;
   int i;
 
@@ -319,7 +320,7 @@ static sc3_error_t *
 test_sibling (const int ninit_quads, sc3_array_t * a,
               p4est3_quadrant_vtable_t * qvt)
 {
-  p4est3_locidx       quad, n_quads;
+  size_t              quad, n_quads;
   void               *q, *tmp;
   int i, c;
 
@@ -340,7 +341,7 @@ static sc3_error_t *
 test_face_neighbor (const int ninit_nquads, sc3_array_t * a,
                     p4est3_quadrant_vtable_t * qvt)
 {
-  p4est3_locidx quad, n_quads;
+  size_t quad, n_quads;
   void *q, *tmp;
   int i, c;
   const int *order
@@ -369,7 +370,7 @@ static sc3_error_t *
 test_tree_boundaries (const int ninit_nquads, sc3_array_t * a,
                       p4est3_quadrant_vtable_t * qvt, sc3_array_t * tmp)
 {
-  p4est3_locidx quad, n_quads;
+  size_t quad, n_quads;
   void *q;
   int i;
 

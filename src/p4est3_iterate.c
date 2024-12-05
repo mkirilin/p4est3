@@ -109,8 +109,7 @@ p4est3_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 static sc3_error_t *
 p4est3_array_set_zero (sc3_array_t * arr)
 {
-  int                 ecount;
-  size_t              esize;
+  size_t              esize, ecount;
   void               *idx;
   SC3E (sc3_array_get_elem_count (arr, &ecount));
   SC3E (sc3_array_get_elem_size (arr, &esize));
@@ -653,7 +652,7 @@ p4est3_iterate_volume_rec_init (p4est3_t * p3,
 
   SC3E (sc3_array_index (sa->idx_vol_stack, 0, &arr));
 #ifdef P4EST_ENABLE_DEBUG
-  int                 ecount;
+  size_t              ecount;
   SC3E (sc3_array_get_elem_count (*(sc3_array_t **) arr, &ecount));
   SC3A_CHECK (ecount == 2);
   SC3E (sc3_array_get_elem_count (sa->idx_vol_stack, &ecount));

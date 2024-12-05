@@ -60,8 +60,8 @@ p4est3_search_array_new (sc3_allocator_t * alloc, size_t esize,
  *  it in 3D in the usual way.
  */
 static sc3_error_t *
-type_fn_global_quad_index (sc3_array_t * array, int index,
-                           void *data_array, int *type)
+type_fn_global_quad_index (sc3_array_t * array, size_t index,
+                           void *data_array, size_t *type)
 {
   p4est3_gloidx      *my_begin_end, *entry;
 
@@ -90,12 +90,12 @@ p4est3_find_partition (sc3_allocator_t * alloc, int num_entities,
                        p4est3_gloidx my_begin, p4est3_gloidx my_end,
                        p4est3_gloidx * begin, p4est3_gloidx * end)
 {
-  int                *iptr;
+  size_t             *iptr;
   sc3_array_t        *view, *offsets;
   p4est3_gloidx       my_begin_end[2];
 
   SC3A_CHECK (my_begin <= my_end);
-  SC3E (p4est3_search_array_new (alloc, sizeof (int), 0, 0, &offsets));
+  SC3E (p4est3_search_array_new (alloc, sizeof (size_t), 0, 0, &offsets));
   SC3E (sc3_array_new_data (alloc, &view, search_in,
                             sizeof (p4est3_gloidx), 0, num_entities));
 
@@ -194,16 +194,18 @@ p4est3_array_split_data_t;
 
 /* Custom quadrant ancestor_id function to align with sc3_array_split interface. */
 static sc3_error_t *
-p4est3_array_split_ancestor_id (sc3_array_t * a, int index, void *data,
-                                int *type)
+p4est3_array_split_ancestor_id (sc3_array_t * a, size_t index, void *data,
+                                size_t *type)
 {
   SC3A_CHECK (data != NULL);
 
   void               *q;
+  int                 t;
   p4est3_array_split_data_t *d = (p4est3_array_split_data_t *) data;
   SC3E (sc3_array_index (a, index, &q));
 
-  SC3E (d->quadrant_ancestor_id (q, *(d->level), type));
+  SC3E (d->quadrant_ancestor_id (q, *(d->level), &t));
+  *type = t;
   return NULL;
 }
 
@@ -216,7 +218,8 @@ p4est3_quadrant_array_split (const p4est3_quadrant_vtable_t * qvt,
   p4est3_qvt_non_const_wrapper_t sqvtw, *qvtw = &sqvtw;
 #ifdef P4EST_ENABLE_DEBUG
   void               *q1, *q2;
-  int                 l, count;
+  int                 l;
+  size_t              count;
 #endif
 
   qvtw->qvt = qvt;
