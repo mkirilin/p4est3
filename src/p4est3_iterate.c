@@ -503,8 +503,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
       if (level == Level[side]) {
         is_refine[side] = 0;
-        fside[side].nquad = *(b_f[side]) + p3->goffset[p3->mpirank]
-          - p3->gtroffset[trees[side]];
+        fside[side].nquad = *(b_f[side]) - p3->gtroffset[trees[side]];
         fside[side].quadrant = first_quad;
       }
     }
