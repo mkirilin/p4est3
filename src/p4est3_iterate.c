@@ -470,11 +470,11 @@ p4est3_internal_iterate_face (p4est3_t * p3,
   /* Check if both sides belong to remote process(es) (at least, partly).
      If so, we ignore this face. */
   if ((sa->nsides == 1 && 
-        (*(b_f[0]) >= sa->local_end || *(e_f[0]) <= sa->local_begin))
+        (*(b_f[0]) >= sa->local_end_face[0] || *(e_f[0]) <= sa->local_begin_face[0]))
         ||
         (sa->nsides == 2 && 
-        (*(b_f[0]) >= sa->local_end || *(e_f[0]) <= sa->local_begin) &&
-        (*(b_f[1]) >= sa->local_end || *(e_f[1]) <= sa->local_begin))) {
+        (*(b_f[0]) >= sa->local_end_face[0] || *(e_f[0]) <= sa->local_begin_face[0]) &&
+        (*(b_f[1]) >= sa->local_end_face[1] || *(e_f[1]) <= sa->local_begin_face[1]))) {
     return NULL;
   }
 
@@ -485,7 +485,8 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       continue;
     }
 
-    if (*(b_f[side]) >= sa->local_end || *(e_f[side]) <= sa->local_begin) {
+    if (*(b_f[side]) >= sa->local_end_face[side]
+     || *(e_f[side]) <= sa->local_begin_face[side]) {
       /* if we are on a physical boundary, this case is not possible */
       /* there is no local quadrants, so perform check for a remote face */
 
@@ -599,6 +600,9 @@ p4est3_iterate_face_inner_init (p4est3_t * p3, p4est3_search_area_t * sa,
     SC3E (sc3_array_index (*(sc3_array_t **) top, 0, &arr_vol_it));
     *(begin) = *(arr_vol_it + ch_neigh[s]);
     *(end) = *(arr_vol_it + ch_neigh[s] + 1);
+    /* Since we iterate inner faces, we inherit the local boundaries for volumes */
+    sa->local_begin_face[s] = sa->local_begin;
+    sa->local_end_face[s] = sa->local_end;
   }
 
   return NULL;
