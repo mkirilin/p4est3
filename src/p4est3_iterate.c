@@ -38,7 +38,6 @@ typedef struct p4est3_search_area
   /* general section */
   int                 max_children;
   int                 nfaces;   /*Global number of faces */
-  int                 start_level;
   sc3_array_t        *view_quads;       /* array ptr to pass tree's quads
                                            into array_split */
   int                *children_face_neighbors;
@@ -183,7 +182,6 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
   /*set general section of sa */
   sa->max_children = p3->num_children;
   sa->nfaces = 2 * p3->qvt->dim;
-  sa->start_level = 0;
   SC3E (p4est3_set_children_face_neighbors (p3, sa));
   SC3E (p4est3_set_face_dual (p3, sa));
 
@@ -444,8 +442,9 @@ p4est3_internal_iterate_face (p4est3_t * p3,
   const int           half_ch = max_children / 2;
   p4est3_topidx      *trees = sa->treeid_face;
   p4est3_gloidx      *b_f[2], *e_f[2];
+  p4est3_gloidx       proc_owner;
   void               *stack_it[2];
-  p4est3_locidx      *arr_it;
+  p4est3_gloidx      *arr_it;
   sc3_array_t        *view_q = sa->view_quads;
   sc3_array_t       **idx_face_stack = sa->idx_face_stack;
   p4est3_iterate_face_side_t *fside;
@@ -467,7 +466,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
            sa->child_id_face[side] + 1, &(e_f[side])));
   }
 
-  /* Check if both sides belong to remote process(es) (at least, partly).
+  /* Check if both sides belong to remote process(es).
      If so, we ignore this face. */
   if ((sa->nsides == 1 && 
         (*(b_f[0]) >= sa->local_end_face[0] || *(e_f[0]) <= sa->local_begin_face[0]))
@@ -485,30 +484,30 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       continue;
     }
 
-    if (*(b_f[side]) >= sa->local_end_face[side]
-     || *(e_f[side]) <= sa->local_begin_face[side]) {
-      /* if we are on a physical boundary, this case is not possible */
-      /* there is no local quadrants, so perform check for a remote face */
-
-      /** TODO: in non-contiguous case here should be the different code */
-      first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*(b_f[side])));
-      SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
-      if (level == Level[side]) {
-        is_refine[side] = 0;
-        fside[side].nquad = *(b_f[side]) - p3->gtroffset[trees[side]];
-        fside[side].quadrant = first_quad;
-      }
+    /* TODO: make it through p4est3_find_partition and last_goffsets */
+    /* Find process that owns this quadrant */
+    /* Start binary search from a local process */
+    proc_owner = p3->mpirank;
+    SC3E (p4est3_search_lower_bound64
+            (*(b_f[side]), p3->goffset, p3->mpisize + 1, &proc_owner));
+    if (p3->goffset[proc_owner] > *(b_f[side])) {
+      SC3A_CHECK (proc_owner > 0);
+      proc_owner--;
     }
-    else {
-      first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*(b_f[side])));
-      SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
-      if (level == Level[side]) {
-        is_refine[side] = 0;
-        fside[side].nquad = *(b_f[side]) - p3->gtroffset[trees[side]];
-        fside[side].quadrant = first_quad;
-      }
+    SC3A_CHECK (proc_owner >= 0 && proc_owner < p3->mpisize);
+
+    /* Get quadrant from the owning process's window */
+    first_quad = (void *) (p3->nodequads[proc_owner] +
+                          p3->qsize * (*(b_f[side]) - p3->goffset[proc_owner]));
+
+    SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
+    if (level == Level[side]) {
+      is_refine[side] = 0;
+      fside[side].nquad = *(b_f[side]) - p3->gtroffset[trees[side]];
+      fside[side].quadrant = first_quad;
     }
   }
+
   if (!is_refine[0] && !is_refine[1]) {
     if (cface != NULL) {
       SC3E (cface (sa->finfo));
@@ -528,14 +527,16 @@ p4est3_internal_iterate_face (p4est3_t * p3,
 #ifdef P4EST_ENABLE_DEBUG
     SC3E (p4est3_array_set_zero (*(sc3_array_t **) (stack_it[side])));
 #endif
+    /* here we start with the very beginning of not necessary local node
+       quadrants, because of our specialized array_split_noncontig function */
     SC3E (sc3_array_renew_data (&view_q, p3->nodequads[0], p3->qsize,
-                                *(b_f[side]), *(e_f[side]) - *(b_f[side])));
-    SC3E (p4est3_quadrant_array_split
-          (p3->qvt, view_q, Level[side], *(sc3_array_t **) (stack_it[side])));
+                                0, *(e_f[side]) - *(b_f[side])));
+    SC3E (p4est3_quadrant_array_split_noncontig
+          (p3, view_q, Level[side], *(b_f[side]),
+           *(sc3_array_t **) (stack_it[side])));
 
     /* since array_split doesn't count shift from the beinning of quadrants
        in a proc, we shift result indices at the loop below */
-    /** WARNING: The loop below MIGHT be rudundant */
     for (i = 0; i < max_children + 1; ++i) {
       SC3E (sc3_array_index (*(sc3_array_t **) (stack_it[side]), i, &arr_it));
       *arr_it += *(b_f[side]);
@@ -728,7 +729,8 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
   void               *first_quad;       /*first quadrant in this search area */
   int                 level;
   void               *stack_it;
-  p4est3_locidx      *arr_it;
+  p4est3_gloidx      *arr_it;
+  p4est3_gloidx       proc_owner;
 
   const int           max_children = p3->num_children;
   int                *l2nch = sa->level2nchildren;
@@ -750,8 +752,21 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
     return NULL;
   }
 
-  /* Access quadrant here! */
-  first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
+  /* TODO: make it through p4est3_find_partition and last_goffsets */
+  /* Find process that owns this quadrant */
+  /* Start binary search from a local process */
+  proc_owner = p3->mpirank;
+  SC3E (p4est3_search_lower_bound64
+         (*begin, p3->goffset, p3->mpisize + 1, &proc_owner));
+  if (p3->goffset[proc_owner] > *begin) {
+    SC3A_CHECK (proc_owner > 0);
+    proc_owner--;
+  }
+  SC3A_CHECK (proc_owner >= 0 && proc_owner < p3->mpisize);
+
+  /* Get quadrant from the owning process's window */
+  first_quad = (void *) (p3->nodequads[proc_owner] +
+                        p3->qsize * (*begin - p3->goffset[proc_owner]));
 
   SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
   if (level == *Level) {
@@ -775,29 +790,25 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
     return NULL;
   }
 
-  if (l2nch[sa->start_level] > 0) {
-    return NULL;
-  }
-
   SC3E (sc3_array_push (idx_vol_stack, &stack_it));
 #ifdef P4EST_ENABLE_DEBUG
   SC3E (p4est3_array_set_zero (*(sc3_array_t **) stack_it));
 #endif
-  /** TODO: Potentially we can run out of locidx range here!!! */
+  /* here we start with the very beginning of not necessary local node
+     quadrants, because of our specialized array_split_noncontig function */
   SC3E (sc3_array_renew_data
-        (&view_q, p3->nodequads[0], p3->qsize, *begin, *end - *begin));
-  SC3E (p4est3_quadrant_array_split
-        (p3->qvt, view_q, *Level, *(sc3_array_t **) stack_it));
+        (&view_q, p3->nodequads[0], p3->qsize, 0, *end - *begin));
+
+  SC3E (p4est3_quadrant_array_split_noncontig
+        (p3, view_q, *Level, *begin, *(sc3_array_t **) stack_it));
   l2nch[++(*Level)] = 0;
 
   /* since array_split doesn't count shift from the beinning of quadrants
      in a node, we shift result indices at the loop below */
-  /** WARNING: The loop below MIGHT be rudundant */
   for (i = 0; i < max_children + 1; ++i) {
     SC3E (sc3_array_index (*(sc3_array_t **) stack_it, i, &arr_it));
     *arr_it += *begin;
   }
-  SC3E (sc3_array_index (*(sc3_array_t **) stack_it, 0, &arr_it));
   for (i = 0; i < max_children; ++i) {
     sa->child_id = i;
     SC3E (p4est3_iterate_volume_rec (p3, cvolume, cface, ccodim, sa));

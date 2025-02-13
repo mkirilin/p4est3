@@ -252,6 +252,83 @@ p4est3_quadrant_array_split (const p4est3_quadrant_vtable_t * qvt,
   return NULL;
 }
 
+/* Wrap user data to pass into custom p4est3_array_split_ancestor_id function. */
+typedef struct p4est3_array_split_data_noncontig
+{
+  p4est3_quadrant_ancestor_id_t quadrant_ancestor_id;
+  int                *level;
+  p4est3_gloidx       begin_idx; /*< absolute global index of begin of the array
+                                    (in general sense of non-contig. SH.M. arrays)
+                                    to be split */
+  p4est3_t           *p3;
+}
+p4est3_array_split_data_noncontig_t;
+
+/* Custom quadrant ancestor_id function to align with sc3_array_split interface. */
+static sc3_error_t *
+p4est3_array_split_ancestor_id_noncontig (sc3_array_t * a, size_t index,
+                                          void *data, size_t *type)
+{
+  SC3A_CHECK (data != NULL);
+
+  void               *q;
+  int                 t;
+  p4est3_gloidx       gloidx;
+  p4est3_array_split_data_noncontig_t *d =
+    (p4est3_array_split_data_noncontig_t *) data;
+  p4est3_t           *p3 = d->p3;
+  p4est3_gloidx       proc_begin = (p3->mpisize + 1) / 2;
+
+  /* global index of a quadrant to check */
+  gloidx = d->begin_idx + index;
+
+  /* find a process to which the quadrant belongs to */
+  SC3E (p4est3_search_lower_bound64 (gloidx, p3->goffset, p3->mpisize + 1,
+                                     &proc_begin));
+  if (p3->goffset[proc_begin] > gloidx) {
+    SC3A_CHECK (proc_begin > 0);
+    proc_begin--;
+  }
+  SC3A_CHECK (proc_begin >= 0 && proc_begin < p3->mpisize);
+  q = (void *) (p3->nodequads[proc_begin] +
+    p3->qsize * (gloidx - p3->goffset[proc_begin]));
+  
+  SC3E (d->quadrant_ancestor_id (q, *(d->level), &t));
+  *type = t;
+  return NULL;
+}
+
+sc3_error_t         *
+p4est3_quadrant_array_split_noncontig (p4est3_t * p3, sc3_array_t * array,
+                                       int level, p4est3_gloidx begin,
+                                       sc3_array_t * indices)
+{
+  p4est3_array_split_data_noncontig_t data;
+  p4est3_qvt_non_const_wrapper_t sqvtw, *qvtw = &sqvtw;
+
+  qvtw->qvt = p3->qvt;
+  SC3A_IS (sc3_array_is_setup, array);
+  SC3A_IS (sc3_array_is_setup, indices);
+  SC3A_CHECK (0 <= level && level < p3->qvt->max_level);
+
+#ifdef P4EST_ENABLE_DEBUG
+  /* TODO: make a proper check on first and last quadrants in the area we split
+     have level l > level. */
+  /* TODO: check if l >= level, where l is a level of nearest
+     common ancestor of q1 and q2.
+   */
+#endif
+
+  level++;
+  data.quadrant_ancestor_id = p3->qvt->quadrant_ancestor_id;
+  data.level = &level;
+  data.begin_idx = begin;
+  data.p3 = p3;
+  SC3E (sc3_array_split (array, indices, p3->num_children,
+                         p4est3_array_split_ancestor_id_noncontig, &data));
+  return NULL;
+}
+
 #ifdef __cplusplus
 #if 0
 {

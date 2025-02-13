@@ -239,7 +239,7 @@ p4est3_new_shortcut (p4est3_t ** p3, const setup_t * t, int start_level,
   SC3E (p4est3_set_refine (*p3, p3crefine));
   SC3E (p4est3_set_source (*p3, src));
   SC3E (p4est3_set_shared (*p3, 1));
-  SC3E (p4est3_set_contiguous (*p3, 1));
+  SC3E (p4est3_set_contiguous (*p3, 0));
   SC3E (p4est3_set_family (*p3, 0));
   SC3E (p4est3_set_partition (*p3, is_partition, NULL));
   /*SC3E (p4est3_set_user_data (*p3, user_data)); */

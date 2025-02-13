@@ -107,6 +107,32 @@ sc3_error_t        *p4est3_quadrant_array_split
                      (const p4est3_quadrant_vtable_t * qvt,
                       sc3_array_t * array, int level, sc3_array_t * indices);
 
+
+/** Split an array of quadrants by the children of an ancestor. A special case
+ *  when quadrants are stored in non-contiguous shared memory.
+ *
+ * Given a sorted \b array of quadrants that have a common ancestor at level
+ * \b level, compute the \b indices of the first quadrant in each of the common
+ * ancestor's children at level \b level + 1.
+ * \param [in] qvt       Valid virtual quadrant table for implementation of
+ *                       quadrants in \b array.
+ * \param [in] array     The sorted array of quadrants of level > \b level.
+ * \param [in] level     The level at which there is a common ancestor.
+ * \param [in] begin_idx The absolute global index of the first quadrant in the array.
+ * \param [in] goffset   The global offsets of the first quadrant in each process.
+ * \param [in,out] indices     The indices of the first quadrant in each of
+ *                             the ancestors's children, plus an additional
+ *                             index on the end.  The quadrants of \b array
+ *                             that are descendants of child i have indices
+ *                             between indices[i] and indices[i + 1] - 1.  If
+ *                             indices[i] = indices[i+1], this indicates that
+ *                             no quadrant in the array is contained in
+ *                             child i.
+ */
+sc3_error_t         *p4est3_quadrant_array_split_noncontig
+                      (p4est3_t * p3, sc3_array_t * array, int level,
+                       p4est3_gloidx begin, sc3_array_t * indices);
+
 #ifdef __cplusplus
 #if 0
 {
