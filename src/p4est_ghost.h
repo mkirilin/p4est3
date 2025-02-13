@@ -51,18 +51,20 @@ typedef struct
    * quadrant and the neighboring tree.
    */
   sc_array_t          ghosts; /**< array of p4est_quadrant_t type */
-  p4est_locidx_t     *tree_offsets;     /**< num_trees + 1 ghost indices */
-  p4est_locidx_t     *proc_offsets;     /**< mpisize + 1 ghost indices */
+  p4est_locidx_t     *tree_offsets;     /**< num_trees + 1 ghost indices */ /*How many ghosts in the tree or in all trees before this one*/
+  p4est_locidx_t     *proc_offsets;     /**< mpisize + 1 ghost indices */ /* Same by processes */
 
   /** An array of local quadrants that touch the parallel boundary from the
    * inside, i.e., that are ghosts in the perspective of at least one other
    * processor.  The storage convention is the same as for \c ghosts above.
    */
+  /* Quads on a local proc that touches atleast one ghost (inside proc boundary) */
   sc_array_t          mirrors; /**< array of p4est_quadrant_t type */
   p4est_locidx_t     *mirror_tree_offsets;      /**< num_trees + 1 mirror indices */
   p4est_locidx_t     *mirror_proc_mirrors;      /**< indices into mirrors grouped by
                                                    outside processor rank and
                                                    ascending within each rank */
+  /* Might me NULL */
   p4est_locidx_t     *mirror_proc_offsets;      /**< mpisize + 1 indices into 
                                                    mirror_proc_mirrors */
 
