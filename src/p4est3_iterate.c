@@ -505,6 +505,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
       is_refine[side] = 0;
       fside[side].nquad = *(b_f[side]) - p3->gtroffset[trees[side]];
       fside[side].quadrant = first_quad;
+      fside[side].is_ghost = proc_owner == p3->mpirank ? 0 : 1;
     }
   }
 
@@ -676,7 +677,7 @@ p4est3_iterate_volume_rec_init (p4est3_t * p3,
   SC3E (sc3_array_index (sa->finfo->sides, 0, &fside));
   for (int side = 0; side < 2; ++side) {
     fside[side].ntree = tree;
-    fside[side].is_ghost = 0;
+    fside[side].is_ghost = -1;
   }
 
   /* Find here the range of procs that share the same tree as noderank */
@@ -754,7 +755,8 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
 
   /* TODO: make it through p4est3_find_partition and last_goffsets */
   /* Find process that owns this quadrant */
-  /* Start binary search from a local process */
+  /* Start binary search from a local process, we do this for volume, too,
+     because we need to fill the metadata to proceed the recursion. */
   proc_owner = p3->mpirank;
   SC3E (p4est3_search_lower_bound64
          (*begin, p3->goffset, p3->mpisize + 1, &proc_owner));
@@ -771,6 +773,9 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
   SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
   if (level == *Level) {
     if (cvolume != NULL) {
+      /* Check that this state is never reached by a remote process */
+      SC3A_CHECK (proc_owner == p3->mpirank);
+
       vinfo->quadrant = first_quad;
       /* vinfo->nquad does not really make sense, since it is the quadrant index,
          calculated from the beginning of the tree, counting the quadrants from

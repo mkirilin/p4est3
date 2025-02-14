@@ -520,6 +520,8 @@ face_callback (p4est3_iterate_face_info_t * fi)
     SC3E (p4est3_quadrant_level
           (fi->p3->qvt, sides[i]->quadrant, &levels[i]));
     SC3E (sc3_allocator_calloc_one (fi->p3->alloc, fi->p3->qsize, &tempq[i]));
+    SC3E_DEMAND (sides[i]->is_ghost == 0 || sides[i]->is_ghost == 1,
+                 "invalid value for is_ghost");
   }
   if (nsides == 2) {
     ss_id = levels[0] > levels[1] ? 0 : 1;
