@@ -357,6 +357,7 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
   is_refine[0] = is_refine[1] = 0;
   fside[0].ntree = tree;
   fside[0].nface = face;
+  fside[0].is_ghost = -1;
   SC3E (p4est3_connectivity_get_face
         (p3->conn, &tree_neighbor, &face, &orient));
   /*if (tree_neighbor > p3->lltree || tree_neighbor < p3->fltree) {
@@ -383,6 +384,7 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
     fside[1].ntree = tree_neighbor;
     sa->treeid_face[1] = tree_neighbor;
     fside[1].nface = face;
+    fside[1].is_ghost = -1;
   }
   SC3E (sc3_array_resize (sa->finfo->sides, sa->nsides));
   tree_ids[0] = tree;

@@ -22,6 +22,7 @@
 */
 
 #include <p4est3_ghost.h>
+#include <p4est3_internal.h>
 
 #ifdef __cplusplus
 extern              "C"
@@ -33,27 +34,82 @@ extern              "C"
 
 typedef struct
 {
-  p4est_ghost_t     *ghosts;
+  p4est_ghost_t     *ghost;
 }
 p4est3_ghost_fill_data_t;
 
 static sc3_error_t *
 p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 {
+  p4est3_ghost_fill_data_t *d = (p4est3_ghost_fill_data_t *) fi->user_data;
+  p4est_ghost_t      *ghost = d->ghost;
+  p4est3_iterate_face_side_t *fside[2], *gside;
+  int                nsides;
+
+  SC3A(sc3_array_get_elem_count (fi->sides, &nsides));
+  SC3A_CHECK(nsides == 2 || nsides == 1);
+
+  if (nsides = 1) {
+    /* Nothing to do here. There are no ghosts on a boundary. */
+    return NULL;
+  }
+
+  /** Check if exactly one side is a ghost */
+  sc3_array_index (fi->sides, 0, &fside[0]);
+  sc3_array_index (fi->sides, 1, &fside[1]);
+  SC3A_CHECK(fside[0]->is_ghost != -1 || fside[1]->is_ghost != -1);
+  SC3A_CHECK(fside[0]->is_ghost != 1 && fside[1]->is_ghost != 1);
+
+  if (fside[0]->is_ghost == 0 && fside[1] == 0) {
+    /* It's not a ghost. Nothing to do here. */
+    return NULL;
+  }
+
+  gside = fside[0]->is_ghost == 1 ? fside[0] : fside[1]; /*< ghost side*/
+  SC3A_CHECK(gside->is_ghost == 1);
+
+  /** Add ghost to \c ghost->ghosts array */
+  /** How to now to what location of the array to place the quadrant? 
+   * 1. Simple yet not optimal solution is add any ghost to the array and sort
+   *    it at the end.
+   * 2. 
+   * 
+  */
+
+
+  /** Fill its \c piggy3 field */
+
+  /** Contribute to a structure tracking \c tree_offsets */
+  /** Contribute to a structure tracking \c proc_offsets */
+
+  /** Do the same for mirrors */
+
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t ** ghost)
+p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
 {
-  /*TODO: Allocate memory for ghosts */
+  /*TODO: Allocate memory for ghosts outside and before this function call */
   p4est3_ghost_fill_data_t data, *d = &data;
   /* ... */
 
+  d->ghost = ghost;
 
+  ghost->mpisize = p3->mpisize;
+  ghost->num_trees = p3->num_trees;
+  ghost->btype = P4EST_CONNECT_FACE;
+
+  /* Might be NULL for integration with Dune */
+  ghost->mirror_proc_offsets = NULL;
+  ghost->mirror_proc_fronts = NULL;
+  ghost->mirror_proc_front_offsets = NULL;
 
 
   SC3E (p4est3_iterate_face (p3, NULL, p4est3_ghost_fill_callback, d));
+
+  /** Fill \c tree_offsets */
+  /** Fill \c proc_offsets */
 
   return NULL;
 }
