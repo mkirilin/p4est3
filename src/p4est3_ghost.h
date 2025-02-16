@@ -48,7 +48,7 @@ extern              "C"
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_ghost_fill_p4est (p4est3_t * p3,
-                                             p4est_ghost_t ** ghost);
+                                             p4est_ghost_t * ghost);
 
 #ifdef __cplusplus
 #if 0

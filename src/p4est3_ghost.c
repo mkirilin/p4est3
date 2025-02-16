@@ -44,12 +44,14 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   p4est3_ghost_fill_data_t *d = (p4est3_ghost_fill_data_t *) fi->user_data;
   p4est_ghost_t      *ghost = d->ghost;
   p4est3_iterate_face_side_t *fside[2], *gside;
-  int                nsides;
+  size_t               nsides;
 
-  SC3A(sc3_array_get_elem_count (fi->sides, &nsides));
+  ghost = (void *) ghost; /* temporarily to avoid unused variable */
+
+  SC3E(sc3_array_get_elem_count (fi->sides, &nsides));
   SC3A_CHECK(nsides == 2 || nsides == 1);
 
-  if (nsides = 1) {
+  if (nsides == 1) {
     /* Nothing to do here. There are no ghosts on a boundary. */
     return NULL;
   }
@@ -69,13 +71,13 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   SC3A_CHECK(gside->is_ghost == 1);
 
   /** Add ghost to \c ghost->ghosts array */
-  /** How to now to what location of the array to place the quadrant? 
-   * 1. Simple yet not optimal solution is add any ghost to the array and sort
-   *    it at the end.
-   * 2. 
-   * 
+  /** How to know at what location of the array to place the quadrant?
+   * 1. Simple and memory efficient solution is add any ghost to the array and
+   *    sort it at the end. It costs additional O(n log n) operations in the
+   *    worst case. Which is alright because the Iterator is O(n log n) anyway.
+   * TODO: Double check the exact complexity of the Iterator.
+   * 2. Iterate in the order of increasing ghosts id. Is it even possible?
   */
-
 
   /** Fill its \c piggy3 field */
 
