@@ -44,15 +44,14 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 {
   p4est3_ghost_fill_data_t *d = (p4est3_ghost_fill_data_t *) fi->user_data;
   p4est_ghost_t      *ghost = d->ghost;
-  p4est3_iterate_face_side_t *fside[2], *gside;
+  p4est3_iterate_face_side_t *fside[2], *gside, *mside;
   p4est_quadrant_t    q;
   size_t              nsides;
-  p4est_topidx_t     *ghosts_in_tree;
-  p4est_gloidx_t     *ghosts_in_proc, proc_owner, global_qid;
+  p4est_gloidx_t      proc_owner, global_qid;
   int                 coords[P4EST_DIM], level;
 
-  /* TODO: Check if the ghost is already in the layer via hash table.
-           If so, skip it. */
+  /* TODO: Check if the ghost and mirrors are already in the layer via hash table.
+           If so, skip the nesessary entity. */
 
   SC3E(sc3_array_get_elem_count (fi->sides, &nsides));
   SC3A_CHECK(nsides == 2 || nsides == 1);
@@ -74,7 +73,10 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   }
 
   gside = fside[0]->is_ghost == 1 ? fside[0] : fside[1]; /*< ghost side*/
-  SC3A_CHECK(gside->is_ghost == 1);
+  mside = fside[0]->is_ghost == 0 ? fside[0] : fside[1]; /*< mirror side*/
+  SC3A_CHECK(gside->is_ghost == 1 && mside->is_ghost == 0);
+
+  /************* GHOST **************/
 
   /** Add ghost to \c ghost->ghosts array */
   /** How to know at what location of the array to place the quadrant?
@@ -85,7 +87,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
    * 2. Iterate in the order of increasing ghosts id. Is it even possible?
   */
 
-  /* Convert p3 quad to p2 quad throughout coordinates because of qvt */
+  /* Convert p3 quad to p2 quad */
   SC3E (p4est3_quadrant_coordinates (fi->p3->qvt, gside->quadrant, coords));
   SC3E (p4est3_quadrant_level (fi->p3->qvt, gside->quadrant, &q.level));
   q.x = coords[0];
@@ -113,17 +115,39 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   *(p4est_quadrant_t *) sc_array_push(&(ghost->ghosts)) = q;
 
   /** Contribute to a structure tracking \c tree_offsets */
-
-  ghosts_in_tree =
-    (p4est_locidx_t *) sc_array_index (ghost->tree_offsets, gside->ntree);
-  (*ghosts_in_tree)++;
+  /* TODO: Check if it is really gside->ntree or (gside->ntree + 1).
+           Same for procs and mirrors */
+  (ghost->tree_offsets[gside->ntree])++;
 
   /** Contribute to a structure tracking \c proc_offsets */
-  ghosts_in_proc =
-    (p4est_locidx_t *) sc_array_index (ghost->proc_offsets, proc_owner);
-  (*ghosts_in_proc)++;
+  (ghost->proc_offsets[proc_owner])++;
 
-  /** Do the same for mirrors */
+
+  /************* MIRROR **************/
+
+  /* Convert p3 quad to p2 quad */
+  SC3E (p4est3_quadrant_coordinates (fi->p3->qvt, mside->quadrant, coords));
+  SC3E (p4est3_quadrant_level (fi->p3->qvt, mside->quadrant, &q.level));
+  q.x = coords[0];
+  q.y = coords[1];
+#ifdef P4_TO_P8
+  q.z = coords[2];
+#endif
+
+  global_qid = (p4est3_gloidx) mside->nquad + fi->p3->gtroffset[mside->ntree];
+  /** Fill its \c piggy3 field */
+  q.p.piggy3.which_tree = mside->ntree;
+  q.p.piggy3.local_num = global_qid - fi->p3->goffset[fi->p3->mpirank];
+
+  /* Push back to mirrors array */
+  *(p4est_quadrant_t *) sc_array_push(&(ghost->mirrors)) = q;
+
+  /** Contribute to a structure tracking \c mirror_tree_offsets */
+  (ghost->mirror_tree_offsets[mside->ntree])++;
+
+  /** Contribute to a structure tracking \c mirror_proc_offsets */
+  /* Not like with ghosts. See p4est_ghost_t::mirror_proc_mirrors doc. */
+
   /* Check 1st todo */
 
   return NULL;
@@ -163,6 +187,9 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
     (*(p4est_locidx_t *) sc_array_index (ghost->proc_offsets, i)) +=
       (*(p4est_locidx_t *) sc_array_index (ghost->proc_offsets, i - 1));
   }
+
+  /** Sort \c ghosts */
+  /** Sort \c mirrors. Or is it already sorted? */
 
   return NULL;
 }
