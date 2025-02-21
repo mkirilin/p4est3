@@ -36,8 +36,10 @@ extern              "C"
 /* A ghost quadrant index is uniquefied by adding the owning process. */
 typedef struct ghost_hash_key
 {
-  p4est_locidx_t      qid;    /* local index within owner process */
-  p4est_locidx_t      owner;
+  p4est_locidx_t      qid;    /* for ghost -- local index within owner process.
+                                 for mirror -- local index and a process to
+                                 what it is mirrored */
+  p4est_locidx_t      proc;
 }
 ghost_hash_key_t;
 
@@ -60,7 +62,7 @@ ghost_hash_fn (const void *v, const void *u)
 
   P4EST_ASSERT (k != NULL);
   q = (uint32_t) k->qid;
-  o = (uint32_t) k->owner;
+  o = (uint32_t) k->proc;
   z = (uint32_t) 0;
 
   sc_hash_final(q, o, z);
@@ -78,7 +80,7 @@ ghost_equal_fn (const void *v1, const void *v2, const void *u)
   P4EST_ASSERT (k1 != NULL);
   P4EST_ASSERT (k2 != NULL);
 
-  return (k1->qid == k2->qid && k1->owner == k2->owner);
+  return (k1->qid == k2->qid && k1->proc == k2->proc);
 }
 
 
@@ -86,7 +88,7 @@ ghost_equal_fn (const void *v1, const void *v2, const void *u)
 typedef struct p4est3_ghost_fill_data
 {
   p4est_ghost_t     *ghost;
-  ghost_hash_data_t *hdata;
+  ghost_hash_data_t *ghost_hdata;
 }
 p4est3_ghost_fill_data_t;
 
@@ -160,15 +162,15 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   }
 
   /* Check if considered ghost is unique */
-  k = (ghost_hash_key_t *) sc_mempool_alloc (d->hdata->ckeys);
+  k = (ghost_hash_key_t *) sc_mempool_alloc (d->ghost_hdata->ckeys);
   k->qid = global_qid - fi->p3->goffset[proc_owner];
-  k->owner = proc_owner;
-  if (sc_hash_insert_unique (d->hdata->chash, k, &found)) {
+  k->proc = proc_owner;
+  if (sc_hash_insert_unique (d->ghost_hdata->chash, k, &found)) {
     /* The key is newly linked into the hash table: count it */
     P4EST_ASSERT (*found == k);
     P4EST_INFOF ("First time adding ghost %ld, proc %ld\n",
-                 (long) k->qid, (long) k->owner);
-    d->hdata->added++;
+                 (long) k->qid, (long) k->proc);
+    d->ghost_hdata->added++;
 
     /** Fill its \c piggy3 field */
     q.p.piggy3.which_tree = gside->ntree;
@@ -186,8 +188,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   else {
     /* The key for this ghost had already been stored earlier */
     P4EST_ASSERT (*found != k);
-    sc_mempool_free (d->hdata->ckeys, k);
-    d->hdata->duped++;
+    sc_mempool_free (d->ghost_hdata->ckeys, k);
+    d->ghost_hdata->duped++;
   }
 
 
@@ -230,12 +232,13 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   p4est3_ghost_fill_data_t data, *d = &data;
   int                i;
   /* ... */
-  ghost_hash_data_t  shdata, *hdata = &shdata;
+  ghost_hash_data_t  sghost_hdata, *ghost_hdata = &sghost_hdata;
+
 
   /* hash table for ghosts checking */
-  hdata->ckeys = sc_mempool_new (sizeof (ghost_hash_key_t));
-  hdata->chash = sc_hash_new (ghost_hash_fn, ghost_equal_fn, hdata, NULL);
-  hdata->added = hdata->duped = 0;
+  ghost_hdata->ckeys = sc_mempool_new (sizeof (ghost_hash_key_t));
+  ghost_hdata->chash = sc_hash_new (ghost_hash_fn, ghost_equal_fn, ghost_hdata, NULL);
+  ghost_hdata->added = ghost_hdata->duped = 0;
 
   d->ghost = ghost;
 
@@ -267,10 +270,10 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   /** Sort \c mirrors. */
 
   /* clean up memory */
-  sc_hash_destroy (hdata->chash);
-  sc_mempool_destroy (hdata->ckeys);
+  sc_hash_destroy (ghost_hdata->chash);
+  sc_mempool_destroy (ghost_hdata->ckeys);
   P4EST_PRODUCTINF ("Added %ld ghosts, duplicates %ld\n",
-                    (long) hdata->added, (long) hdata->duped);
+                    (long) ghost_hdata->added, (long) ghost_hdata->duped);
 
   return NULL;
 }
