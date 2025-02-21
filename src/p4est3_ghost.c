@@ -33,9 +33,60 @@ extern              "C"
 #endif
 #endif
 
-typedef struct
+/* A ghost quadrant index is uniquefied by adding the owning process. */
+typedef struct ghost_hash_key
+{
+  p4est_locidx_t      qid;    /* local index within owner process */
+  p4est_locidx_t      owner;
+}
+ghost_hash_key_t;
+
+/* Provide an allocator for the key data as well as the hash map itself */
+typedef struct ghost_hash_data
+{
+  sc_mempool_t       *ckeys;    /* memory pool for allocating the hash keys */
+  sc_hash_t          *chash;    /* the hash map links keys without copying */
+  p4est_locidx_t      added;    /* count each coordinate point just once */
+  p4est_locidx_t      duped;    /* count attempts to add more than once */
+}
+ghost_hash_data_t;
+
+/* Calculate a hash function for a ghost index */
+static unsigned
+ghost_hash_fn (const void *v, const void *u)
+{
+  uint32_t           q, o, z;
+  const ghost_hash_key_t *k = (ghost_hash_key_t *) v;
+
+  P4EST_ASSERT (k != NULL);
+  q = (uint32_t) k->qid;
+  o = (uint32_t) k->owner;
+  z = (uint32_t) 0;
+
+  sc_hash_final(q, o, z);
+
+  return (unsigned) z;
+}
+
+/* Determine whether two ghosts are equal */
+static int
+ghost_equal_fn (const void *v1, const void *v2, const void *u)
+{
+  const ghost_hash_key_t *k1 = (ghost_hash_key_t *) v1;
+  const ghost_hash_key_t *k2 = (ghost_hash_key_t *) v2;
+
+  P4EST_ASSERT (k1 != NULL);
+  P4EST_ASSERT (k2 != NULL);
+
+  return (k1->qid == k2->qid && k1->owner == k2->owner);
+}
+
+
+
+typedef struct p4est3_ghost_fill_data
 {
   p4est_ghost_t     *ghost;
+  ghost_hash_data_t *hdata;
 }
 p4est3_ghost_fill_data_t;
 
@@ -48,9 +99,11 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   p4est_quadrant_t    q;
   size_t              nsides;
   p4est_gloidx_t      proc_owner, global_qid;
+  ghost_hash_key_t   *k;
   int                 coords[P4EST_DIM], level;
+  void              **found;
 
-  /* TODO: Check if the ghost and mirrors are already in the layer via hash table.
+  /* TODO: 1. Check if the ghost and mirrors are already in the layer via hash table.
            If so, skip the nesessary entity. */
 
   SC3E(sc3_array_get_elem_count (fi->sides, &nsides));
@@ -80,11 +133,10 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 
   /** Add ghost to \c ghost->ghosts array */
   /** How to know at what location of the array to place the quadrant?
-   * 1. Simple and memory efficient solution is add any ghost to the array and
-   *    sort it at the end. It costs additional O(n log n) operations in the
-   *    worst case. Which is alright because the Iterator is O(n log n) anyway.
+   * - Simple and memory efficient solution is add any ghost to the array and
+   *   sort it at the end. It costs additional O(n log n) operations in the
+   *   worst case. Which is alright because the Iterator is O(n log n) anyway.
    * TODO: Double check the exact complexity of the Iterator.
-   * 2. Iterate in the order of increasing ghosts id. Is it even possible?
   */
 
   /* Convert p3 quad to p2 quad */
@@ -107,20 +159,36 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
     proc_owner--;
   }
 
-  /** Fill its \c piggy3 field */
-  q.p.piggy3.which_tree = gside->ntree;
-  q.p.piggy3.local_num = global_qid - fi->p3->goffset[proc_owner];
+  /* Check if considered ghost is unique */
+  k = (ghost_hash_key_t *) sc_mempool_alloc (d->hdata->ckeys);
+  k->qid = global_qid - fi->p3->goffset[proc_owner];
+  k->owner = proc_owner;
+  if (sc_hash_insert_unique (d->hdata->chash, k, &found)) {
+    /* The key is newly linked into the hash table: count it */
+    P4EST_ASSERT (*found == k);
+    P4EST_INFOF ("First time adding ghost %ld, proc %ld\n",
+                 (long) k->qid, (long) k->owner);
+    d->hdata->added++;
 
-  /* Push back to ghosts array */
-  *(p4est_quadrant_t *) sc_array_push(&(ghost->ghosts)) = q;
+    /** Fill its \c piggy3 field */
+    q.p.piggy3.which_tree = gside->ntree;
+    q.p.piggy3.local_num = k->qid;
 
-  /** Contribute to a structure tracking \c tree_offsets */
-  /* TODO: Check if it is really gside->ntree or (gside->ntree + 1).
-           Same for procs and mirrors */
-  (ghost->tree_offsets[gside->ntree])++;
+    /* Push back to ghosts array */
+    *(p4est_quadrant_t *) sc_array_push(&(ghost->ghosts)) = q;
 
-  /** Contribute to a structure tracking \c proc_offsets */
-  (ghost->proc_offsets[proc_owner])++;
+    /** Contribute to a structure tracking \c tree_offsets */
+    (ghost->tree_offsets[gside->ntree + 1])++;
+
+    /** Contribute to a structure tracking \c proc_offsets */
+    (ghost->proc_offsets[proc_owner + 1])++;
+  }
+  else {
+    /* The key for this ghost had already been stored earlier */
+    P4EST_ASSERT (*found != k);
+    sc_mempool_free (d->hdata->ckeys, k);
+    d->hdata->duped++;
+  }
 
 
   /************* MIRROR **************/
@@ -143,11 +211,12 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   *(p4est_quadrant_t *) sc_array_push(&(ghost->mirrors)) = q;
 
   /** Contribute to a structure tracking \c mirror_tree_offsets */
-  (ghost->mirror_tree_offsets[mside->ntree])++;
+  (ghost->mirror_tree_offsets[mside->ntree + 1])++;
 
   /** Contribute to a structure tracking \c mirror_proc_offsets */
-  /* Not like with ghosts. See p4est_ghost_t::mirror_proc_mirrors doc. */
+  (ghost->mirror_proc_offsets[proc_owner + 1])++;
 
+  /**  */
   /* Check 1st todo */
 
   return NULL;
@@ -161,6 +230,12 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   p4est3_ghost_fill_data_t data, *d = &data;
   int                i;
   /* ... */
+  ghost_hash_data_t  shdata, *hdata = &shdata;
+
+  /* hash table for ghosts checking */
+  hdata->ckeys = sc_mempool_new (sizeof (ghost_hash_key_t));
+  hdata->chash = sc_hash_new (ghost_hash_fn, ghost_equal_fn, hdata, NULL);
+  hdata->added = hdata->duped = 0;
 
   d->ghost = ghost;
 
@@ -177,19 +252,25 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   SC3E (p4est3_iterate_face (p3, NULL, p4est3_ghost_fill_callback, d));
 
   /** Accumulate \c tree_offsets */
-  for (i = 1; i < ghost->num_trees; i++) {
+  for (i = 1; i < ghost->num_trees + 1; i++) {
     (*(p4est_locidx_t *) sc_array_index (ghost->tree_offsets, i)) +=
       (*(p4est_locidx_t *) sc_array_index (ghost->tree_offsets, i - 1));
   }
 
   /** Accumulate \c proc_offsets */
-  for (i = 1; i < ghost->mpisize; i++) {
+  for (i = 1; i < ghost->mpisize + 1; i++) {
     (*(p4est_locidx_t *) sc_array_index (ghost->proc_offsets, i)) +=
       (*(p4est_locidx_t *) sc_array_index (ghost->proc_offsets, i - 1));
   }
 
   /** Sort \c ghosts */
-  /** Sort \c mirrors. Or is it already sorted? */
+  /** Sort \c mirrors. */
+
+  /* clean up memory */
+  sc_hash_destroy (hdata->chash);
+  sc_mempool_destroy (hdata->ckeys);
+  P4EST_PRODUCTINF ("Added %ld ghosts, duplicates %ld\n",
+                    (long) hdata->added, (long) hdata->duped);
 
   return NULL;
 }

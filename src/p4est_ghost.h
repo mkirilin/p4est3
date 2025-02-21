@@ -64,9 +64,9 @@ typedef struct
   p4est_locidx_t     *mirror_proc_mirrors;      /**< indices into mirrors grouped by
                                                    outside processor rank and
                                                    ascending within each rank */
-  /* Might me NULL */
   p4est_locidx_t     *mirror_proc_offsets;      /**< mpisize + 1 indices into 
                                                    mirror_proc_mirrors */
+  /* Might me NULL */
 
   p4est_locidx_t     *mirror_proc_fronts;       /**< like mirror_proc_mirrors,
                                                    but limited to the
