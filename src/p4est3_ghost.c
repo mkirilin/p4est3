@@ -455,8 +455,6 @@ merge_mirror_proc_arrays (p4est3_t * p3, p4est_ghost_t * ghost,
 sc3_error_t        *
 p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
 {
-  /*TODO: Allocate memory for ghosts outside and before this function call */
-  /* Ensure tree_ and proc_offsets are pre-initialized by 0 */
   p4est3_ghost_fill_data_t data, *d = &data;
   int                 i;
   /* ... */
@@ -500,6 +498,12 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   ghost->mirror_proc_offsets = NULL;
   ghost->mirror_proc_fronts = NULL;
   ghost->mirror_proc_front_offsets = NULL;
+
+  /* Initialize tree_offsets and proc_offsets */
+  sc_array_memset (ghost->tree_offsets, 0);
+  sc_array_memset (ghost->proc_offsets, 0);
+  sc_array_memset (ghost->mirror_tree_offsets, 0);
+  sc_array_memset (ghost->mirror_proc_offsets, 0);
 
   /*--------------------------------------------------------------*/
   /************************** ITERATE *****************************/
