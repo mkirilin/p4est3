@@ -24,6 +24,8 @@
 #include <p4est3_ghost.h>
 #include <p4est3_internal.h>
 #include <p4est3_search.h>
+#include <stdlib.h>  /* for qsort */
+#include <p4est_bits.h>
 
 #ifdef __cplusplus
 extern              "C"
@@ -267,6 +269,14 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   return NULL;
 }
 
+/* Sort ghost quadrants contained in ghost->ghosts */
+void
+sort_ghost_quadrants (sc_array_t *ghosts)
+{
+  qsort (ghosts->array, ghosts->elem_count, ghosts->elem_size,
+          p4est_quadrant_compare_piggy);
+}
+
 sc3_error_t        *
 p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
 {
@@ -279,6 +289,9 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   ghost_hash_data_t  smirror_hdata, *mirror_hdata = &smirror_hdata;
   sc_array_t       **p2m;
 
+  /*--------------------------------------------------------------*/
+  /************************ ALLOCATIONS ***************************/
+  /*--------------------------------------------------------------*/
 
   /* hash table for ghosts checking */
   ghost_hdata->ckeys = sc_mempool_new (sizeof (ghost_hash_key_t));
@@ -300,6 +313,9 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   }
 
   d->ghost = ghost;
+  d->ghost_hdata = ghost_hdata;
+  d->mirror_hdata = mirror_hdata;
+  d->p2m = p2m;
 
   ghost->mpisize = p3->mpisize;
   ghost->num_trees = p3->num_trees;
@@ -310,22 +326,38 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   ghost->mirror_proc_fronts = NULL;
   ghost->mirror_proc_front_offsets = NULL;
 
+  /*--------------------------------------------------------------*/
+  /************************** ITERATE *****************************/
+  /*--------------------------------------------------------------*/
+
   SC3E (p4est3_iterate_face (p3, NULL, p4est3_ghost_fill_callback, d));
+
+  /*--------------------------------------------------------------*/
+  /******************* POST-ITERATE PROCESSING ********************/
+  /*--------------------------------------------------------------*/
 
   /** Accumulate \c tree_offsets */
   for (i = 1; i < ghost->num_trees + 1; i++) {
     (*(p4est_locidx_t *) sc_array_index (ghost->tree_offsets, i)) +=
       (*(p4est_locidx_t *) sc_array_index (ghost->tree_offsets, i - 1));
+
+    (*(p4est_locidx_t *) sc_array_index (ghost->mirror_tree_offsets, i)) +=
+      (*(p4est_locidx_t *) sc_array_index (ghost->mirror_tree_offsets, i - 1));
   }
 
   /** Accumulate \c proc_offsets */
   for (i = 1; i < ghost->mpisize + 1; i++) {
     (*(p4est_locidx_t *) sc_array_index (ghost->proc_offsets, i)) +=
       (*(p4est_locidx_t *) sc_array_index (ghost->proc_offsets, i - 1));
+
+    (*(p4est_locidx_t *) sc_array_index (ghost->mirror_proc_offsets, i)) +=
+      (*(p4est_locidx_t *) sc_array_index (ghost->mirror_proc_offsets, i - 1));
   }
 
   /** Sort \c ghosts */
-  /** Sort \c mirrors. */
+  sort_ghost_quadrants(&(ghost->ghosts));
+
+  /** Sort \c mirrors */
 
   /* clean up memory */
   sc_hash_destroy (ghost_hdata->chash);
