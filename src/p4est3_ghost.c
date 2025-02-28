@@ -111,7 +111,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t * fi)
   p4est_quadrant_t    q;
   size_t              nsides;
   p4est_gloidx_t      p_own, global_qid;
-  ghost_hash_key_t   *k, *k_unique_p, **found, **found_unique_p;
+  ghost_hash_key_t   *k, *k_unique_p;
+  void              **found, **found_unique_p;
   int                 coords[P4EST_DIM], level;
 
 #ifdef P4EST_ENABLE_DEBUG
@@ -153,7 +154,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t * fi)
 
   /* Convert p3 quad to p2 quad */
   SC3E (p4est3_quadrant_coordinates (fi->p3->qvt, gside->quadrant, coords));
-  SC3E (p4est3_quadrant_level (fi->p3->qvt, gside->quadrant, &q.level));
+  SC3E (p4est3_quadrant_level (fi->p3->qvt, gside->quadrant, &level));
+  q.level = level;
   q.x = coords[0];
   q.y = coords[1];
 #ifdef P4_TO_P8
@@ -206,7 +208,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t * fi)
 
   /* Convert p3 quad to p2 quad */
   SC3E (p4est3_quadrant_coordinates (fi->p3->qvt, mside->quadrant, coords));
-  SC3E (p4est3_quadrant_level (fi->p3->qvt, mside->quadrant, &q.level));
+  SC3E (p4est3_quadrant_level (fi->p3->qvt, mside->quadrant, &level));
+  q.level = level;
   q.x = coords[0];
   q.y = coords[1];
 #ifdef P4_TO_P8
@@ -229,7 +232,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t * fi)
     P4EST_ASSERT (*found == k);
     P4EST_INFOF ("First time adding mirror %ld, proc %ld\n",
                  (long) k->qid, (long) k->proc);
-    (*found)->i = d->mirror_hdata->added++;
+    (*(ghost_hash_key_t **) found)->i = d->mirror_hdata->added++;
 #ifdef P4EST_ENABLE_DEBUG
     is_found = 1;
 #endif
@@ -247,7 +250,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t * fi)
     P4EST_ASSERT (*found_unique_p == k_unique_p);
     P4EST_INFOF ("First time adding mirror %ld, proc %ld\n",
                  (long) k_unique_p->qid, (long) k_unique_p->proc);
-    *(size_t *) sc_array_push (d->p2m[p_own]) = (*found)->i;
+    *(size_t *) sc_array_push (d->p2m[p_own]) =
+      (*(ghost_hash_key_t **) found)->i;
   }
   else {
     /* if we uniquely inserted k before, this case is not possible */
@@ -301,7 +305,7 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
                     void *context)
 {
   char               *i, *j;
-  char               *pivot, *left , *right, tmp[size];
+  char               *pivot, *left, *right, tmp[size];
   size_t              right_elements, left_elements;
 
   if (nmemb <= 1) {
@@ -363,6 +367,7 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
 static void
 sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
 {
+  int                 ii;
   void               *sorted;
   size_t              i, j, count, old_idx, *index_ptr;
   sc_array_t         *arr, *mirrors = &d->ghost->mirrors;
@@ -396,8 +401,7 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
       /* Copy mirror at old index perm[i] into sorted[i] */
       memcpy ((char *) sorted + i * mirrors->elem_size,
               (char *) mirrors->array +
-              perm[i] * mirrors->elem_size,
-              mirrors->elem_size);
+              perm[i] * mirrors->elem_size, mirrors->elem_size);
     }
 
     /* Replace mirrors array with sorted order */
@@ -405,11 +409,11 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
     mirrors->array = sorted;
 
     /* Update each sc_array in d->p2m */
-    for (i = 0; i < d->ghost->mpisize; i++) {
-      arr = d->p2m[i];
-      sc3_array_get_elem_count (arr, &count);
+    for (ii = 0; ii < d->ghost->mpisize; ii++) {
+      arr = d->p2m[ii];
+      count = arr->elem_count;
       for (j = 0; j < count; j++) {
-        *index_ptr = (size_t *) sc_array_index (arr, j);
+        index_ptr = (size_t *) sc_array_index (arr, j);
         old_idx = *index_ptr;
         /* Map old index to new */
         *index_ptr = inv[old_idx];
@@ -441,13 +445,13 @@ merge_mirror_proc_arrays (p4est3_t * p3, p4est_ghost_t * ghost,
   offset = 0;
   for (i = 0; i < p3->mpisize; i++) {
     count = p2m[i]->elem_count;
-    
+
     /* Copy indices from this p2m array */
     for (j = 0; j < count; j++) {
       index_ptr = (size_t *) sc_array_index (p2m[i], j);
-      ghost->mirror_proc_mirrors[offset + j] = (p4est_locidx_t) *index_ptr;
+      ghost->mirror_proc_mirrors[offset + j] = (p4est_locidx_t) * index_ptr;
     }
-    
+
     offset += count;
   }
 }
@@ -500,10 +504,17 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   ghost->mirror_proc_front_offsets = NULL;
 
   /* Initialize tree_offsets and proc_offsets */
-  sc_array_memset (ghost->tree_offsets, 0);
-  sc_array_memset (ghost->proc_offsets, 0);
-  sc_array_memset (ghost->mirror_tree_offsets, 0);
-  sc_array_memset (ghost->mirror_proc_offsets, 0);
+  memset (ghost->tree_offsets, 0,
+          (ghost->num_trees + 1) * sizeof (p4est_locidx_t));
+
+  memset (ghost->proc_offsets, 0,
+          (ghost->mpisize + 1) * sizeof (p4est_locidx_t));
+
+  memset (ghost->mirror_tree_offsets, 0,
+          (ghost->num_trees + 1) * sizeof (p4est_locidx_t));
+
+  memset (ghost->mirror_proc_offsets, 0,
+          (ghost->mpisize + 1) * sizeof (p4est_locidx_t));
 
   /*--------------------------------------------------------------*/
   /************************** ITERATE *****************************/
@@ -516,8 +527,8 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   sc_hash_destroy (mirror_hdata->chash);
   sc_mempool_destroy (ghost_hdata->ckeys);
   sc_mempool_destroy (mirror_hdata->ckeys);
-  P4EST_PRODUCTINF ("Added %ld ghosts, duplicates %ld\n",
-                    (long) ghost_hdata->added, (long) ghost_hdata->duped);
+  P4EST_PRODUCTIONF ("Added %ld ghosts, duplicates %ld\n",
+                     (long) ghost_hdata->added, (long) ghost_hdata->duped);
 
   /*--------------------------------------------------------------*/
   /******************* POST-ITERATE PROCESSING ********************/
@@ -525,22 +536,14 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
 
   /** Accumulate \c tree_offsets */
   for (i = 1; i < ghost->num_trees + 1; i++) {
-    (*(p4est_locidx_t *) sc_array_index (ghost->tree_offsets, i)) +=
-      (*(p4est_locidx_t *) sc_array_index (ghost->tree_offsets, i - 1));
-
-    (*(p4est_locidx_t *) sc_array_index (ghost->mirror_tree_offsets, i)) +=
-      (*(p4est_locidx_t *)
-       sc_array_index (ghost->mirror_tree_offsets, i - 1));
+    ghost->tree_offsets[i] += ghost->tree_offsets[i - 1];
+    ghost->mirror_tree_offsets[i] += ghost->mirror_tree_offsets[i - 1];
   }
 
   /** Accumulate \c proc_offsets */
   for (i = 1; i < ghost->mpisize + 1; i++) {
-    (*(p4est_locidx_t *) sc_array_index (ghost->proc_offsets, i)) +=
-      (*(p4est_locidx_t *) sc_array_index (ghost->proc_offsets, i - 1));
-
-    (*(p4est_locidx_t *) sc_array_index (ghost->mirror_proc_offsets, i)) +=
-      (*(p4est_locidx_t *)
-       sc_array_index (ghost->mirror_proc_offsets, i - 1));
+    ghost->proc_offsets[i] += ghost->proc_offsets[i - 1];
+    ghost->mirror_proc_offsets[i] += ghost->mirror_proc_offsets[i - 1];
   }
 
   /** Sort \c ghosts */
