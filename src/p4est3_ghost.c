@@ -367,8 +367,8 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
   size_t              i, j, count, old_idx, *index_ptr;
   sc_array_t         *arr, *mirrors = &d->ghost->mirrors;
   size_t              nmirrors = mirrors->elem_count;
-  size_t             *perm = SC_ALLOC (size_t, nmirrors);
-  size_t             *inv = SC_ALLOC (size_t, nmirrors);
+  size_t             *perm = P4EST_ALLOC (size_t, nmirrors);
+  size_t             *inv = P4EST_ALLOC (size_t, nmirrors);
   mirror_compare_context_t context;
 
   if (nmirrors > 0) {
@@ -391,7 +391,7 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
     }
 
     /* Create a new array for sorted mirrors */
-    sorted = SC_ALLOC (p4est_quadrant_t, nmirrors);
+    sorted = P4EST_ALLOC (p4est_quadrant_t, nmirrors);
     for (i = 0; i < nmirrors; i++) {
       /* Copy mirror at old index perm[i] into sorted[i] */
       memcpy ((char *) sorted + i * mirrors->elem_size,
@@ -401,7 +401,7 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
     }
 
     /* Replace mirrors array with sorted order */
-    free (mirrors->array);
+    P4EST_FREE (mirrors->array);
     mirrors->array = sorted;
 
     /* Update each sc_array in d->p2m */
@@ -416,8 +416,39 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
       }
     }
 
-    free (perm);
-    free (inv);
+    P4EST_FREE (perm);
+    P4EST_FREE (inv);
+  }
+}
+
+/* Merge the per-processor arrays of mirror indices into a single array */
+static void
+merge_mirror_proc_arrays (p4est3_t * p3, p4est_ghost_t * ghost,
+                          sc_array_t ** p2m)
+{
+  int                 i;
+  p4est_locidx_t      total_mirrors = 0;
+  p4est_locidx_t      offset = 0;
+  size_t              j, count;
+  size_t             *index_ptr;
+
+  /* Calculate total size needed for the merged array */
+  for (i = 0; i < p3->mpisize; i++) {
+    total_mirrors += p2m[i]->elem_count;
+  }
+
+  /* Copy data from p2m arrays to mirror_proc_mirrors */
+  offset = 0;
+  for (i = 0; i < p3->mpisize; i++) {
+    count = p2m[i]->elem_count;
+    
+    /* Copy indices from this p2m array */
+    for (j = 0; j < count; j++) {
+      index_ptr = (size_t *) sc_array_index (p2m[i], j);
+      ghost->mirror_proc_mirrors[offset + j] = (p4est_locidx_t) *index_ptr;
+    }
+    
+    offset += count;
   }
 }
 
@@ -451,7 +482,7 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
 
   /* c-array of sc_array_t * to store mirrors in a proc, that form
      mirrors_proc_mirrors later */
-  p2m = SC_ALLOC (sc_array_t *, p3->mpisize);
+  p2m = P4EST_ALLOC (sc_array_t *, p3->mpisize);
   for (i = 0; i < p3->mpisize; i++) {
     p2m[i] = sc_array_new (sizeof (size_t));
   }
@@ -475,6 +506,14 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   /*--------------------------------------------------------------*/
 
   SC3E (p4est3_iterate_face (p3, NULL, p4est3_ghost_fill_callback, d));
+
+  /* Clean up hash tables */
+  sc_hash_destroy (ghost_hdata->chash);
+  sc_hash_destroy (mirror_hdata->chash);
+  sc_mempool_destroy (ghost_hdata->ckeys);
+  sc_mempool_destroy (mirror_hdata->ckeys);
+  P4EST_PRODUCTINF ("Added %ld ghosts, duplicates %ld\n",
+                    (long) ghost_hdata->added, (long) ghost_hdata->duped);
 
   /*--------------------------------------------------------------*/
   /******************* POST-ITERATE PROCESSING ********************/
@@ -507,14 +546,14 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   sort_mirror_quadrants (d);
 
   /** Merge \c d->p2m arrays to \c mirror_proc_mirrors */
+  merge_mirror_proc_arrays (p3, ghost, p2m);
 
-  /* clean up memory */
-  sc_hash_destroy (ghost_hdata->chash);
-  sc_hash_destroy (mirror_hdata->chash);
-  sc_mempool_destroy (ghost_hdata->ckeys);
-  sc_mempool_destroy (mirror_hdata->ckeys);
-  P4EST_PRODUCTINF ("Added %ld ghosts, duplicates %ld\n",
-                    (long) ghost_hdata->added, (long) ghost_hdata->duped);
+  /* clean up memory temporary mirror_proc_mirrors sub-arrays */
+  for (i = 0; i < p3->mpisize; i++) {
+    /* Free this p2m array */
+    sc_array_destroy (p2m[i]);
+  }
+  P4EST_FREE (p2m);
 
   return NULL;
 }
