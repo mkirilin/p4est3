@@ -24,7 +24,7 @@
 #include <p4est3_ghost.h>
 #include <p4est3_internal.h>
 #include <p4est3_search.h>
-#include <stdlib.h>  /* for qsort */
+#include <stdlib.h>             /* for qsort */
 #include <p4est_bits.h>
 
 #ifdef __cplusplus
@@ -38,11 +38,11 @@ extern              "C"
 /* A ghost quadrant index is uniquefied by adding the owning process. */
 typedef struct ghost_hash_key
 {
-  p4est_locidx_t      qid;    /* for ghost -- local index within owner process.
-                                 for mirror -- local index and a process to
-                                 what it is mirrored */
+  p4est_locidx_t      qid;      /* for ghost -- local index within owner process.
+                                   for mirror -- local index and a process to
+                                   what it is mirrored */
   p4est_locidx_t      proc;
-  size_t              i;      /* for mirror -- index within the mirror */
+  size_t              i;        /* for mirror -- index within the mirror */
 }
 ghost_hash_key_t;
 
@@ -56,11 +56,18 @@ typedef struct ghost_hash_data
 }
 ghost_hash_data_t;
 
+/* Context structure for mirror index comparison */
+typedef struct
+{
+  p4est_quadrant_t   *mirrors;
+}
+mirror_compare_context_t;
+
 /* Calculate a hash function for a ghost index */
 static unsigned
 ghost_hash_fn (const void *v, const void *u)
 {
-  uint32_t           q, o, z;
+  uint32_t            q, o, z;
   const ghost_hash_key_t *k = (ghost_hash_key_t *) v;
 
   P4EST_ASSERT (k != NULL);
@@ -68,7 +75,7 @@ ghost_hash_fn (const void *v, const void *u)
   o = (uint32_t) k->proc;
   z = (uint32_t) 0;
 
-  sc_hash_final(q, o, z);
+  sc_hash_final (q, o, z);
 
   return (unsigned) z;
 }
@@ -88,15 +95,15 @@ ghost_equal_fn (const void *v1, const void *v2, const void *u)
 
 typedef struct p4est3_ghost_fill_data
 {
-  p4est_ghost_t     *ghost;
-  ghost_hash_data_t *ghost_hdata;
-  ghost_hash_data_t *mirror_hdata;
-  sc_array_t       **p2m;
+  p4est_ghost_t      *ghost;
+  ghost_hash_data_t  *ghost_hdata;
+  ghost_hash_data_t  *mirror_hdata;
+  sc_array_t        **p2m;
 }
 p4est3_ghost_fill_data_t;
 
 static sc3_error_t *
-p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
+p4est3_ghost_fill_callback (p4est3_iterate_face_info_t * fi)
 {
   p4est3_ghost_fill_data_t *d = (p4est3_ghost_fill_data_t *) fi->user_data;
   p4est_ghost_t      *ghost = d->ghost;
@@ -111,8 +118,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   int                 is_found = 0;
 #endif
 
-  SC3E(sc3_array_get_elem_count (fi->sides, &nsides));
-  SC3A_CHECK(nsides == 2 || nsides == 1);
+  SC3E (sc3_array_get_elem_count (fi->sides, &nsides));
+  SC3A_CHECK (nsides == 2 || nsides == 1);
 
   if (nsides == 1) {
     /* Nothing to do here. There are no ghosts on a boundary. */
@@ -122,17 +129,17 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   /** Check if exactly one side is a ghost */
   sc3_array_index (fi->sides, 0, &fside[0]);
   sc3_array_index (fi->sides, 1, &fside[1]);
-  SC3A_CHECK(fside[0]->is_ghost != -1 || fside[1]->is_ghost != -1);
-  SC3A_CHECK(fside[0]->is_ghost != 1 && fside[1]->is_ghost != 1);
+  SC3A_CHECK (fside[0]->is_ghost != -1 || fside[1]->is_ghost != -1);
+  SC3A_CHECK (fside[0]->is_ghost != 1 && fside[1]->is_ghost != 1);
 
   if (fside[0]->is_ghost == 0 && fside[1] == 0) {
     /* It's not a ghost. Nothing to do here. */
     return NULL;
   }
 
-  gside = fside[0]->is_ghost == 1 ? fside[0] : fside[1]; /*< ghost side*/
-  mside = fside[0]->is_ghost == 0 ? fside[0] : fside[1]; /*< mirror side*/
-  SC3A_CHECK(gside->is_ghost == 1 && mside->is_ghost == 0);
+  gside = fside[0]->is_ghost == 1 ? fside[0] : fside[1];        /*< ghost side */
+  mside = fside[0]->is_ghost == 0 ? fside[0] : fside[1];        /*< mirror side */
+  SC3A_CHECK (gside->is_ghost == 1 && mside->is_ghost == 0);
 
   /************* GHOST **************/
 
@@ -158,7 +165,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   /** TODO: We just did it in Iterator to fill callback data.
    *        Now we do it again here. Think on a way to optimize it. */
   SC3E (p4est3_search_lower_bound64
-         (global_qid, fi->p3->goffset, fi->p3->mpisize + 1, &p_own));
+        (global_qid, fi->p3->goffset, fi->p3->mpisize + 1, &p_own));
   if (fi->p3->goffset[p_own] > global_qid) {
     SC3A_CHECK (p_own > 0);
     p_own--;
@@ -180,7 +187,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
     q.p.piggy3.local_num = k->qid;
 
     /* Push back to ghosts array */
-    *(p4est_quadrant_t *) sc_array_push(&(ghost->ghosts)) = q;
+    *(p4est_quadrant_t *) sc_array_push (&(ghost->ghosts)) = q;
 
     /** Contribute to a structure tracking \c tree_offsets */
     (ghost->tree_offsets[gside->ntree + 1])++;
@@ -194,7 +201,6 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
     sc_mempool_free (d->ghost_hdata->ckeys, k);
     d->ghost_hdata->duped++;
   }
-
 
   /************* MIRROR **************/
 
@@ -236,7 +242,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   }
 
   if (sc_hash_insert_unique
-    (d->mirror_hdata->chash, k_unique_p, &found_unique_p)) {
+      (d->mirror_hdata->chash, k_unique_p, &found_unique_p)) {
     /* The key is newly linked into the hash table: count it */
     P4EST_ASSERT (*found_unique_p == k_unique_p);
     P4EST_INFOF ("First time adding mirror %ld, proc %ld\n",
@@ -258,7 +264,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   q.p.piggy3.local_num = global_qid - fi->p3->goffset[fi->p3->mpirank];
 
   /* Push back to mirrors array */
-  *(p4est_quadrant_t *) sc_array_push(&(ghost->mirrors)) = q;
+  *(p4est_quadrant_t *) sc_array_push (&(ghost->mirrors)) = q;
 
   /** Contribute to a structure tracking \c mirror_tree_offsets */
   (ghost->mirror_tree_offsets[mside->ntree + 1])++;
@@ -271,10 +277,148 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 
 /* Sort ghost quadrants contained in ghost->ghosts */
 void
-sort_ghost_quadrants (sc_array_t *ghosts)
+sort_ghost_quadrants (sc_array_t * ghosts)
 {
   qsort (ghosts->array, ghosts->elem_count, ghosts->elem_size,
-          p4est_quadrant_compare_piggy);
+         p4est_quadrant_compare_piggy);
+}
+
+/* Compare function for mirror indices using context */
+static int
+compare_mirror_indices_context (const void *a, const void *b, void *ctx)
+{
+  size_t              idx1 = *(const size_t *) a;
+  size_t              idx2 = *(const size_t *) b;
+  mirror_compare_context_t *context = (mirror_compare_context_t *) ctx;
+  return p4est_quadrant_compare_piggy (&context->mirrors[idx1],
+                                       &context->mirrors[idx2]);
+}
+
+/* Quicksort implementation that allows context to be passed to comparison function */
+static void
+qsort_with_context (void *base, size_t nmemb, size_t size,
+                    int (*compar) (const void *, const void *, void *),
+                    void *context)
+{
+  char               *i, *j;
+  char               *pivot, *left , *right, tmp[size];
+  size_t              right_elements, left_elements;
+
+  if (nmemb <= 1) {
+    return;
+  }
+
+  /* Simple insertion sort for small arrays */
+  if (nmemb <= 16) {
+
+    for (i = (char *) base + size; i < (char *) base + nmemb * size;
+         i += size) {
+      memcpy (tmp, i, size);
+      for (j = i - size; j >= (char *) base &&
+           compar (j, tmp, context) > 0; j -= size) {
+        memcpy (j + size, j, size);
+      }
+      memcpy (j + size, tmp, size);
+    }
+    return;
+  }
+
+  /* Quicksort for larger arrays */
+  pivot = (char *) base + (nmemb / 2) * size;
+  left = (char *) base;
+  right = (char *) base + (nmemb - 1) * size;
+
+  while (left <= right) {
+    while (left < (char *) base + nmemb * size
+           && compar (left, pivot, context) < 0)
+      left += size;
+    while (right >= (char *) base && compar (right, pivot, context) > 0)
+      right -= size;
+
+    if (left <= right) {
+      /* Swap left and right */
+      if (left != right) {
+        memcpy (tmp, left, size);
+        memcpy (left, right, size);
+        memcpy (right, tmp, size);
+      }
+      left += size;
+      right -= size;
+    }
+  }
+
+  /* Recursively sort sub-arrays */
+  right_elements = (right - (char *) base) / size + 1;
+  if (right_elements > 0) {
+    qsort_with_context (base, right_elements, size, compar, context);
+  }
+
+  left_elements = nmemb - (left - (char *) base) / size;
+  if (left_elements > 0) {
+    qsort_with_context (left, left_elements, size, compar, context);
+  }
+}
+
+/* Sort the mirrors in a ghost layer and update the p2m arrays accordingly */
+static void
+sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
+{
+  void               *sorted;
+  size_t              i, j, count, old_idx, *index_ptr;
+  sc_array_t         *arr, *mirrors = &d->ghost->mirrors;
+  size_t              nmirrors = mirrors->elem_count;
+  size_t             *perm = SC_ALLOC (size_t, nmirrors);
+  size_t             *inv = SC_ALLOC (size_t, nmirrors);
+  mirror_compare_context_t context;
+
+  if (nmirrors > 0) {
+
+    /* Initialize permutation: identity */
+    for (i = 0; i < nmirrors; i++) {
+      perm[i] = i;
+    }
+
+    /* Set context with pointer to mirrors array */
+    context.mirrors = (p4est_quadrant_t *) mirrors->array;
+
+    /* Sort permutation array using our context-based comparison */
+    qsort_with_context (perm, nmirrors, sizeof (size_t),
+                        compare_mirror_indices_context, &context);
+
+    /* Build inverse permutation: inverse[old_index] = new_index */
+    for (i = 0; i < nmirrors; i++) {
+      inv[perm[i]] = i;
+    }
+
+    /* Create a new array for sorted mirrors */
+    sorted = SC_ALLOC (p4est_quadrant_t, nmirrors);
+    for (i = 0; i < nmirrors; i++) {
+      /* Copy mirror at old index perm[i] into sorted[i] */
+      memcpy ((char *) sorted + i * mirrors->elem_size,
+              (char *) mirrors->array +
+              perm[i] * mirrors->elem_size,
+              mirrors->elem_size);
+    }
+
+    /* Replace mirrors array with sorted order */
+    free (mirrors->array);
+    mirrors->array = sorted;
+
+    /* Update each sc_array in d->p2m */
+    for (i = 0; i < d->ghost->mpisize; i++) {
+      arr = d->p2m[i];
+      sc3_array_get_elem_count (arr, &count);
+      for (j = 0; j < count; j++) {
+        *index_ptr = (size_t *) sc_array_index (arr, j);
+        old_idx = *index_ptr;
+        /* Map old index to new */
+        *index_ptr = inv[old_idx];
+      }
+    }
+
+    free (perm);
+    free (inv);
+  }
 }
 
 sc3_error_t        *
@@ -283,11 +427,11 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   /*TODO: Allocate memory for ghosts outside and before this function call */
   /* Ensure tree_ and proc_offsets are pre-initialized by 0 */
   p4est3_ghost_fill_data_t data, *d = &data;
-  int                i;
+  int                 i;
   /* ... */
-  ghost_hash_data_t  sghost_hdata, *ghost_hdata = &sghost_hdata;
-  ghost_hash_data_t  smirror_hdata, *mirror_hdata = &smirror_hdata;
-  sc_array_t       **p2m;
+  ghost_hash_data_t   sghost_hdata, *ghost_hdata = &sghost_hdata;
+  ghost_hash_data_t   smirror_hdata, *mirror_hdata = &smirror_hdata;
+  sc_array_t        **p2m;
 
   /*--------------------------------------------------------------*/
   /************************ ALLOCATIONS ***************************/
@@ -342,7 +486,8 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
       (*(p4est_locidx_t *) sc_array_index (ghost->tree_offsets, i - 1));
 
     (*(p4est_locidx_t *) sc_array_index (ghost->mirror_tree_offsets, i)) +=
-      (*(p4est_locidx_t *) sc_array_index (ghost->mirror_tree_offsets, i - 1));
+      (*(p4est_locidx_t *)
+       sc_array_index (ghost->mirror_tree_offsets, i - 1));
   }
 
   /** Accumulate \c proc_offsets */
@@ -351,13 +496,17 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
       (*(p4est_locidx_t *) sc_array_index (ghost->proc_offsets, i - 1));
 
     (*(p4est_locidx_t *) sc_array_index (ghost->mirror_proc_offsets, i)) +=
-      (*(p4est_locidx_t *) sc_array_index (ghost->mirror_proc_offsets, i - 1));
+      (*(p4est_locidx_t *)
+       sc_array_index (ghost->mirror_proc_offsets, i - 1));
   }
 
   /** Sort \c ghosts */
-  sort_ghost_quadrants(&(ghost->ghosts));
+  sort_ghost_quadrants (&(ghost->ghosts));
 
-  /** Sort \c mirrors */
+  /** Sort \c mirrors and update \c d->p2m arrays */
+  sort_mirror_quadrants (d);
+
+  /** Merge \c d->p2m arrays to \c mirror_proc_mirrors */
 
   /* clean up memory */
   sc_hash_destroy (ghost_hdata->chash);
