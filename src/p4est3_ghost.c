@@ -40,6 +40,7 @@ typedef struct ghost_hash_key
                                  for mirror -- local index and a process to
                                  what it is mirrored */
   p4est_locidx_t      proc;
+  size_t              i;      /* for mirror -- index within the mirror */
 }
 ghost_hash_key_t;
 
@@ -48,7 +49,7 @@ typedef struct ghost_hash_data
 {
   sc_mempool_t       *ckeys;    /* memory pool for allocating the hash keys */
   sc_hash_t          *chash;    /* the hash map links keys without copying */
-  p4est_locidx_t      added;    /* count each coordinate point just once */
+  p4est_locidx_t      added;    /* count each quadrant just once */
   p4est_locidx_t      duped;    /* count attempts to add more than once */
 }
 ghost_hash_data_t;
@@ -83,12 +84,12 @@ ghost_equal_fn (const void *v1, const void *v2, const void *u)
   return (k1->qid == k2->qid && k1->proc == k2->proc);
 }
 
-
-
 typedef struct p4est3_ghost_fill_data
 {
   p4est_ghost_t     *ghost;
   ghost_hash_data_t *ghost_hdata;
+  ghost_hash_data_t *mirror_hdata;
+  sc_array_t       **p2m;
 }
 p4est3_ghost_fill_data_t;
 
@@ -100,13 +101,13 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   p4est3_iterate_face_side_t *fside[2], *gside, *mside;
   p4est_quadrant_t    q;
   size_t              nsides;
-  p4est_gloidx_t      proc_owner, global_qid;
-  ghost_hash_key_t   *k;
+  p4est_gloidx_t      p_own, global_qid;
+  ghost_hash_key_t   *k, *k_unique_p, **found, **found_unique_p;
   int                 coords[P4EST_DIM], level;
-  void              **found;
 
-  /* TODO: 1. Check if the ghost and mirrors are already in the layer via hash table.
-           If so, skip the nesessary entity. */
+#ifdef P4EST_ENABLE_DEBUG
+  int                 is_found = 0;
+#endif
 
   SC3E(sc3_array_get_elem_count (fi->sides, &nsides));
   SC3A_CHECK(nsides == 2 || nsides == 1);
@@ -150,21 +151,21 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   q.z = coords[2];
 #endif
   /* Find ghost proc owner */
-  proc_owner = fi->p3->mpirank;
+  p_own = fi->p3->mpirank;
   global_qid = (p4est3_gloidx) gside->nquad + fi->p3->gtroffset[gside->ntree];
   /** TODO: We just did it in Iterator to fill callback data.
    *        Now we do it again here. Think on a way to optimize it. */
   SC3E (p4est3_search_lower_bound64
-         (global_qid, fi->p3->goffset, fi->p3->mpisize + 1, &proc_owner));
-  if (fi->p3->goffset[proc_owner] > global_qid) {
-    SC3A_CHECK (proc_owner > 0);
-    proc_owner--;
+         (global_qid, fi->p3->goffset, fi->p3->mpisize + 1, &p_own));
+  if (fi->p3->goffset[p_own] > global_qid) {
+    SC3A_CHECK (p_own > 0);
+    p_own--;
   }
 
   /* Check if considered ghost is unique */
   k = (ghost_hash_key_t *) sc_mempool_alloc (d->ghost_hdata->ckeys);
-  k->qid = global_qid - fi->p3->goffset[proc_owner];
-  k->proc = proc_owner;
+  k->qid = global_qid - fi->p3->goffset[p_own];
+  k->proc = p_own;
   if (sc_hash_insert_unique (d->ghost_hdata->chash, k, &found)) {
     /* The key is newly linked into the hash table: count it */
     P4EST_ASSERT (*found == k);
@@ -183,7 +184,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
     (ghost->tree_offsets[gside->ntree + 1])++;
 
     /** Contribute to a structure tracking \c proc_offsets */
-    (ghost->proc_offsets[proc_owner + 1])++;
+    (ghost->proc_offsets[p_own + 1])++;
   }
   else {
     /* The key for this ghost had already been stored earlier */
@@ -205,6 +206,51 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 #endif
 
   global_qid = (p4est3_gloidx) mside->nquad + fi->p3->gtroffset[mside->ntree];
+
+  /* Check if considered mirror is unique */
+  k = (ghost_hash_key_t *) sc_mempool_alloc (d->mirror_hdata->ckeys);
+  k->qid = global_qid - fi->p3->goffset[fi->p3->mpirank];
+  k->proc = fi->p3->mpirank;
+
+  k_unique_p = (ghost_hash_key_t *) sc_mempool_alloc (d->mirror_hdata->ckeys);
+  *k_unique_p = *k;
+  k_unique_p->proc = p_own;
+
+  if (sc_hash_insert_unique (d->mirror_hdata->chash, k, &found)) {
+    /* The key is newly linked into the hash table: count it */
+    P4EST_ASSERT (*found == k);
+    P4EST_INFOF ("First time adding mirror %ld, proc %ld\n",
+                 (long) k->qid, (long) k->proc);
+    (*found)->i = d->mirror_hdata->added++;
+#ifdef P4EST_ENABLE_DEBUG
+    is_found = 1;
+#endif
+  }
+  else {
+    /* The key for this mirror had already been stored earlier */
+    P4EST_ASSERT (*found != k);
+    sc_mempool_free (d->mirror_hdata->ckeys, k);
+    d->mirror_hdata->duped++;
+  }
+
+  if (sc_hash_insert_unique
+    (d->mirror_hdata->chash, k_unique_p, &found_unique_p)) {
+    /* The key is newly linked into the hash table: count it */
+    P4EST_ASSERT (*found_unique_p == k_unique_p);
+    P4EST_INFOF ("First time adding mirror %ld, proc %ld\n",
+                 (long) k_unique_p->qid, (long) k_unique_p->proc);
+    *(size_t *) sc_array_push (d->p2m[p_own]) = (*found)->i;
+  }
+  else {
+    /* if we uniquely inserted k before, this case is not possible */
+    P4EST_ASSERT (is_found == 0);
+
+    /* The key for this mirror had already been stored earlier */
+    P4EST_ASSERT (*found_unique_p != k_unique_p);
+    sc_mempool_free (d->mirror_hdata->ckeys, k_unique_p);
+    d->mirror_hdata->duped++;
+  }
+
   /** Fill its \c piggy3 field */
   q.p.piggy3.which_tree = mside->ntree;
   q.p.piggy3.local_num = global_qid - fi->p3->goffset[fi->p3->mpirank];
@@ -216,10 +262,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   (ghost->mirror_tree_offsets[mside->ntree + 1])++;
 
   /** Contribute to a structure tracking \c mirror_proc_offsets */
-  (ghost->mirror_proc_offsets[proc_owner + 1])++;
-
-  /**  */
-  /* Check 1st todo */
+  (ghost->mirror_proc_offsets[p_own + 1])++;
 
   return NULL;
 }
@@ -233,12 +276,28 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   int                i;
   /* ... */
   ghost_hash_data_t  sghost_hdata, *ghost_hdata = &sghost_hdata;
+  ghost_hash_data_t  smirror_hdata, *mirror_hdata = &smirror_hdata;
+  sc_array_t       **p2m;
 
 
   /* hash table for ghosts checking */
   ghost_hdata->ckeys = sc_mempool_new (sizeof (ghost_hash_key_t));
-  ghost_hdata->chash = sc_hash_new (ghost_hash_fn, ghost_equal_fn, ghost_hdata, NULL);
+  ghost_hdata->chash =
+    sc_hash_new (ghost_hash_fn, ghost_equal_fn, ghost_hdata, NULL);
   ghost_hdata->added = ghost_hdata->duped = 0;
+
+  /* hash table for mirrors checking */
+  mirror_hdata->ckeys = sc_mempool_new (sizeof (ghost_hash_key_t));
+  mirror_hdata->chash =
+    sc_hash_new (ghost_hash_fn, ghost_equal_fn, mirror_hdata, NULL);
+  mirror_hdata->added = mirror_hdata->duped = 0;
+
+  /* c-array of sc_array_t * to store mirrors in a proc, that form
+     mirrors_proc_mirrors later */
+  p2m = SC_ALLOC (sc_array_t *, p3->mpisize);
+  for (i = 0; i < p3->mpisize; i++) {
+    p2m[i] = sc_array_new (sizeof (size_t));
+  }
 
   d->ghost = ghost;
 
@@ -250,7 +309,6 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   ghost->mirror_proc_offsets = NULL;
   ghost->mirror_proc_fronts = NULL;
   ghost->mirror_proc_front_offsets = NULL;
-
 
   SC3E (p4est3_iterate_face (p3, NULL, p4est3_ghost_fill_callback, d));
 
@@ -271,7 +329,9 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
 
   /* clean up memory */
   sc_hash_destroy (ghost_hdata->chash);
+  sc_hash_destroy (mirror_hdata->chash);
   sc_mempool_destroy (ghost_hdata->ckeys);
+  sc_mempool_destroy (mirror_hdata->ckeys);
   P4EST_PRODUCTINF ("Added %ld ghosts, duplicates %ld\n",
                     (long) ghost_hdata->added, (long) ghost_hdata->duped);
 
