@@ -369,18 +369,19 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
 {
   int                 ii;
   void               *sorted;
-  size_t              i, j, count, old_idx, *index_ptr;
+  size_t              i, j, count;
   sc_array_t         *arr, *mirrors = &d->ghost->mirrors;
   size_t              nmirrors = mirrors->elem_count;
-  size_t             *perm = P4EST_ALLOC (size_t, nmirrors);
-  size_t             *inv = P4EST_ALLOC (size_t, nmirrors);
+  p4est_locidx_t     *perm = P4EST_ALLOC (p4est_locidx_t, nmirrors);
+  p4est_locidx_t     *inv = P4EST_ALLOC (p4est_locidx_t, nmirrors);
+  p4est_locidx_t     *index_ptr, old_idx;
   mirror_compare_context_t context;
 
   if (nmirrors > 0) {
 
     /* Initialize permutation: identity */
     for (i = 0; i < nmirrors; i++) {
-      perm[i] = i;
+      perm[i] = (p4est_locidx_t) i;
     }
 
     /* Set context with pointer to mirrors array */
@@ -392,7 +393,7 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
 
     /* Build inverse permutation: inverse[old_index] = new_index */
     for (i = 0; i < nmirrors; i++) {
-      inv[perm[i]] = i;
+      inv[perm[i]] = (p4est_locidx_t) i;
     }
 
     /* Create a new array for sorted mirrors */
@@ -413,7 +414,7 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
       arr = d->p2m[ii];
       count = arr->elem_count;
       for (j = 0; j < count; j++) {
-        index_ptr = (size_t *) sc_array_index (arr, j);
+        index_ptr = (p4est_locidx_t *) sc_array_index (arr, j);
         old_idx = *index_ptr;
         /* Map old index to new */
         *index_ptr = inv[old_idx];
@@ -434,12 +435,14 @@ merge_mirror_proc_arrays (p4est3_t * p3, p4est_ghost_t * ghost,
   p4est_locidx_t      total_mirrors = 0;
   p4est_locidx_t      offset = 0;
   size_t              j, count;
-  size_t             *index_ptr;
 
   /* Calculate total size needed for the merged array */
   for (i = 0; i < p3->mpisize; i++) {
     total_mirrors += p2m[i]->elem_count;
   }
+
+  /* Allocate memory for the merged array */
+  ghost->mirror_proc_mirrors = P4EST_ALLOC (p4est_locidx_t, total_mirrors);
 
   /* Copy data from p2m arrays to mirror_proc_mirrors */
   offset = 0;
@@ -448,8 +451,8 @@ merge_mirror_proc_arrays (p4est3_t * p3, p4est_ghost_t * ghost,
 
     /* Copy indices from this p2m array */
     for (j = 0; j < count; j++) {
-      index_ptr = (size_t *) sc_array_index (p2m[i], j);
-      ghost->mirror_proc_mirrors[offset + j] = (p4est_locidx_t) * index_ptr;
+      ghost->mirror_proc_mirrors[offset + j] =
+        *((p4est_locidx_t *) sc_array_index (p2m[i], j));
     }
 
     offset += count;
@@ -461,7 +464,6 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
 {
   p4est3_ghost_fill_data_t data, *d = &data;
   int                 i;
-  /* ... */
   ghost_hash_data_t   sghost_hdata, *ghost_hdata = &sghost_hdata;
   ghost_hash_data_t   smirror_hdata, *mirror_hdata = &smirror_hdata;
   sc_array_t        **p2m;
@@ -486,7 +488,7 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
      mirrors_proc_mirrors later */
   p2m = P4EST_ALLOC (sc_array_t *, p3->mpisize);
   for (i = 0; i < p3->mpisize; i++) {
-    p2m[i] = sc_array_new (sizeof (size_t));
+    p2m[i] = sc_array_new (sizeof (p4est_locidx_t));
   }
 
   d->ghost = ghost;
