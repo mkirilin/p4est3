@@ -44,7 +44,8 @@ extern              "C"
 
 /** Fill the \a p4est \a ghost layer structure by iterating over \a p4est3.
  * \param [in] p3       Forest passed for reference.
- * \param [out] ghost   Pointer to a valid ghost structure. Must be pre-allocated.
+ * \param [out] ghost   Pointer to a valid ghost structure. Must be pre-allocated,
+ *                      except for the \a mirrors_proc_mirrors.
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_ghost_fill_p4est (p4est3_t * p3,
