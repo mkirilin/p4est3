@@ -101,6 +101,104 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
   return NULL;
 }
 
+static sc3_error_t *
+compare_ghost_results (p4est_t * p4est, p4est3_t * p3, 
+                      p4est_ghost_t * ghost_p4est, p4est_ghost_t * ghost_p4est3,
+                      const p4est3_quadrant_vtable_t * qvt)
+{
+  char               *q3;
+  int                 i, coords[P4EST_DIM], level;
+  p4est_quadrant_t   *q, *q_p4est, *q_p3;
+  size_t              ghost_count_p4est, ghost_count_p3;
+  size_t              mirror_count_p4est, mirror_count_p3;
+  p4est_topidx_t      num_trees;
+
+  /* Check basic properties */
+  SC3E_DEMAND (ghost_p4est->mpisize == ghost_p4est3->mpisize,
+               "Ghost mpisize mismatch");
+  SC3E_DEMAND (ghost_p4est->num_trees == ghost_p4est3->num_trees,
+               "Ghost num_trees mismatch");
+  SC3E_DEMAND (ghost_p4est->btype == ghost_p4est3->btype,
+               "Ghost btype mismatch");
+
+  /* Check ghost counts */
+  ghost_count_p4est = ghost_p4est->ghosts.elem_count;
+  ghost_count_p3 = ghost_p4est3->ghosts.elem_count;
+  SC3E_DEMAND (ghost_count_p4est == ghost_count_p3,
+               "Number of ghost elements mismatch");
+
+  /* Check mirror counts */
+  mirror_count_p4est = ghost_p4est->mirrors.elem_count;
+  mirror_count_p3 = ghost_p4est3->mirrors.elem_count;
+  SC3E_DEMAND (mirror_count_p4est == mirror_count_p3,
+               "Number of mirror elements mismatch");
+
+  /* Check tree offsets */
+  num_trees = ghost_p4est->num_trees;
+  for (i = 0; i <= num_trees; ++i) {
+    SC3E_DEMAND (ghost_p4est->tree_offsets[i] == ghost_p4est3->tree_offsets[i],
+                 "Ghost tree offsets mismatch");
+    SC3E_DEMAND (ghost_p4est->mirror_tree_offsets[i] == 
+                ghost_p4est3->mirror_tree_offsets[i],
+                "Mirror tree offsets mismatch");
+  }
+
+  /* Check proc offsets */
+  for (i = 0; i <= ghost_p4est->mpisize; ++i) {
+    SC3E_DEMAND (ghost_p4est->proc_offsets[i] == ghost_p4est3->proc_offsets[i],
+                 "Ghost proc offsets mismatch");
+    if (ghost_p4est->mirror_proc_offsets != NULL && 
+        ghost_p4est3->mirror_proc_offsets != NULL) {
+      SC3E_DEMAND (ghost_p4est->mirror_proc_offsets[i] == 
+                  ghost_p4est3->mirror_proc_offsets[i],
+                  "Mirror proc offsets mismatch");
+    }
+  }
+
+  /* Compare individual ghost quadrants */
+  for (i = 0; i < (int)ghost_count_p4est; ++i) {
+    q_p4est = p4est_quadrant_array_index (&ghost_p4est->ghosts, i);
+    q_p3 = p4est_quadrant_array_index (&ghost_p4est3->ghosts, i);
+    
+    /* Compare position and level */
+    SC3E_DEMAND (q_p4est->level == q_p3->level, 
+                "Ghost quadrant level mismatch");
+    SC3E_DEMAND (q_p4est->x == q_p3->x && q_p4est->y == q_p3->y,
+                "Ghost quadrant position mismatch");
+#ifdef P4_TO_P8
+    SC3E_DEMAND (q_p4est->z == q_p3->z, "Ghost quadrant z position mismatch");
+#endif
+    /* Compare piggy3 data */
+    SC3E_DEMAND (q_p4est->p.piggy3.which_tree == q_p3->p.piggy3.which_tree,
+                "Ghost quadrant tree id mismatch");
+    SC3E_DEMAND (q_p4est->p.piggy3.local_num == q_p3->p.piggy3.local_num,
+                "Ghost quadrant local_num mismatch");
+  }
+
+  /* Compare individual mirror quadrants */
+  for (i = 0; i < (int)mirror_count_p4est; ++i) {
+    q_p4est = p4est_quadrant_array_index (&ghost_p4est->mirrors, i);
+    q_p3 = p4est_quadrant_array_index (&ghost_p4est3->mirrors, i);
+    
+    /* Compare position and level */
+    SC3E_DEMAND (q_p4est->level == q_p3->level, 
+                "Mirror quadrant level mismatch");
+    SC3E_DEMAND (q_p4est->x == q_p3->x && q_p4est->y == q_p3->y,
+                "Mirror quadrant position mismatch");
+#ifdef P4_TO_P8
+    SC3E_DEMAND (q_p4est->z == q_p3->z, "Mirror quadrant z position mismatch");
+#endif
+    /* Compare piggy3 data */
+    SC3E_DEMAND (q_p4est->p.piggy3.which_tree == q_p3->p.piggy3.which_tree,
+                "Mirror quadrant tree id mismatch");
+    SC3E_DEMAND (q_p4est->p.piggy3.local_num == q_p3->p.piggy3.local_num,
+                "Mirror quadrant local_num mismatch");
+  }
+
+  /* TODO: Check mirror_proc_mirrors */
+
+  return NULL;
+}
 
 int main(int argc, char **argv)
 {
@@ -158,19 +256,21 @@ int main(int argc, char **argv)
   SC3E_NULL_SET (e, p4est3_convert_p4est (p4est, p4est3));
 
   ghost_p4est3 = init_ghost_layer (p4est);
-
   SC3E_NULL_SET (e, p4est3_ghost_fill_p4est (p4est3, ghost_p4est3));
+  
+  // Add comparison of ghost layers
+  SC3E_NULL_SET (e, compare_ghost_results(p4est, p4est3, ghost_p4est, ghost_p4est3, p4est3->qvt));
 
   /* tenporatily, to avoid unused variable error */
   ghost_p4est = (void *) ghost_p4est;
   ghost_p4est3 = (void *) ghost_p4est3;
 
   /* clean up */
-  //p4est_ghost_destroy(ghost_p4est);
-  //p4est_ghost_destroy(ghost_p4est3);
-  //p4est_destroy(p4est);
-  //p4est3_destroy(&p4est3);
-  //p4est_connectivity_destroy(conn);
+  p4est_ghost_destroy(ghost_p4est);
+  p4est_ghost_destroy(ghost_p4est3);
+  p4est_destroy(p4est);
+  p4est3_destroy(&p4est3);
+  p4est_connectivity_destroy(conn);
 
   /* exit */
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
