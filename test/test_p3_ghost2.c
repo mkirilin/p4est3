@@ -36,8 +36,8 @@ static int          refine_level = 4;
 #endif
 
 static int
-refine_fn (p4est_t * p4est, p4est_topidx_t which_tree,
-           p4est_quadrant_t * quadrant)
+refine_fn (p4est_t *p4est, p4est_topidx_t which_tree,
+           p4est_quadrant_t *quadrant)
 {
   int                 cid;
 
@@ -77,7 +77,7 @@ static p4est_ghost_t *
 init_ghost_layer (p4est_t *p)
 {
   const p4est_topidx_t num_trees = p->connectivity->num_trees;
-  p4est_ghost_t     *gl;
+  p4est_ghost_t      *gl;
 
   gl = P4EST_ALLOC (p4est_ghost_t, 1);
   sc_array_init (&gl->ghosts, sizeof (p4est_quadrant_t));
@@ -93,7 +93,7 @@ init_ghost_layer (p4est_t *p)
 }
 
 static sc3_error_t *
-make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
+make_allocator (sc3_allocator_t *oa, sc3_allocator_t **alloc)
 {
   SC3A_IS (sc3_allocator_is_setup, oa);
   SC3E (sc3_allocator_new (oa, alloc));
@@ -102,16 +102,17 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
 }
 
 static sc3_error_t *
-compare_ghost_results (p4est_t * p4est, p4est3_t * p3, 
-                      p4est_ghost_t * ghost_p4est, p4est_ghost_t * ghost_p4est3,
-                      const p4est3_quadrant_vtable_t * qvt)
+compare_ghost_results (p4est_t *p4est, p4est3_t *p3,
+                       p4est_ghost_t *ghost_p4est,
+                       p4est_ghost_t *ghost_p4est3,
+                       const p4est3_quadrant_vtable_t *qvt)
 {
-  char               *q3;
-  int                 i, coords[P4EST_DIM], level;
-  p4est_quadrant_t   *q, *q_p4est, *q_p3;
+  int                 i;
+  p4est_quadrant_t   *q_p4est, *q_p3;
   size_t              ghost_count_p4est, ghost_count_p3;
   size_t              mirror_count_p4est, mirror_count_p3;
   p4est_topidx_t      num_trees;
+  p4est_locidx_t      n_offsetx;
 
   /* Check basic properties */
   SC3E_DEMAND (ghost_p4est->mpisize == ghost_p4est3->mpisize,
@@ -136,88 +137,109 @@ compare_ghost_results (p4est_t * p4est, p4est3_t * p3,
   /* Check tree offsets */
   num_trees = ghost_p4est->num_trees;
   for (i = 0; i <= num_trees; ++i) {
-    SC3E_DEMAND (ghost_p4est->tree_offsets[i] == ghost_p4est3->tree_offsets[i],
+    SC3E_DEMAND (ghost_p4est->tree_offsets[i] ==
+                 ghost_p4est3->tree_offsets[i],
                  "Ghost tree offsets mismatch");
-    SC3E_DEMAND (ghost_p4est->mirror_tree_offsets[i] == 
-                ghost_p4est3->mirror_tree_offsets[i],
-                "Mirror tree offsets mismatch");
+
+    SC3E_DEMAND (ghost_p4est->mirror_tree_offsets[i] ==
+                 ghost_p4est3->mirror_tree_offsets[i],
+                 "Mirror tree offsets mismatch");
   }
 
   /* Check proc offsets */
+  SC3E_DEMAND (ghost_p4est->mirror_proc_offsets != NULL &&
+               ghost_p4est3->mirror_proc_offsets != NULL,
+               "Ghost mirror_proc_offsets array is NULL");
+
+  SC3E_DEMAND (ghost_p4est->proc_offsets != NULL &&
+               ghost_p4est3->proc_offsets != NULL,
+               "Ghost proc_offsets array is NULL");
+
   for (i = 0; i <= ghost_p4est->mpisize; ++i) {
-    SC3E_DEMAND (ghost_p4est->proc_offsets[i] == ghost_p4est3->proc_offsets[i],
+    SC3E_DEMAND (ghost_p4est->proc_offsets[i] ==
+                 ghost_p4est3->proc_offsets[i],
                  "Ghost proc offsets mismatch");
-    if (ghost_p4est->mirror_proc_offsets != NULL && 
-        ghost_p4est3->mirror_proc_offsets != NULL) {
-      SC3E_DEMAND (ghost_p4est->mirror_proc_offsets[i] == 
-                  ghost_p4est3->mirror_proc_offsets[i],
-                  "Mirror proc offsets mismatch");
-    }
+
+    SC3E_DEMAND (ghost_p4est->mirror_proc_offsets[i] ==
+                 ghost_p4est3->mirror_proc_offsets[i],
+                 "Mirror proc offsets mismatch");
   }
 
   /* Compare individual ghost quadrants */
-  for (i = 0; i < (int)ghost_count_p4est; ++i) {
+  for (i = 0; i < (int) ghost_count_p4est; ++i) {
     q_p4est = p4est_quadrant_array_index (&ghost_p4est->ghosts, i);
     q_p3 = p4est_quadrant_array_index (&ghost_p4est3->ghosts, i);
-    
+
     /* Compare position and level */
-    SC3E_DEMAND (q_p4est->level == q_p3->level, 
-                "Ghost quadrant level mismatch");
+    SC3E_DEMAND (q_p4est->level == q_p3->level,
+                 "Ghost quadrant level mismatch");
     SC3E_DEMAND (q_p4est->x == q_p3->x && q_p4est->y == q_p3->y,
-                "Ghost quadrant position mismatch");
+                 "Ghost quadrant position mismatch");
 #ifdef P4_TO_P8
     SC3E_DEMAND (q_p4est->z == q_p3->z, "Ghost quadrant z position mismatch");
 #endif
     /* Compare piggy3 data */
     SC3E_DEMAND (q_p4est->p.piggy3.which_tree == q_p3->p.piggy3.which_tree,
-                "Ghost quadrant tree id mismatch");
+                 "Ghost quadrant tree id mismatch");
     SC3E_DEMAND (q_p4est->p.piggy3.local_num == q_p3->p.piggy3.local_num,
-                "Ghost quadrant local_num mismatch");
+                 "Ghost quadrant local_num mismatch");
   }
 
   /* Compare individual mirror quadrants */
-  for (i = 0; i < (int)mirror_count_p4est; ++i) {
+  for (i = 0; i < (int) mirror_count_p4est; ++i) {
     q_p4est = p4est_quadrant_array_index (&ghost_p4est->mirrors, i);
     q_p3 = p4est_quadrant_array_index (&ghost_p4est3->mirrors, i);
-    
+
     /* Compare position and level */
-    SC3E_DEMAND (q_p4est->level == q_p3->level, 
-                "Mirror quadrant level mismatch");
+    SC3E_DEMAND (q_p4est->level == q_p3->level,
+                 "Mirror quadrant level mismatch");
     SC3E_DEMAND (q_p4est->x == q_p3->x && q_p4est->y == q_p3->y,
-                "Mirror quadrant position mismatch");
+                 "Mirror quadrant position mismatch");
 #ifdef P4_TO_P8
-    SC3E_DEMAND (q_p4est->z == q_p3->z, "Mirror quadrant z position mismatch");
+    SC3E_DEMAND (q_p4est->z == q_p3->z,
+                 "Mirror quadrant z position mismatch");
 #endif
     /* Compare piggy3 data */
     SC3E_DEMAND (q_p4est->p.piggy3.which_tree == q_p3->p.piggy3.which_tree,
-                "Mirror quadrant tree id mismatch");
+                 "Mirror quadrant tree id mismatch");
     SC3E_DEMAND (q_p4est->p.piggy3.local_num == q_p3->p.piggy3.local_num,
-                "Mirror quadrant local_num mismatch");
+                 "Mirror quadrant local_num mismatch");
   }
 
-  /* TODO: Check mirror_proc_mirrors */
+  /* Check mirror_proc_mirrors */
+  SC3E_DEMAND (ghost_p4est->mirror_proc_mirrors != NULL &&
+               ghost_p4est3->mirror_proc_mirrors != NULL,
+               "Ghost mirror_proc_mirrors array is NULL");
+
+  n_offsetx = ghost_p4est->mirror_proc_offsets[ghost_p4est->mpisize];
+  for (i = 0; i < n_offsetx; ++i) {
+    SC3E_DEMAND (ghost_p4est->mirror_proc_mirrors[i] ==
+                 ghost_p4est3->mirror_proc_mirrors[i],
+                 "Ghost mirror_proc_mirrors array element mismatch");
+  }
 
   return NULL;
 }
 
-int main(int argc, char **argv)
+int
+main (int argc, char **argv)
 {
-  int mpiret;
-  sc_MPI_Comm mpicomm;
-  p4est_t *p4est;
-  p4est3_t *p4est3;
+  int                 mpiret;
+  sc_MPI_Comm         mpicomm;
+  p4est_t            *p4est;
+  p4est3_t           *p4est3;
   p4est_connectivity_t *conn;
-  p4est_ghost_t *ghost_p4est, *ghost_p4est3;
+  p4est_ghost_t      *ghost_p4est, *ghost_p4est3;
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e = NULL;
-  
+
   /* initialize MPI */
-  mpiret = sc_MPI_Init(&argc, &argv);
-  SC_CHECK_MPI(mpiret);
+  mpiret = sc_MPI_Init (&argc, &argv);
+  SC_CHECK_MPI (mpiret);
   mpicomm = sc_MPI_COMM_WORLD;
 
-  sc_init(mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
-  p4est_init(NULL, SC_LP_DEFAULT);
+  sc_init (mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
+  p4est_init (NULL, SC_LP_DEFAULT);
 
   /*--------------------------------------------------------------*/
   /************************** P4EST 2 *****************************/
@@ -229,19 +251,19 @@ int main(int argc, char **argv)
   conn = p8est_connectivity_new_rotcubes ();
 #endif
 
-  p4est = p4est_new(mpicomm, conn, 0, NULL, NULL);
+  p4est = p4est_new (mpicomm, conn, 0, NULL, NULL);
 
   /* refine to make the number of elements interesting */
-  p4est_refine(p4est, 1, refine_fn, NULL);
-  
+  p4est_refine (p4est, 1, refine_fn, NULL);
+
   /* balance the forest */
-  p4est_balance(p4est, P4EST_CONNECT_FULL, NULL);
+  p4est_balance (p4est, P4EST_CONNECT_FULL, NULL);
 
   /* do a uniform partition */
-  p4est_partition(p4est, 0, NULL);
+  p4est_partition (p4est, 0, NULL);
 
   /* create the ghost layer for p4est */
-  ghost_p4est = p4est_ghost_new(p4est, P4EST_CONNECT_FACE);
+  ghost_p4est = p4est_ghost_new (p4est, P4EST_CONNECT_FACE);
 
   /*--------------------------------------------------------------*/
   /************************** P4EST 3 *****************************/
@@ -257,26 +279,22 @@ int main(int argc, char **argv)
 
   ghost_p4est3 = init_ghost_layer (p4est);
   SC3E_NULL_SET (e, p4est3_ghost_fill_p4est (p4est3, ghost_p4est3));
-  
-  // Add comparison of ghost layers
-  SC3E_NULL_SET (e, compare_ghost_results(p4est, p4est3, ghost_p4est, ghost_p4est3, p4est3->qvt));
 
-  /* tenporatily, to avoid unused variable error */
-  ghost_p4est = (void *) ghost_p4est;
-  ghost_p4est3 = (void *) ghost_p4est3;
+  SC3E_NULL_SET (e, compare_ghost_results (p4est, p4est3, ghost_p4est,
+                                           ghost_p4est3, p4est3->qvt));
 
   /* clean up */
-  p4est_ghost_destroy(ghost_p4est);
-  p4est_ghost_destroy(ghost_p4est3);
-  p4est_destroy(p4est);
-  p4est3_destroy(&p4est3);
-  p4est_connectivity_destroy(conn);
+  p4est_ghost_destroy (ghost_p4est);
+  p4est_ghost_destroy (ghost_p4est3);
+  p4est_destroy (p4est);
+  p4est3_destroy (&p4est3);
+  p4est_connectivity_destroy (conn);
 
   /* exit */
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
 
-  mpiret = sc_MPI_Finalize();
-  SC_CHECK_MPI(mpiret);
+  mpiret = sc_MPI_Finalize ();
+  SC_CHECK_MPI (mpiret);
 
   SC3X (e);
   return 0;
