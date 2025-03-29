@@ -103,7 +103,7 @@ typedef struct p4est3_ghost_fill_data
 p4est3_ghost_fill_data_t;
 
 static sc3_error_t *
-p4est3_ghost_fill_callback (p4est3_iterate_face_info_t * fi)
+p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 {
   p4est3_ghost_fill_data_t *d = (p4est3_ghost_fill_data_t *) fi->user_data;
   p4est_ghost_t      *ghost = d->ghost;
@@ -133,7 +133,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t * fi)
   SC3A_CHECK (fside[0]->is_ghost != -1 || fside[1]->is_ghost != -1);
   SC3A_CHECK (fside[0]->is_ghost != 1 && fside[1]->is_ghost != 1);
 
-  if (fside[0]->is_ghost == 0 && fside[1] == 0) {
+  if (fside[0]->is_ghost == 0 && fside[1]->is_ghost == 0) {
     /* It's not a ghost. Nothing to do here. */
     return NULL;
   }
@@ -281,7 +281,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t * fi)
 
 /* Sort ghost quadrants contained in ghost->ghosts */
 void
-sort_ghost_quadrants (sc_array_t * ghosts)
+sort_ghost_quadrants (sc_array_t *ghosts)
 {
   qsort (ghosts->array, ghosts->elem_count, ghosts->elem_size,
          p4est_quadrant_compare_piggy);
@@ -365,7 +365,7 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
 
 /* Sort the mirrors in a ghost layer and update the p2m arrays accordingly */
 static void
-sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
+sort_mirror_quadrants (p4est3_ghost_fill_data_t *d)
 {
   int                 ii;
   void               *sorted;
@@ -420,16 +420,15 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t * d)
         *index_ptr = inv[old_idx];
       }
     }
-
-    P4EST_FREE (perm);
-    P4EST_FREE (inv);
   }
+  P4EST_FREE (perm);
+  P4EST_FREE (inv);
 }
 
 /* Merge the per-processor arrays of mirror indices into a single array */
 static void
-merge_mirror_proc_arrays (p4est3_t * p3, p4est_ghost_t * ghost,
-                          sc_array_t ** p2m)
+merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
+                          sc_array_t **p2m)
 {
   int                 i;
   p4est_locidx_t      total_mirrors = 0;
@@ -460,7 +459,7 @@ merge_mirror_proc_arrays (p4est3_t * p3, p4est_ghost_t * ghost,
 }
 
 sc3_error_t        *
-p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
+p4est3_ghost_fill_p4est (p4est3_t *p3, p4est_ghost_t *ghost)
 {
   p4est3_ghost_fill_data_t data, *d = &data;
   int                 i;
@@ -501,7 +500,6 @@ p4est3_ghost_fill_p4est (p4est3_t * p3, p4est_ghost_t * ghost)
   ghost->btype = P4EST_CONNECT_FACE;
 
   /* Might be NULL for integration with Dune */
-  ghost->mirror_proc_offsets = NULL;
   ghost->mirror_proc_fronts = NULL;
   ghost->mirror_proc_front_offsets = NULL;
 
