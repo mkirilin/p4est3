@@ -47,10 +47,13 @@ extern              "C"
  * donor p4est_t object, then they will be overwritten.
  * \param [in] p            Ponter to \ref p8est_t object that must be setup.
  * \param [in,out] p3       Pointer to new allocated \ref p4est3_t object.
+ * \param [out] pconn       Non-NULL reference to a pointer to \ref
+ *                          p4est3_connectivity_t object that will be created.
  *
  * \return                  NULL on success, error object otherwise.
  */
-sc3_error_t        *p4est3_convert_p8est (p8est_t * p, p4est3_t * p3);
+sc3_error_t        *p4est3_convert_p8est (p8est_t * p, p4est3_t * p3,
+                                          p4est3_connectivity_t ** pconn);
 
 #ifdef __cplusplus
 #if 0

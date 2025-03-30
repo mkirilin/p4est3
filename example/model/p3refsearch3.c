@@ -38,13 +38,13 @@
 #include "tribox.h"
 #include <string.h>
 
-static int max_ref_level = 1;
+static int          max_ref_level = 1;
 
 typedef struct triangle
 {
-  double v0[3];
-  double v1[3];
-  double v2[3];
+  double              v0[3];
+  double              v1[3];
+  double              v2[3];
 }
 triangle_t;
 
@@ -58,25 +58,25 @@ triangulation_is_vertex_inside_aabb (const double * aabb, const double * v)
 
 static int
 triangulation_intersect_model (p4est_topidx_t which_tree,
-                               const double aabb[6], void * model,
-                               void *point)
+                               const double aabb[6], void *model, void *point)
 {
-  float boxcenter[3], boxhalfsize[3], triverts[3][3];
+  float               boxcenter[3], boxhalfsize[3], triverts[3][3];
 
-  triangle_t * t = (triangle_t *) ((p4est_model_t *) model)->primitives;
-  size_t p = *(size_t *) point;
+  triangle_t         *t =
+    (triangle_t *) ((p4est_model_t *) model)->primitives;
+  size_t              p = *(size_t *) point;
 
   /*int is_v0_in = triangulation_is_vertex_inside_aabb (aabb, t[p].v0);
-  int is_v1_in = triangulation_is_vertex_inside_aabb (aabb, t[p].v1);
-  int is_v2_in = triangulation_is_vertex_inside_aabb (aabb, t[p].v2);
+     int is_v1_in = triangulation_is_vertex_inside_aabb (aabb, t[p].v1);
+     int is_v2_in = triangulation_is_vertex_inside_aabb (aabb, t[p].v2);
 
-  if (is_v0_in || is_v1_in || is_v2_in)
-  {
-    return 1;
-  }
-  else {
-    return 0;
-  }*/
+     if (is_v0_in || is_v1_in || is_v2_in)
+     {
+     return 1;
+     }
+     else {
+     return 0;
+     } */
   boxcenter[0] = (aabb[3] + aabb[0]) * 0.5;
   boxcenter[1] = (aabb[4] + aabb[1]) * 0.5;
   boxcenter[2] = (aabb[5] + aabb[2]) * 0.5;
@@ -112,7 +112,7 @@ triangulation_intersect_model (p4est_topidx_t which_tree,
  * p4est_connectivity_getline_upper (FILE * stream).
  */
 static char        *
-triangulation_getline_upper (FILE * stream)
+triangulation_getline_upper (FILE *stream)
 {
   char               *line = P4EST_ALLOC (char, 1024), *linep = line;
   size_t              lenmax = 1024, len = lenmax;
@@ -204,19 +204,19 @@ triangulation_getline_upper (FILE * stream)
  * 4 6 0 2 4
 */
 static int
-triangulation_read_off_file_stream (p4est_model_t * m, FILE * fin)
+triangulation_read_off_file_stream (p4est_model_t *m, FILE *fin)
 {
-  char * line;
+  char               *line;
   int                 lines_read = 0;
-  size_t v = 0, f = 0;
-  int retval;
-  size_t num_vertices, num_edges, v2f, vid[3];
-  triangle_t * faces = NULL;
-  double * vertices= NULL;
-  double x = 0, y = 0, z = 0;
-  double min_x = 0., min_y = 0., min_z = 0.;
-  double max_x = 0., max_y = 0., max_z = 0.;
-  double axis_scale = 1.;
+  size_t              v = 0, f = 0;
+  int                 retval;
+  size_t              num_vertices, num_edges, v2f, vid[3];
+  triangle_t         *faces = NULL;
+  double             *vertices = NULL;
+  double              x = 0, y = 0, z = 0;
+  double              min_x = 0., min_y = 0., min_z = 0.;
+  double              max_x = 0., max_y = 0., max_z = 0.;
+  double              axis_scale = 1.;
 
   for (;;) {
     line = triangulation_getline_upper (fin);
@@ -241,7 +241,8 @@ triangulation_read_off_file_stream (p4est_model_t * m, FILE * fin)
     /* check for number of vertices and faces in the object to read */
     if (lines_read == 2) {
       retval
-        = sscanf (line, "%lu %lu %lu", &num_vertices, &m->num_prim, &num_edges);
+        =
+        sscanf (line, "%lu %lu %lu", &num_vertices, &m->num_prim, &num_edges);
 
       if (retval != 3) {
         P4EST_LERROR ("Wrong file format to read");
@@ -297,11 +298,13 @@ triangulation_read_off_file_stream (p4est_model_t * m, FILE * fin)
 
       if (v == num_vertices) {
         axis_scale
-          = 1. / SC_MAX (SC_MAX (max_x - min_x, max_y - min_y), max_z - min_z);
+          =
+          1. / SC_MAX (SC_MAX (max_x - min_x, max_y - min_y), max_z - min_z);
       }
       P4EST_FREE (line);
       continue;
-    } else {
+    }
+    else {
       /* all vertices are read, now read faces */
       retval
         = sscanf (line, "%lu %lu %lu %lu", &v2f, &vid[0], &vid[1], &vid[2]);
@@ -338,10 +341,10 @@ triangulation_read_off_file_stream (p4est_model_t * m, FILE * fin)
 }
 
 static int
-triangulation_read_off_file (p4est_model_t * m, const char * filename)
+triangulation_read_off_file (p4est_model_t *m, const char *filename)
 {
-  int retval = 0;
-  FILE *fin = NULL;
+  int                 retval = 0;
+  FILE               *fin = NULL;
 
   P4EST_GLOBAL_PRODUCTIONF ("Reading connectivity from %s\n", filename);
 
@@ -351,7 +354,7 @@ triangulation_read_off_file (p4est_model_t * m, const char * filename)
     return 0;
   }
 
-  if (!triangulation_read_off_file_stream (m, fin)){
+  if (!triangulation_read_off_file_stream (m, fin)) {
     P4EST_LERRORF ("Failed to read %s: pass 1\n", filename);
     return 0;
   }
@@ -366,16 +369,16 @@ triangulation_read_off_file (p4est_model_t * m, const char * filename)
 }
 
 static void
-triangulation_desroy_primitives (void * primitives)
+triangulation_desroy_primitives (void *primitives)
 {
   P4EST_FREE (primitives);
 }
 
 static int
-triangulation_setup_model (p4est_model_t ** m, const char * filename,
-                           const char * model_name)
+triangulation_setup_model (p4est_model_t **m, const char *filename,
+                           const char *model_name)
 {
-  p4est_model_t  *model = P4EST_ALLOC_ZERO (p4est_model_t, 1);
+  p4est_model_t      *model = P4EST_ALLOC_ZERO (p4est_model_t, 1);
   model->conn = p8est_connectivity_new_unitcube ();
   if (model->conn == NULL) {
     P4EST_LERROR ("Failed to create a model's connectivity");
@@ -394,7 +397,7 @@ triangulation_setup_model (p4est_model_t ** m, const char * filename,
 }
 
 static sc3_error_t *
-make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
+make_allocator (sc3_allocator_t *oa, sc3_allocator_t **alloc)
 {
   SC3A_IS (sc3_allocator_is_setup, oa);
   SC3E (sc3_allocator_new (oa, alloc));
@@ -404,8 +407,8 @@ make_allocator (sc3_allocator_t * oa, sc3_allocator_t ** alloc)
 
 #ifndef P4EST_ENABLE_DEBUG
 static sc3_error_t *
-array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
-           int ecount, sc3_array_t ** arr)
+array_new (sc3_allocator_t *alloc, size_t esize, int ealloc,
+           int ecount, sc3_array_t **arr)
 {
   SC3E_RETVAL (arr, NULL);
   SC3A_IS (sc3_allocator_is_setup, alloc);
@@ -422,8 +425,8 @@ array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 }
 
 static sc3_error_t *
-compare_results (sc3_allocator_t *alloc, p4est3_t * p3, p4est_t * p,
-                 const p4est3_quadrant_vtable_t * qvt)
+compare_results (sc3_allocator_t *alloc, p4est3_t *p3, p4est_t *p,
+                 const p4est3_quadrant_vtable_t *qvt)
 {
 
   char               *q3;
@@ -448,8 +451,7 @@ compare_results (sc3_allocator_t *alloc, p4est3_t * p3, p4est_t * p,
   SC3E_DEMAND (num_loc_quads == p->local_num_quadrants,
                "different #local quadrants");
   SC3E (array_new (alloc, sizeof (int), num_loc_quads, 0, &p3levels));
-  SC3E (array_new
-        (alloc, sizeof (int), p->local_num_quadrants, 0, &levels));
+  SC3E (array_new (alloc, sizeof (int), p->local_num_quadrants, 0, &levels));
   for (tt = p->first_local_tree; tt <= p->last_local_tree; ++tt) {
     tree = p4est_tree_array_index (p->trees, tt);
     for (nq = 0; nq < tree->quadrants.elem_count; ++nq) {
@@ -486,10 +488,10 @@ compare_results (sc3_allocator_t *alloc, p4est3_t * p3, p4est_t * p,
 #endif /* P4EST_ENABLE_DEBUG */
 
 static sc3_error_t *
-p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
+p4est3_new_shortcut (p4est3_t **p3, sc3_allocator_t *alloc,
                      sc3_MPI_Comm_t mpicomm, p4est3_connectivity_t *conn,
-                     const p4est3_quadrant_vtable_t * qvt,
-                     p4est3_t * src, int is_partition, int is_family,
+                     const p4est3_quadrant_vtable_t *qvt,
+                     p4est3_t *src, int is_partition, int is_family,
                      p4est3_weight_callback_t cweight, void *user_data)
 {
   SC3E (p4est3_new (alloc, p3));
@@ -502,7 +504,7 @@ p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
   SC3E (p4est3_set_contiguous (*p3, 1));
   SC3E (p4est3_set_family (*p3, is_family));
   SC3E (p4est3_set_partition (*p3, is_partition, cweight));
-  /*SC3E (p4est3_set_user_data (*p3, user_data));*/
+  /*SC3E (p4est3_set_user_data (*p3, user_data)); */
   if ((*p3)->old != NULL) {
     (*p3)->old->user_data = user_data;
   }
@@ -511,7 +513,7 @@ p4est3_new_shortcut (p4est3_t ** p3, sc3_allocator_t *alloc,
 }
 
 static sc3_error_t *
-run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
+run_program (sc_MPI_Comm *mpicomm, p4est_model_t *model)
 {
   size_t              zz;
   char                filename[BUFSIZ];
@@ -522,12 +524,11 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
   const size_t        quad_data_size = 0;
   const int           start_level = 3;
   int                 level;
-  p4est3_connectivity_t *conn;
+  p4est3_connectivity_t *conn3;
 
   sc_flopinfo_t       fi, sshot_total, sshot_new, sshot_convert,
-                      sshot_part_p4est, sshot_part_p4est3;
+    sshot_part_p4est, sshot_part_p4est3;
   sc_statinfo_t       stats;
-
 
   mainalloc = sc3_allocator_nothread ();
   SC3E (make_allocator (mainalloc, &alloc));
@@ -556,13 +557,13 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
     p4est_refine (p4est, 0, p4est_model_refine, p4est_model_quad_init);
 
     if (level == max_ref_level - 1) {
-      
+
       snprintf (filename, BUFSIZ, "./%s/%d/before",
                 model->output_prefix, level + 1);
       p4est_vtk_write_file (p4est, model->geom, filename);
 
       sc_flops_snap (&fi, &sshot_convert);
-      SC3E (p4est3_convert_p8est (p4est, p4est3));
+      SC3E (p4est3_convert_p8est (p4est, p4est3, &conn3));
       sc_flops_shot (&fi, &sshot_convert);
 
       sc_flops_snap (&fi, &sshot_part_p4est);
@@ -576,7 +577,7 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
       sc_flops_shot (&fi, &sshot_part_p4est3);
 
       snprintf (filename, BUFSIZ, "./%s/%d/after",
-              model->output_prefix, level + 1);
+                model->output_prefix, level + 1);
       p4est_vtk_write_file (p4est, model->geom, filename);
     }
   }
@@ -604,16 +605,15 @@ run_program (sc_MPI_Comm * mpicomm, p4est_model_t * model)
   /* cleanup */
   sc_array_destroy (primitives);
   p4est_destroy (p4est);
-  conn = p4est3->conn;
   SC3E (p4est3_destroy (&p4est3));
   SC3E (p4est3_destroy (&p3part));
-  SC3E (p4est3_connectivity_destroy (&conn));
+  SC3E (p4est3_connectivity_destroy (&conn3));
   SC3E (sc3_allocator_destroy (&alloc));
   return NULL;
 }
 
 static int
-usagerrf (sc_options_t * opt, const char *fmt, ...)
+usagerrf (sc_options_t *opt, const char *fmt, ...)
 {
   va_list             ap;
   char                msg[BUFSIZ];
@@ -629,7 +629,7 @@ usagerrf (sc_options_t * opt, const char *fmt, ...)
 }
 
 static int
-usagerr (sc_options_t * opt, const char *msg)
+usagerr (sc_options_t *opt, const char *msg)
 {
   return usagerrf (opt, "%s", msg);
 }
@@ -641,7 +641,7 @@ main (int argc, char **argv)
   int                 mpiret;
   int                 ue, fa;
   sc_options_t       *opt;
-  p4est_model_t * model = NULL;
+  p4est_model_t      *model = NULL;
   const char         *fn_par;
   char               *model_name;
   char                filename[BUFSIZ], filename_temp[BUFSIZ];
@@ -662,9 +662,9 @@ main (int argc, char **argv)
   sc_options_add_int (opt, 'L', "maxlevel", &max_ref_level, P4EST_QMAXLEVEL,
                       "Maximum refinement level");
   sc_options_add_string (opt, 'F', "filename", &fn_par, "model.off",
-                        "Input file in .off format");
+                         "Input file in .off format");
 
-    /* proceed in run-once loop for cleaner error checking */
+  /* proceed in run-once loop for cleaner error checking */
   ue = 0;
   do {
     /* parse command line and assign configuration variables */
@@ -678,8 +678,7 @@ main (int argc, char **argv)
 
     /* check consistency of parameters */
     if (max_ref_level < 1 || max_ref_level > P4EST_QMAXLEVEL) {
-      ue = usagerrf (opt, "maxlevel not between 1 and %d",
-                     P4EST_QMAXLEVEL);
+      ue = usagerrf (opt, "maxlevel not between 1 and %d", P4EST_QMAXLEVEL);
     }
   }
   while (0);

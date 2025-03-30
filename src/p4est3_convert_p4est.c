@@ -40,8 +40,8 @@ extern              "C"
 #endif
 
 static sc3_error_t *
-p4est3_conv_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
-                       int ecount, sc3_array_t ** arr)
+p4est3_conv_array_new (sc3_allocator_t *alloc, size_t esize, int ealloc,
+                       int ecount, sc3_array_t **arr)
 {
   SC3E_RETVAL (arr, NULL);
   SC3A_IS (sc3_allocator_is_setup, alloc);
@@ -58,32 +58,35 @@ p4est3_conv_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 }
 
 sc3_error_t        *
-p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
+p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
 {
-  int n;
+  int                 n;
   int                 dispunit;
-  int nodesize, node_frank, noderank;
-  p4est_topidx_t ti;
-  p4est3_topidx ti3;
-  p4est3_locidx locq_it;
-  size_t i;
+  int                 nodesize, node_frank, noderank;
+  p4est_topidx_t      ti;
+  p4est3_topidx       ti3;
+  p4est3_locidx       locq_it;
+  size_t              i;
   p4est3_connectivity_t *conn;
   const p4est3_quadrant_vtable_t *qvt_standard;
-  sc3_MPI_Aint_t tempbytes;
+  sc3_MPI_Aint_t      tempbytes;
   sc3_MPI_Comm_t      nodecomm;
-  p4est_tree_t *t;
-  p4est3_tree_t *t3;
+  p4est_tree_t       *t;
+  p4est3_tree_t      *t3;
   SC3A_IS (p4est3_is_new, p3);
   SC3E (p4est3_set_comm (p3, p->mpicomm, 1));
 
   /* inherit p4est_t's connectivity and set it up */
   p3->accessed_conn = 0;
-  SC3E (p4est3_connectivity_new_p4est
-        (p3->alloc, &conn, p->connectivity, 0));
+  SC3E (p4est3_connectivity_new_p4est (p3->alloc, &conn, p->connectivity, 0));
+  /* if p3 is already referencing a different connectivity */
   if (p3->conn != NULL) {
     SC3E (p4est3_connectivity_unref (p3->conn));
   }
   SC3E (p4est3_set_connectivity (p3, conn));
+
+  SC3E_RETVAL (pconn, NULL);
+  *pconn = conn;
 
   /* pretend it never existed */
   SC3E_DEMAND (p3->pvt == NULL && p3->slf == NULL, "Forest vtable exists");
@@ -159,21 +162,21 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
     /* translate */
     SC3E (p4est3_quadrant_translate
           (qvt_standard, &p->global_first_position[p->mpirank],
-          p3->qvt, p3->gfpos + p3->mpirank * p3->qsize));
+           p3->qvt, p3->gfpos + p3->mpirank * p3->qsize));
   }
   if (p3->mpirank == 0) {
     /* same but for the (mpisize)'th element */
     if (p3->qvt == qvt_standard) {
-    /* just copy */
-    SC3E (p4est3_quadrant_copy
-          (p3->qvt, &p->global_first_position[p->mpisize],
-           p3->gfpos + p3->mpisize * p3->qsize));
+      /* just copy */
+      SC3E (p4est3_quadrant_copy
+            (p3->qvt, &p->global_first_position[p->mpisize],
+             p3->gfpos + p3->mpisize * p3->qsize));
     }
     else {
       /* translate */
       SC3E (p4est3_quadrant_translate
             (qvt_standard, &p->global_first_position[p->mpisize],
-            p3->qvt, p3->gfpos + p3->mpisize * p3->qsize));
+             p3->qvt, p3->gfpos + p3->mpisize * p3->qsize));
     }
   }
   SC3E (sc3_MPI_Win_sync (p3->gposition->meta->win));
@@ -185,7 +188,7 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   p3->goffset[p3->mpirank]
     = (p4est3_gloidx) p->global_first_quadrant[p->mpirank];
   if (p3->mpirank == 0) {
-  /* same but for the (mpisize)'th element */
+    /* same but for the (mpisize)'th element */
     p3->goffset[p3->mpisize]
       = (p4est3_gloidx) p->global_first_quadrant[p->mpisize];
   }
@@ -219,7 +222,7 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
     SC3A_CHECK (sc3_MPI_Barrier (p3->mpicomm) == NULL);
     SC3A_CHECK (tempbytes >= (sc3_MPI_Aint_t)
                 (p3->goffset[node_frank + n + 1] -
-                  p3->goffset[node_frank + n]) * p3->qsize);
+                 p3->goffset[node_frank + n]) * p3->qsize);
     SC3A_CHECK (dispunit == p3->qsize);
     SC3A_CHECK (p3->nodequads[n] != NULL || tempbytes == 0);
   }
@@ -227,8 +230,8 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
 
   /* copy quadrants in shared memory */
   if (p3->qvt == qvt_standard) {
-    for (ti = p->first_local_tree, locq_it = 0; ti <= p->last_local_tree; ++ti)
-    {
+    for (ti = p->first_local_tree, locq_it = 0; ti <= p->last_local_tree;
+         ++ti) {
       t = p4est_tree_array_index (p->trees, ti - p->first_local_tree);
       for (i = 0; i < t->quadrants.elem_count; ++i) {
         SC3E (p4est3_quadrant_copy
@@ -238,8 +241,8 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
     }
   }
   else {
-    for (ti = p->first_local_tree, locq_it = 0; ti <= p->last_local_tree; ++ti)
-    {
+    for (ti = p->first_local_tree, locq_it = 0; ti <= p->last_local_tree;
+         ++ti) {
       t = p4est_tree_array_index (p->trees, ti - p->first_local_tree);
       for (i = 0; i < t->quadrants.elem_count; ++i) {
         SC3E (p4est3_quadrant_translate
@@ -260,7 +263,6 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   p3->lltree = p->last_local_tree;
   p3->nltrees = p->last_local_tree - p->first_local_tree + 1;
 
-
   /* fill in trees */
   SC3E (p4est3_conv_array_new (p3->alloc, sizeof (p4est3_tree_t),
                                p3->nltrees, p3->nltrees, &p3->trees));
@@ -272,7 +274,7 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
     t3->num_quads = t->quadrants.elem_count;
     t3->quad_offset = t->quadrants_offset;
     t3->tquads = p3->quads + p3->qsize * t3->quad_offset;
-    t3->first_tquad = p3->goffset[p3->mpirank] -  p3->gtroffset[ti3];
+    t3->first_tquad = p3->goffset[p3->mpirank] - p3->gtroffset[ti3];
     t3->end_tquad = t3->first_tquad + t3->num_quads;
     t3->last_tquad = t3->end_tquad - 1;
   }
@@ -282,11 +284,11 @@ p4est3_convert_p4est (p4est_t * p, p4est3_t * p3)
   SC3E (p4est3_tree_offsets_communication (p3, noderank, nodecomm));
 
   /* inherited user data stays as a sc_mempool_t, we leave it to user how to
-   manage them */
+     manage them */
   p3->user_data = p->user_data_pool;
 
   /* since refinement, coarsening and partitioning are not available upon
-    convertion stage, we do not need these callback functions */
+     convertion stage, we do not need these callback functions */
   p3->crefine = NULL;
   p3->ccoarse = NULL;
   p3->cweight = NULL;

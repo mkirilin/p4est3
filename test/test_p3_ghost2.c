@@ -229,6 +229,7 @@ main (int argc, char **argv)
   p4est_t            *p4est;
   p4est3_t           *p4est3;
   p4est_connectivity_t *conn;
+  p4est3_connectivity_t *conn3;
   p4est_ghost_t      *ghost_p4est, *ghost_p4est3;
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e = NULL;
@@ -275,7 +276,7 @@ main (int argc, char **argv)
   SC3E_NULL_SET (e, p4est3_set_shared (p4est3, 1));
   SC3E_NULL_SET (e, p4est3_set_contiguous (p4est3, 1));
 
-  SC3E_NULL_SET (e, p4est3_convert_p4est (p4est, p4est3));
+  SC3E_NULL_SET (e, p4est3_convert_p4est (p4est, p4est3, &conn3));
 
   ghost_p4est3 = init_ghost_layer (p4est);
   SC3E_NULL_SET (e, p4est3_ghost_fill_p4est (p4est3, ghost_p4est3));
@@ -287,8 +288,11 @@ main (int argc, char **argv)
   p4est_ghost_destroy (ghost_p4est);
   p4est_ghost_destroy (ghost_p4est3);
   p4est_destroy (p4est);
-  p4est3_destroy (&p4est3);
   p4est_connectivity_destroy (conn);
+
+  SC3E_NULL_SET (e, p4est3_destroy (&p4est3));
+  SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn3));
+  SC3E_NULL_SET (e, sc3_allocator_destroy (&alloc));
 
   /* exit */
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
