@@ -25,7 +25,6 @@ along with p4est; if not, write to the Free Software Foundation, Inc.,
 #include <p4est_ghost.h>
 
 #include <p4est3.h>
-#include <p4est3_internal.h>
 #include <p4est3_ghost.h>
 #include <p4est3_convert_p4est.h>
 
@@ -102,10 +101,8 @@ make_allocator (sc3_allocator_t *oa, sc3_allocator_t **alloc)
 }
 
 static sc3_error_t *
-compare_ghost_results (p4est_t *p4est, p4est3_t *p3,
-                       p4est_ghost_t *ghost_p4est,
-                       p4est_ghost_t *ghost_p4est3,
-                       const p4est3_quadrant_vtable_t *qvt)
+compare_ghost_results (p4est_ghost_t *ghost_p4est,
+                       p4est_ghost_t *ghost_p4est3)
 {
   int                 i;
   p4est_quadrant_t   *q_p4est, *q_p3;
@@ -281,8 +278,7 @@ main (int argc, char **argv)
   ghost_p4est3 = init_ghost_layer (p4est);
   SC3E_NULL_SET (e, p4est3_ghost_fill_p4est (p4est3, ghost_p4est3));
 
-  SC3E_NULL_SET (e, compare_ghost_results (p4est, p4est3, ghost_p4est,
-                                           ghost_p4est3, p4est3->qvt));
+  SC3E_NULL_SET (e, compare_ghost_results (ghost_p4est, ghost_p4est3));
 
   /* clean up */
   p4est_ghost_destroy (ghost_p4est);
