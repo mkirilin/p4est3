@@ -127,14 +127,17 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
     return NULL;
   }
 
-  /** Check if exactly one side is a ghost */
   sc3_array_index (fi->sides, 0, &fside[0]);
   sc3_array_index (fi->sides, 1, &fside[1]);
-  SC3A_CHECK (fside[0]->is_ghost != -1 || fside[1]->is_ghost != -1);
-  SC3A_CHECK (fside[0]->is_ghost != 1 && fside[1]->is_ghost != 1);
+
+  /* Check both sides are initialized */
+  SC3A_CHECK (fside[0]->is_ghost != -1 && fside[1]->is_ghost != -1);
+
+  /* Check at least one side is not ghost */
+  SC3A_CHECK (fside[0]->is_ghost == 0 || fside[1]->is_ghost == 0);
 
   if (fside[0]->is_ghost == 0 && fside[1]->is_ghost == 0) {
-    /* It's not a ghost. Nothing to do here. */
+    /* No ghosts here. Nothing to do here. */
     return NULL;
   }
 
@@ -155,7 +158,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   /* Convert p3 quad to p2 quad */
   SC3E (p4est3_quadrant_coordinates (fi->p3->qvt, gside->quadrant, coords));
   SC3E (p4est3_quadrant_level (fi->p3->qvt, gside->quadrant, &level));
-  q.level = level;
+  q.level = (int8_t) level;
   q.x = coords[0];
   q.y = coords[1];
 #ifdef P4_TO_P8
@@ -175,13 +178,13 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 
   /* Check if considered ghost is unique */
   k = (ghost_hash_key_t *) sc_mempool_alloc (d->ghost_hdata->ckeys);
-  k->qid = global_qid - fi->p3->goffset[p_own];
-  k->proc = p_own;
+  k->qid = (p4est_locidx_t) (global_qid - fi->p3->goffset[p_own]);
+  k->proc = (int) p_own;
   if (sc_hash_insert_unique (d->ghost_hdata->chash, k, &found)) {
     /* The key is newly linked into the hash table: count it */
     P4EST_ASSERT (*found == k);
-    P4EST_INFOF ("First time adding ghost %ld, proc %ld\n",
-                 (long) k->qid, (long) k->proc);
+    P4EST_INFOF ("First time adding ghost %ld, proc %d\n",
+                 (long) k->qid, k->proc);
     d->ghost_hdata->added++;
 
     /** Fill its \c piggy3 field */
@@ -209,7 +212,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   /* Convert p3 quad to p2 quad */
   SC3E (p4est3_quadrant_coordinates (fi->p3->qvt, mside->quadrant, coords));
   SC3E (p4est3_quadrant_level (fi->p3->qvt, mside->quadrant, &level));
-  q.level = level;
+  q.level = (int8_t) level;
   q.x = coords[0];
   q.y = coords[1];
 #ifdef P4_TO_P8
@@ -220,18 +223,18 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 
   /* Check if considered mirror is unique */
   k = (ghost_hash_key_t *) sc_mempool_alloc (d->mirror_hdata->ckeys);
-  k->qid = global_qid - fi->p3->goffset[fi->p3->mpirank];
+  k->qid = (p4est_locidx_t) (global_qid - fi->p3->goffset[fi->p3->mpirank]);
   k->proc = fi->p3->mpirank;
 
   k_unique_p = (ghost_hash_key_t *) sc_mempool_alloc (d->mirror_hdata->ckeys);
   *k_unique_p = *k;
-  k_unique_p->proc = p_own;
+  k_unique_p->proc = (int) p_own;
 
   if (sc_hash_insert_unique (d->mirror_hdata->chash, k, &found)) {
     /* The key is newly linked into the hash table: count it */
     P4EST_ASSERT (*found == k);
-    P4EST_INFOF ("First time adding mirror %ld, proc %ld\n",
-                 (long) k->qid, (long) k->proc);
+    P4EST_INFOF ("First time adding mirror %ld, proc %d\n",
+                 (long) k->qid, k->proc);
     (*(ghost_hash_key_t **) found)->i = d->mirror_hdata->added++;
 #ifdef P4EST_ENABLE_DEBUG
     is_found = 1;
@@ -250,8 +253,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
     P4EST_ASSERT (*found_unique_p == k_unique_p);
     P4EST_INFOF ("First time adding mirror %ld, proc %ld\n",
                  (long) k_unique_p->qid, (long) k_unique_p->proc);
-    *(size_t *) sc_array_push (d->p2m[p_own]) =
-      (*(ghost_hash_key_t **) found)->i;
+    *(p4est_locidx_t *) sc_array_push (d->p2m[p_own]) =
+      (*(ghost_hash_key_t **) found_unique_p)->i;
   }
   else {
     /* if we uniquely inserted k before, this case is not possible */
@@ -265,7 +268,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 
   /** Fill its \c piggy3 field */
   q.p.piggy3.which_tree = mside->ntree;
-  q.p.piggy3.local_num = global_qid - fi->p3->goffset[fi->p3->mpirank];
+  q.p.piggy3.local_num =
+    (p4est_locidx_t) (global_qid - fi->p3->goffset[fi->p3->mpirank]);
 
   /* Push back to mirrors array */
   *(p4est_quadrant_t *) sc_array_push (&(ghost->mirrors)) = q;
@@ -291,8 +295,8 @@ sort_ghost_quadrants (sc_array_t *ghosts)
 static int
 compare_mirror_indices_context (const void *a, const void *b, void *ctx)
 {
-  size_t              idx1 = *(const size_t *) a;
-  size_t              idx2 = *(const size_t *) b;
+  p4est_locidx_t      idx1 = *(const p4est_locidx_t *) a;
+  p4est_locidx_t      idx2 = *(const p4est_locidx_t *) b;
   mirror_compare_context_t *context = (mirror_compare_context_t *) ctx;
   return p4est_quadrant_compare_piggy (&context->mirrors[idx1],
                                        &context->mirrors[idx2]);
@@ -388,7 +392,7 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t *d)
     context.mirrors = (p4est_quadrant_t *) mirrors->array;
 
     /* Sort permutation array using our context-based comparison */
-    qsort_with_context (perm, nmirrors, sizeof (size_t),
+    qsort_with_context (perm, nmirrors, sizeof (p4est_locidx_t),
                         compare_mirror_indices_context, &context);
 
     /* Build inverse permutation: inverse[old_index] = new_index */
@@ -437,7 +441,7 @@ merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
 
   /* Calculate total size needed for the merged array */
   for (i = 0; i < p3->mpisize; i++) {
-    total_mirrors += p2m[i]->elem_count;
+    total_mirrors += (p4est_locidx_t) p2m[i]->elem_count;
   }
 
   /* Allocate memory for the merged array */
@@ -454,7 +458,7 @@ merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
         *((p4est_locidx_t *) sc_array_index (p2m[i], j));
     }
 
-    offset += count;
+    offset += (p4est_locidx_t) count;
   }
 }
 
