@@ -41,8 +41,8 @@ typedef struct ghost_hash_key
   p4est_locidx_t      qid;      /* for ghost -- local index within owner process.
                                    for mirror -- local index and a process to
                                    what it is mirrored */
-  p4est_locidx_t      proc;
-  size_t              i;        /* for mirror -- index within the mirror */
+  int                 proc;
+  p4est_locidx_t      i;        /* for mirror -- index within the mirror */
 }
 ghost_hash_key_t;
 
@@ -239,6 +239,19 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 #ifdef P4EST_ENABLE_DEBUG
     is_found = 1;
 #endif
+
+    /** Fill its \c piggy3 field */
+    q.p.piggy3.which_tree = mside->ntree;
+    q.p.piggy3.local_num = k->qid;
+
+    /* Push back to mirrors array */
+    *(p4est_quadrant_t *) sc_array_push (&(ghost->mirrors)) = q;
+
+    /** Contribute to a structure tracking \c mirror_tree_offsets */
+    (ghost->mirror_tree_offsets[mside->ntree + 1])++;
+
+    /** Contribute to a structure tracking \c mirror_proc_offsets */
+    (ghost->mirror_proc_offsets[p_own + 1])++;
   }
   else {
     /* The key for this mirror had already been stored earlier */
@@ -254,7 +267,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
     P4EST_INFOF ("First time adding mirror %ld, proc %ld\n",
                  (long) k_unique_p->qid, (long) k_unique_p->proc);
     *(p4est_locidx_t *) sc_array_push (d->p2m[p_own]) =
-      (*(ghost_hash_key_t **) found_unique_p)->i;
+      (*(ghost_hash_key_t **) found)->i;
   }
   else {
     /* if we uniquely inserted k before, this case is not possible */
@@ -265,20 +278,6 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
     sc_mempool_free (d->mirror_hdata->ckeys, k_unique_p);
     d->mirror_hdata->duped++;
   }
-
-  /** Fill its \c piggy3 field */
-  q.p.piggy3.which_tree = mside->ntree;
-  q.p.piggy3.local_num =
-    (p4est_locidx_t) (global_qid - fi->p3->goffset[fi->p3->mpirank]);
-
-  /* Push back to mirrors array */
-  *(p4est_quadrant_t *) sc_array_push (&(ghost->mirrors)) = q;
-
-  /** Contribute to a structure tracking \c mirror_tree_offsets */
-  (ghost->mirror_tree_offsets[mside->ntree + 1])++;
-
-  /** Contribute to a structure tracking \c mirror_proc_offsets */
-  (ghost->mirror_proc_offsets[p_own + 1])++;
 
   return NULL;
 }
