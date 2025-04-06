@@ -23,22 +23,46 @@ along with p4est; if not, write to the Free Software Foundation, Inc.,
 
 #include <p4est_bits.h>
 #include <p4est_ghost.h>
+#include <p4est_vtk.h>
+#include <p4est_extended.h>
 
 #include <p4est3.h>
 #include <p4est3_ghost.h>
 #include <p4est3_convert_p4est.h>
 
 #ifndef P4_TO_P8
-static int          refine_level = 5;
+static int          refine_level = 1;
 #else
 static int          refine_level = 4;
 #endif
+
+#define TEST_SIMPLE 1
+
+#if TEST_SIMPLE == 1
+
+static int
+refine_fractal (p4est_t *p, p4est_topidx_t which_tree, p4est_quadrant_t *q)
+{
+  /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
+  p4est_locidx_t     *quadrant_local_id = (p4est_locidx_t *) p->user_pointer;
+
+  return (((p->global_first_quadrant[p->mpirank] + (*quadrant_local_id)++) %
+#ifdef P4_TO_P8
+           7)
+#else
+           3)
+#endif
+          == 0);
+}
+
+#else
 
 static int
 refine_fn (p4est_t *p4est, p4est_topidx_t which_tree,
            p4est_quadrant_t *quadrant)
 {
   int                 cid;
+  p4est = (void *) p4est;
 
   if (which_tree == 2 || which_tree == 3) {
     return 0;
@@ -53,6 +77,9 @@ refine_fn (p4est_t *p4est, p4est_topidx_t which_tree,
        && quadrant->z >= P4EST_LAST_OFFSET (P4EST_MAXLEVEL - 2)
 #endif
       )) {
+    if (quadrant->level >= refine_level) {
+      return 0;
+    }
     return 1;
   }
   if ((int) quadrant->level >= (refine_level - (int) (which_tree % 3))) {
@@ -71,6 +98,8 @@ refine_fn (p4est_t *p4est, p4est_topidx_t which_tree,
 
   return 1;
 }
+
+#endif
 
 static p4est_ghost_t *
 init_ghost_layer (p4est_t *p)
@@ -230,6 +259,9 @@ main (int argc, char **argv)
   p4est_ghost_t      *ghost_p4est, *ghost_p4est3;
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e = NULL;
+#if TEST_SIMPLE == 1
+  p4est3_locidx       quadrant_local_id = 0;
+#endif
 
   /* initialize MPI */
   mpiret = sc_MPI_Init (&argc, &argv);
@@ -244,15 +276,33 @@ main (int argc, char **argv)
   /*--------------------------------------------------------------*/
 
 #ifndef P4_TO_P8
+
+#if TEST_SIMPLE == 1
+  conn = p4est_connectivity_new_twotrees (1, 0, 0);
+#else
   conn = p4est_connectivity_new_moebius ();
+#endif
+
 #else
   conn = p8est_connectivity_new_rotcubes ();
 #endif
 
+#if TEST_SIMPLE == 1
+  p4est = p4est_new_ext (mpicomm, conn, 0, 0, 1, 0, NULL, &quadrant_local_id);
+#else
   p4est = p4est_new (mpicomm, conn, 0, NULL, NULL);
+#endif
 
   /* refine to make the number of elements interesting */
+#if TEST_SIMPLE == 1
+  /*** refine in a loop ***/
+  for (int i = 0; i < refine_level; ++i) {
+    quadrant_local_id = 0;
+    p4est_refine (p4est, 0, refine_fractal, NULL);
+  }
+#else
   p4est_refine (p4est, 1, refine_fn, NULL);
+#endif
 
   /* balance the forest */
   p4est_balance (p4est, P4EST_CONNECT_FULL, NULL);
@@ -262,6 +312,7 @@ main (int argc, char **argv)
 
   /* create the ghost layer for p4est */
   ghost_p4est = p4est_ghost_new (p4est, P4EST_CONNECT_FACE);
+  printf ("p4est_ghost_new done\n");
 
   /*--------------------------------------------------------------*/
   /************************** P4EST 3 *****************************/
@@ -274,10 +325,17 @@ main (int argc, char **argv)
   SC3E_NULL_SET (e, p4est3_set_contiguous (p4est3, 1));
 
   SC3E_NULL_SET (e, p4est3_convert_p4est (p4est, p4est3, &conn3));
+  printf ("p4est3_convert_p4est done\n");
 
+  printf ("writing p4est3 file...\n");
+  p4est_vtk_write_file (p4est, NULL, "test_ghost_p3");
+
+  printf ("making p4est ghost layer...\n");
   ghost_p4est3 = init_ghost_layer (p4est);
+  printf ("making p4est3 ghost layer...\n");
   SC3E_NULL_SET (e, p4est3_ghost_fill_p4est (p4est3, ghost_p4est3));
 
+  printf ("comparing ghost layers...\n");
   SC3E_NULL_SET (e, compare_ghost_results (ghost_p4est, ghost_p4est3));
 
   /* clean up */
