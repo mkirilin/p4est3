@@ -26,6 +26,7 @@
 #include <p4est3_search.h>
 #include <stdlib.h>             /* for qsort */
 #include <p4est_bits.h>
+#include <p4est3_p4est.h>
 
 #ifdef __cplusplus
 extern              "C"
@@ -112,6 +113,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   size_t              nsides;
   p4est_gloidx_t      p_own, global_qid;
   ghost_hash_key_t   *k, *k_unique_p;
+  p4est3_quadrant_vtable_t *qvt_standard;
   void              **found, **found_unique_p;
   int                 coords[P4EST_DIM], level;
 
@@ -158,12 +160,10 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   /* Convert p3 quad to p2 quad */
   SC3E (p4est3_quadrant_coordinates (fi->p3->qvt, gside->quadrant, coords));
   SC3E (p4est3_quadrant_level (fi->p3->qvt, gside->quadrant, &level));
-  q.level = (int8_t) level;
-  q.x = coords[0];
-  q.y = coords[1];
-#ifdef P4_TO_P8
-  q.z = coords[2];
-#endif
+
+  SC3E (p4est3_quadrant_vtable_p4est (&qvt_standard));
+  SC3E (p4est3_quadrant_quadrant (qvt_standard, coords, level, &q));
+
   /* Find ghost proc owner */
   p_own = fi->p3->mpirank;
   global_qid = (p4est3_gloidx) gside->nquad + fi->p3->gtroffset[gside->ntree];
@@ -212,12 +212,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   /* Convert p3 quad to p2 quad */
   SC3E (p4est3_quadrant_coordinates (fi->p3->qvt, mside->quadrant, coords));
   SC3E (p4est3_quadrant_level (fi->p3->qvt, mside->quadrant, &level));
-  q.level = (int8_t) level;
-  q.x = coords[0];
-  q.y = coords[1];
-#ifdef P4_TO_P8
-  q.z = coords[2];
-#endif
+
+  SC3E (p4est3_quadrant_quadrant (qvt_standard, coords, level, &q));
 
   global_qid = (p4est3_gloidx) mside->nquad + fi->p3->gtroffset[mside->ntree];
 
