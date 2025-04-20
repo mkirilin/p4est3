@@ -232,7 +232,7 @@ p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
   if (p3->qvt == qvt_standard) {
     for (ti = p->first_local_tree, locq_it = 0; ti <= p->last_local_tree;
          ++ti) {
-      t = p4est_tree_array_index (p->trees, ti - p->first_local_tree);
+      t = p4est_tree_array_index (p->trees, ti);
       for (i = 0; i < t->quadrants.elem_count; ++i) {
         SC3E (p4est3_quadrant_copy
               (p3->qvt, p4est_quadrant_array_index (&t->quadrants, i),
@@ -243,7 +243,7 @@ p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
   else {
     for (ti = p->first_local_tree, locq_it = 0; ti <= p->last_local_tree;
          ++ti) {
-      t = p4est_tree_array_index (p->trees, ti - p->first_local_tree);
+      t = p4est_tree_array_index (p->trees, ti);
       for (i = 0; i < t->quadrants.elem_count; ++i) {
         SC3E (p4est3_quadrant_translate
               (qvt_standard, p4est_quadrant_array_index (&t->quadrants, i),
@@ -268,7 +268,7 @@ p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
                                p3->nltrees, p3->nltrees, &p3->trees));
   for (ti3 = p3->fltree; ti3 <= p3->lltree; ++ti3) {
     SC3E (p4est3_tree_index (p3, ti3, &t3));
-    t = p4est_tree_array_index (p->trees, ti3 - p->first_local_tree);
+    t = p4est_tree_array_index (p->trees, ti3);
 
     t3->treeid = ti3;
     t3->num_quads = t->quadrants.elem_count;
