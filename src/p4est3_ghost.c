@@ -94,6 +94,15 @@ ghost_equal_fn (const void *v1, const void *v2, const void *u)
   return (k1->qid == k2->qid && k1->proc == k2->proc);
 }
 
+int
+compare_locidx (const void *a, const void *b)
+{
+  p4est_locidx_t      arg1 = *(const p4est_locidx_t *) a;
+  p4est_locidx_t      arg2 = *(const p4est_locidx_t *) b;
+
+  return (arg1 > arg2) - (arg1 < arg2);
+}
+
 typedef struct p4est3_ghost_fill_data
 {
   p4est_ghost_t      *ghost;
@@ -245,9 +254,6 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 
     /** Contribute to a structure tracking \c mirror_tree_offsets */
     (ghost->mirror_tree_offsets[mside->ntree + 1])++;
-
-    /** Contribute to a structure tracking \c mirror_proc_offsets */
-    (ghost->mirror_proc_offsets[p_own + 1])++;
   }
   else {
     /* The key for this mirror had already been stored earlier */
@@ -418,6 +424,8 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t *d)
         /* Map old index to new */
         *index_ptr = inv[old_idx];
       }
+      /* sort newly mapped elements with qsort */
+      qsort (arr->array, count, arr->elem_size, compare_locidx);
     }
   }
   P4EST_FREE (perm);
@@ -437,6 +445,8 @@ merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
   /* Calculate total size needed for the merged array */
   for (i = 0; i < p3->mpisize; i++) {
     total_mirrors += (p4est_locidx_t) p2m[i]->elem_count;
+    ghost->mirror_proc_offsets[i + 1] =
+      ghost->mirror_proc_offsets[i] + (p4est_locidx_t) p2m[i]->elem_count;
   }
 
   /* Allocate memory for the merged array */
