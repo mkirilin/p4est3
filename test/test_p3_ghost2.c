@@ -21,14 +21,29 @@ along with p4est; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+#include <p4est3_internal.h>
+
+#ifndef P4_TO_P8
+
+#include <p4est_extended.h>
 #include <p4est_bits.h>
 #include <p4est_ghost.h>
 #include <p4est_vtk.h>
-#include <p4est_extended.h>
-
-#include <p4est3.h>
-#include <p4est3_ghost.h>
+#include <p4est3_p4est.h>
 #include <p4est3_convert_p4est.h>
+#include <p4est3_ghost_p4est.h>
+
+#else
+
+#include <p8est_extended.h>
+#include <p8est_bits.h>
+#include <p8est_ghost.h>
+#include <p8est_vtk.h>
+#include <p4est3_p8est.h>
+#include <p4est3_convert_p8est.h>
+#include <p4est3_ghost_p8est.h>
+
+#endif
 
 #ifndef P4_TO_P8
 static int          refine_level = 1;

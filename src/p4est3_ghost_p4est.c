@@ -21,12 +21,21 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#include <p4est3_ghost.h>
+#ifndef P4_TO_P8
+#include <p4est3_ghost_p4est.h>
+#include <p4est3_p4est.h>
+#include <p4est_bits.h>
+
+#else
+#include <p4est3_ghost_p8est.h>
+#include <p4est3_p8est.h>
+#include <p8est_bits.h>
+
+#endif
+
 #include <p4est3_internal.h>
 #include <p4est3_search.h>
 #include <stdlib.h>             /* for qsort */
-#include <p4est_bits.h>
-#include <p4est3_p4est.h>
 
 #ifdef __cplusplus
 extern              "C"
@@ -192,8 +201,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   if (sc_hash_insert_unique (d->ghost_hdata->chash, k, &found)) {
     /* The key is newly linked into the hash table: count it */
     P4EST_ASSERT (*found == k);
-    P4EST_INFOF ("First time adding ghost %ld, proc %d\n",
-                 (long) k->qid, k->proc);
+    //P4EST_INFOF ("First time adding ghost %ld, proc %d\n",
+    //             (long) k->qid, k->proc);
     d->ghost_hdata->added++;
 
     /** Fill its \c piggy3 field */
@@ -238,8 +247,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   if (sc_hash_insert_unique (d->mirror_hdata->chash, k, &found)) {
     /* The key is newly linked into the hash table: count it */
     P4EST_ASSERT (*found == k);
-    P4EST_INFOF ("First time adding mirror %ld, proc %d\n",
-                 (long) k->qid, k->proc);
+    //P4EST_INFOF ("First time adding mirror %ld, proc %d\n",
+    //             (long) k->qid, k->proc);
     (*(ghost_hash_key_t **) found)->i = d->mirror_hdata->added++;
 #ifdef P4EST_ENABLE_DEBUG
     is_found = 1;
@@ -266,8 +275,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
       (d->mirror_hdata->chash, k_unique_p, &found_unique_p)) {
     /* The key is newly linked into the hash table: count it */
     P4EST_ASSERT (*found_unique_p == k_unique_p);
-    P4EST_INFOF ("First time adding mirror %ld, proc %ld\n",
-                 (long) k_unique_p->qid, (long) k_unique_p->proc);
+    //P4EST_INFOF ("First time adding mirror %ld, proc %ld\n",
+    //             (long) k_unique_p->qid, (long) k_unique_p->proc);
     *(p4est_locidx_t *) sc_array_push (d->p2m[p_own]) =
       (*(ghost_hash_key_t **) found)->i;
   }

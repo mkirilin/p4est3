@@ -21,30 +21,41 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#ifndef P4EST3_TO_P8EST3_H
-#define P4EST3_TO_P8EST3_H
+/** \file p4est3_ghost_p8est.h
+ * Fill p4est structure p8est_ghost_t by iteration over p4est3 structure.
+ *
+ * \ingroup p4est3
+ */
 
-#ifdef P4EST3_H
-#error "The include files p4est3.h and p4est3_to_p8est3.h cannot be combined"
+#ifndef P4EST3_GHOST_P8EST_H
+#define P4EST3_GHOST_P8EST_H
+
+#include <p4est3.h>
+#include <p8est_ghost.h>
+#include <p4est3_iterate.h>
+
+#ifdef __cplusplus
+extern              "C"
+{
+#if 0
+}
 #endif
-#define P4_TO_P8
+#endif
 
-/* functions in p4est3_p4est */
-#define p4est3_new_p4est                    p4est3_new_p8est
-#define p4est3_connectivity_new_p4est       p4est3_connectivity_new_p8est
-#define p4est3_connectivity_new_p4est_brick     p4est3_connectivity_new_p8est_brick
-#define p4est3_quadrant_vtable_p4est        p4est3_quadrant_vtable_p8est
+/** Fill the \a p4est \a ghost layer structure by iterating over \a p4est3.
+ * \param [in] p3       Forest passed for reference.
+ * \param [out] ghost   Pointer to a valid ghost structure. Must be pre-allocated,
+ *                      except for the \a mirrors_proc_mirrors.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_ghost_fill_p8est (p4est3_t * p3,
+                                             p8est_ghost_t * ghost);
 
-/* functions in p4est3_quadrant_yx */
-#define p4est3_quadrant_yx_vtable           p4est3_quadrant_zyx_vtable
+#ifdef __cplusplus
+#if 0
+{
+#endif
+}
+#endif
 
-/* functions in p4est3_quadrant_mort */
-#define p4est3_quadrant_mort2d_vtable       p4est3_quadrant_mort3d_vtable
-
-/* functions in p4est3_convert_p4est */
-#define p4est3_convert_p4est                p4est3_convert_p8est
-
-/* functions in p4est3_ghost_p4est */
-#define p4est3_ghost_fill_p4est             p4est3_ghost_fill_p8est
-
-#endif /* !P4EST3_TO_P8EST3_H */
+#endif /* !P4EST3_GHOST_P8EST_H */

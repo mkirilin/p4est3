@@ -8,16 +8,14 @@ libp4est_installed_headers = src/p4est_base.h src/p4est3_base.h \
         src/p4est3_connectivity.h \
         src/p4est3_quadrant_vtable.h src/p4est3.h \
         src/p4est3_iterate.h \
-        src/p4est3_search.h \
-        src/p4est3_ghost.h
+        src/p4est3_search.h
 libp4est_internal_headers = src/p4est3_internal.h
 libp4est_compiled_sources = src/p4est_base.c \
         src/p4est3_connectivity.c \
         src/p4est3_quadrant_vtable.c src/p4est3.c \
         src/p4est3_internal_mpi.c src/p4est3_iterate.c \
         src/p4est3_refine.c  src/p4est3_internal_global.c \
-        src/p4est3_partition.c src/p4est3_search.c \
-        src/p4est3_ghost.c
+        src/p4est3_partition.c src/p4est3_search.c
 
 if P4EST_ENABLE_BUILD_2D
 libp4est_installed_headers += \
@@ -33,7 +31,8 @@ libp4est_installed_headers += \
         src/p4est3_p4est.h \
         src/p4est3_quadrant_yx.h \
         src/p4est3_quadrant_mort2d.h \
-        src/p4est3_convert_p4est.h
+        src/p4est3_convert_p4est.h \
+        src/p4est3_ghost_p4est.h
 libp4est_compiled_sources += \
         src/p4est_connectivity.c src/p4est.c \
         src/p4est_bits.c src/p4est_search.c src/p4est_build.c \
@@ -48,7 +47,8 @@ libp4est_compiled_sources += \
         src/p4est3_p4est.c \
         src/p4est3_quadrant_yx.c \
         src/p4est3_quadrant_mort2d.c \
-        src/p4est3_convert_p4est.c
+        src/p4est3_convert_p4est.c \
+        src/p4est3_ghost_p4est.c
 endif
 if P4EST_ENABLE_BUILD_3D
 libp4est_installed_headers += \
@@ -66,7 +66,8 @@ libp4est_installed_headers += \
         src/p4est3_p8est.h \
         src/p4est3_quadrant_zyx.h \
         src/p4est3_quadrant_mort3d.h \
-        src/p4est3_convert_p8est.h
+        src/p4est3_convert_p8est.h \
+        src/p4est3_ghost_p8est.h
 libp4est_compiled_sources += \
         src/p8est_connectivity.c src/p8est.c \
         src/p8est_bits.c src/p8est_search.c src/p8est_build.c  \
@@ -81,7 +82,8 @@ libp4est_compiled_sources += \
         src/p4est3_p8est.c \
         src/p4est3_quadrant_zyx.c \
         src/p4est3_quadrant_mort3d.c \
-        src/p4est3_convert_p8est.c
+        src/p4est3_convert_p8est.c \
+        src/p4est3_ghost_p8est.c
 endif
 if P4EST_ENABLE_BUILD_2D
 if P4EST_ENABLE_BUILD_3D

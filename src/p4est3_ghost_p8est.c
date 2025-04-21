@@ -21,41 +21,6 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-/** \file p4est3_ghost.h
- * Fill p4est structure p4est_ghost_t by iteration over p4est3 structure.
- *
- * \ingroup p4est3
- */
-
-#ifndef P4EST3_GHOST_H
-#define P4EST3_GHOST_H
-
-#include <p4est3.h>
-#include <p4est_ghost.h>
-#include <p4est3_iterate.h>
-
-#ifdef __cplusplus
-extern              "C"
-{
-#if 0
-}
-#endif
-#endif
-
-/** Fill the \a p4est \a ghost layer structure by iterating over \a p4est3.
- * \param [in] p3       Forest passed for reference.
- * \param [out] ghost   Pointer to a valid ghost structure. Must be pre-allocated,
- *                      except for the \a mirrors_proc_mirrors.
- * \return              NULL on success, error object otherwise.
- */
-sc3_error_t        *p4est3_ghost_fill_p4est (p4est3_t * p3,
-                                             p4est_ghost_t * ghost);
-
-#ifdef __cplusplus
-#if 0
-{
-#endif
-}
-#endif
-
-#endif /* !P4EST3_GHOST_H */
+#include <p4est_to_p8est.h>
+#include <p4est3_to_p8est3.h>
+#include "p4est3_ghost_p4est.c"

@@ -63,7 +63,8 @@ p4est_test_programs += \
         test/p8est3_test_p3_refine \
         test/p8est_test_io \
         test/p8est_test_neighbor_transform \
-        test/p8est3_test_p3_partition
+        test/p8est3_test_p3_partition \
+        test/p8est3_test_p3_ghost
 if P4EST_WITH_METIS
 p4est_test_programs += \
         test/p8est_test_reorder
@@ -172,6 +173,7 @@ test_p8est3_test_p3_refine_SOURCES = test/test_p3_refine3.c
 test_p8est_test_neighbor_transform_SOURCES = test/test_neighbor_transform3.c
 test_p8est_test_io_SOURCES = test/test_io3.c
 test_p8est3_test_p3_partition_SOURCES = test/test_p3_partition3.c
+test_p8est3_test_p3_ghost_SOURCES = test/test_p3_ghost3.c
 if P4EST_WITH_METIS
 test_p8est_test_reorder_SOURCES = test/test_reorder3.c
 endif
