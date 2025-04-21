@@ -319,7 +319,9 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
                     void *context)
 {
   char               *i, *j;
-  char               *pivot, *left, *right, tmp[size];
+  char               *left, *right, *pivot_ptr;
+  char                pivot_val[size];  // Store pivot value, not just pointer
+  char                tmp[size];
   size_t              right_elements, left_elements;
 
   if (nmemb <= 1) {
@@ -328,7 +330,7 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
 
   /* Simple insertion sort for small arrays */
   if (nmemb <= 16) {
-
+    char                tmp[size];
     for (i = (char *) base + size; i < (char *) base + nmemb * size;
          i += size) {
       memcpy (tmp, i, size);
@@ -342,15 +344,19 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
   }
 
   /* Quicksort for larger arrays */
-  pivot = (char *) base + (nmemb / 2) * size;
   left = (char *) base;
   right = (char *) base + (nmemb - 1) * size;
 
+  /* Choose pivot (middle element) and copy its value */
+  pivot_ptr = (char *) base + (nmemb / 2) * size;
+  memcpy (pivot_val, pivot_ptr, size);
+
   while (left <= right) {
+    /* Use pivot_val instead of pivot pointer */
     while (left < (char *) base + nmemb * size
-           && compar (left, pivot, context) < 0)
+           && compar (left, pivot_val, context) < 0)
       left += size;
-    while (right >= (char *) base && compar (right, pivot, context) > 0)
+    while (right >= (char *) base && compar (right, pivot_val, context) > 0)
       right -= size;
 
     if (left <= right) {
