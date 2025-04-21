@@ -385,7 +385,7 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
   int                 noderank, nodesize, mpisize;
   int                 dispunit;
   sc3_MPI_Aint_t      gftreebytes = 0, gfposbytes = 0,
-                      goffsetbytes = 0, quadbytes = 0, tempbytes;
+    goffsetbytes = 0, gtreeoffbytes = 0, quadbytes = 0, tempbytes;
   sc3_MPI_Comm_t      nodecomm;
   sc3_MPI_Info_t      info_noncontig;
   sc3_mpienv_t       *mpienv;
@@ -443,9 +443,9 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
   if (mto != NULL) {
     SC3A_IS (p4est3_gtroffs_is_new, mto);
     SC3A_CHECK (mto->num_trees > 0);
-    goffsetbytes = (mto->num_trees + 1) * sizeof (p4est3_gloidx);
+    gtreeoffbytes = (mto->num_trees + 1) * sizeof (p4est3_gloidx);
     SC3E (sc3_MPI_Win_allocate_shared
-          (noderank == 0 ? goffsetbytes : 0, sizeof (p4est3_gloidx),
+          (noderank == 0 ? gtreeoffbytes : 0, sizeof (p4est3_gloidx),
            info_noncontig, nodecomm, &mto->gtreeoffset, &mto->meta->win));
   }
   if (mq != NULL) {
@@ -482,7 +482,7 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
     if (mto != NULL) {
       SC3E (sc3_MPI_Win_shared_query
             (mto->meta->win, 0, &tempbytes, &dispunit, &mto->gtreeoffset));
-      SC3A_CHECK (tempbytes >= goffsetbytes);
+      SC3A_CHECK (tempbytes >= gtreeoffbytes);
       SC3A_CHECK (dispunit == (int) sizeof (p4est3_gloidx));
       SC3A_CHECK (mto->gtreeoffset != NULL);
     }
