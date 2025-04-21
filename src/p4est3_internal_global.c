@@ -24,7 +24,7 @@
 #include <p4est3_internal.h>
 
 static int
-p4est3_magic_base_is_valid (const p4est3_magic_base_t * m, char *reason)
+p4est3_magic_base_is_valid (const p4est3_magic_base_t *m, char *reason)
 {
   SC3E_IS (sc3_refcount_is_valid, &m->rc, reason);
   SC3E_IS (sc3_allocator_is_setup, m->mator, reason);
@@ -37,7 +37,7 @@ p4est3_magic_base_is_valid (const p4est3_magic_base_t * m, char *reason)
 
 #ifdef P4EST_ENABLE_DEBUG
 static int
-p4est3_magic_base_is_new (const p4est3_magic_base_t * m, char *reason)
+p4est3_magic_base_is_new (const p4est3_magic_base_t *m, char *reason)
 {
   SC3E_IS (p4est3_magic_base_is_valid, m, reason);
   SC3E_TEST (!m->setup, reason);
@@ -46,7 +46,7 @@ p4est3_magic_base_is_new (const p4est3_magic_base_t * m, char *reason)
 #endif /* P4EST_ENABLE_DEBUG */
 
 static sc3_error_t *
-p4est3_magic_base_new (sc3_allocator_t * mator, p4est3_magic_base_t ** mp)
+p4est3_magic_base_new (sc3_allocator_t *mator, p4est3_magic_base_t **mp)
 {
   p4est3_magic_base_t *m;
 
@@ -64,7 +64,7 @@ p4est3_magic_base_new (sc3_allocator_t * mator, p4est3_magic_base_t ** mp)
 }
 
 static sc3_error_t *
-p4est3_magic_base_destroy (p4est3_magic_base_t ** mp)
+p4est3_magic_base_destroy (p4est3_magic_base_t **mp)
 {
   p4est3_magic_base_t *m;
   sc3_allocator_t    *mator;
@@ -86,7 +86,7 @@ p4est3_magic_base_destroy (p4est3_magic_base_t ** mp)
 }
 
 int
-p4est3_glotree_is_valid (const p4est3_glotree_t * m, char *reason)
+p4est3_glotree_is_valid (const p4est3_glotree_t *m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);
   SC3E_TEST (m->meta != NULL, reason);
@@ -102,7 +102,7 @@ p4est3_glotree_is_valid (const p4est3_glotree_t * m, char *reason)
 }
 
 int
-p4est3_glopos_is_valid (const p4est3_glopos_t * m, char *reason)
+p4est3_glopos_is_valid (const p4est3_glopos_t *m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);
   SC3E_TEST (m->meta != NULL, reason);
@@ -119,7 +119,7 @@ p4est3_glopos_is_valid (const p4est3_glopos_t * m, char *reason)
 }
 
 int
-p4est3_glooffs_is_valid (const p4est3_glooffs_t * m, char *reason)
+p4est3_glooffs_is_valid (const p4est3_glooffs_t *m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);
   SC3E_TEST (m->meta != NULL, reason);
@@ -135,7 +135,7 @@ p4est3_glooffs_is_valid (const p4est3_glooffs_t * m, char *reason)
 }
 
 int
-p4est3_gtroffs_is_valid (const p4est3_gtroffs_t * m, char *reason)
+p4est3_gtroffs_is_valid (const p4est3_gtroffs_t *m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);
   SC3E_TEST (m->meta != NULL, reason);
@@ -152,7 +152,7 @@ p4est3_gtroffs_is_valid (const p4est3_gtroffs_t * m, char *reason)
 }
 
 int
-p4est3_quadrants_is_valid (const p4est3_quadrants_t * m, char *reason)
+p4est3_quadrants_is_valid (const p4est3_quadrants_t *m, char *reason)
 {
   SC3E_TEST (m != NULL, reason);
   SC3E_TEST (m->meta != NULL, reason);
@@ -169,7 +169,7 @@ p4est3_quadrants_is_valid (const p4est3_quadrants_t * m, char *reason)
 }
 
 int
-p4est3_glotree_is_new (const p4est3_glotree_t * m, char *reason)
+p4est3_glotree_is_new (const p4est3_glotree_t *m, char *reason)
 {
   SC3E_IS (p4est3_glotree_is_valid, m, reason);
   SC3E_TEST (!m->meta->setup, reason);
@@ -177,7 +177,7 @@ p4est3_glotree_is_new (const p4est3_glotree_t * m, char *reason)
 }
 
 int
-p4est3_glopos_is_new (const p4est3_glopos_t * m, char *reason)
+p4est3_glopos_is_new (const p4est3_glopos_t *m, char *reason)
 {
   SC3E_IS (p4est3_glopos_is_valid, m, reason);
   SC3E_TEST (!m->meta->setup, reason);
@@ -185,7 +185,7 @@ p4est3_glopos_is_new (const p4est3_glopos_t * m, char *reason)
 }
 
 int
-p4est3_glooffs_is_new (const p4est3_glooffs_t * m, char *reason)
+p4est3_glooffs_is_new (const p4est3_glooffs_t *m, char *reason)
 {
   SC3E_IS (p4est3_glooffs_is_valid, m, reason);
   SC3E_TEST (!m->meta->setup, reason);
@@ -193,7 +193,7 @@ p4est3_glooffs_is_new (const p4est3_glooffs_t * m, char *reason)
 }
 
 int
-p4est3_gtroffs_is_new (const p4est3_gtroffs_t * m, char *reason)
+p4est3_gtroffs_is_new (const p4est3_gtroffs_t *m, char *reason)
 {
   SC3E_IS (p4est3_gtroffs_is_valid, m, reason);
   SC3E_TEST (!m->meta->setup, reason);
@@ -201,7 +201,7 @@ p4est3_gtroffs_is_new (const p4est3_gtroffs_t * m, char *reason)
 }
 
 int
-p4est3_quadrants_is_new (const p4est3_quadrants_t * m, char *reason)
+p4est3_quadrants_is_new (const p4est3_quadrants_t *m, char *reason)
 {
   SC3E_IS (p4est3_quadrants_is_valid, m, reason);
   SC3E_TEST (!m->meta->setup, reason);
@@ -209,7 +209,7 @@ p4est3_quadrants_is_new (const p4est3_quadrants_t * m, char *reason)
 }
 
 sc3_error_t        *
-p4est3_glotree_new (sc3_allocator_t * mator, p4est3_glotree_t ** mp)
+p4est3_glotree_new (sc3_allocator_t *mator, p4est3_glotree_t **mp)
 {
   p4est3_magic_base_t *b;
   p4est3_glotree_t   *m;
@@ -228,7 +228,7 @@ p4est3_glotree_new (sc3_allocator_t * mator, p4est3_glotree_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_glopos_new (sc3_allocator_t * mator, p4est3_glopos_t ** mp)
+p4est3_glopos_new (sc3_allocator_t *mator, p4est3_glopos_t **mp)
 {
   p4est3_magic_base_t *b;
   p4est3_glopos_t    *m;
@@ -247,7 +247,7 @@ p4est3_glopos_new (sc3_allocator_t * mator, p4est3_glopos_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_glooffs_new (sc3_allocator_t * mator, p4est3_glooffs_t ** mp)
+p4est3_glooffs_new (sc3_allocator_t *mator, p4est3_glooffs_t **mp)
 {
   p4est3_magic_base_t *b;
   p4est3_glooffs_t   *m;
@@ -265,7 +265,7 @@ p4est3_glooffs_new (sc3_allocator_t * mator, p4est3_glooffs_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_gtroffs_new (sc3_allocator_t * mator, p4est3_gtroffs_t ** mp)
+p4est3_gtroffs_new (sc3_allocator_t *mator, p4est3_gtroffs_t **mp)
 {
   p4est3_magic_base_t *b;
   p4est3_gtroffs_t   *m;
@@ -284,7 +284,7 @@ p4est3_gtroffs_new (sc3_allocator_t * mator, p4est3_gtroffs_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_quadrants_new (sc3_allocator_t * mator, p4est3_quadrants_t ** mp)
+p4est3_quadrants_new (sc3_allocator_t *mator, p4est3_quadrants_t **mp)
 {
   p4est3_magic_base_t *b;
   p4est3_quadrants_t *m;
@@ -304,14 +304,14 @@ p4est3_quadrants_new (sc3_allocator_t * mator, p4est3_quadrants_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_glopartition_set_mpienv (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
-                                p4est3_glooffs_t * mo, p4est3_gtroffs_t * mto,
-                                p4est3_quadrants_t * mq, sc3_mpienv_t * mpienv)
+p4est3_glopartition_set_mpienv (p4est3_glotree_t *mt, p4est3_glopos_t *mp,
+                                p4est3_glooffs_t *mo, p4est3_gtroffs_t *mto,
+                                p4est3_quadrants_t *mq, sc3_mpienv_t *mpienv)
 {
   SC3A_IS (sc3_mpienv_is_setup, mpienv);
   SC3E_DEMAND
     (mt != NULL || mp != NULL || mo != NULL || mto != NULL || mq != NULL,
-    "At least one global partition object should not be NULL");
+     "At least one global partition object should not be NULL");
   if (mt != NULL) {
     SC3A_IS (p4est3_glotree_is_new, mt);
     SC3E (sc3_mpienv_ref (mpienv));
@@ -341,7 +341,7 @@ p4est3_glopartition_set_mpienv (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
 }
 
 sc3_error_t        *
-p4est3_glopos_set_qsize (p4est3_glopos_t * m, int qsize)
+p4est3_glopos_set_qsize (p4est3_glopos_t *m, int qsize)
 {
   SC3A_IS (p4est3_glopos_is_new, m);
   SC3A_CHECK (qsize > 0);
@@ -350,7 +350,7 @@ p4est3_glopos_set_qsize (p4est3_glopos_t * m, int qsize)
 }
 
 sc3_error_t        *
-p4est3_gtroffs_set_num_trees (p4est3_gtroffs_t * m, p4est3_topidx num_trees)
+p4est3_gtroffs_set_num_trees (p4est3_gtroffs_t *m, p4est3_topidx num_trees)
 {
   SC3A_IS (p4est3_gtroffs_is_new, m);
   SC3A_CHECK (num_trees > 0);
@@ -359,7 +359,7 @@ p4est3_gtroffs_set_num_trees (p4est3_gtroffs_t * m, p4est3_topidx num_trees)
 }
 
 sc3_error_t        *
-p4est3_quadrants_set_local_num_quads (p4est3_quadrants_t * m,
+p4est3_quadrants_set_local_num_quads (p4est3_quadrants_t *m,
                                       p4est3_locidx local_num_quads)
 {
   SC3A_IS (p4est3_quadrants_is_new, m);
@@ -369,7 +369,7 @@ p4est3_quadrants_set_local_num_quads (p4est3_quadrants_t * m,
 }
 
 sc3_error_t        *
-p4est3_quadrants_set_qsize (p4est3_quadrants_t * m, int qsize)
+p4est3_quadrants_set_qsize (p4est3_quadrants_t *m, int qsize)
 {
   SC3A_IS (p4est3_quadrants_is_new, m);
   SC3A_CHECK (qsize > 0);
@@ -378,9 +378,9 @@ p4est3_quadrants_set_qsize (p4est3_quadrants_t * m, int qsize)
 }
 
 sc3_error_t        *
-p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
-                           p4est3_glooffs_t * mo, p4est3_gtroffs_t * mto,
-                           p4est3_quadrants_t * mq)
+p4est3_glopartition_setup (p4est3_glotree_t *mt, p4est3_glopos_t *mp,
+                           p4est3_glooffs_t *mo, p4est3_gtroffs_t *mto,
+                           p4est3_quadrants_t *mq)
 {
   int                 noderank, nodesize, mpisize;
   int                 dispunit;
@@ -507,42 +507,42 @@ p4est3_glopartition_setup (p4est3_glotree_t * mt, p4est3_glopos_t * mp,
 }
 
 sc3_error_t        *
-p4est3_glotree_ref (p4est3_glotree_t * m)
+p4est3_glotree_ref (p4est3_glotree_t *m)
 {
   SC3E (sc3_refcount_ref (&m->meta->rc));
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_glopos_ref (p4est3_glopos_t * m)
+p4est3_glopos_ref (p4est3_glopos_t *m)
 {
   SC3E (sc3_refcount_ref (&m->meta->rc));
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_glooffs_ref (p4est3_glooffs_t * m)
+p4est3_glooffs_ref (p4est3_glooffs_t *m)
 {
   SC3E (sc3_refcount_ref (&m->meta->rc));
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_gtroffs_ref (p4est3_gtroffs_t * m)
+p4est3_gtroffs_ref (p4est3_gtroffs_t *m)
 {
   SC3E (sc3_refcount_ref (&m->meta->rc));
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_quadrants_ref (p4est3_quadrants_t * m)
+p4est3_quadrants_ref (p4est3_quadrants_t *m)
 {
   SC3E (sc3_refcount_ref (&m->meta->rc));
   return NULL;
 }
 
 sc3_error_t        *
-p4est3_glotree_unref (p4est3_glotree_t ** mp)
+p4est3_glotree_unref (p4est3_glotree_t **mp)
 {
   int                 waslast;
   sc3_allocator_t    *mator;
@@ -563,7 +563,7 @@ p4est3_glotree_unref (p4est3_glotree_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_glopos_unref (p4est3_glopos_t ** mp)
+p4est3_glopos_unref (p4est3_glopos_t **mp)
 {
   int                 waslast;
   sc3_allocator_t    *mator;
@@ -584,7 +584,7 @@ p4est3_glopos_unref (p4est3_glopos_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_glooffs_unref (p4est3_glooffs_t ** mp)
+p4est3_glooffs_unref (p4est3_glooffs_t **mp)
 {
   int                 waslast;
   p4est3_glooffs_t   *m;
@@ -605,7 +605,7 @@ p4est3_glooffs_unref (p4est3_glooffs_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_gtroffs_unref (p4est3_gtroffs_t ** mp)
+p4est3_gtroffs_unref (p4est3_gtroffs_t **mp)
 {
   int                 waslast;
   p4est3_gtroffs_t   *m;
@@ -626,7 +626,7 @@ p4est3_gtroffs_unref (p4est3_gtroffs_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_quadrants_unref (p4est3_quadrants_t ** mp)
+p4est3_quadrants_unref (p4est3_quadrants_t **mp)
 {
   int                 waslast;
   p4est3_quadrants_t *m;
@@ -647,7 +647,7 @@ p4est3_quadrants_unref (p4est3_quadrants_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_glotree_destroy (p4est3_glotree_t ** mp)
+p4est3_glotree_destroy (p4est3_glotree_t **mp)
 {
   sc3_error_t        *leak = NULL;
   p4est3_glotree_t   *m;
@@ -661,7 +661,7 @@ p4est3_glotree_destroy (p4est3_glotree_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_glopos_destroy (p4est3_glopos_t ** mp)
+p4est3_glopos_destroy (p4est3_glopos_t **mp)
 {
   sc3_error_t        *leak = NULL;
   p4est3_glopos_t    *m;
@@ -675,7 +675,7 @@ p4est3_glopos_destroy (p4est3_glopos_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_glooffs_destroy (p4est3_glooffs_t ** mp)
+p4est3_glooffs_destroy (p4est3_glooffs_t **mp)
 {
   sc3_error_t        *leak = NULL;
   p4est3_glooffs_t   *m;
@@ -689,7 +689,7 @@ p4est3_glooffs_destroy (p4est3_glooffs_t ** mp)
 }
 
 sc3_error_t        *
-p4est3_gtroffs_destroy (p4est3_gtroffs_t ** mp)
+p4est3_gtroffs_destroy (p4est3_gtroffs_t **mp)
 {
   sc3_error_t        *leak = NULL;
   p4est3_gtroffs_t   *m;
@@ -702,8 +702,8 @@ p4est3_gtroffs_destroy (p4est3_gtroffs_t ** mp)
   return leak;
 }
 
-sc3_error_t       *
-p4est3_quadrants_destroy (p4est3_quadrants_t ** mp)
+sc3_error_t        *
+p4est3_quadrants_destroy (p4est3_quadrants_t **mp)
 {
   sc3_error_t        *leak = NULL;
   p4est3_quadrants_t *m;
