@@ -46,31 +46,12 @@ along with p4est; if not, write to the Free Software Foundation, Inc.,
 #endif
 
 #ifndef P4_TO_P8
-static int          refine_level = 1;
+static int          refine_level = 4;
 #else
 static int          refine_level = 4;
 #endif
 
-#define TEST_SIMPLE 1
-
-#if TEST_SIMPLE == 1
-
-static int
-refine_fractal (p4est_t *p, p4est_topidx_t which_tree, p4est_quadrant_t *q)
-{
-  /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
-  p4est_locidx_t     *quadrant_local_id = (p4est_locidx_t *) p->user_pointer;
-
-  return (((p->global_first_quadrant[p->mpirank] + (*quadrant_local_id)++) %
-#ifdef P4_TO_P8
-           7)
-#else
-           3)
-#endif
-          == 0);
-}
-
-#else
+#define TEST_SIMPLE 0
 
 static int
 refine_fn (p4est_t *p4est, p4est_topidx_t which_tree,
@@ -114,8 +95,6 @@ refine_fn (p4est_t *p4est, p4est_topidx_t which_tree,
   return 1;
 }
 
-#endif
-
 static p4est_ghost_t *
 init_ghost_layer (p4est_t *p)
 {
@@ -145,7 +124,8 @@ make_allocator (sc3_allocator_t *oa, sc3_allocator_t **alloc)
 }
 
 static sc3_error_t *
-compare_ghost_results (p4est_ghost_t *ghost_p4est,
+compare_ghost_results (p4est_t *p4est, p4est3_t *p4est3,
+                       p4est_ghost_t *ghost_p4est,
                        p4est_ghost_t *ghost_p4est3)
 {
   int                 i;
@@ -274,17 +254,11 @@ main (int argc, char **argv)
   p4est_ghost_t      *ghost_p4est, *ghost_p4est3;
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e = NULL;
-#if TEST_SIMPLE == 1
-  p4est3_locidx       quadrant_local_id = 0;
-#endif
 
   /* initialize MPI */
   mpiret = sc_MPI_Init (&argc, &argv);
   SC_CHECK_MPI (mpiret);
   mpicomm = sc_MPI_COMM_WORLD;
-
-  sc_init (mpicomm, 1, 1, NULL, SC_LP_DEFAULT);
-  p4est_init (NULL, SC_LP_DEFAULT);
 
   /*--------------------------------------------------------------*/
   /************************** P4EST 2 *****************************/
@@ -292,32 +266,18 @@ main (int argc, char **argv)
 
 #ifndef P4_TO_P8
 
-#if TEST_SIMPLE == 1
-  conn = p4est_connectivity_new_twotrees (1, 0, 0);
-#else
   conn = p4est_connectivity_new_moebius ();
-#endif
 
 #else
+
   conn = p8est_connectivity_new_rotcubes ();
+
 #endif
 
-#if TEST_SIMPLE == 1
-  p4est = p4est_new_ext (mpicomm, conn, 0, 0, 1, 0, NULL, &quadrant_local_id);
-#else
   p4est = p4est_new (mpicomm, conn, 0, NULL, NULL);
-#endif
 
   /* refine to make the number of elements interesting */
-#if TEST_SIMPLE == 1
-  /*** refine in a loop ***/
-  for (int i = 0; i < refine_level; ++i) {
-    quadrant_local_id = 0;
-    p4est_refine (p4est, 0, refine_fractal, NULL);
-  }
-#else
   p4est_refine (p4est, 1, refine_fn, NULL);
-#endif
 
   /* balance the forest */
   p4est_balance (p4est, P4EST_CONNECT_FULL, NULL);
@@ -327,31 +287,33 @@ main (int argc, char **argv)
 
   /* create the ghost layer for p4est */
   ghost_p4est = p4est_ghost_new (p4est, P4EST_CONNECT_FACE);
-  printf ("p4est_ghost_new done\n");
+
+  P4EST_INFO ("Start writing p4est file...\n");
+  p4est_vtk_write_file (p4est, NULL, "test_ghost_p3");
+  P4EST_INFO ("Done vtk writing\n");
 
   /*--------------------------------------------------------------*/
   /************************** P4EST 3 *****************************/
   /*--------------------------------------------------------------*/
 
   mainalloc = sc3_allocator_nothread ();
-  SC3E_NULL_SET (e, make_allocator (mainalloc, &alloc));
-  SC3E_NULL_SET (e, p4est3_new (alloc, &p4est3));
-  SC3E_NULL_SET (e, p4est3_set_shared (p4est3, 1));
-  SC3E_NULL_SET (e, p4est3_set_contiguous (p4est3, 1));
+  SC3X (make_allocator (mainalloc, &alloc));
+  SC3X (p4est3_new (alloc, &p4est3));
+  SC3X (p4est3_set_shared (p4est3, 1));
+  SC3X (p4est3_set_contiguous (p4est3, 1));
 
-  SC3E_NULL_SET (e, p4est3_convert_p4est (p4est, p4est3, &conn3));
-  printf ("p4est3_convert_p4est done\n");
+  P4EST_INFO ("Start making p2 -> p3 conversion\n");
+  SC3X (p4est3_convert_p4est (p4est, p4est3, &conn3));
+  P4EST_INFO ("Done p2 -> p3 conversion\n");
 
-  printf ("writing p4est3 file...\n");
-  p4est_vtk_write_file (p4est, NULL, "test_ghost_p3");
-
-  printf ("making p4est ghost layer...\n");
+  P4EST_INFO ("Start making p4est ghost layer...\n");
   ghost_p4est3 = init_ghost_layer (p4est);
-  printf ("making p4est3 ghost layer...\n");
-  SC3E_NULL_SET (e, p4est3_ghost_fill_p4est (p4est3, ghost_p4est3));
+  P4EST_INFO ("Done p4est3 ghost layer\n");
 
-  printf ("comparing ghost layers...\n");
-  SC3E_NULL_SET (e, compare_ghost_results (ghost_p4est, ghost_p4est3));
+  SC3X (p4est3_ghost_fill_p4est (p4est3, ghost_p4est3));
+
+  P4EST_INFO ("Start comparing ghost layers...\n");
+  SC3X (compare_ghost_results (p4est, p4est3, ghost_p4est, ghost_p4est3));
 
   /* clean up */
   p4est_ghost_destroy (ghost_p4est);
@@ -359,9 +321,9 @@ main (int argc, char **argv)
   p4est_destroy (p4est);
   p4est_connectivity_destroy (conn);
 
-  SC3E_NULL_SET (e, p4est3_destroy (&p4est3));
-  SC3E_NULL_SET (e, p4est3_connectivity_destroy (&conn3));
-  SC3E_NULL_SET (e, sc3_allocator_destroy (&alloc));
+  SC3X (p4est3_destroy (&p4est3));
+  SC3X (p4est3_connectivity_destroy (&conn3));
+  SC3X (sc3_allocator_destroy (&alloc));
 
   /* exit */
   SC3E_NULL_REQ (e, !sc_finalize_noabort ());
@@ -369,6 +331,5 @@ main (int argc, char **argv)
   mpiret = sc_MPI_Finalize ();
   SC_CHECK_MPI (mpiret);
 
-  SC3X (e);
   return 0;
 }
