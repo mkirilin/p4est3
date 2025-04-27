@@ -30,7 +30,7 @@ endif()
 
 if(enable_p8est)
   set(p8est_tests test_conn_transformation3 test_brick3 test_join3 test_conn_reduce3 test_mesh_corners3)
-  if(P4EST_HAVE_ARPA_INET_H OR P4EST_HAVE_NETINET_IN_H OR P4EST_HAVE_WINSOCK2_H)
+  if(P4EST_HAVE_ARPA_INET_H OR P4EST_HAVE_NETINET_IN_H OR WIN32)
     # htonl
     list(APPEND p8est_tests test_balance3 test_partition_corr3 test_coarsen3
          test_balance_type3 test_lnodes3 test_plex3 test_connrefine3
@@ -41,13 +41,13 @@ if(enable_p8est)
   endif()
 
   if(P4EST_HAVE_GETOPT_H)
-    list(APPEND p8est_tests test_load3)
+    list(APPEND p8est_tests test_load3 test_loadsave3)
   endif()
 endif()
 
 
 if(enable_p6est AND enable_p8est AND P4EST_HAVE_GETOPT_H)
-  if(P4EST_HAVE_ARPA_INET_H OR P4EST_HAVE_NETINET_IN_H OR P4EST_HAVE_WINSOCK2_H)
+  if(P4EST_HAVE_ARPA_INET_H OR P4EST_HAVE_NETINET_IN_H OR WIN32)
     set(p6est_tests test_all6)
   endif()
 endif()
@@ -57,10 +57,10 @@ foreach(t IN LISTS p4est_tests p6est_tests p8est_tests)
 
 add_executable(${t} ${t}.c)
 
-target_link_libraries(${t} PRIVATE
-p4est
-$<$<BOOL:${P4EST_HAVE_WINSOCK2_H}>:${WINSOCK_LIBRARIES}>
-)
+target_link_libraries(${t} PRIVATE p4est)
+if (WIN32)
+  target_link_libraries(${t} PRIVATE ${WINSOCK_LIBRARIES})
+endif()
 
 if(P4EST_ENABLE_MPI)
   add_test(NAME ${t} COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_NUMPROC_MAX} $<TARGET_FILE:${t}>)
