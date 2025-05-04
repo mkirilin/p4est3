@@ -24,9 +24,10 @@
 #include <p4est3_internal.h>
 #include <sc3_omp.h>
 #include <sc3_refcount.h>
+#include "p4est3.h"
 
 int
-p4est3_vtable_is_valid (const p4est3_vtable_t * pvt, char *reason)
+p4est3_vtable_is_valid (const p4est3_vtable_t *pvt, char *reason)
 {
   int                 cdim;
 
@@ -50,7 +51,7 @@ p4est3_vtable_is_valid (const p4est3_vtable_t * pvt, char *reason)
 }
 
 int
-p4est3_is_valid (const p4est3_t * p3, char *reason)
+p4est3_is_valid (const p4est3_t *p3, char *reason)
 {
   SC3E_TEST (p3 != NULL, reason);
   SC3E_IS (sc3_refcount_is_valid, &p3->rc, reason);
@@ -98,7 +99,7 @@ p4est3_is_valid (const p4est3_t * p3, char *reason)
 }
 
 int
-p4est3_is_new (const p4est3_t * p3, char *reason)
+p4est3_is_new (const p4est3_t *p3, char *reason)
 {
   SC3E_IS (p4est3_is_valid, p3, reason);
   SC3E_TEST (!p3->setup, reason);
@@ -106,7 +107,7 @@ p4est3_is_new (const p4est3_t * p3, char *reason)
 }
 
 int
-p4est3_is_setup (const p4est3_t * p3, char *reason)
+p4est3_is_setup (const p4est3_t *p3, char *reason)
 {
   SC3E_IS (p4est3_is_valid, p3, reason);
   SC3E_TEST (p3->setup, reason);
@@ -114,7 +115,7 @@ p4est3_is_setup (const p4est3_t * p3, char *reason)
 }
 
 sc3_error_t        *
-p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
+p4est3_new (sc3_allocator_t *alloc, p4est3_t **pp3)
 {
   p4est3_t           *p3;
 
@@ -138,7 +139,7 @@ p4est3_new (sc3_allocator_t * alloc, p4est3_t ** pp3)
 }
 
 sc3_error_t        *
-p4est3_set_vtable (p4est3_t * p3, p4est3_vtable_t * pvt, void *slf)
+p4est3_set_vtable (p4est3_t *p3, p4est3_vtable_t *pvt, void *slf)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_IS (p4est3_vtable_is_valid, pvt);
@@ -161,7 +162,7 @@ p4est3_set_vtable (p4est3_t * p3, p4est3_vtable_t * pvt, void *slf)
 }
 
 sc3_error_t        *
-p4est3_set_comm (p4est3_t * p3, sc3_MPI_Comm_t comm, int dup)
+p4est3_set_comm (p4est3_t *p3, sc3_MPI_Comm_t comm, int dup)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (comm != SC3_MPI_COMM_NULL);
@@ -184,7 +185,7 @@ p4est3_set_comm (p4est3_t * p3, sc3_MPI_Comm_t comm, int dup)
 }
 
 sc3_error_t        *
-p4est3_set_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
+p4est3_set_connectivity (p4est3_t *p3, p4est3_connectivity_t *conn)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_IS (p4est3_connectivity_is_setup, conn);
@@ -201,8 +202,7 @@ p4est3_set_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
 }
 
 sc3_error_t        *
-p4est3_set_quadrant_vtable (p4est3_t * p3,
-                            const p4est3_quadrant_vtable_t * qvt)
+p4est3_set_quadrant_vtable (p4est3_t *p3, const p4est3_quadrant_vtable_t *qvt)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (qvt != NULL);
@@ -213,7 +213,7 @@ p4est3_set_quadrant_vtable (p4est3_t * p3,
 }
 
 sc3_error_t        *
-p4est3_set_level (p4est3_t * p3, int level)
+p4est3_set_level (p4est3_t *p3, int level)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (level >= 0);
@@ -223,7 +223,7 @@ p4est3_set_level (p4est3_t * p3, int level)
 }
 
 static sc3_error_t *
-p4est3_setup_vtable (p4est3_t * p3)
+p4est3_setup_vtable (p4est3_t *p3)
 {
   /* TODO: make MPI communicator wrappers of sc and sc3 compatible */
   /* TODO: set as many p3 member variables as makes sense */
@@ -232,7 +232,7 @@ p4est3_setup_vtable (p4est3_t * p3)
 }
 
 sc3_error_t        *
-p4est3_set_setup_mode (p4est3_t * p3, p4est3_setup_mode_t mode)
+p4est3_set_setup_mode (p4est3_t *p3, p4est3_setup_mode_t mode)
 {
   SC3A_IS (p4est3_is_new, p3);
   SC3A_CHECK (0 <= mode && mode < P4EST3_NEW_MODE_LAST);
@@ -242,7 +242,7 @@ p4est3_set_setup_mode (p4est3_t * p3, p4est3_setup_mode_t mode)
 }
 
 sc3_error_t        *
-p4est3_set_source (p4est3_t * p3, p4est3_t * old)
+p4est3_set_source (p4est3_t *p3, p4est3_t *old)
 {
   SC3A_IS (p4est3_is_new, p3);
   if (old == NULL) {
@@ -262,7 +262,7 @@ p4est3_set_source (p4est3_t * p3, p4est3_t * old)
 }
 
 sc3_error_t        *
-p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine)
+p4est3_set_refine (p4est3_t *p3, p4est3_refine_callback_t crefine)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->crefine = crefine;
@@ -271,7 +271,7 @@ p4est3_set_refine (p4est3_t * p3, p4est3_refine_callback_t crefine)
 }
 
 sc3_error_t        *
-p4est3_set_coarsen (p4est3_t * p3, p4est3_coarsen_callback_t ccoarse)
+p4est3_set_coarsen (p4est3_t *p3, p4est3_coarsen_callback_t ccoarse)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->ccoarse = ccoarse;
@@ -280,7 +280,7 @@ p4est3_set_coarsen (p4est3_t * p3, p4est3_coarsen_callback_t ccoarse)
 }
 
 sc3_error_t        *
-p4est3_set_shared (p4est3_t * p3, int shared)
+p4est3_set_shared (p4est3_t *p3, int shared)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->shared = shared;
@@ -288,7 +288,7 @@ p4est3_set_shared (p4est3_t * p3, int shared)
 }
 
 sc3_error_t        *
-p4est3_set_contiguous (p4est3_t * p3, int contiguous)
+p4est3_set_contiguous (p4est3_t *p3, int contiguous)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->contiguous = contiguous;
@@ -296,7 +296,7 @@ p4est3_set_contiguous (p4est3_t * p3, int contiguous)
 }
 
 sc3_error_t        *
-p4est3_set_family (p4est3_t * p3, int is_family)
+p4est3_set_family (p4est3_t *p3, int is_family)
 {
   SC3A_IS (p4est3_is_new, p3);
   p3->family = is_family;
@@ -305,7 +305,7 @@ p4est3_set_family (p4est3_t * p3, int is_family)
 }
 
 sc3_error_t        *
-p4est3_set_partition (p4est3_t * p3, int partition,
+p4est3_set_partition (p4est3_t *p3, int partition,
                       p4est3_weight_callback_t cweight)
 {
   SC3A_IS (p4est3_is_new, p3);
@@ -315,7 +315,7 @@ p4est3_set_partition (p4est3_t * p3, int partition,
 }
 
 sc3_error_t        *
-p4est3_setup (p4est3_t * p3)
+p4est3_setup (p4est3_t *p3)
 {
   int                 cdim;
   int                 lev;
@@ -408,7 +408,7 @@ p4est3_setup (p4est3_t * p3)
 }
 
 sc3_error_t        *
-p4est3_ref (p4est3_t * p3)
+p4est3_ref (p4est3_t *p3)
 {
   SC3A_IS (p4est3_is_setup, p3);
   SC3E (sc3_refcount_ref (&p3->rc));
@@ -416,7 +416,7 @@ p4est3_ref (p4est3_t * p3)
 }
 
 sc3_error_t        *
-p4est3_unref (p4est3_t * p3)
+p4est3_unref (p4est3_t *p3)
 {
   int                 waslast;
 
@@ -429,7 +429,7 @@ p4est3_unref (p4est3_t * p3)
 }
 
 sc3_error_t        *
-p4est3_destroy (p4est3_t ** pp3)
+p4est3_destroy (p4est3_t **pp3)
 {
   sc3_allocator_t    *alloc;
   p4est3_t           *p3;
@@ -496,7 +496,7 @@ p4est3_destroy (p4est3_t ** pp3)
 }
 
 sc3_error_t        *
-p4est3_access_connectivity (p4est3_t * p3, p4est3_connectivity_t ** pconn)
+p4est3_access_connectivity (p4est3_t *p3, p4est3_connectivity_t **pconn)
 {
   SC3E_RETVAL (pconn, NULL);
   SC3A_IS (p4est3_is_setup, p3);
@@ -508,7 +508,7 @@ p4est3_access_connectivity (p4est3_t * p3, p4est3_connectivity_t ** pconn)
 }
 
 sc3_error_t        *
-p4est3_restore_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
+p4est3_restore_connectivity (p4est3_t *p3, p4est3_connectivity_t *conn)
 {
   SC3A_IS (p4est3_is_setup, p3);
   SC3A_CHECK (conn == p3->conn);
@@ -520,9 +520,9 @@ p4est3_restore_connectivity (p4est3_t * p3, p4est3_connectivity_t * conn)
 }
 
 sc3_error_t        *
-p4est3_get_local_num_trees (const p4est3_t * p3,
-                            p4est3_topidx * first_local_tree,
-                            p4est3_topidx * last_local_tree)
+p4est3_get_local_num_trees (const p4est3_t *p3,
+                            p4est3_topidx *first_local_tree,
+                            p4est3_topidx *last_local_tree)
 {
   SC3A_IS (p4est3_is_setup, p3);
   SC3A_CHECK (first_local_tree != NULL);
@@ -541,7 +541,17 @@ p4est3_get_local_num_trees (const p4est3_t * p3,
 }
 
 sc3_error_t        *
-p4est3_get_quadrants (const p4est3_t * p3, char **q)
+p4est3_get_global_quadrant_offsets (const p4est3_t *p3,
+                                    p4est3_gloidx **goffset)
+{
+  SC3A_IS (p4est3_is_setup, p3);
+
+  *goffset = p3->goffset;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_get_quadrants (const p4est3_t *p3, char **q)
 {
   SC3A_IS (p4est3_is_setup, p3);
 
@@ -551,7 +561,7 @@ p4est3_get_quadrants (const p4est3_t * p3, char **q)
 }
 
 sc3_error_t        *
-p4est3_get_global_num_quads (const p4est3_t * p3, p4est3_gloidx * n)
+p4est3_get_global_num_quads (const p4est3_t *p3, p4est3_gloidx *n)
 {
   if (n != NULL) {
     *n = 0L;
@@ -565,7 +575,7 @@ p4est3_get_global_num_quads (const p4est3_t * p3, p4est3_gloidx * n)
 }
 
 sc3_error_t        *
-p4est3_get_local_num_quads (const p4est3_t * p3, p4est3_locidx * n)
+p4est3_get_local_num_quads (const p4est3_t *p3, p4est3_locidx *n)
 {
   if (n != NULL) {
     *n = 0L;
