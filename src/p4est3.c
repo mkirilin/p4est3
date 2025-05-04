@@ -315,6 +315,13 @@ p4est3_set_partition (p4est3_t *p3, int partition,
 }
 
 sc3_error_t        *
+p4est3_set_user_data (p4est3_t *p3, void *user_data)
+{
+  p3->user_data = user_data;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_setup (p4est3_t *p3)
 {
   int                 cdim;
@@ -585,5 +592,14 @@ p4est3_get_local_num_quads (const p4est3_t *p3, p4est3_locidx *n)
   if (n != NULL) {
     *n = p3->local_num_quads;
   }
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_get_user_data (p4est3_t *p3, void **user_data)
+{
+  SC3A_CHECK (user_data != NULL);
+
+  *user_data = p3->user_data;
   return NULL;
 }
