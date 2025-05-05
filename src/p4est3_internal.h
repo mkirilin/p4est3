@@ -52,16 +52,6 @@ typedef enum p4est3_setup_mode
 }
 p4est3_setup_mode_t;
 
-/* Use to choose a way of filling a forest based on another one. */
-typedef enum p4est3_source_setup
-{
-  P4EST3_SRC_COPY,     /**< Setup by a simple copying quadrants */
-  P4EST3_SRC_REFINE,   /**< Setup with refinement where necessary */
-  P4EST3_SRC_COARSE,   /**< Setup with coarsening where necessary */
-  P4EST3_SRC_MODE_LAST  /**< Unused bounding value */
-}
-p4est3_source_setup_t;
-
 /** Internal data for a process-local tree and the quadrants it contains. */
 typedef struct p4est3_tree
 {
@@ -366,7 +356,7 @@ sc3_error_t        *p4est3_quadrants_destroy (p4est3_quadrants_t ** mp);
  * \param [in,out] p3       The forest must not have been setup.
  * \param [in] mode         See \ref p4est3_setup_mode_t type for
  *                          available options. Default value is
- *                          P4EST3_NEW_MORTON.
+ *                          P4EST3_NEW_RECURSIVE_CHILD.
  */
 sc3_error_t        *p4est3_set_setup_mode (p4est3_t * p3,
                                            p4est3_setup_mode_t mode);

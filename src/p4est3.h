@@ -274,9 +274,6 @@ sc3_error_t        *p4est3_set_level (p4est3_t * p3, int level);
  * \param [in,out] p3       New forest object under construction.
  * \param [in] old          Source forest object that data will be used on
  *                          the setting up stage. NULL is possible.
- * \param [in] mode         See \ref p4est3_source_setup_t type for
- *                          available options. Default value is
- *                          P4EST3_COPY_MODE.
  * \return                  NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_set_source (p4est3_t * p3, p4est3_t * old);
@@ -400,8 +397,17 @@ sc3_error_t        *p4est3_get_local_num_trees (const p4est3_t * p3,
                                                 p4est3_topidx *
                                                 last_local_tree);
 
+/** Query the array of global quadrant offsets for each processor. The array
+ * has mpisize + 1 entries. For each process, it stores the global index of the
+ * first quadrant owned. The last entry is the global number of quadrants.
+ * \param [in] p3          Must be setup. Provides the forest to examine.
+ * \param [out] offset     On output, points to an array of global offsets.
+ *                         The array is owned by the forest and must not be 
+ *                         freed or modified.
+ * \return                 NULL on success, error object otherwise.
+ */
 sc3_error_t        *p4est3_get_global_quadrant_offsets (const p4est3_t * p3,
-                                                        p4est3_gloidx **
+                                                        const p4est3_gloidx **
                                                         offset);
 
 /*----------------------- accessing quadrants ------------------------*/

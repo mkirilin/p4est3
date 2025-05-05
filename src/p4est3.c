@@ -127,7 +127,7 @@ p4est3_new (sc3_allocator_t *alloc, p4est3_t **pp3)
   SC3E (sc3_refcount_init (&p3->rc));
   p3->alloc = alloc;
   p3->mpicomm = SC3_MPI_COMM_WORLD;
-  p3->setup_mode = P4EST3_NEW_MORTON;
+  p3->setup_mode = P4EST3_NEW_RECURSIVE_CHILD;
   p3->shared = 0;
   p3->contiguous = 0;
   p3->family = 0;
@@ -549,9 +549,10 @@ p4est3_get_local_num_trees (const p4est3_t *p3,
 
 sc3_error_t        *
 p4est3_get_global_quadrant_offsets (const p4est3_t *p3,
-                                    p4est3_gloidx **goffset)
+                                    const p4est3_gloidx **goffset)
 {
   SC3A_IS (p4est3_is_setup, p3);
+  SC3E_RETVAL (goffset, NULL);
 
   *goffset = p3->goffset;
   return NULL;
