@@ -410,6 +410,17 @@ sc3_error_t        *p4est3_get_global_quadrant_offsets (const p4est3_t * p3,
                                                         const p4est3_gloidx **
                                                         offset);
 
+/** Query the allocator used by this forest.
+ * \param [in] p3          Must be setup. Provides the forest to examine.
+ * \param [out] alloc      On output, points to the forest's allocator.
+ *                         The allocator is owned by the forest and must not be
+ *                         freed or modified.
+ * \return                 NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_allocator (const p4est3_t * p3,
+                                          sc3_allocator_t ** alloc);
+
+
 /*----------------------- accessing quadrants ------------------------*/
 /* TODO: think about this interface */
 

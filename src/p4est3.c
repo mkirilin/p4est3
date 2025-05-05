@@ -559,6 +559,17 @@ p4est3_get_global_quadrant_offsets (const p4est3_t *p3,
 }
 
 sc3_error_t        *
+p4est3_get_allocator (const p4est3_t *p3, sc3_allocator_t **alloc)
+{
+  SC3A_IS (p4est3_is_setup, p3);
+  SC3A_IS (sc3_allocator_is_setup, p3->alloc);
+  SC3E_RETVAL (alloc, NULL);
+
+  *alloc = p3->alloc;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_get_quadrants (const p4est3_t *p3, char **q)
 {
   SC3A_IS (p4est3_is_setup, p3);
