@@ -949,9 +949,6 @@ p4est3_internal_setup_from_source (p4est3_t * p3)
   SC3E (p4est3_set_level (p3, old->level));
   SC3E (p4est3_set_setup_mode (p3, old->setup_mode));
 
-  /* variables populated during p4est3_setup: communicator related */
-  SC3E (p4est3_set_shared (p3, old->shared));
-
   /* variables populated during p4est3_setup: partition related */
  /** TODO: why is it int type while p4est3_quadrant_size returs size_t? */
   p3->qsize = (int) p4est3_quadrant_size (p3->qvt);
