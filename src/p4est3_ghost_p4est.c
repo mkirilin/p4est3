@@ -483,17 +483,29 @@ merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
 }
 
 sc3_error_t        *
-p4est3_ghost_fill_p4est (p4est3_t *p3, p4est_ghost_t *ghost)
+p4est3_ghost_fill_p4est (p4est3_t *p3, p4est_ghost_t **ptr_ghost)
 {
   p4est3_ghost_fill_data_t data, *d = &data;
   int                 i;
   ghost_hash_data_t   sghost_hdata, *ghost_hdata = &sghost_hdata;
   ghost_hash_data_t   smirror_hdata, *mirror_hdata = &smirror_hdata;
   sc_array_t        **p2m;
+  p4est_ghost_t      *ghost;
 
   /*--------------------------------------------------------------*/
   /************************ ALLOCATIONS ***************************/
   /*--------------------------------------------------------------*/
+  ghost = P4EST_ALLOC (p4est_ghost_t, 1);
+  sc_array_init (&(ghost)->ghosts, sizeof (p4est_quadrant_t));
+  (ghost)->tree_offsets = P4EST_ALLOC (p4est_locidx_t, p3->num_trees + 1);
+  (ghost)->proc_offsets = P4EST_ALLOC (p4est_locidx_t, p3->mpisize + 1);
+
+  sc_array_init (&(ghost)->mirrors, sizeof (p4est_quadrant_t));
+  (ghost)->mirror_tree_offsets =
+    P4EST_ALLOC (p4est_locidx_t, p3->num_trees + 1);
+  (ghost)->mirror_proc_mirrors = NULL;
+  (ghost)->mirror_proc_offsets =
+    P4EST_ALLOC (p4est_locidx_t, p3->mpisize + 1);
 
   /* hash table for ghosts checking */
   ghost_hdata->ckeys = sc_mempool_new (sizeof (ghost_hash_key_t));
@@ -586,6 +598,7 @@ p4est3_ghost_fill_p4est (p4est3_t *p3, p4est_ghost_t *ghost)
   }
   P4EST_FREE (p2m);
 
+  SC3E_RETVAL (ptr_ghost, ghost);
   return NULL;
 }
 

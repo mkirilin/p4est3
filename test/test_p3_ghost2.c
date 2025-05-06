@@ -95,25 +95,6 @@ refine_fn (p4est_t *p4est, p4est_topidx_t which_tree,
   return 1;
 }
 
-static p4est_ghost_t *
-init_ghost_layer (p4est_t *p)
-{
-  const p4est_topidx_t num_trees = p->connectivity->num_trees;
-  p4est_ghost_t      *gl;
-
-  gl = P4EST_ALLOC (p4est_ghost_t, 1);
-  sc_array_init (&gl->ghosts, sizeof (p4est_quadrant_t));
-  gl->tree_offsets = P4EST_ALLOC (p4est_locidx_t, num_trees + 1);
-  gl->proc_offsets = P4EST_ALLOC (p4est_locidx_t, p->mpisize + 1);
-
-  sc_array_init (&gl->mirrors, sizeof (p4est_quadrant_t));
-  gl->mirror_tree_offsets = P4EST_ALLOC (p4est_locidx_t, num_trees + 1);
-  gl->mirror_proc_mirrors = NULL;
-  gl->mirror_proc_offsets = P4EST_ALLOC (p4est_locidx_t, p->mpisize + 1);
-
-  return gl;
-}
-
 static sc3_error_t *
 make_allocator (sc3_allocator_t *oa, sc3_allocator_t **alloc)
 {
@@ -306,11 +287,7 @@ main (int argc, char **argv)
   SC3X (p4est3_convert_p4est (p4est, p4est3, &conn3));
   P4EST_INFO ("Done p2 -> p3 conversion\n");
 
-  P4EST_INFO ("Start making p4est ghost layer...\n");
-  ghost_p4est3 = init_ghost_layer (p4est);
-  P4EST_INFO ("Done p4est3 ghost layer\n");
-
-  SC3X (p4est3_ghost_fill_p4est (p4est3, ghost_p4est3));
+  SC3X (p4est3_ghost_fill_p4est (p4est3, &ghost_p4est3));
 
   P4EST_INFO ("Start comparing ghost layers...\n");
   SC3X (compare_ghost_results (p4est, p4est3, ghost_p4est, ghost_p4est3));
