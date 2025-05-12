@@ -103,7 +103,7 @@ ghost_equal_fn (const void *v1, const void *v2, const void *u)
   return (k1->qid == k2->qid && k1->proc == k2->proc);
 }
 
-int
+static int
 compare_locidx (const void *a, const void *b)
 {
   p4est_locidx_t      arg1 = *(const p4est_locidx_t *) a;
@@ -294,7 +294,7 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
 }
 
 /* Sort ghost quadrants contained in ghost->ghosts */
-void
+static void
 sort_ghost_quadrants (sc_array_t *ghosts)
 {
   qsort (ghosts->array, ghosts->elem_count, ghosts->elem_size,
@@ -320,17 +320,20 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
 {
   char               *i, *j;
   char               *left, *right, *pivot_ptr;
-  char                pivot_val[size];  // Store pivot value, not just pointer
-  char                tmp[size];
+  char               *pivot_val, *tmp, *inner_tmp;
   size_t              right_elements, left_elements;
 
   if (nmemb <= 1) {
     return;
   }
 
+  /* Allocate memory for pivot and temp buffer */
+  pivot_val = P4EST_ALLOC(char, size);
+  tmp = P4EST_ALLOC(char, size);
+
   /* Simple insertion sort for small arrays */
   if (nmemb <= 16) {
-    char                tmp[size];
+    inner_tmp = P4EST_ALLOC(char, size);
     for (i = (char *) base + size; i < (char *) base + nmemb * size;
          i += size) {
       memcpy (tmp, i, size);
@@ -340,6 +343,9 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
       }
       memcpy (j + size, tmp, size);
     }
+    P4EST_FREE(inner_tmp);
+    P4EST_FREE(pivot_val);
+    P4EST_FREE(tmp);
     return;
   }
 
@@ -381,6 +387,10 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
   if (left_elements > 0) {
     qsort_with_context (left, left_elements, size, compar, context);
   }
+
+  /* Free allocated memory */
+  P4EST_FREE(pivot_val);
+  P4EST_FREE(tmp);
 }
 
 /* Sort the mirrors in a ghost layer and update the p2m arrays accordingly */
@@ -427,7 +437,7 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t *d)
 
     /* Replace mirrors array with sorted order */
     P4EST_FREE (mirrors->array);
-    mirrors->array = sorted;
+    mirrors->array = (char *) sorted;
 
     /* Update each sc_array in d->p2m */
     for (ii = 0; ii < d->ghost->mpisize; ii++) {
