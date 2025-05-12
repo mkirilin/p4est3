@@ -29,7 +29,6 @@
 #include <p4est3_p8est.h>
 #endif
 #include <p4est3_internal.h>
-#include <sc3_omp.h>
 
 #ifdef __cplusplus
 extern              "C"
@@ -116,7 +115,7 @@ p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
   p3->qsize = (int) p4est3_quadrant_size (p3->qvt);
   p3->qmaxlevel = p3->qvt->max_level;
   p3->num_children = p4est3_quadrant_num_children (p3->qvt);
-  p3->max_threads = sc3_omp_max_threads ();
+  p3->max_threads = 1;
 
   /* setup mpi, this call also sets p4est3_t::commdup */
   SC3E (p4est3_internal_setup_comm (p3));

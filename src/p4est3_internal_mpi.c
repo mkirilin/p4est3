@@ -23,10 +23,6 @@
 
 #include <p4est3_internal.h>
 
-#ifndef P4EST_ENABLE_OPENMP
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#endif
-
 sc3_error_t        *
 p4est3_internal_setup_comm (p4est3_t * p3)
 {

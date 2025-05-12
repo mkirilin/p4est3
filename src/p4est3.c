@@ -22,7 +22,6 @@
 */
 
 #include <p4est3_internal.h>
-#include <sc3_omp.h>
 #include <sc3_refcount.h>
 #include "p4est3.h"
 
@@ -391,7 +390,7 @@ p4est3_setup (p4est3_t *p3)
     SC3A_CHECK (p4est3_glopow (p3->num_children, p3->level) == num_uniform);
 
     /* allocate one temporary quadrant per thread */
-    p3->max_threads = sc3_omp_max_threads ();
+    p3->max_threads = 1;
     SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),
                                 &p3->temp_quad));
     for (ti = 0; ti < p3->max_threads; ++ti) {
