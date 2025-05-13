@@ -108,6 +108,8 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
     ri.quadrant = vi->quadrant;
     ri.qvt = vi->p3->qvt;
     ri.user_data = vi->p3->user_data;
+    ri.nquad = (p4est3_locidx) ((p4est3_gloidx) vi->nquad
+      + vi->p3->gtroffset[vi->ntree] - vi->p3->goffset[vi->p3->mpirank]);
     SC3E (cdata->crefine (&ri, &is_refine));
   }
   if (!is_refine) {
@@ -157,6 +159,9 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
       ci.family = cdata->family;
       ci.qvt = vi->p3->qvt;
       ci.user_data = vi->p3->user_data;
+      ci.nquad = (p4est3_locidx) ((p4est3_gloidx) vi->nquad
+      + vi->p3->gtroffset[vi->ntree] - vi->p3->goffset[vi->p3->mpirank])
+      - (vi->p3->num_children - 1);
       SC3E (cdata->ccoarse (&ci, &is_coarsen));
       cdata->nsiblings = 0;
 
@@ -205,6 +210,8 @@ p4est3_refine_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
     ri.quadrant = vi->quadrant;
     ri.qvt = vi->p3->qvt;
     ri.user_data = vi->p3->user_data;
+    ri.nquad = (p4est3_locidx) ((p4est3_gloidx) vi->nquad
+    + vi->p3->gtroffset[vi->ntree] - vi->p3->goffset[vi->p3->mpirank]);
     SC3E (cdata->crefine (&ri, &is_refine));
   }
   if (!is_refine) {
@@ -225,6 +232,9 @@ p4est3_refine_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
         ci.family = cdata->family;
         ci.qvt = vi->p3->qvt;
         ci.user_data = vi->p3->user_data;
+        ci.nquad = (p4est3_locidx) ((p4est3_gloidx) vi->nquad
+        + vi->p3->gtroffset[vi->ntree] - vi->p3->goffset[vi->p3->mpirank])
+        - (vi->p3->num_children - 1);
         SC3E (cdata->ccoarse (&ci, &is_coarsen));
 
         cdata->nsiblings = 0;

@@ -110,6 +110,7 @@ typedef struct p4est3_refine_callback_info
 
   /* these variables are specific to each quadrant asked for refinement */
   p4est3_topidx       ntree;            /**< Number of tree of quadrant */
+  p4est3_locidx       nquad;            /**< Local index of quadrant */
   void               *quadrant;         /**< Pointer to the quadrant that
                                              may be refined */
 }
@@ -126,6 +127,8 @@ typedef struct p4est3_coarsen_callback_info
 
   /* these variables are specific to each quadrant asked for refinement */
   p4est3_topidx       ntree;            /**< Number of tree of quadrant family */
+  p4est3_locidx       nquad;            /**< Minimal local index among
+                                             quadrants in a family */
   sc3_array_t        *family;           /**< Array of quadrants that represent
                                              a family that may be coarsened */
 }
