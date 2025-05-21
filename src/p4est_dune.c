@@ -1122,6 +1122,9 @@ typedef struct p4est_quad_nonb
    * The special value -2 designates a full size ghost quadrant.
    */
   p4est_locidx_t      nvdesc;
+
+  /* nearest common ancestor of contained quadrants */
+  p4est_quadrant_t    snca;
 }
 p4est_quad_nonb_t;
 
@@ -1319,6 +1322,88 @@ p4est_dune_nonb_hanging (p4est_quad_nonb_t *nq,
 }
 
 static void
+p4est_quad_nonb_nca (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
+{
+  int                 cmp;
+  size_t              lz, glz;
+  p4est_quadrant_t   *fd, *ld;
+
+  /* verify preconditions */
+  P4EST_ASSERT (nonb != NULL);
+  P4EST_ASSERT (nquad != NULL);
+  P4EST_ASSERT (nquad->nvdesc > 0);
+
+  /* we know that this quadrant is split */
+  lz = nquad->squads.elem_count;
+  glz = nquad->ghosts.elem_count;
+  if (lz + glz == 1) {
+
+    /* we have just one known descendant */
+    if (lz == 1) {
+      P4EST_ASSERT (glz == 0);
+      p4est_quadrant_copy
+        (p4est_quadrant_array_index (&nquad->squads, 0), &nquad->snca);
+    }
+    else {
+      P4EST_ASSERT (lz == 0);
+      P4EST_ASSERT (glz == 1);
+      p4est_quadrant_copy
+        (p4est_quadrant_array_index (&nquad->ghosts, 0), &nquad->snca);
+    }
+  }
+  else {
+
+    /* determine the nearest common ancestor of locals and ghosts */
+    fd = ld = NULL;
+    if (lz > 0) {
+      fd = p4est_quadrant_array_index (&nquad->squads, 0);
+      ld = p4est_quadrant_array_index (&nquad->squads,
+                                       nquad->squads.elem_count - 1);
+    }
+    if (glz > 0) {
+      p4est_quadrant_t   *gd;
+
+      /* first descendant */
+      gd = p4est_quadrant_array_index (&nquad->ghosts, 0);
+      if (fd == NULL) {
+        fd = gd;
+      }
+      else {
+        cmp = p4est_quadrant_compare (fd, gd);
+        P4EST_ASSERT (cmp != 0);
+        if (cmp > 0) {
+          fd = gd;
+        }
+      }
+
+      /* last descendant */
+      gd = p4est_quadrant_array_index (&nquad->ghosts,
+                                       nquad->ghosts.elem_count - 1);
+      if (ld == NULL) {
+        ld = gd;
+      }
+      else {
+        cmp = p4est_quadrant_compare (ld, gd);
+        P4EST_ASSERT (cmp != 0);
+        if (cmp < 0) {
+          ld = gd;
+        }
+      }
+    }
+
+    /* determine nearest common ancestor */
+    P4EST_ASSERT (fd != NULL);
+    P4EST_ASSERT (ld != NULL);
+    p4est_nearest_common_ancestor (fd, ld, &nquad->snca);
+  }
+
+  /* determine face touches with ancestor */
+
+  /* TO DO implement */
+
+}
+
+static void
 p4est_quad_nonb_split (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
 {
   size_t              lz, glz;
@@ -1359,6 +1444,10 @@ p4est_quad_nonb_split (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
     }
   }
 
+  /* determine nearest common ancestor of all quadrants */
+  nquad->nvdesc = (p4est_locidx_t) (lz + glz);
+  p4est_quad_nonb_nca (nonb, nquad);
+
   /* now there is at least one quadrant below the current level */
   p4est_split_array (&nquad->squads, nquad->skey.level, nquad->split);
   P4EST_ASSERT (lz == nquad->split[P4EST_CHILDREN]);
@@ -1366,8 +1455,6 @@ p4est_quad_nonb_split (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
     p4est_split_array (&nquad->ghosts, nquad->skey.level, nquad->gsplit);
     P4EST_ASSERT (glz == nquad->gsplit[P4EST_CHILDREN]);
   }
-  nquad->nvdesc = (p4est_locidx_t) (lz + glz);
-  P4EST_ASSERT (nquad->nvdesc > 0);
 }
 
 static p4est_quad_nonb_t *
