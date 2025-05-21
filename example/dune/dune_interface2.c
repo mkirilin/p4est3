@@ -22,6 +22,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+#include <sc_statistics.h>
 #ifndef P4_TO_P8
 #include <p4est_bits.h>
 #include <p4est_dune.h>
@@ -160,6 +161,9 @@ p4est_dune_face_iter (p4est_iter_face_info_t *info, void *user_data)
 static void
 run_dune_iterator (p4est_t *p4est, p4est_ghost_t *ghost)
 {
+  double              nonb_begin, nonb_dura;
+  sc_statinfo_t       nonb_stats[2];
+
   p4est_dune_iter_context_t scontext, *context = &scontext;
   context->p4est = p4est;
 
@@ -184,15 +188,26 @@ run_dune_iterator (p4est_t *p4est, p4est_ghost_t *ghost)
   context->tree = NULL;
   context->num_volumes = context->num_faces = 0;
   context->num_faces_full = context->num_faces_boundary = 0;
+  nonb_begin = sc_MPI_Wtime ();
   p4est_dune_iterate (p4est, ghost, context,
                       p4est_dune_volume_iter, p4est_dune_face_iter);
+  nonb_dura = sc_MPI_Wtime () - nonb_begin;
   SC_CHECK_ABORT (context->num_volumes == p4est->local_num_quadrants,
                   "face iteration count mismatch");
 
+  /* gather parallel timing information */
+  sc_stats_set1 (&nonb_stats[0], nonb_dura, "Iterate");
+  sc_stats_set1 (&nonb_stats[1], context->num_volumes == 0 ? 0. :
+                 nonb_dura / context->num_volumes, "Perquad");
+  sc_stats_compute1 (p4est->mpicomm, 2, nonb_stats);
+  sc_stats_print (p4est_get_package_id (), SC_LP_STATISTICS,
+                  2, nonb_stats, 1, 1);
+
   /* print simple diagnostic message */
-  P4EST_INFOF ("Iterated over %ld local faces full %ld boundary %ld\n",
+  P4EST_INFOF ("Iterated over %ld local faces full %ld boundary %ld sec/leaf %g\n",
                (long) context->num_faces, (long) context->num_faces_full,
-               (long) context->num_faces_boundary);
+               (long) context->num_faces_boundary,
+               nonb_dura / context->num_volumes);
 }
 
 static int
@@ -262,7 +277,7 @@ run_dune_interface (sc_MPI_Comm mpicomm, p4est_connectivity_t * conn,
   }
 #endif
 
-  /* run face iterator */
+  /* run volume & face iterators */
   run_dune_iterator (p4est, ghost);
 
   /* deallocate temporary structure */
