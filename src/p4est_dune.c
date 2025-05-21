@@ -1125,6 +1125,9 @@ typedef struct p4est_quad_nonb
 
   /* nearest common ancestor of contained quadrants */
   p4est_quadrant_t    snca;
+
+  /* boundary bits for local range; see p4est_find_range_boundaries */
+  int32_t             touch;
 }
 p4est_quad_nonb_t;
 
@@ -1397,10 +1400,27 @@ p4est_quad_nonb_nca (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
     p4est_nearest_common_ancestor (fd, ld, &nquad->snca);
   }
 
-  /* determine face touches with ancestor */
+  /* determine local touches with ancestor */
+  if (nquad->squads.elem_count > 0) {
+    p4est_quadrant_t            first, last;
 
-  /* TO DO implement */
+    /* find smallest first descendant of local range */
+    fd = p4est_quadrant_array_index (&nquad->squads, 0);
+    p4est_quadrant_first_descendant (fd, &first, P4EST_QMAXLEVEL);
 
+    /* find smallest last descendant of local range */
+    ld = p4est_quadrant_array_index (&nquad->squads,
+                                     nquad->squads.elem_count - 1);
+    p4est_quadrant_last_descendant (ld, &last, P4EST_QMAXLEVEL);
+
+    /* determine boundary contact of quadrant range */
+    nquad->touch = p4est_find_range_boundaries
+      (&first, &last, nquad->skey.level, NULL,
+#ifdef P4_TO_P8
+       NULL,
+#endif
+       NULL);
+  }
 }
 
 static void
@@ -1428,6 +1448,19 @@ p4est_quad_nonb_split (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
 
     /* mark full local descendant as special case */
     if (tquad->level == nquad->skey.level) {
+      P4EST_ASSERT (glz == 0);
+
+      /* set nearest comment ancestor to sole quadrant */
+      p4est_quadrant_copy (tquad, &nquad->snca);
+
+      /* the local quadrant touches all faces */
+      nquad->touch = (1 << (P4EST_FACES +
+#ifdef P4_TO_P8
+                            P8EST_EDGES +
+#endif
+                            P4EST_CHILDREN)) - 1;
+
+      /* encode special case */
       nquad->nvdesc = -1;
       return;
     }
@@ -1439,6 +1472,12 @@ p4est_quad_nonb_split (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
 
     /* mark full ghost descendant as special case */
     if (tquad->level == nquad->skey.level) {
+      P4EST_ASSERT (lz == 0);
+
+      /* set nearest comment ancestor to sole quadrant */
+      p4est_quadrant_copy (tquad, &nquad->snca);
+
+      /* encode special case */
       nquad->nvdesc = -2;
       return;
     }
@@ -1644,6 +1683,12 @@ p4est_dune_nonb_tface (p4est_dune_nonb_t *nonb,
       sc_array_index (&nonb->finfo.sides, k);
   }
 
+  /* if no local quadrants touch the face on either side, we bail */
+  if (!(nquads[0]->touch & (1 << fsides[0]->face)) &&
+      !(nquads[1]->touch & (1 << fsides[1]->face))) {
+    return;
+  }
+
   /* we will definitely execute the face callback or go into the recursion */
   for (k = 0; k < 2; ++k) {
     fchildren[k][0] = NULL;
@@ -1755,6 +1800,11 @@ p4est_dune_nonb_bface (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
   /* the face has only one side */
   fside = (p4est_iter_face_side_t *)
     sc_array_index (&nonb->fbinfo.sides, 0);
+
+  /* if no local quadrants touch the face, we bail */
+  if (!(nquad->touch & (1 << fside->face))) {
+    return;
+  }
 
   /* callback on a full size local quadrant */
   if (nquad->nvdesc == -1) {
