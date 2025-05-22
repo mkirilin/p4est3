@@ -42,77 +42,15 @@
 
 SC_EXTERN_C_BEGIN;
 
-/** Parameters to the constructor of the dune number tables. */
-typedef struct p4est_dune_numbers_params
-{
-  /** Determine which codimensions are numbered. */
-  p4est_connect_type_t ctype;
-}
-p4est_dune_numbers_params_t;
-
-/** Element corner and face numbers to interface to the DUNE library.
- *
- * The element corners and faces arrays hold local indices that are unique
- * within this process among all faces, and likewise unique within this
- * process among all corners.  The same number may occur in both the
- * face and corner list, but it refers to a different mesh object.
- *
- * The indices are numbered starting from zero.
- *
- * The array entries are of type \ref p4est_locidx_t.
+/** Volume and face iterator over a 2:1 balanced forest.
+ * See \ref p4est_dune_iterate for a detailed reference.
  */
-typedef struct p4est_dune_numbers
-{
-  /** Parameters the numbers are built with are copied by value. */
-  p4est_dune_numbers_params_t params;
-
-  /** Highest number (exclusive) among all element corner entries. */
-  p4est_locidx_t      num_corner_numbers;
-
-  /** For each local element corner a process-local index. */
-  sc_array_t         *element_corners;
-
-  /** Highest number (exclusive) among all element face entries. */
-  p4est_locidx_t      num_face_numbers;
-
-  /** For each local element face a process-local index. */
-  sc_array_t         *element_faces;
-}
-p4est_dune_numbers_t;
-
-/** Set default parameters to pass to \ref p4est_dune_numbers_new.
- * \param [out] params  Pointer must not be NULL.
- *                      The structure is filled with default values.
- */
-void                p4est_dune_numbers_params_init
-  (p4est_dune_numbers_params_t * params);
-
-/** Create lookup tables for unique corners and faces.
- * Hanging corners and faces are included as independent entities.
- * All numbers are process-local.
- *
- * \param [in] p4est    Required input parameter is not modified.  It must
- *                      be balanced at least to \ref P4EST_CONNECT_ALMOST.
- * \param [in] ghost    The ghost layer must have been generated with
- *                      \ref p4est_ghost_new using the same \c p4est and
- *                      the parameter \ref P4EST_CONNECT_FULL.
- * \param [in] params   Further parameters to control the mode of operation.
- *                      When passing NULL, the behavior is identical to using
- *                      defaults by \ref p4est_dune_numbers_params_init.
- * \return              A fully initialized dune node numbering.
- *                      Deallocate with \ref p4est_dune_numbers_destroy.
- */
-p4est_dune_numbers_t *p4est_dune_numbers_new (p4est_t * p4est,
-                                              p4est_ghost_t * ghost,
-                                              const
-                                              p4est_dune_numbers_params_t *
-                                              params);
-
-/** Destroy the dune element number tables previously generated.
- * \param [in] dn       Valid dune number tables from \ref
- *                      p4est_dune_numbers_new are deallocated.
- */
-void                p4est_dune_numbers_destroy (p4est_dune_numbers_t * dn);
+void                p4est_dune_iterate_balanced (p4est_t *p4est,
+                                                 p4est_ghost_t *ghost_layer,
+                                                 void *user_data,
+                                                 p4est_iter_volume_t
+                                                 iter_volume,
+                                                 p4est_iter_face_t iter_face);
 
 /** Execute user supplied callbacks at every local volume and face.
  *
@@ -143,13 +81,14 @@ void                p4est_dune_numbers_destroy (p4est_dune_numbers_t * dn);
  * its face siblings in the variable is.hanging.quadid[1], values in [0, 2).
  *
  * \param[in] p4est          The forest to iterate over.
- * \param[in] ghost_layer    Required valid ghost structure.
+ *                           It is not required to be 2:1 balanced.
+ * \param[in] ghost_layer    Valid ghost structure or NULL.
  * \param[in,out] user_data  optional context to supply to each callback.
  * \param[in] iter_volume    callback function for every quadrant interior.
  * \param[in] iter_face      callback function for every face between.
  */
-void                p4est_dune_iterate (p4est_t * p4est,
-                                        p4est_ghost_t * ghost_layer,
+void                p4est_dune_iterate (p4est_t *p4est,
+                                        p4est_ghost_t *ghost_layer,
                                         void *user_data,
                                         p4est_iter_volume_t iter_volume,
                                         p4est_iter_face_t iter_face);

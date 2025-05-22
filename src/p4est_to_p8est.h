@@ -337,6 +337,7 @@
 #define p4est_quadrant_is_equal         p8est_quadrant_is_equal
 #define p4est_quadrant_overlaps         p8est_quadrant_overlaps
 #define p4est_quadrant_is_equal_piggy   p8est_quadrant_is_equal_piggy
+#define p4est_quadrant_hash_piggy       p8est_quadrant_hash_piggy
 #define p4est_quadrant_compare          p8est_quadrant_compare
 #define p4est_coordinates_compare       p8est_coordinates_compare
 #define p4est_quadrant_disjoint         p8est_quadrant_disjoint
@@ -660,6 +661,7 @@
 #define p4est_dune_numbers_params_init  p8est_dune_numbers_params_init
 #define p4est_dune_numbers_new          p8est_dune_numbers_new
 #define p4est_dune_numbers_destroy      p8est_dune_numbers_destroy
+#define p4est_dune_iterate_balanced     p8est_dune_iterate_balanced
 #define p4est_dune_iterate              p8est_dune_iterate
 
 /* functions in p4est_connrefine */

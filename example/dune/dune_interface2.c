@@ -22,6 +22,7 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+#include <sc_statistics.h>
 #ifndef P4_TO_P8
 #include <p4est_bits.h>
 #include <p4est_dune.h>
@@ -81,8 +82,14 @@ refine_callback (p4est_t * p4est,
 
 typedef struct p4est_dune_iter_context
 {
+  p4est_t            *p4est;
+  p4est_topidx_t      treeid;
+  p4est_tree_t       *tree;
+
   p4est_locidx_t      num_volumes;
   p4est_locidx_t      num_faces;
+  p4est_locidx_t      num_faces_full;
+  p4est_locidx_t      num_faces_boundary;
 }
 p4est_dune_iter_context_t;
 
@@ -91,55 +98,131 @@ p4est_dune_volume_iter (p4est_iter_volume_info_t *info, void *user_data)
 {
   p4est_dune_iter_context_t *c = (p4est_dune_iter_context_t *) user_data;
 
+  P4EST_ASSERT (info != NULL);
   P4EST_ASSERT (c != NULL);
+
+  if (info->treeid > c->treeid) {
+    c->tree = p4est_tree_array_index (c->p4est->trees,
+                                      c->treeid = info->treeid);
+  }
+  P4EST_ASSERT (c->tree->quadrants_offset + info->quadid == c->num_volumes);
+
   ++c->num_volumes;
+}
+
+static void
+p4est_dune_face_dummy (p4est_iter_face_info_t *info, void *user_data)
+{
 }
 
 static void
 p4est_dune_face_iter (p4est_iter_face_info_t *info, void *user_data)
 {
   p4est_dune_iter_context_t *c = (p4est_dune_iter_context_t *) user_data;
+  int                 k;
+  int                 full;
+  p4est_iter_face_side_t *fside;
 
+  P4EST_ASSERT (info != NULL);
   P4EST_ASSERT (c != NULL);
+
   ++c->num_faces;
+
+  /* count specific cases of face connections */
+  if (info->sides.elem_count == 2) {
+    /* identify cases where no side is hanging */
+    full = 1;
+    for (k = 0; k < 2; ++k) {
+      fside = (p4est_iter_face_side_t *)
+        sc_array_index_int (&info->sides, k);
+      if (fside->is_hanging) {
+        /* there can be no callback with two hanging faces */
+        P4EST_ASSERT (full);
+        full = 0;
+      }
+    }
+    if (full) {
+      ++c->num_faces_full;
+    }
+  }
+  else {
+    /* this is a domain (necessarily tree) boundary */
+#ifdef P4EST_ENABLE_DEBUG
+    P4EST_ASSERT (info->sides.elem_count == 1);
+    P4EST_ASSERT (info->tree_boundary == P4EST_CONNECT_FACE);
+    fside = (p4est_iter_face_side_t *)
+      sc_array_index_int (&info->sides, 0);
+    P4EST_ASSERT (!fside->is_hanging);
+#endif
+    ++c->num_faces_boundary;
+  }
 }
 
 static void
 run_dune_iterator (p4est_t *p4est, p4est_ghost_t *ghost)
 {
+  double              nonb_begin, nonb_dura;
+  sc_statinfo_t       nonb_stats[2];
+
   p4est_dune_iter_context_t scontext, *context = &scontext;
+  context->p4est = p4est;
 
   /* empty iteration */
   p4est_dune_iterate (p4est, ghost, NULL, NULL, NULL);
 
+  /* just faces without ghost layer */
+  p4est_dune_iterate (p4est, NULL, NULL, NULL, p4est_dune_face_dummy);
+
   /* iterate over volumes only */
+  context->treeid = -1;
+  context->tree = NULL;
   context->num_volumes = context->num_faces = 0;
+  context->num_faces_full = context->num_faces_boundary = 0;
   p4est_dune_iterate (p4est, ghost, context, p4est_dune_volume_iter, NULL);
   SC_CHECK_ABORT (context->num_volumes == p4est->local_num_quadrants,
                   "volume iteration count mismatch");
   SC_CHECK_ABORT (context->num_faces == 0, "face iteration nonzero count");
 
   /* iterate over volumes and faces */
+  context->treeid = -1;
+  context->tree = NULL;
   context->num_volumes = context->num_faces = 0;
+  context->num_faces_full = context->num_faces_boundary = 0;
+  nonb_begin = sc_MPI_Wtime ();
   p4est_dune_iterate (p4est, ghost, context,
                       p4est_dune_volume_iter, p4est_dune_face_iter);
+  nonb_dura = sc_MPI_Wtime () - nonb_begin;
   SC_CHECK_ABORT (context->num_volumes == p4est->local_num_quadrants,
                   "face iteration count mismatch");
 
+  /* gather parallel timing information */
+  sc_stats_set1 (&nonb_stats[0], nonb_dura, "Iterate");
+  sc_stats_set1 (&nonb_stats[1], context->num_volumes == 0 ? 0. :
+                 nonb_dura / context->num_volumes, "Perquad");
+  sc_stats_compute1 (p4est->mpicomm, 2, nonb_stats);
+  sc_stats_print (p4est_get_package_id (), SC_LP_STATISTICS,
+                  2, nonb_stats, 1, 1);
+
   /* print simple diagnostic message */
-  P4EST_INFOF ("Iterated over %ld local faces\n", (long) context->num_faces);
+  P4EST_INFOF ("Iterated over %ld local faces full %ld boundary %ld sec/leaf %g\n",
+               (long) context->num_faces, (long) context->num_faces_full,
+               (long) context->num_faces_boundary,
+               nonb_dura / context->num_volumes);
 }
 
 static int
 run_dune_interface (sc_MPI_Comm mpicomm, p4est_connectivity_t * conn,
                     int maxlevel)
 {
-  int                 i, j;
-  int                 ctype;
+  int                 i;
   p4est_gloidx_t      gnum;
   p4est_t            *p4est;
   p4est_ghost_t      *ghost;
+#if 0
+  int                 j;
+  int                 ctype;
   p4est_dune_numbers_t *dn;
+#endif
 
   /* generate mesh with some arbitrary adaptive refinement */
   p4est = p4est_new_ext (mpicomm, conn, 0, 0, 1, 0, NULL, NULL);
@@ -172,6 +255,7 @@ run_dune_interface (sc_MPI_Comm mpicomm, p4est_connectivity_t * conn,
   /* we must provide a ghost layer */
   ghost = p4est_ghost_new (p4est, P4EST_CONNECT_FULL);
 
+#if 0
   /* initialize DUNE node number export */
   p4est_dune_numbers_params_t dparams, *pa = &dparams;
   p4est_dune_numbers_params_init (pa);
@@ -191,8 +275,9 @@ run_dune_interface (sc_MPI_Comm mpicomm, p4est_connectivity_t * conn,
     /* free memory in generated interface */
     p4est_dune_numbers_destroy (dn);
   }
+#endif
 
-  /* run face iterator */
+  /* run volume & face iterators */
   run_dune_iterator (p4est, ghost);
 
   /* deallocate temporary structure */

@@ -39,4 +39,6 @@ example_timings_p8est3_p3time_SOURCES = example/timings/p3time3.c
 example_timings_p8est3_p3partition_SOURCES = example/timings/p3partition3.c
 endif
 
-EXTRA_DIST += example/timings/timana.awk example/timings/timana.sh
+EXTRA_DIST += example/timings/timana.awk example/timings/timana.sh \
+              example/timings/tsrana.awk example/timings/tsrana.sh \
+              example/timings/perfscript.sh
