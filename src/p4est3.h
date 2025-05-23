@@ -394,6 +394,14 @@ sc3_error_t        *p4est3_restore_connectivity (p4est3_t * p3,
  */
 sc3_error_t        *p4est3_get_mpirank (const p4est3_t * p3, int *rank);
 
+/** Query the Maximum allowed refinement level of this forest.
+ * \param [in] p3          Must be setup.  Provides the forest to examine.
+ * \param [out] maxlevel   On output, indicates the maximum allowed
+ *                         refinement level.
+ * \return                 NULL on success, error object otherwise.
+*/
+sc3_error_t        *p4est3_get_maxlevel (const p4est3_t * p3, int *maxlevel);
+
 /** Query the range of processor-local trees of this forest.
  * \param [in] p3                   Initialized, valid forest.
  * \param [out] first_local_tree    The first local tree, or -1 if empty.
@@ -431,7 +439,7 @@ sc3_error_t        *p4est3_get_global_quadrant_offsets (const p4est3_t * p3,
  * \return                 NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_get_global_quadrant_tree_offsets
-                      (const p4est3_t * p3, const p4est3_gloidx ** offset);
+  (const p4est3_t * p3, const p4est3_gloidx ** offset);
 
 /** Query the allocator used by this forest.
  * \param [in] p3          Must be setup. Provides the forest to examine.
@@ -442,7 +450,6 @@ sc3_error_t        *p4est3_get_global_quadrant_tree_offsets
  */
 sc3_error_t        *p4est3_get_allocator (const p4est3_t * p3,
                                           sc3_allocator_t ** alloc);
-
 
 /*----------------------- accessing quadrants ------------------------*/
 /* TODO: think about this interface */
