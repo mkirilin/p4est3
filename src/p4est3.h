@@ -386,6 +386,14 @@ sc3_error_t        *p4est3_restore_connectivity (p4est3_t * p3,
                                                  p4est3_connectivity_t *
                                                  conn);
 
+/** Query the rank in forest communicator.
+ * \param [in] p3          Must be setup.  Provides the forest to examine.
+ * \param [out] rank       On output, indicates the rank in the forest
+ *                         communicator.
+ * \return                 NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_mpirank (const p4est3_t * p3, int *rank);
+
 /** Query the range of processor-local trees of this forest.
  * \param [in] p3                   Initialized, valid forest.
  * \param [out] first_local_tree    The first local tree, or -1 if empty.
@@ -412,6 +420,18 @@ sc3_error_t        *p4est3_get_local_num_trees (const p4est3_t * p3,
 sc3_error_t        *p4est3_get_global_quadrant_offsets (const p4est3_t * p3,
                                                         const p4est3_gloidx **
                                                         offset);
+
+/** Query the array of global tree offsets for each processor. The array
+ * has num_trees + 1 entries. For each tree, it stores the global index of the
+ * first quadrant inth the tree. The last entry is the global number of quadrants.
+ * \param [in] p3          Must be setup. Provides the forest to examine.
+ * \param [out] offset     On output, points to an array of global offsets.
+ *                         The array is owned by the forest and must not be
+ *                         freed or modified.
+ * \return                 NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_global_quadrant_tree_offsets
+                      (const p4est3_t * p3, const p4est3_gloidx ** offset);
 
 /** Query the allocator used by this forest.
  * \param [in] p3          Must be setup. Provides the forest to examine.

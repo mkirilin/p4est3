@@ -526,6 +526,16 @@ p4est3_restore_connectivity (p4est3_t *p3, p4est3_connectivity_t *conn)
 }
 
 sc3_error_t        *
+p4est3_get_mpirank (const p4est3_t * p3, int *rank)
+{
+  SC3A_IS (p4est3_is_setup, p3);
+  SC3A_CHECK (rank != NULL);
+
+  *rank = p3->mpirank;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_get_local_num_trees (const p4est3_t *p3,
                             p4est3_topidx *first_local_tree,
                             p4est3_topidx *last_local_tree)
@@ -554,6 +564,17 @@ p4est3_get_global_quadrant_offsets (const p4est3_t *p3,
   SC3E_RETVAL (goffset, NULL);
 
   *goffset = p3->goffset;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_get_global_quadrant_tree_offsets (const p4est3_t * p3,
+                                         const p4est3_gloidx ** offset)
+{
+  SC3A_IS (p4est3_is_setup, p3);
+  SC3E_RETVAL (offset, NULL);
+
+  *offset = p3->gtroffset;
   return NULL;
 }
 
