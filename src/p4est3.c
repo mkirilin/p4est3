@@ -526,6 +526,16 @@ p4est3_restore_connectivity (p4est3_t *p3, p4est3_connectivity_t *conn)
 }
 
 sc3_error_t        *
+p4est3_get_mpicomm (const p4est3_t *p3, sc3_MPI_Comm_t *comm)
+{
+  SC3A_IS (p4est3_is_setup, p3);
+  SC3A_CHECK (comm != NULL);
+
+  *comm = p3->mpicomm;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_get_mpirank (const p4est3_t *p3, int *rank)
 {
   SC3A_IS (p4est3_is_setup, p3);

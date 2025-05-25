@@ -386,6 +386,16 @@ sc3_error_t        *p4est3_restore_connectivity (p4est3_t * p3,
                                                  p4est3_connectivity_t *
                                                  conn);
 
+/** Query an MPI communicator of a forest.
+ * \param [in] p3          Must be setup.  Provides the forest to examine.
+ * \param [out] comm       On output, points to the forest's communicator.
+ *                         The communicator is owned by the forest and must not
+ *                         be destroyed.
+ * \return                 NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_mpicomm (const p4est3_t * p3,
+                                        sc3_MPI_Comm_t * comm);
+
 /** Query the rank in forest communicator.
  * \param [in] p3          Must be setup.  Provides the forest to examine.
  * \param [out] rank       On output, indicates the rank in the forest
