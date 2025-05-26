@@ -196,6 +196,10 @@ run_dune_iterator (p4est_t *p4est, p4est_ghost_t *ghost)
                   "face iteration count mismatch");
 
   /* gather parallel timing information */
+  P4EST_GLOBAL_STATISTICSF ("Nonbalanced iterator with touch %d nca %d skip %d\n",
+                            p4est_dune_iterate_with_touch,
+                            p4est_dune_iterate_with_nca,
+                            p4est_dune_iterate_with_skip);
   sc_stats_set1 (&nonb_stats[0], nonb_dura, "Iterate");
   sc_stats_set1 (&nonb_stats[1], context->num_volumes == 0 ? 0. :
                  nonb_dura / context->num_volumes, "Perquad");

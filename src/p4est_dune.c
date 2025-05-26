@@ -1092,6 +1092,12 @@ sc_hash_mru_remove (sc_hash_mru_t *mru, void *v, void **found)
 *                       Non-balanced face iterator                     *
 \**********************************************************************/
 
+int                p4est_dune_iterate_with_touch = 1;
+
+int                p4est_dune_iterate_with_nca = 1;
+
+int                p4est_dune_iterate_with_skip = 1;
+
 /** The complete quadrant context for the recursion. */
 typedef struct p4est_quad_nonb
 {
@@ -1161,6 +1167,9 @@ typedef struct p4est_dune_nonb
   void               *user_data;
   p4est_iter_volume_t iter_volume;
   p4est_iter_face_t   iter_face;
+  int                 with_touch;
+  int                 with_nca;
+  int                 with_skip;
 
   /* containers and data */
   sc_hash_t          *qhash;
@@ -1354,7 +1363,7 @@ p4est_quad_nonb_nca (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
         (p4est_quadrant_array_index (&nquad->ghosts, 0), &nquad->snca);
     }
   }
-  else {
+  else if (nonb->with_nca) {
 
     /* determine the nearest common ancestor of locals and ghosts */
     fd = ld = NULL;
@@ -1401,7 +1410,7 @@ p4est_quad_nonb_nca (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
   }
 
   /* determine local touches with ancestor */
-  if (nquad->squads.elem_count > 0) {
+  if (nonb->with_touch && nquad->squads.elem_count > 0) {
     p4est_quadrant_t            first, last;
 
     /* find smallest first descendant of local range */
@@ -1683,10 +1692,13 @@ p4est_dune_nonb_tface (p4est_dune_nonb_t *nonb,
       sc_array_index (&nonb->finfo.sides, k);
   }
 
-  /* if no local quadrants touch the face on either side, we bail */
-  if (!(nquads[0]->touch & (1 << fsides[0]->face)) &&
-      !(nquads[1]->touch & (1 << fsides[1]->face))) {
-    return;
+  /* optional optimization */
+  if (nonb->with_touch) {
+    /* if no local quadrants touch the face on either side, we bail */
+    if (!(nquads[0]->touch & (1 << fsides[0]->face)) &&
+        !(nquads[1]->touch & (1 << fsides[1]->face))) {
+      return;
+    }
   }
 
   /* we will definitely execute the face callback or go into the recursion */
@@ -1801,9 +1813,12 @@ p4est_dune_nonb_bface (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
   fside = (p4est_iter_face_side_t *)
     sc_array_index (&nonb->fbinfo.sides, 0);
 
-  /* if no local quadrants touch the face, we bail */
-  if (!(nquad->touch & (1 << fside->face))) {
-    return;
+  /* optional optimization */
+  if (nonb->with_touch) {
+    /* if no local quadrants touch the face, we bail */
+    if (!(nquad->touch & (1 << fside->face))) {
+      return;
+    }
   }
 
   /* callback on a full size local quadrant */
@@ -1972,6 +1987,9 @@ p4est_dune_iterate_nonbalanced (p4est_t *p4est, p4est_ghost_t *ghost_layer,
 
   /* setup context data */
   memset (nonb, 0, sizeof (*nonb));
+  nonb->with_touch = p4est_dune_iterate_with_touch;
+  nonb->with_nca = p4est_dune_iterate_with_nca;
+  nonb->with_skip = p4est_dune_iterate_with_skip;
   nonb->p4est = p4est;
   nonb->ghost_layer = ghost_layer;
   nonb->user_data = user_data;

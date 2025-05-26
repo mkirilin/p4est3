@@ -656,11 +656,9 @@
 #define p4est_get_plex_data_ext         p8est_get_plex_data_ext
 
 /* functions and types in p4est_dune */
-#define p4est_dune_numbers_t            p8est_dune_numbers_t
-#define p4est_dune_numbers_params_t     p8est_dune_numbers_params_t
-#define p4est_dune_numbers_params_init  p8est_dune_numbers_params_init
-#define p4est_dune_numbers_new          p8est_dune_numbers_new
-#define p4est_dune_numbers_destroy      p8est_dune_numbers_destroy
+#define p4est_dune_iterate_with_touch   p8est_dune_iterate_with_touch
+#define p4est_dune_iterate_with_nca     p8est_dune_iterate_with_nca
+#define p4est_dune_iterate_with_skip    p8est_dune_iterate_with_skip
 #define p4est_dune_iterate_balanced     p8est_dune_iterate_balanced
 #define p4est_dune_iterate              p8est_dune_iterate
 

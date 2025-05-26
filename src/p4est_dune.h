@@ -52,6 +52,15 @@ void                p4est_dune_iterate_balanced (p4est_t *p4est,
                                                  iter_volume,
                                                  p4est_iter_face_t iter_face);
 
+/** Boolean: do we optimize the algorithm using range boundaries? */
+extern int          p4est_dune_iterate_with_touch;
+
+/** Boolean: do we generate the nearest common recursion ancestor? */
+extern int          p4est_dune_iterate_with_nca;
+
+/** Boolean: do we avoid re-splitting quadrants for strict children? */
+extern int          p4est_dune_iterate_with_skip;
+
 /** Execute user supplied callbacks at every local volume and face.
  *
  * Execute the user-supplied callback functions at every volume and face in
