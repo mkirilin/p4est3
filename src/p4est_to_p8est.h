@@ -656,9 +656,6 @@
 #define p4est_get_plex_data_ext         p8est_get_plex_data_ext
 
 /* functions and types in p4est_dune */
-#define p4est_dune_iterate_with_touch   p8est_dune_iterate_with_touch
-#define p4est_dune_iterate_with_nca     p8est_dune_iterate_with_nca
-#define p4est_dune_iterate_with_skip    p8est_dune_iterate_with_skip
 #define p4est_dune_iterate_balanced     p8est_dune_iterate_balanced
 #define p4est_dune_iterate              p8est_dune_iterate
 
