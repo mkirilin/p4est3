@@ -42,6 +42,14 @@ extern              "C"
 #endif
 #endif
 
+typedef struct p4est3_ghost
+{
+  p4est_ghost_t      *ghost;        /**< Pointer to the ghost structure */
+  sc_array_t          gid_to_ghost;  /**< Maps global IDs to a position in
+                                          a ghost array */
+}
+p4est3_ghost_t;
+
 /** Fill the \a p4est \a ghost layer structure by iterating over \a p4est3.
  * \param [in] p3       Forest passed for reference.
  * \param [out] ptr_ghost On output a pointer to a valid ghost structure.
