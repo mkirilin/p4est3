@@ -22,5 +22,15 @@
   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+/* translate 2D definitions to 3D for reuse of a single code file */
 #include <p4est_to_p8est.h>
+
+/* these definitions are private and thus not in the above header */
+#define p4est_dune_numbers_t            p8est_dune_numbers_t
+#define p4est_dune_numbers_params_t     p8est_dune_numbers_params_t
+#define p4est_dune_numbers_params_init  p8est_dune_numbers_params_init
+#define p4est_dune_numbers_new          p8est_dune_numbers_new
+#define p4est_dune_numbers_destroy      p8est_dune_numbers_destroy
+
+/* one code file to generate independent objects for 2D and 3D */
 #include "p4est_dune.c"

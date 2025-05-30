@@ -1095,8 +1095,31 @@ sc_hash_mru_remove (sc_hash_mru_t *mru, void *v, void **found)
 /** The complete quadrant context for the recursion. */
 typedef struct p4est_quad_nonb
 {
+  /*** these first members depend on the current node in the search tree ***/
+
   /* Valid quadrant with valid p.which_tree member. */
   p4est_quadrant_t    skey;
+
+  /* if the nca is smaller, its ancestor id for skey, otherwise -1 */
+  int                 ncaid;
+
+  /* this flag indicates reuse of array split information */
+  int                 reuse;
+
+  /* boundary bits for local range; see p4est_find_range_boundaries */
+  int32_t             touch;
+
+  /* Number of visible strict descendants below skey.
+   * If this is 0, there is neither a local nor ghost contained.
+   * The special value -1 designates a full size local quadrant.
+   * The special value -2 designates a full size ghost quadrant.
+   */
+  p4est_locidx_t      nvdesc;
+
+  /*** these latter members depend only on the smallest non-empty subtree ***/
+
+  /* smallest common ancestor of contained local and ghost quadrants */
+  p4est_quadrant_t    snca;
 
   /* Number relative to tree of first local descendant of skey. */
   p4est_locidx_t      quadid;
@@ -1115,19 +1138,6 @@ typedef struct p4est_quad_nonb
 
   /* If skey is equal to a ghost, this is all zeroes. */
   size_t              gsplit[P4EST_CHILDREN + 1];
-
-  /* Number of visible strict descendants below skey.
-   * If this is 0, there is neither a local nor ghost contained.
-   * The special value -1 designates a full size local quadrant.
-   * The special value -2 designates a full size ghost quadrant.
-   */
-  p4est_locidx_t      nvdesc;
-
-  /* nearest common ancestor of contained quadrants */
-  p4est_quadrant_t    snca;
-
-  /* boundary bits for local range; see p4est_find_range_boundaries */
-  int32_t             touch;
 }
 p4est_quad_nonb_t;
 
@@ -1174,6 +1184,7 @@ typedef struct p4est_dune_nonb
   p4est_iter_face_info_t finfo;
   p4est_iter_face_info_t fbinfo;
   int                 face_corners[P4EST_HALF];
+  size_t              nulled, reused, freshed;
 }
 p4est_dune_nonb_t;
 
@@ -1329,7 +1340,6 @@ p4est_quad_nonb_nca (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
 {
   int                 cmp;
   size_t              lz, glz;
-  p4est_quadrant_t   *fd, *ld;
 
   /* verify preconditions */
   P4EST_ASSERT (nonb != NULL);
@@ -1346,15 +1356,22 @@ p4est_quad_nonb_nca (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
       P4EST_ASSERT (glz == 0);
       p4est_quadrant_copy
         (p4est_quadrant_array_index (&nquad->squads, 0), &nquad->snca);
+
+      /* strictly this is not called for, but we query it for debugging */
+      nquad->split[P4EST_CHILDREN] = 1;
     }
     else {
       P4EST_ASSERT (lz == 0);
       P4EST_ASSERT (glz == 1);
       p4est_quadrant_copy
         (p4est_quadrant_array_index (&nquad->ghosts, 0), &nquad->snca);
+
+      /* strictly this is not called for, but we query it for debugging */
+      nquad->gsplit[P4EST_CHILDREN] = 1;
     }
   }
   else {
+    p4est_quadrant_t   *fd, *ld;
 
     /* determine the nearest common ancestor of locals and ghosts */
     fd = ld = NULL;
@@ -1398,11 +1415,85 @@ p4est_quad_nonb_nca (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
     P4EST_ASSERT (fd != NULL);
     P4EST_ASSERT (ld != NULL);
     p4est_nearest_common_ancestor (fd, ld, &nquad->snca);
+
+    /* there is at least one quadrant at the nearest common ancestor */
+    p4est_split_array (&nquad->squads, nquad->snca.level, nquad->split);
+    P4EST_ASSERT (lz == nquad->split[P4EST_CHILDREN]);
+    if (nonb->ghost_layer != NULL) {
+      p4est_split_array (&nquad->ghosts, nquad->snca.level, nquad->gsplit);
+      P4EST_ASSERT (glz == nquad->gsplit[P4EST_CHILDREN]);
+    }
+  }
+}
+
+static void
+p4est_quad_nonb_split (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad,
+                       int reuse)
+{
+  size_t              lz, glz;
+  p4est_quadrant_t   *tquad;
+  p4est_quadrant_t    first, last;
+
+  /* verify preconditions */
+  P4EST_ASSERT (nonb != NULL);
+  P4EST_ASSERT (nquad != NULL);
+  P4EST_ASSERT (nquad->nvdesc == 0 || reuse);
+  P4EST_ASSERT (nquad->nvdesc > 0 || !reuse);
+  P4EST_ASSERT (p4est_quadrant_is_valid (&nquad->skey));
+
+  /* this quadrant may be empty entirely */
+  nquad->ncaid = -1;
+  lz = nquad->squads.elem_count;
+  glz = nquad->ghosts.elem_count;
+  if (lz + glz == 0) {
+
+    /* this cannot happen if we reuse a subtree */
+    P4EST_ASSERT (!reuse);
+    return;
   }
 
-  /* determine local touches with ancestor */
-  if (nquad->squads.elem_count > 0) {
-    p4est_quadrant_t            first, last;
+  /* handle special case of a full size leaf quadrant */
+  if (lz == 1) {
+    tquad = p4est_quadrant_array_index (&nquad->squads, 0);
+
+    /* mark full local descendant as special case */
+    if (tquad->level == nquad->skey.level) {
+      P4EST_ASSERT (glz == 0);
+      if (reuse) {
+        P4EST_ASSERT (p4est_quadrant_is_equal (tquad, &nquad->snca));
+      }
+      else {
+
+        /* set nearest comment ancestor to sole quadrant */
+        p4est_quadrant_copy (tquad, &nquad->snca);
+      }
+
+      /* the local quadrant touches all faces */
+      nquad->touch = (1 << (P4EST_FACES +
+#ifdef P4_TO_P8
+                            P8EST_EDGES +
+#endif
+                            P4EST_CHILDREN)) - 1;
+
+      /* encode special case */
+      nquad->nvdesc = -1;
+      return;
+    }
+
+    /* setup a trivial call to determine local touched boundaries */
+    p4est_quadrant_first_descendant (tquad, &first, P4EST_QMAXLEVEL);
+    p4est_quadrant_last_descendant (tquad, &last, P4EST_QMAXLEVEL);
+    nquad->touch = p4est_find_range_boundaries
+      (&first, &last, nquad->skey.level, NULL,
+#ifdef P4_TO_P8
+       NULL,
+#endif
+       NULL);
+  }
+  else if (lz > 1) {
+
+    /* determine boundary touch also for more than one local quadrant */
+    p4est_quadrant_t   *fd, *ld;
 
     /* find smallest first descendant of local range */
     fd = p4est_quadrant_array_index (&nquad->squads, 0);
@@ -1421,50 +1512,6 @@ p4est_quad_nonb_nca (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
 #endif
        NULL);
   }
-}
-
-static void
-p4est_quad_nonb_split (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
-{
-  size_t              lz, glz;
-  p4est_quadrant_t   *tquad;
-
-  /* verify preconditions */
-  P4EST_ASSERT (nonb != NULL);
-  P4EST_ASSERT (nquad != NULL);
-  P4EST_ASSERT (nquad->nvdesc == 0);
-  P4EST_ASSERT (p4est_quadrant_is_valid (&nquad->skey));
-
-  /* this quadrant may be empty entirely */
-  lz = nquad->squads.elem_count;
-  glz = nquad->ghosts.elem_count;
-  if (lz + glz == 0) {
-    return;
-  }
-
-  /* handle special case of a full size leaf quadrant */
-  if (lz == 1) {
-    tquad = p4est_quadrant_array_index (&nquad->squads, 0);
-
-    /* mark full local descendant as special case */
-    if (tquad->level == nquad->skey.level) {
-      P4EST_ASSERT (glz == 0);
-
-      /* set nearest comment ancestor to sole quadrant */
-      p4est_quadrant_copy (tquad, &nquad->snca);
-
-      /* the local quadrant touches all faces */
-      nquad->touch = (1 << (P4EST_FACES +
-#ifdef P4_TO_P8
-                            P8EST_EDGES +
-#endif
-                            P4EST_CHILDREN)) - 1;
-
-      /* encode special case */
-      nquad->nvdesc = -1;
-      return;
-    }
-  }
 
   /* handle special case of a full size ghost quadrant */
   if (glz == 1) {
@@ -1473,9 +1520,14 @@ p4est_quad_nonb_split (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
     /* mark full ghost descendant as special case */
     if (tquad->level == nquad->skey.level) {
       P4EST_ASSERT (lz == 0);
+      if (reuse) {
+        P4EST_ASSERT (p4est_quadrant_is_equal (tquad, &nquad->snca));
+      }
+      else {
 
-      /* set nearest comment ancestor to sole quadrant */
-      p4est_quadrant_copy (tquad, &nquad->snca);
+        /* set nearest comment ancestor to sole quadrant */
+        p4est_quadrant_copy (tquad, &nquad->snca);
+      }
 
       /* encode special case */
       nquad->nvdesc = -2;
@@ -1483,23 +1535,37 @@ p4est_quad_nonb_split (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
     }
   }
 
-  /* determine nearest common ancestor of all quadrants */
-  nquad->nvdesc = (p4est_locidx_t) (lz + glz);
-  p4est_quad_nonb_nca (nonb, nquad);
-
-  /* now there is at least one quadrant below the current level */
-  p4est_split_array (&nquad->squads, nquad->skey.level, nquad->split);
-  P4EST_ASSERT (lz == nquad->split[P4EST_CHILDREN]);
-  if (nonb->ghost_layer != NULL) {
-    p4est_split_array (&nquad->ghosts, nquad->skey.level, nquad->gsplit);
-    P4EST_ASSERT (glz == nquad->gsplit[P4EST_CHILDREN]);
+  /* determine nearest common ancestor of all quadrants and split */
+  if (reuse) {
+    P4EST_ASSERT (nquad->nvdesc == (p4est_locidx_t) (lz + glz));
   }
+  else {
+    nquad->nvdesc = (p4est_locidx_t) (lz + glz);
+    p4est_quad_nonb_nca (nonb, nquad);
+  }
+
+  /* compute nearest common ancestor's id within parent */
+  if (nquad->snca.level == nquad->skey.level) {
+    P4EST_ASSERT
+      (p4est_quadrant_is_equal (&nquad->snca, &nquad->skey));
+    P4EST_ASSERT (nquad->ncaid == -1);
+  }
+  else {
+    P4EST_ASSERT
+      (p4est_quadrant_is_ancestor (&nquad->skey, &nquad->snca));
+    nquad->ncaid = p4est_quadrant_ancestor_id
+      (&nquad->snca, nquad->skey.level + 1);
+  }
+
+  /* remember reuse flag */
+  nquad->reuse = reuse;
 }
 
 static p4est_quad_nonb_t *
 p4est_quad_nonb_child (p4est_dune_nonb_t *nonb,
                        p4est_quad_nonb_t *nparent, int i)
 {
+  int                 reuse;
   size_t              oz, lz;
   size_t              goz, glz;
   p4est_quad_nonb_t  *nchild;
@@ -1511,28 +1577,53 @@ p4est_quad_nonb_child (p4est_dune_nonb_t *nonb,
   P4EST_ASSERT (p4est_quadrant_is_valid (&nparent->skey));
   P4EST_ASSERT (0 <= i && i < P4EST_CHILDREN);
 
-  /* allocate fresh quadrant object */
-  nchild = p4est_dune_nquad_alloc (nonb);
-  memset (nchild, 0, sizeof (*nchild));
+  /* optimize by reusing the subtree information */
+  if (nparent->skey.level < nparent->snca.level) {
+    P4EST_ASSERT (nparent->ncaid >= 0);
+    if (nparent->ncaid != i) {
+      /* this child has no descendants whatsoever */
+      ++nonb->nulled;
+      return NULL;
+    }
 
-  /* set quadrant and tree coordinates */
-  p4est_quadrant_child (&nparent->skey, &nchild->skey, i);
-  nchild->skey.p.which_tree = nparent->skey.p.which_tree;
+    /* allocate and start with a copy of the parent */
+    nchild = p4est_dune_nquad_alloc (nonb);
+    memcpy (nchild, nparent, sizeof (*nchild));
+    p4est_quadrant_child (&nparent->skey, &nchild->skey, i);
 
-  /* the quadrant is obtained by splitting its parent */
-  lz = nparent->split[i + 1] - (oz = nparent->split[i]);
-  nchild->quadid = nparent->quadid + (p4est_locidx_t) oz;
-  sc_array_init_view (&nchild->squads, &nparent->squads, oz, lz);
+    /* we can reuse the subtree information */
+    ++nonb->reused;
+    reuse = 1;
+  }
+  else {
 
-  /* setup ghost information similarly */
-  if (nonb->ghost_layer != NULL) {
-    glz = nparent->gsplit[i + 1] - (goz = nparent->gsplit[i]);
-    nchild->ghostid = nparent->ghostid + (p4est_locidx_t) goz;
-    sc_array_init_view (&nchild->ghosts, &nparent->ghosts, goz, glz);
+    /* allocate fresh quadrant object */
+    nchild = p4est_dune_nquad_alloc (nonb);
+    memset (nchild, 0, sizeof (*nchild));
+
+    /* initialize child from scratch */
+    p4est_quadrant_child (&nparent->skey, &nchild->skey, i);
+    nchild->skey.p.which_tree = nparent->skey.p.which_tree;
+
+    /* the quadrant is obtained by splitting its parent */
+    lz = nparent->split[i + 1] - (oz = nparent->split[i]);
+    nchild->quadid = nparent->quadid + (p4est_locidx_t) oz;
+    sc_array_init_view (&nchild->squads, &nparent->squads, oz, lz);
+
+    /* setup ghost information similarly */
+    if (nonb->ghost_layer != NULL) {
+      glz = nparent->gsplit[i + 1] - (goz = nparent->gsplit[i]);
+      nchild->ghostid = nparent->ghostid + (p4est_locidx_t) goz;
+      sc_array_init_view (&nchild->ghosts, &nparent->ghosts, goz, glz);
+    }
+
+    /* note that we will recreate the split */
+    ++nonb->freshed;
+    reuse = 0;
   }
 
   /* create rest of quadrant information */
-  p4est_quad_nonb_split (nonb, nchild);
+  p4est_quad_nonb_split (nonb, nchild, reuse);
   return nchild;
 }
 
@@ -1568,7 +1659,7 @@ p4est_quad_nonb_root (p4est_dune_nonb_t *nonb, p4est_topidx_t tt)
   }
 
   /* create rest of quadrant information */
-  p4est_quad_nonb_split (nonb, nroot);
+  p4est_quad_nonb_split (nonb, nroot, 0);
   return nroot;
 }
 
@@ -1578,12 +1669,22 @@ p4est_quad_nonb_insert (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
   /* verify preconditions */
   P4EST_ASSERT (nonb != NULL);
   P4EST_ASSERT (nonb->mru != NULL);
-  P4EST_ASSERT (nquad != NULL);
+
+  /* if this quadrant is void, we do nothing */
+  if (nquad == NULL) {
+    return;
+  }
   P4EST_ASSERT (p4est_quadrant_is_valid (&nquad->skey));
 
-  /* knowing that this quadrant is non yet cached */
-  P4EST_EXECUTE_ASSERT_TRUE
-    (sc_hash_mru_insert_unique (nonb->mru[nquad->skey.level], nquad, NULL));
+  if (nquad->reuse) {
+    /* if this quadrant is reused, we do not need to remember it */
+    p4est_dune_nquad_free (nonb, nquad);
+  }
+  else {
+    /* knowing that this quadrant is non currently cached */
+    P4EST_EXECUTE_ASSERT_TRUE
+      (sc_hash_mru_insert_unique (nonb->mru[nquad->skey.level], nquad, NULL));
+  }
 }
 
 static p4est_quad_nonb_t *
@@ -1669,7 +1770,11 @@ p4est_dune_nonb_tface (p4est_dune_nonb_t *nonb,
   P4EST_ASSERT (nonb != NULL);
   P4EST_ASSERT (nonb->finfo.sides.elem_count == 2);
   P4EST_ASSERT (nonb->iter_face != NULL);
-  P4EST_ASSERT (nquads[0] != NULL && nquads[1] != NULL);
+
+  /* if any of the sides is void, we do nothing */
+  if (nquads[0] == NULL || nquads[1] == NULL) {
+    return;
+  }
 
   /* if there are no local quadrants on either side, we bail */
   if (nquads[0]->squads.elem_count == 0 && nquads[1]->squads.elem_count == 0) {
@@ -1691,7 +1796,6 @@ p4est_dune_nonb_tface (p4est_dune_nonb_t *nonb,
 
   /* we will definitely execute the face callback or go into the recursion */
   for (k = 0; k < 2; ++k) {
-    fchildren[k][0] = NULL;
     fcorners[k][0] = -1;
     nq = nquads[k];
     fside = fsides[k];
@@ -1740,7 +1844,6 @@ p4est_dune_nonb_tface (p4est_dune_nonb_t *nonb,
   if (nquads[0]->nvdesc <= 0 && nquads[1]->nvdesc <= 0) {
     P4EST_ASSERT (nquads[0]->squads.elem_count == 1 ||
                   nquads[1]->squads.elem_count == 1);
-    P4EST_ASSERT (fchildren[0][0] == NULL && fchildren[1][0] == NULL);
     P4EST_ASSERT (fcorners[0][0] == -1 && fcorners[1][0] == -1);
 
     /* execute the face callback with two unsplit sides */
@@ -1751,7 +1854,6 @@ p4est_dune_nonb_tface (p4est_dune_nonb_t *nonb,
     for (j = 0; j < P4EST_HALF; ++j) {
       for (k = 0; k < 2; ++k) {
         if (nquads[k]->nvdesc <= 0) {
-          P4EST_ASSERT (fchildren[k][0] == NULL);
           P4EST_ASSERT (fcorners[k][0] == -1);
           chang[k] = -1;
           cquads[k] = nquads[k];
@@ -1766,8 +1868,7 @@ p4est_dune_nonb_tface (p4est_dune_nonb_t *nonb,
 
     /* put child quadrants back into cache */
     for (k = 0; k < 2; ++k) {
-      if (fchildren[k][0] != NULL) {
-        P4EST_ASSERT (fcorners[k][0] >= 0);
+      if (fcorners[k][0] >= 0) {
         for (j = 0; j < P4EST_HALF; ++j) {
           p4est_quad_nonb_insert (nonb, fchildren[k][j]);
         }
@@ -1789,7 +1890,11 @@ p4est_dune_nonb_bface (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
   P4EST_ASSERT (nonb->fbinfo.orientation == 0);
   P4EST_ASSERT (nonb->fbinfo.sides.elem_count == 1);
   P4EST_ASSERT (nonb->iter_face != NULL);
-  P4EST_ASSERT (nquad != NULL);
+
+  /* if the side is void, we do nothing */
+  if (nquad == NULL) {
+    return;
+  }
 
   /* if there are no local quadrant on this side, we bail */
   if (nquad->squads.elem_count == 0) {
@@ -1841,7 +1946,11 @@ p4est_dune_nonb_volume (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
 
   /* verify preconditions */
   P4EST_ASSERT (nonb != NULL);
-  P4EST_ASSERT (nquad != NULL);
+
+  /* if the volume is void, we do nothing */
+  if (nquad == NULL) {
+    return;
+  }
   P4EST_ASSERT (p4est_quadrant_is_valid (&nquad->skey));
   P4EST_ASSERT (nonb->vinfo.treeid == nquad->skey.p.which_tree);
 
@@ -1857,6 +1966,7 @@ p4est_dune_nonb_volume (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
     P4EST_ASSERT (nquad->squads.elem_count == 1);
     tquad = p4est_quadrant_array_index (&nquad->squads, 0);
     P4EST_ASSERT (tquad->level == nquad->skey.level);
+    P4EST_ASSERT (nquad->ncaid == -1);
 
     /* this is the place to execute the volume callback */
     if (nonb->iter_volume != NULL) {
@@ -1873,6 +1983,7 @@ p4est_dune_nonb_volume (p4est_dune_nonb_t *nonb, p4est_quad_nonb_t *nquad)
     P4EST_ASSERT (nquad->ghosts.elem_count == 1);
     tquad = p4est_quadrant_array_index (&nquad->ghosts, 0);
     P4EST_ASSERT (tquad->level == nquad->skey.level);
+    P4EST_ASSERT (nquad->ncaid == -1);
 #endif
     return;
   }
@@ -2117,6 +2228,9 @@ p4est_dune_iterate_nonbalanced (p4est_t *p4est, p4est_ghost_t *ghost_layer,
     }
     sc_hash_mru_destroy (mru);
   }
+  P4EST_LDEBUGF ("Counts for child creation null %ld reuse %ld fresh %ld\n",
+                 (long) nonb->nulled, (long) nonb->reused,
+                 (long) nonb->freshed);
 
   /* free context data */
   sc_hash_destroy (nonb->qhash);
