@@ -60,7 +60,6 @@ ghost_hash_key_t;
 typedef struct ghost_hash_data
 {
   sc_mempool_t       *ckeys;    /* memory pool for allocating the hash keys */
-  sc_mempool_t       *cvalues;  /* memory pool for allocating the hash values */
   sc_hash_t          *chash;    /* the hash map links keys without copying */
   p4est_locidx_t      added;    /* count each quadrant just once */
   p4est_locidx_t      duped;    /* count attempts to add more than once */
@@ -95,11 +94,12 @@ ghost_hash_fn (const void *v, const void *u)
 static unsigned
 ghost_position_hash_fn (const void *v, const void *u)
 {
-  const p4est_gloidx_t *k = (const p4est_gloidx_t *) v;
+  const p4est3_ghost_pos_hash_key_t *k =
+    (const p4est3_ghost_pos_hash_key_t *) v;
   uint32_t            h1, h2, h3;
 
-  h1 = (uint32_t) * k;
-  h2 = (uint32_t) (*k >> 32);
+  h1 = (uint32_t) k->gid;
+  h2 = (uint32_t) (k->gid >> 32);
   h3 = 0;
 
   sc_hash_final (h1, h2, h3);
@@ -124,10 +124,12 @@ ghost_equal_fn (const void *v1, const void *v2, const void *u)
 static int
 ghost_position_equal_fn (const void *v1, const void *v2, const void *u)
 {
-  const p4est_gloidx_t *k1 = (const p4est_gloidx_t *) v1;
-  const p4est_gloidx_t *k2 = (const p4est_gloidx_t *) v2;
+  const p4est3_ghost_pos_hash_key_t *k1 =
+    (const p4est3_ghost_pos_hash_key_t *) v1;
+  const p4est3_ghost_pos_hash_key_t *k2 =
+    (const p4est3_ghost_pos_hash_key_t *) v2;
 
-  return *k1 == *k2;
+  return k1->gid == k2->gid;
 }
 
 static int
@@ -333,16 +335,13 @@ build_ghost_id_map (p4est3_t *p3, p4est_ghost_t *ghost,
                     ghost_hash_data_t *hash_data)
 {
   p4est_quadrant_t   *q;
-  p4est_gloidx_t     *key;
-  p4est_locidx_t     *value;
+  p4est3_ghost_pos_hash_key_t *key;
   void              **found;
-  p4est_gloidx_t      global_id;
   int                 proc;
   p4est_locidx_t      i, start, end;
 
   /* Create hash table for positions in ghost array */
-  hash_data->ckeys = sc_mempool_new (sizeof (p4est_gloidx_t));
-  hash_data->cvalues = sc_mempool_new (sizeof (p4est_locidx_t));
+  hash_data->ckeys = sc_mempool_new (sizeof (p4est3_ghost_pos_hash_key_t));
   hash_data->chash = sc_hash_new
     (ghost_position_hash_fn, ghost_position_equal_fn, NULL, NULL);
   hash_data->added = hash_data->duped = 0;
@@ -355,22 +354,19 @@ build_ghost_id_map (p4est3_t *p3, p4est_ghost_t *ghost,
 
     /* Iterate through the ghosts for this processor */
     for (i = start; i < end; i++) {
+      /* Create and insert key-value pair */
+      key =
+        (p4est3_ghost_pos_hash_key_t *) sc_mempool_alloc (hash_data->ckeys);
+
       q = p4est_quadrant_array_index (&ghost->ghosts, i);
 
       /* Calculate global ID = process offset + local ID */
-      global_id = p3->goffset[proc] + (p4est_gloidx_t) q->p.piggy3.local_num;
-
-      /* Create and insert key-value pair */
-      key = (p4est_gloidx_t *) sc_mempool_alloc (hash_data->ckeys);
-      value = (p4est_locidx_t *) sc_mempool_alloc (hash_data->cvalues);
-
-      *key = global_id;
-      *value = i;
+      key->gid = p3->goffset[proc] + (p4est_gloidx_t) q->p.piggy3.local_num;
+      key->pos = i;
 
       /* Insert into hash table */
       if (sc_hash_insert_unique (hash_data->chash, key, &found)) {
-        /* Key was not present, link to value */
-        *found = value;
+        P4EST_ASSERT (*found == key);
         hash_data->added++;
       }
       else {
@@ -384,8 +380,7 @@ build_ghost_id_map (p4est3_t *p3, p4est_ghost_t *ghost,
 
 /* Find the position of a ghost in the array given its global ID */
 p4est_locidx_t
-p4est3_ghost_find_position (sc_hash_t *ghost_map, p4est_gloidx_t global_id,
-                            sc_mempool_t *key_pool)
+p4est3_ghost_find_position (sc_hash_t *ghost_map, p4est_gloidx_t global_id)
 {
   void              **found;
   p4est_locidx_t     *value;
