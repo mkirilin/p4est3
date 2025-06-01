@@ -59,6 +59,14 @@ sc3_error_t        *p4est3_ghost_fill_p4est (p4est3_t * p3,
                                              p4est3_ghost_p4est_t **
                                              ptr_ghost);
 
+/** Destroy the \a p4est3 \a ghost layer structure.
+ * \param [in, out] ptr_ghost3 On input a pointer to a valid ghost structure.
+ *                             On output NULL.
+ * \return              NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_ghost_destroy_p4est (p4est3_ghost_p4est_t **
+                                                ptr_ghost3);
+
 #ifdef __cplusplus
 #if 0
 {

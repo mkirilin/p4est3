@@ -721,6 +721,18 @@ p4est3_ghost_fill_p4est (p4est3_t *p3, p4est3_ghost_p4est_t **ptr_ghost)
   return NULL;
 }
 
+sc3_error_t        *
+p4est3_ghost_destroy_p4est (p4est3_ghost_p4est_t **ptr_ghost3)
+{
+  p4est3_ghost_p4est_t *ghost;
+
+  SC3E_INULLP (ptr_ghost3, ghost);
+  p4est_ghost_destroy (ghost->ghost);
+  sc_hash_destroy (ghost->gid_to_pos);
+  P4EST_FREE (ghost);
+  return NULL;
+}
+
 #ifdef __cplusplus
 #if 0
 {

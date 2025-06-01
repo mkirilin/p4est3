@@ -46,6 +46,7 @@
 
 /* functions in p4est3_ghost_p4est */
 #define p4est3_ghost_fill_p4est             p4est3_ghost_fill_p8est
+#define p4est3_ghost_destroy_p4est          p4est3_ghost_destroy_p8est
 
 /* definitions in p4est3_ghost_p4est */
 #define p4est3_ghost_p4est_t                p4est3_ghost_p8est_t
