@@ -42,13 +42,13 @@ extern              "C"
 #endif
 #endif
 
-typedef struct p4est3_ghost
+typedef struct p4est3_ghost_p4est
 {
   p4est_ghost_t      *ghost;        /**< Pointer to the ghost structure */
-  sc_array_t          gid_to_ghost;  /**< Maps global IDs to a position in
-                                          a ghost array */
+  sc_hash_t          *gid_to_pos;   /**< Maps global IDs to a position in
+                                         a ghost array */
 }
-p4est3_ghost_t;
+p4est3_ghost_p4est_t;
 
 /** Fill the \a p4est \a ghost layer structure by iterating over \a p4est3.
  * \param [in] p3       Forest passed for reference.
@@ -56,7 +56,8 @@ p4est3_ghost_t;
  * \return              NULL on success, error object otherwise.
  */
 sc3_error_t        *p4est3_ghost_fill_p4est (p4est3_t * p3,
-                                             p4est_ghost_t ** ptr_ghost);
+                                             p4est3_ghost_p4est_t **
+                                             ptr_ghost);
 
 #ifdef __cplusplus
 #if 0

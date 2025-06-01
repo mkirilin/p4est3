@@ -98,11 +98,11 @@ ghost_position_hash_fn (const void *v, const void *u)
   const p4est_gloidx_t *k = (const p4est_gloidx_t *) v;
   uint32_t            h1, h2, h3;
 
-  h1 = (uint32_t) *k;
+  h1 = (uint32_t) * k;
   h2 = (uint32_t) (*k >> 32);
   h3 = 0;
 
-  sc_hash_final(h1, h2, h3);
+  sc_hash_final (h1, h2, h3);
 
   return (unsigned) h3;
 }
@@ -122,7 +122,7 @@ ghost_equal_fn (const void *v1, const void *v2, const void *u)
 
 /* Check equality of ghost position keys */
 static int
-ghost_position_equal_fn(const void *v1, const void *v2, const void *u)
+ghost_position_equal_fn (const void *v1, const void *v2, const void *u)
 {
   const p4est_gloidx_t *k1 = (const p4est_gloidx_t *) v1;
   const p4est_gloidx_t *k2 = (const p4est_gloidx_t *) v2;
@@ -329,46 +329,46 @@ sort_ghost_quadrants (sc_array_t *ghosts)
 }
 
 static void
-build_ghost_id_map(p4est3_t *p3, p4est_ghost_t *ghost,
-                   ghost_hash_data_t *hash_data)
+build_ghost_id_map (p4est3_t *p3, p4est_ghost_t *ghost,
+                    ghost_hash_data_t *hash_data)
 {
-  size_t i;
-  p4est_quadrant_t *q;
-  p4est_gloidx_t *key;
-  size_t *value;
-  void **found;
-  p4est_gloidx_t global_id;
-  int proc;
+  p4est_quadrant_t   *q;
+  p4est_gloidx_t     *key;
+  p4est_locidx_t     *value;
+  void              **found;
+  p4est_gloidx_t      global_id;
+  int                 proc;
+  p4est_locidx_t      i, start, end;
 
   /* Create hash table for positions in ghost array */
-  hash_data->ckeys = sc_mempool_new(sizeof (p4est_gloidx_t));
-  hash_data->cvalues = sc_mempool_new(sizeof (size_t));
+  hash_data->ckeys = sc_mempool_new (sizeof (p4est_gloidx_t));
+  hash_data->cvalues = sc_mempool_new (sizeof (p4est_locidx_t));
   hash_data->chash = sc_hash_new
-      (ghost_position_hash_fn, ghost_position_equal_fn, hash_data, NULL);
+    (ghost_position_hash_fn, ghost_position_equal_fn, NULL, NULL);
   hash_data->added = hash_data->duped = 0;
 
   /* Iterate through all ghost quadrants */
   for (proc = 0; proc < ghost->mpisize; proc++) {
     /* Get the range of ghost indices for this processor */
-    p4est_locidx_t start = ghost->proc_offsets[proc];
-    p4est_locidx_t end = ghost->proc_offsets[proc + 1];
+    start = ghost->proc_offsets[proc];
+    end = ghost->proc_offsets[proc + 1];
 
     /* Iterate through the ghosts for this processor */
     for (i = start; i < end; i++) {
-      q = p4est_quadrant_array_index(&ghost->ghosts, i);
+      q = p4est_quadrant_array_index (&ghost->ghosts, i);
 
       /* Calculate global ID = process offset + local ID */
       global_id = p3->goffset[proc] + (p4est_gloidx_t) q->p.piggy3.local_num;
 
       /* Create and insert key-value pair */
-      key = (p4est_gloidx_t *) sc_mempool_alloc(hash_data->ckeys);
-      value = (size_t *) sc_mempool_alloc(hash_data->cvalues);
+      key = (p4est_gloidx_t *) sc_mempool_alloc (hash_data->ckeys);
+      value = (p4est_locidx_t *) sc_mempool_alloc (hash_data->cvalues);
 
       *key = global_id;
       *value = i;
 
       /* Insert into hash table */
-      if (sc_hash_insert_unique(hash_data->chash, key, &found)) {
+      if (sc_hash_insert_unique (hash_data->chash, key, &found)) {
         /* Key was not present, link to value */
         *found = value;
         hash_data->added++;
@@ -382,27 +382,22 @@ build_ghost_id_map(p4est3_t *p3, p4est_ghost_t *ghost,
   }
 }
 
-/* TODO: double check */
 /* Find the position of a ghost in the array given its global ID */
-size_t
-p4est3_ghost_find_position(sc_hash_t *ghost_map, p4est_gloidx_t global_id,
-                          sc_mempool_t *key_pool)
+p4est_locidx_t
+p4est3_ghost_find_position (sc_hash_t *ghost_map, p4est_gloidx_t global_id,
+                            sc_mempool_t *key_pool)
 {
-  ghost_position_key_t search_key, *key;
-  void **found;
-  ghost_position_value_t *value;
-
-  /* Create a temporary key for searching */
-  search_key.global_id = global_id;
+  void              **found;
+  p4est_locidx_t     *value;
 
   /* Look up in the hash table */
-  if (sc_hash_lookup(ghost_map, &search_key, &found)) {
-    value = (ghost_position_value_t *) *found;
-    return value->position;
+  if (sc_hash_lookup (ghost_map, &global_id, &found)) {
+    value = (p4est_locidx_t *) * found;
+    return *value;
   }
 
   /* Not found */
-  return (size_t)-1;
+  return (p4est_locidx_t) - 1;
 }
 
 /* Compare function for mirror indices using context */
@@ -432,12 +427,12 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
   }
 
   /* Allocate memory for pivot and temp buffer */
-  pivot_val = P4EST_ALLOC(char, size);
-  tmp = P4EST_ALLOC(char, size);
+  pivot_val = P4EST_ALLOC (char, size);
+  tmp = P4EST_ALLOC (char, size);
 
   /* Simple insertion sort for small arrays */
   if (nmemb <= 16) {
-    inner_tmp = P4EST_ALLOC(char, size);
+    inner_tmp = P4EST_ALLOC (char, size);
     for (i = (char *) base + size; i < (char *) base + nmemb * size;
          i += size) {
       memcpy (tmp, i, size);
@@ -447,9 +442,9 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
       }
       memcpy (j + size, tmp, size);
     }
-    P4EST_FREE(inner_tmp);
-    P4EST_FREE(pivot_val);
-    P4EST_FREE(tmp);
+    P4EST_FREE (inner_tmp);
+    P4EST_FREE (pivot_val);
+    P4EST_FREE (tmp);
     return;
   }
 
@@ -493,8 +488,8 @@ qsort_with_context (void *base, size_t nmemb, size_t size,
   }
 
   /* Free allocated memory */
-  P4EST_FREE(pivot_val);
-  P4EST_FREE(tmp);
+  P4EST_FREE (pivot_val);
+  P4EST_FREE (tmp);
 }
 
 /* Sort the mirrors in a ghost layer and update the p2m arrays accordingly */
@@ -571,7 +566,6 @@ merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
   p4est_locidx_t      offset = 0;
   size_t              j, count;
 
-
   /* Calculate total size needed for the merged array */
   for (i = 0; i < p3->mpisize; i++) {
     total_mirrors += (p4est_locidx_t) p2m[i]->elem_count;
@@ -598,7 +592,7 @@ merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
 }
 
 sc3_error_t        *
-p4est3_ghost_fill_p4est (p4est3_t *p3, p4est_ghost_t **ptr_ghost)
+p4est3_ghost_fill_p4est (p4est3_t *p3, p4est3_ghost_p4est_t **ptr_ghost)
 {
   p4est3_ghost_fill_data_t data, *d = &data;
   int                 i;
@@ -606,10 +600,13 @@ p4est3_ghost_fill_p4est (p4est3_t *p3, p4est_ghost_t **ptr_ghost)
   ghost_hash_data_t   smirror_hdata, *mirror_hdata = &smirror_hdata;
   sc_array_t        **p2m;
   p4est_ghost_t      *ghost;
+  p4est3_ghost_p4est_t *ghost3;
 
   /*--------------------------------------------------------------*/
   /************************ ALLOCATIONS ***************************/
   /*--------------------------------------------------------------*/
+  ghost3 = P4EST_ALLOC (p4est3_ghost_p4est_t, 1);
+
   ghost = P4EST_ALLOC (p4est_ghost_t, 1);
   sc_array_init (&(ghost)->ghosts, sizeof (p4est_quadrant_t));
   (ghost)->tree_offsets = P4EST_ALLOC (p4est_locidx_t, p3->num_trees + 1);
@@ -706,15 +703,10 @@ p4est3_ghost_fill_p4est (p4est3_t *p3, p4est_ghost_t **ptr_ghost)
   /** Merge \c d->p2m arrays to \c mirror_proc_mirrors */
   merge_mirror_proc_arrays (p3, ghost, p2m);
 
-  /* TODO: double check interface */
   /* Build the ghost global ID to position mapping */
-  sc_hash_t *ghost_map = NULL;
-  sc_mempool_t *key_pool = NULL;
-  sc_mempool_t *value_pool = NULL;
-  build_ghost_id_map(p3, ghost, &ghost_map, &key_pool, &value_pool);
+  build_ghost_id_map (p3, ghost, ghost_hdata);
 
   /* TODO: Wrap map with p4est_ghost_t */
-
 
   /* clean up memory temporary mirror_proc_mirrors sub-arrays */
   for (i = 0; i < p3->mpisize; i++) {
@@ -723,7 +715,9 @@ p4est3_ghost_fill_p4est (p4est3_t *p3, p4est_ghost_t **ptr_ghost)
   }
   P4EST_FREE (p2m);
 
-  SC3E_RETVAL (ptr_ghost, ghost);
+  ghost3->ghost = ghost;
+  ghost3->gid_to_pos = ghost_hdata->chash;
+  SC3E_RETVAL (ptr_ghost, ghost3);
   return NULL;
 }
 
