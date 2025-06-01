@@ -222,6 +222,58 @@ compare_ghost_results (p4est_t *p4est, p4est3_t *p4est3,
   return NULL;
 }
 
+/* Find the position of a ghost in the array given its global ID */
+static              p4est_locidx_t
+p4est3_ghost_find_position (sc_hash_t *ghost_map,
+                            p4est3_ghost_pos_hash_key_t *key)
+{
+  void              **found;
+  p4est_locidx_t      pos;
+
+  /* Look up in the hash table */
+  if (sc_hash_lookup (ghost_map, key, &found)) {
+    pos = ((p4est3_ghost_pos_hash_key_t *) * found)->pos;
+    return pos;
+  }
+
+  /* Not found */
+  return (p4est_locidx_t) - 1;
+}
+
+static sc3_error_t *
+check_map_correct (p4est3_t *p3, p4est3_ghost_p4est_t *ghost3)
+{
+  int                 proc;
+  p4est_ghost_t      *ghost = ghost3->ghost;
+  sc_hash_t          *gid_to_pos = ghost3->gid_to_pos;
+  p4est_locidx_t      i, start, end, pos;
+  p4est_quadrant_t   *q;
+  p4est3_ghost_pos_hash_key_t skey, *key = &skey;
+
+  /* Iterate through all ghost quadrants */
+  for (proc = 0; proc < ghost->mpisize; proc++) {
+    /* Get the range of ghost indices for this processor */
+    start = ghost->proc_offsets[proc];
+    end = ghost->proc_offsets[proc + 1];
+
+    /* Iterate through the ghosts for this processor */
+    for (i = start; i < end; i++) {
+      q = p4est_quadrant_array_index (&ghost->ghosts, i);
+
+      /* Calculate global ID = process offset + local ID */
+      key->gid = p3->goffset[proc] + (p4est_gloidx_t) q->p.piggy3.local_num;
+      key->pos = i;
+
+      /* Find the position in the ghost array */
+      pos = p4est3_ghost_find_position (gid_to_pos, key);
+      SC3E_DEMAND (pos != (p4est_locidx_t) - 1,
+                   "Global ID not found in ghost map");
+      SC3E_DEMAND (pos == i, "Position mismatch by global id");
+    }
+  }
+  return NULL;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -231,7 +283,8 @@ main (int argc, char **argv)
   p4est3_t           *p4est3;
   p4est_connectivity_t *conn;
   p4est3_connectivity_t *conn3;
-  p4est_ghost_t      *ghost_p4est, *ghost_p4est3;
+  p4est_ghost_t      *ghost_p4est;
+  p4est3_ghost_p4est_t *ghost_p4est3;
   sc3_allocator_t    *alloc, *mainalloc;
   sc3_error_t        *e = NULL;
 
@@ -289,14 +342,20 @@ main (int argc, char **argv)
   SC3X (p4est3_ghost_fill_p4est (p4est3, &ghost_p4est3));
 
   P4EST_INFO ("Start comparing ghost layers...\n");
-  SC3X (compare_ghost_results (p4est, p4est3, ghost_p4est, ghost_p4est3));
+  SC3X (compare_ghost_results
+        (p4est, p4est3, ghost_p4est, ghost_p4est3->ghost));
+  P4EST_INFO ("Done comparing ghost layers\n");
+
+  P4EST_INFO ("Start checking ghost map correctness...\n");
+  SC3X (check_map_correct (p4est3, ghost_p4est3));
+  P4EST_INFO ("Done checking ghost map correctness\n");
 
   /* clean up */
   p4est_ghost_destroy (ghost_p4est);
-  p4est_ghost_destroy (ghost_p4est3);
   p4est_destroy (p4est);
   p4est_connectivity_destroy (conn);
 
+  SC3X (p4est3_ghost_destroy_p4est (&ghost_p4est3));
   SC3X (p4est3_destroy (&p4est3));
   SC3X (p4est3_connectivity_destroy (&conn3));
   SC3X (sc3_allocator_destroy (&alloc));
