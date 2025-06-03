@@ -150,6 +150,16 @@ typedef struct p4est3_quadrant_weight_info
 }
 p4est3_quadrant_weight_info_t;
 
+/** A hash table to store positions of ghost quadrants within a ghost array by
+ * the ghost's global id.
+*/
+typedef struct p4est3_ghost_pos_hash_key
+{
+  p4est3_gloidx      gid;      /* global ID of the ghost quadrant */
+  p4est3_locidx      pos;      /* position in the ghosts array */
+}
+p4est3_ghost_pos_hash_key_t;
+
 /** Document this. */
 typedef             sc3_error_t
   * (*p4est3_refine_callback_t) (p4est3_refine_callback_info_t * ci,

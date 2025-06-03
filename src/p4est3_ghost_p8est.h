@@ -50,13 +50,6 @@ typedef struct p4est3_ghost_p8est
 }
 p4est3_ghost_p8est_t;
 
-typedef struct p4est3_ghost_pos_hash_key
-{
-  p4est_gloidx_t      gid;      /* global ID of the ghost quadrant */
-  p4est_locidx_t      pos;      /* position in the ghosts array */
-}
-p4est3_ghost_pos_hash_key_t;
-
 /** Fill the \a p4est \a ghost layer structure by iterating over \a p4est3.
  * \param [in] p3       Forest passed for reference.
  * \param [out] ptr_ghost On output a pointer to a valid ghost structure.
