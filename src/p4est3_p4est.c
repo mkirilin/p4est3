@@ -42,7 +42,7 @@ p4est3_connectivity_p4est_destroy (void *cslf)
 }
 
 static sc3_error_t *
-p4est3_connectivity_p4est_get_face (void *cslf, p4est3_topidx * which_tree,
+p4est3_connectivity_p4est_get_face (void *cslf, p4est3_topidx *which_tree,
                                     int *nface, int *orient)
 {
   p4est_connectivity_t *c4 = (p4est_connectivity_t *) cslf;
@@ -72,9 +72,9 @@ p4est3_connectivity_p4est_get_face (void *cslf, p4est3_topidx * which_tree,
 }
 
 sc3_error_t        *
-p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
-                               p4est3_connectivity_t ** pc,
-                               p4est_connectivity_t * c4, int autodestroy)
+p4est3_connectivity_new_p4est (sc3_allocator_t *alloc,
+                               p4est3_connectivity_t **pc,
+                               p4est_connectivity_t *c4, int autodestroy)
 {
   p4est3_connectivity_t *c;
   p4est3_connectivity_vtable_t scvt, *cvt = &scvt;
@@ -110,8 +110,8 @@ p4est3_connectivity_new_p4est (sc3_allocator_t * alloc,
 static const char  *P4EST3_P4EST_SELF_MAGIC = "p4est3_p4est_self_magic";
 
 sc3_error_t        *
-p4est3_connectivity_new_p4est_brick (sc3_allocator_t * alloc,
-                                     p4est3_connectivity_t ** pc,
+p4est3_connectivity_new_p4est_brick (sc3_allocator_t *alloc,
+                                     p4est3_connectivity_t **pc,
                                      int ki, int li,
 #ifdef P4_TO_P8
                                      int mi,
@@ -161,7 +161,7 @@ p4est3_p4est_self_t;
 #ifdef P4EST_ENABLE_DEBUG
 
 static int
-p4est3_p4est_self_is_valid (const p4est3_p4est_self_t * pslf, char *reason)
+p4est3_p4est_self_is_valid (const p4est3_p4est_self_t *pslf, char *reason)
 {
   SC3E_TEST (pslf != NULL, reason);
   SC3E_TEST (pslf->magic == P4EST3_P4EST_SELF_MAGIC, reason);
@@ -176,7 +176,7 @@ p4est3_p4est_self_is_valid (const p4est3_p4est_self_t * pslf, char *reason)
 
 static sc3_error_t *
 p4est3_p4est_get_local_num_trees (const void *pslf,
-                                  p4est3_topidx * t1, p4est3_topidx * t2)
+                                  p4est3_topidx *t1, p4est3_topidx *t2)
 {
   p4est3_p4est_self_t *slf = (p4est3_p4est_self_t *) pslf;
   SC3A_IS (p4est3_p4est_self_is_valid, slf);
@@ -202,8 +202,8 @@ p4est3_p4est_destroy (void *pslf)
 }
 
 sc3_error_t        *
-p4est3_new_p4est (sc3_allocator_t * alloc, p4est3_t ** pp3,
-                  p4est_t * p4, int autodestroy)
+p4est3_new_p4est (sc3_allocator_t *alloc, p4est3_t **pp3,
+                  p4est_t *p4, int autodestroy)
 {
   p4est3_p4est_self_t *slf;
   p4est3_t           *p3;
@@ -291,7 +291,7 @@ p4est_quadrant_vtable_get_tree_boundary (const void *q, int face, int *j)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_tree_boundaries (const void *q, sc3_array_t * nf)
+p4est_quadrant_vtable_tree_boundaries (const void *q, sc3_array_t *nf)
 {
   SC3A_CHECK (q != NULL);
   SC3A_CHECK (nf != NULL);
@@ -414,6 +414,9 @@ static sc3_error_t *
 p4est_quadrant_vtable_copy (const void *q, void *r)
 {
   p4est_quadrant_copy ((const p4est_quadrant_t *) q, (p4est_quadrant_t *) r);
+#ifdef P4EST_ENABLE_DEBUG
+  ((p4est_quadrant_t *) r)->p = ((const p4est_quadrant_t *) q)->p;
+#endif
   return NULL;
 }
 
@@ -443,7 +446,7 @@ p4est_quadrant_vtable_face_neighbor (const void *q, int face, void *r)
 
 static sc3_error_t *
 p4est3_quadrant_vtable_tree_face_neighbor (const void *q,
-                                           sc3_array_t * transform,
+                                           sc3_array_t *transform,
                                            int face, void *r)
 {
   p4est_quadrant_t    temp;
@@ -525,8 +528,7 @@ p4est_vtable_nearest_common_ancestor (const void *q1, const void *q2, void *r)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_linear_id (const void *q, int level,
-                                 p4est_gloidx_t * id)
+p4est_quadrant_vtable_linear_id (const void *q, int level, p4est_gloidx_t *id)
 {
   *id = p4est_quadrant_linear_id ((const p4est_quadrant_t *) q, level);
   return NULL;
@@ -548,8 +550,7 @@ p4est_quadrant_vtable_is_parent (const void *q, const void *r, int *j)
   return NULL;
 }
 
-static const p4est3_quadrant_vtable_t quadrant_vtable_p4est =
-{
+static const p4est3_quadrant_vtable_t quadrant_vtable_p4est = {
   P4EST_STRING "quadrant_vtable_p4est",
   P4EST_DIM,
   P4EST_QMAXLEVEL,
@@ -565,7 +566,8 @@ static const p4est3_quadrant_vtable_t quadrant_vtable_p4est =
   (p4est3_quadrant_ancestor_id_t) p4est_quadrant_vtable_ancestor_id,
   (p4est3_quadrant_in_out_t) p4est_quadrant_vtable_coordinates,
   (p4est3_quadrant_linear_id_t) p4est_quadrant_vtable_linear_id,
-  (p4est3_quadrant_get_tree_boundary_t) p4est_quadrant_vtable_get_tree_boundary,
+  (p4est3_quadrant_get_tree_boundary_t)
+    p4est_quadrant_vtable_get_tree_boundary,
   (p4est3_quadrant_tree_boundaries_t) p4est_quadrant_vtable_tree_boundaries,
   (p4est3_quadrant_copy_t) p4est_quadrant_vtable_copy,
   (p4est3_quadrant_child_t) p4est_quadrant_vtable_child,
@@ -577,7 +579,8 @@ static const p4est3_quadrant_vtable_t quadrant_vtable_p4est =
   (p4est3_quadrant_first_descendant_t) p4est_quadrant_vtable_first_descendant,
   (p4est3_quadrant_last_descendant_t) p4est_quadrant_vtable_last_descendant,
   (p4est3_quadrant_face_neighbor_t) p4est_quadrant_vtable_face_neighbor,
-  (p4est3_quadrant_tree_face_neighbor_t) p4est3_quadrant_vtable_tree_face_neighbor,
+  (p4est3_quadrant_tree_face_neighbor_t)
+    p4est3_quadrant_vtable_tree_face_neighbor,
   (p4est3_quadrant_compare_t) p4est_quadrant_vtable_compare,
   (p4est3_quadrant_is2_t) p4est_quadrant_vtable_is_equal,
   (p4est3_quadrant_is_ancestor_t) p4est_quadrant_vtable_is_ancestor,
@@ -585,17 +588,17 @@ static const p4est3_quadrant_vtable_t quadrant_vtable_p4est =
   (p4est3_nearest_common_ancestor_t) p4est_vtable_nearest_common_ancestor
 };
 
-static const p4est3_quadrant_vtable_t * qvt_p4est =
+static const p4est3_quadrant_vtable_t *qvt_p4est =
 #if (P4EST_DIM == 2 && defined(P4EST_ENABLE_BUILD_2D)) \
  || (P4EST_DIM == 3 && defined(P4EST_ENABLE_BUILD_3D))
   &quadrant_vtable_p4est
 #else
   NULL
 #endif
-;
+  ;
 
 sc3_error_t        *
-p4est3_quadrant_vtable_p4est (const p4est3_quadrant_vtable_t ** qvt)
+p4est3_quadrant_vtable_p4est (const p4est3_quadrant_vtable_t **qvt)
 {
   SC3A_CHECK (qvt != NULL);
 
