@@ -378,23 +378,6 @@ build_ghost_id_map (p4est3_t *p3, p4est_ghost_t *ghost,
   }
 }
 
-/* Find the position of a ghost in the array given its global ID */
-p4est_locidx_t
-p4est3_ghost_find_position (sc_hash_t *ghost_map, p4est_gloidx_t global_id)
-{
-  void              **found;
-  p4est_locidx_t     *value;
-
-  /* Look up in the hash table */
-  if (sc_hash_lookup (ghost_map, &global_id, &found)) {
-    value = (p4est_locidx_t *) * found;
-    return *value;
-  }
-
-  /* Not found */
-  return (p4est_locidx_t) - 1;
-}
-
 /* Compare function for mirror indices using context */
 static int
 compare_mirror_indices_context (const void *a, const void *b, void *ctx)
