@@ -370,6 +370,8 @@ build_ghost_id_map (p4est3_t *p3, p4est_ghost_t *ghost,
         hash_data->added++;
       }
       else {
+        P4EST_ASSERT (*found != key);
+        sc_mempool_free (hash_data->ckeys, key);
         /* Key was already present (should not happen) */
         hash_data->duped++;
         P4EST_ASSERT (!hash_data->duped);
