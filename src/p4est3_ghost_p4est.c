@@ -161,7 +161,8 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   p4est_gloidx_t      p_own, global_qid;
   ghost_hash_key_t   *k, *k_unique_p;
   p4est3_quadrant_vtable_t *qvt_standard;
-  void              **found, **found_unique_p;
+  ghost_hash_key_t    sfound;
+  void              **found;
   int                 coords[P4EST_DIM], level;
 
 #ifdef P4EST_ENABLE_DEBUG
@@ -268,10 +269,16 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   k = (ghost_hash_key_t *) sc_mempool_alloc (d->mirror_hdata->ckeys);
   k->qid = (p4est_locidx_t) (global_qid - fi->p3->goffset[fi->p3->mpirank]);
   k->proc = fi->p3->mpirank;
+  k->i = -1;                    /* not used for mirrors */
 
   k_unique_p = (ghost_hash_key_t *) sc_mempool_alloc (d->mirror_hdata->ckeys);
-  *k_unique_p = *k;
+  k_unique_p->qid = k->qid;
   k_unique_p->proc = (int) p_own;
+  k_unique_p->i = -1;           /* not used for mirrors */
+  SC3A_CHECK (k->qid == k_unique_p->qid);
+  SC3A_CHECK (k->proc != k_unique_p->proc);
+
+  SC3A_CHECK (p_own != fi->p3->mpirank);
 
   if (sc_hash_insert_unique (d->mirror_hdata->chash, k, &found)) {
     /* The key is newly linked into the hash table: count it */
@@ -300,21 +307,18 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
     d->mirror_hdata->duped++;
   }
 
-  if (sc_hash_insert_unique
-      (d->mirror_hdata->chash, k_unique_p, &found_unique_p)) {
+  sfound = **(ghost_hash_key_t **) found;
+
+  if (sc_hash_insert_unique (d->mirror_hdata->chash, k_unique_p, NULL)) {
     /* The key is newly linked into the hash table: count it */
-    P4EST_ASSERT (*found_unique_p == k_unique_p);
     //P4EST_INFOF ("First time adding mirror %ld, proc %ld\n",
     //             (long) k_unique_p->qid, (long) k_unique_p->proc);
-    *(p4est_locidx_t *) sc_array_push (d->p2m[p_own]) =
-      (*(ghost_hash_key_t **) found)->i;
+    *(p4est_locidx_t *) sc_array_push (d->p2m[p_own]) = sfound.i;
   }
   else {
     /* if we uniquely inserted k before, this case is not possible */
     P4EST_ASSERT (is_found == 0);
-
     /* The key for this mirror had already been stored earlier */
-    P4EST_ASSERT (*found_unique_p != k_unique_p);
     sc_mempool_free (d->mirror_hdata->ckeys, k_unique_p);
     d->mirror_hdata->duped++;
   }
@@ -537,7 +541,7 @@ sort_mirror_quadrants (p4est3_ghost_fill_data_t *d)
 }
 
 /* Merge the per-processor arrays of mirror indices into a single array */
-static void
+static sc3_error_t *
 merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
                           sc_array_t **p2m)
 {
@@ -569,6 +573,7 @@ merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
 
     offset += (p4est_locidx_t) count;
   }
+  return NULL;
 }
 
 sc3_error_t        *
@@ -602,13 +607,13 @@ p4est3_ghost_fill_p4est (p4est3_t *p3, p4est3_ghost_p4est_t **ptr_ghost)
   /* hash table for ghosts checking */
   ghost_hdata->ckeys = sc_mempool_new (sizeof (ghost_hash_key_t));
   ghost_hdata->chash =
-    sc_hash_new (ghost_hash_fn, ghost_equal_fn, ghost_hdata, NULL);
+    sc_hash_new (ghost_hash_fn, ghost_equal_fn, NULL, NULL);
   ghost_hdata->added = ghost_hdata->duped = 0;
 
   /* hash table for mirrors checking */
   mirror_hdata->ckeys = sc_mempool_new (sizeof (ghost_hash_key_t));
   mirror_hdata->chash =
-    sc_hash_new (ghost_hash_fn, ghost_equal_fn, mirror_hdata, NULL);
+    sc_hash_new (ghost_hash_fn, ghost_equal_fn, NULL, NULL);
   mirror_hdata->added = mirror_hdata->duped = 0;
 
   /* c-array of sc_array_t * to store mirrors in a proc, that form
@@ -681,12 +686,10 @@ p4est3_ghost_fill_p4est (p4est3_t *p3, p4est3_ghost_p4est_t **ptr_ghost)
   sort_mirror_quadrants (d);
 
   /** Merge \c d->p2m arrays to \c mirror_proc_mirrors */
-  merge_mirror_proc_arrays (p3, ghost, p2m);
+  SC3E (merge_mirror_proc_arrays (p3, ghost, p2m));
 
   /* Build the ghost global ID to position mapping */
   build_ghost_id_map (p3, ghost, ghost_hdata);
-
-  /* TODO: Wrap map with p4est_ghost_t */
 
   /* clean up memory temporary mirror_proc_mirrors sub-arrays */
   for (i = 0; i < p3->mpisize; i++) {
