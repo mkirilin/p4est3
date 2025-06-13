@@ -24,6 +24,67 @@
 #include <p4est3_iterate.h>
 #include <p4est3_internal.h>
 #include <p4est3_search.h>
+#include <p4est_base.h>
+#include <stdlib.h>
+
+/* Include MRU cache functionality for array split optimization */
+#include <sc_containers.h>
+
+/* Define maximum quadrant levels - use a reasonable default if not defined */
+#ifndef P4EST_QMAXLEVEL
+#define P4EST_QMAXLEVEL 30
+#endif
+
+/* Define drop function type since it's not available in sc */
+typedef void        (*sc_drop_function_t) (void *data, const void *user);
+
+/* Simple doubly-linked list node for MRU cache */
+typedef struct sc_dlink
+{
+  void               *data;
+  struct sc_dlink    *next;
+  struct sc_dlink    *prev;
+}
+sc_dlink_t;
+
+/* MRU cache structure definition (adapted from p4est_dune.c) */
+typedef struct sc_hash_mru
+{
+  /* functions provided by the user */
+  sc_hash_function_t  hash_fn;
+  sc_equal_function_t equal_fn;
+  sc_drop_function_t  drop_fn;
+  void               *user;
+
+  /* internal container objects */
+  sc_hash_t          *hash;
+  sc_mempool_t       *pool;
+  sc_dlink_t         *first, *last;
+
+  /* counters and statistics */
+  size_t              maxcount;
+  size_t              count;
+  size_t              num_inserted;
+  size_t              insert_missed;
+  size_t              num_removed;
+  size_t              remove_missed;
+}
+sc_hash_mru_t;
+
+/* Forward declarations for MRU cache functions */
+static sc_hash_mru_t *sc_hash_mru_new (sc_hash_function_t hash_fn,
+                                       sc_equal_function_t equal_fn,
+                                       sc_drop_function_t drop_fn,
+                                       void *user, size_t maxcount);
+static void         sc_hash_mru_destroy (sc_hash_mru_t * mru);
+static int          sc_hash_mru_insert_unique (sc_hash_mru_t * mru,
+                                               void *v, void ***found);
+
+/* MRU cache helper functions */
+static unsigned int sc_hash_mru_hash (const void *v, const void *u);
+static int          sc_hash_mru_is_equal (const void *v1, const void *v2,
+                                          const void *u);
+static void         sc_hash_mru_consolidate (sc_hash_mru_t * mru);
 
 #ifdef __cplusplus
 extern              "C"
@@ -32,6 +93,273 @@ extern              "C"
 }
 #endif
 #endif
+
+/* MRU cache structure for array split optimization - combined key and value */
+typedef struct p4est3_split_cache_entry
+{
+  /* Key fields */
+  p4est3_gloidx       first_quad_id;    /* First quadrant ID in the range */
+  p4est3_gloidx       last_quad_id;     /* Last quadrant ID in the range */
+  int                 level;    /* Split level */
+  int                 tree_id;  /* Tree identifier */
+
+  /* Value fields */
+  sc3_array_t        *split_indices;    /* Cached split result indices */
+  int                 reuse_count;      /* Number of times this cache entry was reused */
+}
+p4est3_split_cache_entry_t;
+
+/* Hash and comparison functions for MRU cache */
+static unsigned int
+p4est3_split_cache_hash (const void *entry, const void *user)
+{
+  const p4est3_split_cache_entry_t *cache_entry =
+    (const p4est3_split_cache_entry_t *) entry;
+
+  unsigned int        a, b, c;
+  a = b = c = 0x9e3779b9;       // Initialize with golden ratio
+
+  // Mix in the key fields
+  a += (unsigned int) cache_entry->first_quad_id;
+  b += (unsigned int) (cache_entry->first_quad_id >> 32);
+  c += (unsigned int) cache_entry->last_quad_id;
+
+  // First mixing round
+  sc_hash_mix (a, b, c);
+
+  // Add more fields
+  a += (unsigned int) (cache_entry->last_quad_id >> 32);
+  b += (unsigned int) cache_entry->level;
+  c += (unsigned int) cache_entry->tree_id;
+
+  // Final mixing
+  sc_hash_final (a, b, c);
+
+  return c;
+}
+
+static int
+p4est3_split_cache_equal (const void *entry1, const void *entry2,
+                          const void *user)
+{
+  const p4est3_split_cache_entry_t *e1 =
+    (const p4est3_split_cache_entry_t *) entry1;
+  const p4est3_split_cache_entry_t *e2 =
+    (const p4est3_split_cache_entry_t *) entry2;
+
+  return (e1->first_quad_id == e2->first_quad_id &&
+          e1->last_quad_id == e2->last_quad_id &&
+          e1->level == e2->level && e1->tree_id == e2->tree_id);
+}
+
+static void
+p4est3_split_cache_drop (void *entry, const void *user)
+{
+  p4est3_split_cache_entry_t *cache_entry =
+    (p4est3_split_cache_entry_t *) entry;
+  if (cache_entry->split_indices != NULL) {
+    sc3_array_destroy (&cache_entry->split_indices);
+  }
+  SC_FREE (cache_entry);
+}
+
+/* MRU cache implementation functions */
+static inline unsigned int
+sc_hash_mru_hash (const void *v, const void *u)
+{
+  const sc_hash_mru_t *mru = (const sc_hash_mru_t *) u;
+  const sc_dlink_t   *lynk = (const sc_dlink_t *) v;
+
+  SC_ASSERT (mru != NULL);
+  SC_ASSERT (mru->hash_fn != NULL);
+
+  return mru->hash_fn (lynk->data, mru->user);
+}
+
+static inline int
+sc_hash_mru_is_equal (const void *v1, const void *v2, const void *u)
+{
+  const sc_hash_mru_t *mru = (const sc_hash_mru_t *) u;
+  const sc_dlink_t   *lynk1 = (const sc_dlink_t *) v1;
+  const sc_dlink_t   *lynk2 = (const sc_dlink_t *) v2;
+
+  SC_ASSERT (mru != NULL);
+  SC_ASSERT (mru->equal_fn != NULL);
+
+  return mru->equal_fn (lynk1->data, lynk2->data, mru->user);
+}
+
+static void
+sc_hash_mru_consolidate (sc_hash_mru_t *mru)
+{
+  sc_dlink_t         *drop;
+
+  /* verify preconditions */
+  SC_ASSERT (mru != NULL);
+  SC_ASSERT (mru->pool->elem_count == mru->count);
+  SC_ASSERT (mru->hash->elem_count == mru->count);
+
+  /* drop superfluous objects */
+  while (mru->count > mru->maxcount) {
+    drop = mru->first;
+    SC_ASSERT (drop != NULL);
+    SC_ASSERT (drop->prev == NULL);
+
+    /* first remove element from hash */
+    P4EST_EXECUTE_ASSERT_TRUE (sc_hash_remove (mru->hash, drop, NULL));
+
+    /* call the user's drop handler */
+    if (mru->drop_fn != NULL) {
+      mru->drop_fn (drop->data, mru->user);
+    }
+
+    /* drop oldest list entry */
+    if ((mru->first = drop->next) == NULL) {
+      SC_ASSERT (mru->count == 1);
+      mru->last = NULL;
+    }
+    else {
+      SC_ASSERT (drop->next->prev == drop);
+      mru->first->prev = NULL;
+    }
+
+    /* update memory and count */
+    sc_mempool_free (mru->pool, drop);
+    --mru->count;
+  }
+}
+
+static inline sc_hash_mru_t *
+sc_hash_mru_new (sc_hash_function_t hash_fn, sc_equal_function_t equal_fn,
+                 sc_drop_function_t drop_fn, void *user, size_t maxcount)
+{
+  sc_hash_mru_t      *mru;
+
+  SC_ASSERT (hash_fn != NULL);
+  SC_ASSERT (equal_fn != NULL);
+
+  mru = SC_ALLOC_ZERO (sc_hash_mru_t, 1);
+  mru->hash_fn = hash_fn;
+  mru->equal_fn = equal_fn;
+  mru->drop_fn = drop_fn;
+  mru->user = user;
+
+  mru->hash = sc_hash_new (sc_hash_mru_hash, sc_hash_mru_is_equal, mru, NULL);
+  mru->pool = sc_mempool_new (sizeof (sc_dlink_t));
+
+  mru->maxcount = maxcount;
+
+  return mru;
+}
+
+static void
+sc_hash_mru_destroy (sc_hash_mru_t *mru)
+{
+  /* verify preconditions */
+  SC_ASSERT (mru != NULL);
+  SC_ASSERT (mru->pool->elem_count == mru->count);
+  SC_ASSERT (mru->hash->elem_count == mru->count);
+
+  /* call drop handler on remaining items */
+  if (mru->drop_fn != NULL) {
+    sc_dlink_t         *head = mru->first;
+
+    /* walk through the list from oldest to newest */
+    while (head != NULL) {
+      mru->drop_fn (head->data, mru->user);
+      head = head->next;
+
+      /* returning to mempool would be redundant here */
+    }
+  }
+
+  /* free all stored list elements */
+  sc_hash_destroy (mru->hash);
+
+  /* free the hash structure itself */
+  sc_mempool_destroy (mru->pool);
+
+  /* free this object */
+  SC_FREE (mru);
+}
+
+static int
+sc_hash_mru_insert_unique (sc_hash_mru_t *mru, void *v, void ***found)
+{
+  int                 inserted;
+  void              **lfound;
+  sc_dlink_t          key, *lkey = &key;
+  sc_dlink_t         *add;
+
+  /* verify preconditions */
+  SC_ASSERT (mru != NULL);
+  SC_ASSERT (mru->pool->elem_count == mru->count);
+  SC_ASSERT (mru->hash->elem_count == mru->count);
+
+  /* construct hash key */
+  lkey->data = v;
+  inserted = sc_hash_insert_unique (mru->hash, lkey, &lfound);
+  if (inserted) {
+
+    /* this object is newly added */
+    add = (sc_dlink_t *) sc_mempool_alloc (mru->pool);
+    add->data = v;
+    add->next = NULL;
+    if (mru->last == NULL) {
+
+      /* the list was empty before */
+      SC_ASSERT (mru->first == NULL && mru->count == 0);
+      (mru->first = add)->prev = NULL;
+    }
+    else {
+
+      /* append to the list */
+      SC_ASSERT (mru->last->next == NULL && mru->count > 0);
+      (mru->last->next = add)->prev = mru->last;
+    }
+
+    /* update memory and counters */
+    *(sc_dlink_t **) lfound = mru->last = add;
+    ++mru->count;
+    ++mru->insert_missed;
+  }
+  else {
+
+    /* this object exists already */
+    add = *(sc_dlink_t **) lfound;
+    if (add != mru->last) {
+
+      /* remove it from its place */
+      SC_ASSERT (add->next != NULL);
+      add->next->prev = add->prev;
+      if (add->next->prev == NULL) {
+
+        /* we are removing the first element */
+        SC_ASSERT (add == mru->first);
+        mru->first = add->next;
+      }
+      else {
+
+        /* we keep the first element */
+        add->prev->next = add->next;
+      }
+
+      /* and append it to the end */
+      (add->prev = mru->last)->next = add;
+      (mru->last = add)->next = NULL;
+    }
+  }
+  ++mru->num_inserted;
+
+  /* return data location if so desired */
+  if (found != NULL) {
+    *found = &add->data;
+  }
+
+  /* indicate pre-existing object and return */
+  sc_hash_mru_consolidate (mru);
+  return inserted;
+}
 
 typedef struct p4est3_search_area
 {
@@ -42,6 +370,12 @@ typedef struct p4est3_search_area
                                            into array_split */
   int                *children_face_neighbors;
   int                *face_dual;
+
+  /* MRU cache for array split optimization */
+  sc_hash_mru_t      *split_cache[P4EST_QMAXLEVEL];     /* One cache per level */
+  int                 cache_max_size;   /* Maximum cache size per level */
+  int                 cache_hits;       /* Statistics: cache hits */
+  int                 cache_misses;     /* Statistics: cache misses */
 
   /* volume section */
   p4est3_tree_t      *tree;
@@ -56,7 +390,7 @@ typedef struct p4est3_search_area
   p4est3_gloidx       local_begin;      /* Id of the first local quadrant in
                                            the tree under iteration */
   p4est3_gloidx       local_end;        /* Id of the last local quadrant in
-                                            the tree under iteration */
+                                           the tree under iteration */
   p4est3_iterate_volume_info_t *vinfo;
 
   /* face section */
@@ -76,17 +410,33 @@ typedef struct p4est3_search_area
   p4est3_gloidx       remote_last[2];   /* Id of the last remote proc that
                                            potentially contains the neighbor
                                            quadrants */
-  p4est3_gloidx       local_begin_face[2]; /* Ids of the first local quadrant in
-                                              the tree under iteration */
-  p4est3_gloidx       local_end_face[2];   /* Ids of the last local quadrant in
-                                              the tree under iteration */
+  p4est3_gloidx       local_begin_face[2];      /* Ids of the first local quadrant in
+                                                   the tree under iteration */
+  p4est3_gloidx       local_end_face[2];        /* Ids of the last local quadrant in
+                                                   the tree under iteration */
   p4est3_iterate_face_info_t *finfo;
 }
 p4est3_search_area_t;
 
+/* Forward declarations for MRU cache functions */
+static sc3_error_t *p4est3_split_cache_init (p4est3_search_area_t * sa,
+                                             int max_cache_size);
+static sc3_error_t *p4est3_split_cache_destroy (p4est3_search_area_t * sa);
+static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig (p4est3_t *
+                                                                  p3,
+                                                                  sc3_array_t
+                                                                  * array,
+                                                                  int level,
+                                                                  p4est3_gloidx
+                                                                  begin,
+                                                                  sc3_array_t
+                                                                  * indices,
+                                                                  p4est3_search_area_t
+                                                                  * sa);
+
 static sc3_error_t *
-p4est3_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
-                  int ecount, int is_resizable, sc3_array_t ** arr)
+p4est3_array_new (sc3_allocator_t *alloc, size_t esize, int ealloc,
+                  int ecount, int is_resizable, sc3_array_t **arr)
 {
   SC3E_RETVAL (arr, NULL);
   SC3A_IS (sc3_allocator_is_setup, alloc);
@@ -106,7 +456,7 @@ p4est3_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 
 #ifdef P4EST_ENABLE_DEBUG
 static sc3_error_t *
-p4est3_array_set_zero (sc3_array_t * arr)
+p4est3_array_set_zero (sc3_array_t *arr)
 {
   size_t              esize, ecount;
   void               *idx;
@@ -119,11 +469,12 @@ p4est3_array_set_zero (sc3_array_t * arr)
 #endif
 
 static sc3_error_t *
-p4est3_set_children_face_neighbors (p4est3_t * p3, p4est3_search_area_t * sa)
+p4est3_set_children_face_neighbors (p4est3_t *p3, p4est3_search_area_t *sa)
 {
   int                *cfn;
-  SC3E (sc3_allocator_calloc (p3->alloc, sa->nfaces * (1 << p3->qvt->dim),
-                              sizeof (int), &sa->children_face_neighbors));
+  SC3E (sc3_allocator_calloc
+        (p3->alloc, (size_t) sa->nfaces * (1 << p3->qvt->dim), sizeof (int),
+         (void *) &sa->children_face_neighbors));
   cfn = sa->children_face_neighbors;
   if (p3->qvt->dim == 2) {
     /* *INDENT-OFF* */
@@ -149,11 +500,12 @@ p4est3_set_children_face_neighbors (p4est3_t * p3, p4est3_search_area_t * sa)
 }
 
 static sc3_error_t *
-p4est3_set_face_dual (p4est3_t * p3, p4est3_search_area_t * sa)
+p4est3_set_face_dual (p4est3_t *p3, p4est3_search_area_t *sa)
 {
   int                *fd;
   SC3E (sc3_allocator_calloc
-        (p3->alloc, 2 * p3->qvt->dim, sizeof (int), &sa->face_dual));
+        (p3->alloc, (size_t) 2 * p3->qvt->dim, sizeof (int),
+         (void *) &sa->face_dual));
   fd = sa->face_dual;
   if (p3->qvt->dim == 2) {
     fd[0] = 1;
@@ -173,7 +525,7 @@ p4est3_set_face_dual (p4est3_t * p3, p4est3_search_area_t * sa)
 }
 
 static sc3_error_t *
-p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
+p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
                        void *user_data)
 {
   const int           ntypes = p3->num_children + 1;
@@ -185,19 +537,33 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
   SC3E (p4est3_set_children_face_neighbors (p3, sa));
   SC3E (p4est3_set_face_dual (p3, sa));
 
+  /* Initialize MRU cache for array split optimization */
+  /* Allow cache size to be configured via environment variable */
+  int                 cache_size = 64;  /* Default cache size */
+  const char         *cache_size_env = getenv ("P4EST_SPLIT_CACHE_SIZE");
+  if (cache_size_env != NULL) {
+    int                 env_cache_size = atoi (cache_size_env);
+    if (env_cache_size > 0 && env_cache_size <= 1024) {
+      cache_size = env_cache_size;
+    }
+  }
+  SC3E (p4est3_split_cache_init (sa, cache_size));
+  sa->cache_hits = 0;
+  sa->cache_misses = 0;
+
   /*set volume section of sa */
   SC3E (p4est3_tree_index (p3, p3->fltree, &sa->tree));
   sa->child_id = -1;
   sa->Level = 0;
   SC3E (sc3_allocator_calloc (p3->alloc, p3->qvt->max_level, sizeof (int),
-                              &sa->level2nchildren));
+                              (void *) &sa->level2nchildren));
   memset (sa->level2nchildren, 0, sizeof (int) * p3->qvt->max_level);
 
   /* set 2d stack (array of arrays) */
   SC3E (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
                           p3->qvt->max_level, p3->qvt->max_level, 1,
                           &sa->idx_vol_stack));
-  SC3E (sc3_array_index (sa->idx_vol_stack, 0, &arr));
+  SC3E (sc3_array_index (sa->idx_vol_stack, 0, (void **) &arr));
   SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_gloidx), 2, 2, 1,
                           (sc3_array_t **) arr));
   for (i = 1; i < p3->qvt->max_level; ++i) {
@@ -254,10 +620,14 @@ p4est3_set_outer_data (p4est3_t * p3, p4est3_search_area_t * sa,
 }
 
 static sc3_error_t *
-p4est3_destroy_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
+p4est3_destroy_outer_data (p4est3_t *p3, p4est3_search_area_t *sa)
 {
   int                 i, side;
   void               *arr;
+
+  /* Destroy MRU cache */
+  SC3E (p4est3_split_cache_destroy (sa));
+
   SC3E (sc3_allocator_free (p3->alloc, sa->children_face_neighbors));
   SC3E (sc3_allocator_free (p3->alloc, sa->face_dual));
   SC3E (sc3_allocator_free (p3->alloc, sa->level2nchildren));
@@ -286,21 +656,21 @@ p4est3_destroy_outer_data (p4est3_t * p3, p4est3_search_area_t * sa)
   return NULL;
 }
 
-static int
-p4est3_get_children_face_nb_id (p4est3_search_area_t * sa,
+static inline int
+p4est3_get_children_face_nb_id (p4est3_search_area_t *sa,
                                 int child_id, int face)
 {
   return sa->children_face_neighbors[child_id * sa->nfaces + face];
 }
 
-static int
-p4est3_get_dual_face (p4est3_search_area_t * sa, int face)
+static inline int
+p4est3_get_dual_face (p4est3_search_area_t *sa, int face)
 {
   return sa->face_dual[face];
 }
 
 sc3_error_t        *
-p4est3_iterate_face (p4est3_t * p3,
+p4est3_iterate_face (p4est3_t *p3,
                      p4est3_iterate_volume_t cvolume,
                      p4est3_iterate_face_t cface, void *user_data)
 {
@@ -309,7 +679,7 @@ p4est3_iterate_face (p4est3_t * p3,
 }
 
 sc3_error_t        *
-p4est3_iterate_volume (p4est3_t * p3,
+p4est3_iterate_volume (p4est3_t *p3,
                        p4est3_iterate_volume_t cvolume, void *user_data)
 {
   p4est3_topidx       ntree;
@@ -337,11 +707,11 @@ p4est3_iterate_volume (p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_iterate_face_bound_init (p4est3_t * p3,
-                                p4est3_search_area_t * sa,
+p4est3_iterate_face_bound_init (p4est3_t *p3,
+                                p4est3_search_area_t *sa,
                                 p4est3_topidx tree,
                                 int face,
-                                p4est3_iterate_face_side_t * fside,
+                                p4est3_iterate_face_side_t *fside,
                                 int *is_iterate)
 {
   int                 orient;
@@ -435,10 +805,10 @@ p4est3_iterate_face_bound_init (p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_internal_iterate_face (p4est3_t * p3,
+p4est3_internal_iterate_face (p4est3_t *p3,
                               p4est3_iterate_face_t cface,
                               p4est3_iterate_codim_t ccodim,
-                              p4est3_search_area_t * sa)
+                              p4est3_search_area_t *sa)
 {
   const int           max_children = p3->num_children;
   const int           half_ch = max_children / 2;
@@ -470,12 +840,12 @@ p4est3_internal_iterate_face (p4est3_t * p3,
 
   /* Check if both sides belong to remote process(es).
      If so, we ignore this face. */
-  if ((sa->nsides == 1 && 
-        (*(b_f[0]) >= sa->local_end_face[0] || *(e_f[0]) <= sa->local_begin_face[0]))
-        ||
-        (sa->nsides == 2 && 
-        (*(b_f[0]) >= sa->local_end_face[0] || *(e_f[0]) <= sa->local_begin_face[0]) &&
-        (*(b_f[1]) >= sa->local_end_face[1] || *(e_f[1]) <= sa->local_begin_face[1]))) {
+  if ((sa->nsides == 1 && (*(b_f[0]) >= sa->local_end_face[0]
+                           || *(e_f[0]) <= sa->local_begin_face[0]))
+      || (sa->nsides == 2 && (*(b_f[0]) >= sa->local_end_face[0]
+                              || *(e_f[0]) <= sa->local_begin_face[0])
+          && (*(b_f[1]) >= sa->local_end_face[1]
+              || *(e_f[1]) <= sa->local_begin_face[1]))) {
     return NULL;
   }
 
@@ -491,7 +861,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
     /* Start binary search from a local process */
     proc_owner = p3->mpirank;
     SC3E (p4est3_search_lower_bound64
-            (*(b_f[side]), p3->goffset, p3->mpisize + 1, &proc_owner));
+          (*(b_f[side]), p3->goffset, p3->mpisize + 1, &proc_owner));
     if (p3->goffset[proc_owner] > *(b_f[side])) {
       SC3A_CHECK (proc_owner > 0);
       proc_owner--;
@@ -500,7 +870,8 @@ p4est3_internal_iterate_face (p4est3_t * p3,
 
     /* Get quadrant from the owning process's window */
     first_quad = (void *) (p3->nodequads[proc_owner] +
-                          p3->qsize * (*(b_f[side]) - p3->goffset[proc_owner]));
+                           p3->qsize * (*(b_f[side]) -
+                                        p3->goffset[proc_owner]));
 
     SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
     if (level == Level[side]) {
@@ -534,9 +905,9 @@ p4est3_internal_iterate_face (p4est3_t * p3,
        quadrants, because of our specialized array_split_noncontig function */
     SC3E (sc3_array_renew_data (&view_q, p3->nodequads[0], p3->qsize,
                                 0, *(e_f[side]) - *(b_f[side])));
-    SC3E (p4est3_quadrant_array_split_noncontig
+    SC3E (p4est3_cached_quadrant_array_split_noncontig
           (p3, view_q, Level[side], *(b_f[side]),
-           *(sc3_array_t **) (stack_it[side])));
+           *(sc3_array_t **) (stack_it[side]), sa));
 
     /* since array_split doesn't count shift from the beinning of quadrants
        in a proc, we shift result indices at the loop below */
@@ -579,7 +950,7 @@ p4est3_internal_iterate_face (p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_iterate_face_inner_init (p4est3_t * p3, p4est3_search_area_t * sa,
+p4est3_iterate_face_inner_init (p4est3_t *p3, p4est3_search_area_t *sa,
                                 int child, int neighbor)
 {
   int                *Level_face = sa->Level_face;
@@ -613,10 +984,10 @@ p4est3_iterate_face_inner_init (p4est3_t * p3, p4est3_search_area_t * sa,
 }
 
 static sc3_error_t *
-p4est3_iterate_face_inner (p4est3_t * p3,
+p4est3_iterate_face_inner (p4est3_t *p3,
                            p4est3_iterate_face_t cface,
                            p4est3_iterate_codim_t ccodim,
-                           p4est3_search_area_t * search_area)
+                           p4est3_search_area_t *search_area)
 {
 
   int                 child, face, nb_id;
@@ -640,8 +1011,8 @@ p4est3_iterate_face_inner (p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_iterate_volume_rec_init (p4est3_t * p3,
-                                p4est3_search_area_t * sa, p4est3_topidx tree)
+p4est3_iterate_volume_rec_init (p4est3_t *p3,
+                                p4est3_search_area_t *sa, p4est3_topidx tree)
 {
   int                 side;
   void               *arr;
@@ -674,7 +1045,8 @@ p4est3_iterate_volume_rec_init (p4est3_t * p3,
   *end = p3->gtroffset[tree + 1];
 
   sa->local_begin = SC3_MAX (p3->gtroffset[tree], p3->goffset[p3->mpirank]);
-  sa->local_end = SC3_MIN (p3->gtroffset[tree + 1], p3->goffset[p3->mpirank + 1]);
+  sa->local_end =
+    SC3_MIN (p3->gtroffset[tree + 1], p3->goffset[p3->mpirank + 1]);
 
   SC3E (sc3_array_index (sa->finfo->sides, 0, &fside));
   for (int side = 0; side < 2; ++side) {
@@ -685,7 +1057,7 @@ p4est3_iterate_volume_rec_init (p4est3_t * p3,
   /* Find here the range of procs that share the same tree as noderank */
   /* Since we process inner faces here:
      The procs < mpirank are responsible for 0th sides,
-     the procs > mpirank are responsoble for 1st sides. Proof?*/
+     the procs > mpirank are responsoble for 1st sides. Proof? */
   for (side = 0; side < 2; ++side) {
     sa->remote_first[side] = -1;
     sa->remote_last[side] = -2;
@@ -722,11 +1094,11 @@ p4est3_iterate_volume_rec_init (p4est3_t * p3,
 }
 
 static sc3_error_t *
-p4est3_iterate_volume_rec (p4est3_t * p3,
+p4est3_iterate_volume_rec (p4est3_t *p3,
                            p4est3_iterate_volume_t cvolume,
                            p4est3_iterate_face_t cface,
                            p4est3_iterate_codim_t ccodim,
-                           p4est3_search_area_t * sa)
+                           p4est3_search_area_t *sa)
 {
   int                 i;
   void               *first_quad;       /*first quadrant in this search area */
@@ -761,7 +1133,7 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
      because we need to fill the metadata to proceed the recursion. */
   proc_owner = p3->mpirank;
   SC3E (p4est3_search_lower_bound64
-         (*begin, p3->goffset, p3->mpisize + 1, &proc_owner));
+        (*begin, p3->goffset, p3->mpisize + 1, &proc_owner));
   if (p3->goffset[proc_owner] > *begin) {
     SC3A_CHECK (proc_owner > 0);
     proc_owner--;
@@ -770,7 +1142,7 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
 
   /* Get quadrant from the owning process's window */
   first_quad = (void *) (p3->nodequads[proc_owner] +
-                        p3->qsize * (*begin - p3->goffset[proc_owner]));
+                         p3->qsize * (*begin - p3->goffset[proc_owner]));
 
   SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
   if (level == *Level) {
@@ -789,7 +1161,7 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
           * counting only local quadrant in this tree before it.
           */
       /* vinfo->nquad =  THE PREVIOUS VERSION
-        *begin + p3->goffset[p3->mpirank] - p3->gtroffset[tree->treeid]; */
+       *begin + p3->goffset[p3->mpirank] - p3->gtroffset[tree->treeid]; */
       vinfo->nquad = *begin - p3->gtroffset[tree->treeid];
       SC3E (cvolume (vinfo));
     }
@@ -806,8 +1178,8 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
   SC3E (sc3_array_renew_data
         (&view_q, p3->nodequads[0], p3->qsize, 0, *end - *begin));
 
-  SC3E (p4est3_quadrant_array_split_noncontig
-        (p3, view_q, *Level, *begin, *(sc3_array_t **) stack_it));
+  SC3E (p4est3_cached_quadrant_array_split_noncontig
+        (p3, view_q, *Level, *begin, *(sc3_array_t **) stack_it, sa));
   l2nch[++(*Level)] = 0;
 
   /* since array_split doesn't count shift from the beinning of quadrants
@@ -828,7 +1200,7 @@ p4est3_iterate_volume_rec (p4est3_t * p3,
 }
 
 sc3_error_t        *
-p4est3_iterate_codim (p4est3_t * p3, int codims,
+p4est3_iterate_codim (p4est3_t *p3, int codims,
                       p4est3_iterate_volume_t cvolume,
                       p4est3_iterate_face_t cface,
                       p4est3_iterate_codim_t ccodim, void *user_data)
@@ -874,6 +1246,179 @@ p4est3_iterate_codim (p4est3_t * p3, int codims,
   }
   SC3E (p4est3_destroy_outer_data (p3, search_area));
   return NULL;
+}
+
+/* MRU cache initialization function */
+static sc3_error_t *
+p4est3_split_cache_init (p4est3_search_area_t *sa, int max_cache_size)
+{
+  int                 i;
+
+  sa->cache_max_size = max_cache_size;
+  sa->cache_hits = 0;
+  sa->cache_misses = 0;
+
+  /* Initialize MRU cache for each level */
+  for (i = 0; i < P4EST_QMAXLEVEL; i++) {
+    sa->split_cache[i] = sc_hash_mru_new (p4est3_split_cache_hash,
+                                          p4est3_split_cache_equal,
+                                          p4est3_split_cache_drop,
+                                          NULL, max_cache_size);
+  }
+
+  return NULL;                  /* Success */
+}
+
+/* MRU cache cleanup function */
+static sc3_error_t *
+p4est3_split_cache_destroy (p4est3_search_area_t *sa)
+{
+  int                 i;
+  int                 total_cache_entries = 0;
+
+  /* Print cache statistics before cleanup */
+//  if (sa->cache_hits > 0 || sa->cache_misses > 0) {
+//    printf ("MRU Cache Statistics: Hits=%d, Misses=%d, Hit Rate=%.2f%%\n",
+//            sa->cache_hits, sa->cache_misses,
+//            100.0 * sa->cache_hits / (sa->cache_hits + sa->cache_misses));
+//  }
+//
+//  /* Print detailed per-level cache statistics */
+//  for (i = 0; i < P4EST_QMAXLEVEL; i++) {
+//    if (sa->split_cache[i] != NULL && sa->split_cache[i]->count > 0) {
+//      printf ("  Level %d: Cache entries=%lu, Insertions=%lu\n",
+//              i, sa->split_cache[i]->count, sa->split_cache[i]->num_inserted);
+//      total_cache_entries += sa->split_cache[i]->count;
+//    }
+//  }
+//
+//  if (total_cache_entries > 0) {
+//    printf ("  Total cache entries: %d\n", total_cache_entries);
+//  }
+
+  /* Destroy MRU cache for each level */
+  for (i = 0; i < P4EST_QMAXLEVEL; i++) {
+    if (sa->split_cache[i] != NULL) {
+      sc_hash_mru_destroy (sa->split_cache[i]);
+      sa->split_cache[i] = NULL;
+    }
+  }
+
+  return NULL;                  /* Success */
+}
+
+/* Cached array split function */
+/* Cached version of array split function using unified cache entry structure */
+static sc3_error_t *
+p4est3_cached_quadrant_array_split_noncontig (p4est3_t *p3,
+                                              sc3_array_t *array,
+                                              int level,
+                                              p4est3_gloidx begin,
+                                              sc3_array_t *indices,
+                                              p4est3_search_area_t *sa)
+{
+  p4est3_split_cache_entry_t search_entry;
+  p4est3_split_cache_entry_t *cache_entry = NULL;
+  void              **found;
+  int                 inserted;
+  sc_hash_mru_t      *cache;
+  size_t              elem_count;
+  size_t              indices_count;
+  size_t              i;
+
+  /* Check if caching is available for this level */
+  if (level < 0 || level >= P4EST_QMAXLEVEL || sa->split_cache[level] == NULL) {
+    sa->cache_misses++;
+    return p4est3_quadrant_array_split_noncontig (p3, array, level, begin,
+                                                  indices);
+  }
+
+  cache = sa->split_cache[level];
+  elem_count = sc3_array_elem_count_noerr (array);
+
+  /* Create search entry with key information */
+  search_entry.first_quad_id = begin;
+  search_entry.last_quad_id = begin + (p4est3_gloidx) elem_count - 1;
+  search_entry.level = level;
+  search_entry.tree_id = sa->tree != NULL ? sa->tree->treeid : -1;
+  search_entry.split_indices = NULL;
+  search_entry.reuse_count = 0;
+
+  /* Try to find in cache */
+  inserted = sc_hash_mru_insert_unique (cache, &search_entry, &found);
+
+  if (!inserted) {
+    /* Cache hit - get the cached entry and copy its split result */
+    cache_entry = (p4est3_split_cache_entry_t *) * found;
+    cache_entry->reuse_count++;
+    sa->cache_hits++;
+
+    /* Copy cached split indices to the output array */
+    if (cache_entry->split_indices != NULL) {
+      size_t              cached_count, output_count;
+      void               *cached_data, *output_data;
+
+      SC3E (sc3_array_get_elem_count
+            (cache_entry->split_indices, &cached_count));
+      SC3E (sc3_array_get_elem_count (indices, &output_count));
+
+      /* Ensure output array has enough space */
+      if (output_count < cached_count) {
+        SC3E (sc3_array_resize (indices, cached_count));
+      }
+
+      /* Copy the cached data */
+      SC3E (sc3_array_index (cache_entry->split_indices, 0, &cached_data));
+      SC3E (sc3_array_index (indices, 0, &output_data));
+      memcpy (output_data, cached_data,
+              cached_count * sizeof (p4est3_gloidx));
+
+      return NULL;              /* Success - used cached result */
+    }
+    else {
+      /* Cache entry exists but no stored result - fall back to computation */
+      sa->cache_misses++;
+      return p4est3_quadrant_array_split_noncontig (p3, array, level, begin,
+                                                    indices);
+    }
+  }
+
+  /* Cache miss - allocate persistent cache entry and compute result */
+  sa->cache_misses++;
+
+  /* Allocate persistent storage for the cache entry */
+  cache_entry = SC_ALLOC (p4est3_split_cache_entry_t, 1);
+  *cache_entry = search_entry;
+  cache_entry->reuse_count = 1;
+  *found = cache_entry;
+
+  /* Compute the split result */
+  SC3E (p4est3_quadrant_array_split_noncontig
+        (p3, array, level, begin, indices));
+
+  /* Store the computed result in the cache */
+  SC3E (sc3_array_get_elem_count (indices, &indices_count));
+
+  /* Create a new array to store the cached result using sc package allocator */
+  SC3E (sc3_array_new (p3->alloc, &cache_entry->split_indices));
+  SC3E (sc3_array_set_elem_size
+        (cache_entry->split_indices, sizeof (p4est3_gloidx)));
+  SC3E (sc3_array_set_elem_alloc
+        (cache_entry->split_indices, (int) indices_count));
+  SC3E (sc3_array_set_elem_count
+        (cache_entry->split_indices, (int) indices_count));
+  SC3E (sc3_array_set_initzero (cache_entry->split_indices, 0));
+  SC3E (sc3_array_setup (cache_entry->split_indices));
+
+  /* Copy the computed split indices to the cache */
+  for (i = 0; i < indices_count; i++) {
+    p4est3_gloidx      *src_val, *dst_val;
+    SC3E (sc3_array_index (indices, i, &src_val));
+    SC3E (sc3_array_index (cache_entry->split_indices, i, &dst_val));
+    *dst_val = *src_val;
+  }
+
+  return NULL;                  /* Success */
 }
 
 #ifdef __cplusplus
