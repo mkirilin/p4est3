@@ -405,7 +405,7 @@ make_allocator (sc3_allocator_t *oa, sc3_allocator_t **alloc)
   return NULL;
 }
 
-#ifdef P4EST_ENABLE_DEBUG
+#ifndef P4EST_ENABLE_DEBUG
 static sc3_error_t *
 array_new (sc3_allocator_t *alloc, size_t esize, int ealloc,
            int ecount, sc3_array_t **arr)

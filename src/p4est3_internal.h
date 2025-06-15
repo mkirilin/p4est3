@@ -272,7 +272,7 @@ sc3_error_t        *p4est3_partition (p4est3_t * p3);
  * It is the only field of p4est3_t object to be changed.
  */
 sc3_error_t        *p4est3_tree_offsets_communication
-                     (p4est3_t *p3, int noderank, sc3_MPI_Comm_t nodecomm);
+  (p4est3_t * p3, int noderank, sc3_MPI_Comm_t nodecomm);
 
 /** \cond P4EST_FALSE */
 /* these functions are not documented on purpose */
@@ -303,7 +303,7 @@ int                 p4est3_glooffs_is_new (const p4est3_glooffs_t * m,
                                            char *reason);
 int                 p4est3_gtroffs_is_new (const p4est3_gtroffs_t * m,
                                            char *reason);
-int                p4est3_quadrants_is_new (const p4est3_quadrants_t * m,
+int                 p4est3_quadrants_is_new (const p4est3_quadrants_t * m,
                                              char *reason);
 sc3_error_t        *p4est3_glotree_new (sc3_allocator_t * mator,
                                         p4est3_glotree_t ** mp);
@@ -319,9 +319,9 @@ sc3_error_t        *p4est3_glopos_set_qsize (p4est3_glopos_t * m, int qsize);
 sc3_error_t        *p4est3_gtroffs_set_num_trees (p4est3_gtroffs_t * m,
                                                   p4est3_topidx num_trees);
 sc3_error_t        *p4est3_quadrants_set_local_num_quads
-                     (p4est3_quadrants_t * m, p4est3_locidx local_num_quads);
+  (p4est3_quadrants_t * m, p4est3_locidx local_num_quads);
 sc3_error_t        *p4est3_quadrants_set_qsize
-                     (p4est3_quadrants_t * m, int qsize);
+  (p4est3_quadrants_t * m, int qsize);
 sc3_error_t        *p4est3_glopartition_set_mpienv (p4est3_glotree_t * mt,
                                                     p4est3_glopos_t * mp,
                                                     p4est3_glooffs_t * mo,
