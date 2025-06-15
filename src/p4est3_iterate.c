@@ -763,10 +763,11 @@ p4est3_iterate_face_bound_init (p4est3_t *p3,
      0th -- shares 0th side
      1st -- shares 1st side */
   for (s = 0; s < sa->nsides; ++s) {
-    sa->remote_first[s] = -1;
-    sa->remote_last[s] = -2;
+    sa->remote_first[s] = 0;
+    sa->remote_last[s] = p3->mpisize - 1;
   }
-  if (sa->nsides == 2) {
+
+  if (!p3->contiguous && sa->nsides == 2) {
     /* only if we probe not a physical boundary */
     for (s = 0; s < sa->nsides; ++s) {
       SC3E (p4est3_find_partition
@@ -814,7 +815,7 @@ p4est3_internal_iterate_face (p4est3_t *p3,
   const int           half_ch = max_children / 2;
   p4est3_topidx      *trees = sa->treeid_face;
   p4est3_gloidx      *b_f[2], *e_f[2];
-  p4est3_gloidx       proc_owner;
+  p4est3_gloidx       proc_owner = p3->mpirank;
   p4est3_gloidx      *base_ptr;
   void               *stack_it[2];
   sc3_array_t        *view_q = sa->view_quads;
@@ -856,22 +857,28 @@ p4est3_internal_iterate_face (p4est3_t *p3,
       continue;
     }
 
-    /* TODO: make it through p4est3_find_partition and last_goffsets */
-    /* Find process that owns this quadrant */
-    /* Start binary search from a local process */
-    proc_owner = p3->mpirank;
-    SC3E (p4est3_search_lower_bound64
-          (*(b_f[side]), p3->goffset, p3->mpisize + 1, &proc_owner));
-    if (p3->goffset[proc_owner] > *(b_f[side])) {
-      SC3A_CHECK (proc_owner > 0);
-      proc_owner--;
+    if (p3->contiguous) {
+      /* Get quadrant from shared storage */
+      first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*(b_f[side])));
     }
-    SC3A_CHECK (proc_owner >= 0 && proc_owner < p3->mpisize);
+    else {
+      /* TODO: make it through p4est3_find_partition and last_goffsets */
+      /* Consider batch processing for binary search */
+      /* Find process that owns this quadrant */
+      /* Start binary search from a local process */
+      SC3E (p4est3_search_lower_bound64
+            (*(b_f[side]), p3->goffset, p3->mpisize + 1, &proc_owner));
+      if (p3->goffset[proc_owner] > *(b_f[side])) {
+        SC3A_CHECK (proc_owner > 0);
+        proc_owner--;
+      }
+      SC3A_CHECK (proc_owner >= 0 && proc_owner < p3->mpisize);
 
-    /* Get quadrant from the owning process's window */
-    first_quad = (void *) (p3->nodequads[proc_owner] +
-                           p3->qsize * (*(b_f[side]) -
-                                        p3->goffset[proc_owner]));
+      /* Get quadrant from the owning process's window */
+      first_quad = (void *) (p3->nodequads[proc_owner] +
+                             p3->qsize * (*(b_f[side]) -
+                                          p3->goffset[proc_owner]));
+    }
 
     SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
     if (level == Level[side]) {
@@ -879,7 +886,14 @@ p4est3_internal_iterate_face (p4est3_t *p3,
       fside[side].nquad =
         (p4est3_locidx) (*(b_f[side]) - p3->gtroffset[trees[side]]);
       fside[side].quadrant = first_quad;
-      fside[side].is_ghost = proc_owner == p3->mpirank ? 0 : 1;
+      if (*(b_f[side]) < p3->goffset[p3->mpirank] ||
+          *(e_f[side]) > p3->goffset[p3->mpirank + 1]) {
+        /* This is a ghost quadrant */
+        fside[side].is_ghost = 1;
+      }
+      else {
+        fside[side].is_ghost = 0;
+      }
     }
   }
 
@@ -950,7 +964,7 @@ p4est3_internal_iterate_face (p4est3_t *p3,
   return NULL;
 }
 
-static sc3_error_t *
+static inline sc3_error_t *
 p4est3_iterate_face_inner_init (p4est3_t *p3, p4est3_search_area_t *sa,
                                 int child, int neighbor)
 {
@@ -1060,14 +1074,20 @@ p4est3_iterate_volume_rec_init (p4est3_t *p3,
      The procs < mpirank are responsible for 0th sides,
      the procs > mpirank are responsoble for 1st sides. Proof? */
   for (side = 0; side < 2; ++side) {
-    sa->remote_first[side] = -1;
-    sa->remote_last[side] = -2;
+    sa->remote_first[side] = 0;
+    sa->remote_last[side] = p3->mpisize - 1;
   }
+
+  if (p3->contiguous) {
+    /* The rest functional is valid only for non-contiguous shared memory */
+    return NULL;
+  }
+
   if (tree == p3->fltree && p3->gtroffset[tree] != p3->goffset[p3->mpirank]) {
     SC3E (p4est3_find_partition
           (p3->alloc, p3->mpisize, p3->goffset, p3->gtroffset[tree],
-           p3->goffset[p3->mpirank] - 1,
-           &sa->remote_first[0], &sa->remote_last[0]));
+           p3->goffset[p3->mpirank] - 1, &sa->remote_first[0],
+           &sa->remote_last[0]));
     if (p3->goffset[sa->remote_first[0]] > p3->gtroffset[tree]) {
       sa->remote_first[0]--;
     }
@@ -1106,7 +1126,7 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
   int                 level;
   void               *stack_it;
   p4est3_gloidx      *arr_it;
-  p4est3_gloidx       proc_owner;
+  p4est3_gloidx       proc_owner = p3->mpirank;
 
   const int           max_children = p3->num_children;
   int                *l2nch = sa->level2nchildren;
@@ -1129,21 +1149,27 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
   }
 
   /* TODO: make it through p4est3_find_partition and last_goffsets */
+  /* Consider batch processing for binary search */
   /* Find process that owns this quadrant */
   /* Start binary search from a local process, we do this for volume, too,
      because we need to fill the metadata to proceed the recursion. */
-  proc_owner = p3->mpirank;
-  SC3E (p4est3_search_lower_bound64
-        (*begin, p3->goffset, p3->mpisize + 1, &proc_owner));
-  if (p3->goffset[proc_owner] > *begin) {
-    SC3A_CHECK (proc_owner > 0);
-    proc_owner--;
+  if (p3->contiguous) {
+    /* Get quadrant from shared storage */
+    first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
   }
-  SC3A_CHECK (proc_owner >= 0 && proc_owner < p3->mpisize);
+  else {
+    SC3E (p4est3_search_lower_bound64
+          (*begin, p3->goffset, p3->mpisize + 1, &proc_owner));
+    if (p3->goffset[proc_owner] > *begin) {
+      SC3A_CHECK (proc_owner > 0);
+      proc_owner--;
+    }
+    SC3A_CHECK (proc_owner >= 0 && proc_owner < p3->mpisize);
 
-  /* Get quadrant from the owning process's window */
-  first_quad = (void *) (p3->nodequads[proc_owner] +
-                         p3->qsize * (*begin - p3->goffset[proc_owner]));
+    /* Get quadrant from the owning process's window */
+    first_quad = (void *) (p3->nodequads[proc_owner] +
+                           p3->qsize * (*begin - p3->goffset[proc_owner]));
+  }
 
   SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
   if (level == *Level) {
@@ -1185,9 +1211,9 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
 
   /* since array_split doesn't count shift from the beinning of quadrants
      in a node, we shift result indices at the loop below */
+  SC3E (sc3_array_index (*(sc3_array_t **) stack_it, 0, &arr_it));
   for (i = 0; i < max_children + 1; ++i) {
-    SC3E (sc3_array_index (*(sc3_array_t **) stack_it, i, &arr_it));
-    *arr_it += *begin;
+    arr_it[i] += *begin;
   }
   for (i = 0; i < max_children; ++i) {
     sa->child_id = i;
@@ -1250,7 +1276,7 @@ p4est3_iterate_codim (p4est3_t *p3, int codims,
 }
 
 /* MRU cache initialization function */
-static sc3_error_t *
+static inline sc3_error_t *
 p4est3_split_cache_init (p4est3_t *p3, p4est3_search_area_t *sa,
                          int max_cache_size)
 {
