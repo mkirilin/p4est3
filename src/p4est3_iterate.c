@@ -361,60 +361,58 @@ sc_hash_mru_insert_unique (sc_hash_mru_t *mru, void *v, void ***found)
 
 typedef struct p4est3_search_area
 {
-  /* general section */
+  p4est3_tree_t      *tree;
   int                 max_children;
   int                 nfaces;   /*Global number of faces */
-  sc3_array_t        *view_quads;       /* array ptr to pass tree's quads
-                                           into array_split */
-  int                *children_face_neighbors;
-  int                *face_dual;
-
-  /* MRU cache for array split optimization */
-  sc_hash_mru_t      *split_cache[P4EST3_ITER_CACHE_LVL];       /* One cache per level */
-  int                 cache_max_size;   /* Maximum cache size per level */
-  int                 cache_hits;       /* Statistics: cache hits */
-  int                 cache_misses;     /* Statistics: cache misses */
-
-  /* Memory pool for frequently allocated arrays */
-  sc_mempool_t       *cache_entry_pool; /* Pool for cache entry structures */
-
-  /* volume section */
-  p4est3_tree_t      *tree;
+  int                 Level;    /* Current volume level */
   int                 child_id; /* Child id of the area under consideration */
-  int                 Level;
-  int                *level2nchildren;  /* Array specifing the number n
-                                           of children processed on
-                                           the particular level; n can't be
-                                           greater than p3->num_children */
-  sc3_array_t        *idx_vol_stack;    /* 2D stack storing arrays of indices,
-                                           that are output of split_array */
   p4est3_gloidx       local_begin;      /* Id of the first local quadrant in
                                            the tree under iteration */
   p4est3_gloidx       local_end;        /* Id of the last local quadrant in
                                            the tree under iteration */
-  p4est3_iterate_volume_info_t *vinfo;
 
-  /* face section */
-  int                 nsides;
-  p4est3_topidx       treeid_face[2];
+  int                 nsides;   /* Number of sides of a face */
   int                 child_id_face[2];
   int                 Level_face[2];    /* array of 2, storing the level of
                                            current size */
   int                 is_refine[2];     /* array of 2, storing the information
                                            about neccesity of refenement. Must
                                            be initiated by 0 */
+  p4est3_topidx       treeid_face[2];
+
+  sc3_array_t        *idx_vol_stack;    /* 2D stack storing arrays of indices,
+                                           that are output of split_array */
   sc3_array_t        *idx_face_stack[2];        /* 2D stacks storing arrays of indices,
                                                    that are output of split_array */
+  sc3_array_t        *view_quads;       /* array ptr to pass tree's quads
+                                           into array_split */
+
+  p4est3_gloidx       local_begin_face[2];      /* Ids of the first local quadrant in
+                                                   the tree under iteration */
+  p4est3_gloidx       local_end_face[2];        /* Ids of the last local quadrant in
+                                                   the tree under iteration */
   p4est3_gloidx       remote_first[2];  /* Id of the first remote proc that
                                            potentially contains the neighbor
                                            quadrants */
   p4est3_gloidx       remote_last[2];   /* Id of the last remote proc that
                                            potentially contains the neighbor
                                            quadrants */
-  p4est3_gloidx       local_begin_face[2];      /* Ids of the first local quadrant in
-                                                   the tree under iteration */
-  p4est3_gloidx       local_end_face[2];        /* Ids of the last local quadrant in
-                                                   the tree under iteration */
+
+  /* MRU cache for array split optimization */
+  sc_hash_mru_t      *split_cache[P4EST3_ITER_CACHE_LVL];       /* One cache per level */
+  sc_mempool_t       *cache_entry_pool; /* Pool for cache entry structures */
+  int                 cache_max_size;   /* Maximum cache size per level */
+  int                 cache_hits;       /* Statistics: cache hits */
+  int                 cache_misses;     /* Statistics: cache misses */
+
+  /* general section */
+  int                *children_face_neighbors;
+  int                *face_dual;
+  int                *level2nchildren;  /* Array specifing the number n
+                                           of children processed on
+                                           the particular level; n can't be
+                                           greater than p3->num_children */
+  p4est3_iterate_volume_info_t *vinfo;
   p4est3_iterate_face_info_t *finfo;
 }
 p4est3_search_area_t;
