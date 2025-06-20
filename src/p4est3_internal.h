@@ -238,6 +238,33 @@ struct p4est3
 
   /* pointer to user data, p4est does not touch them */
   void               *user_data;
+
+  /* private area */
+  /* pointers to preserved shared memory windows: for service use only! */
+  /** The following pointers are served for the sole and only purpose:
+   * keep track of previously allocated shared memory (SM).
+   * Reasoning: SM (de-)allocation is costy. This memory is pre-allocated by the
+   * predecessor forest that was created before and served as a source for the
+   * current one. In turn, it will be used by the successor that will take
+   * the current forest as a source to store its SM data.
+   * It looks like a carousel _spin_ of the allocations all around.
+   * In case we reference a source's magic structure (e.g. it is an invariant), we
+   * cannot take it into a _spin_, but we also do not use the corresponding
+   * source's _spin_, so take that one instead.
+   * The use of this allocations is allowed only when no-one else is
+   * referencing them. No outer interface required, for internal use only.
+   */
+  p4est3_glotree_t   *_spin_gtrees;           /**< Preserve global tree partition. */
+  p4est3_glopos_t    *_spin_gposition;        /**< Preserve global first quadrants. */
+  p4est3_glooffs_t   *_spin_goffsets;         /**< Preserve global quadrants offsets. */
+  p4est3_gtroffs_t   *_spin_gtreeoffsets;     /**< Preserve global trees offsets. */
+  /* Since the length of quadrants array likely differs between forests,
+   * we use the preserved memory, only if the need of the new forest is less or equal.
+   * Otherwise, unreference (i.e. destroy, since its only one reference allowed)
+   * the preserved memory and allocate a new one as we would do normally.
+   */
+  p4est3_quadrants_t *_spin_quadrants;        /**< The object providing preserving
+                                             shared memory for quadrants. */
 };
 
 #ifdef __cplusplus

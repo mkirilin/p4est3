@@ -131,6 +131,13 @@ p4est3_new (sc3_allocator_t *alloc, p4est3_t **pp3)
   p3->contiguous = 0;
   p3->family = 0;
   p3->partition = 0;
+
+  p3->_spin_goffsets = NULL;
+  p3->_spin_gtrees = NULL;
+  p3->_spin_gposition = NULL;
+  p3->_spin_gtreeoffsets = NULL;
+  p3->_spin_quadrants = NULL;
+
   SC3A_IS (p4est3_is_new, p3);
 
   *pp3 = p3;
@@ -467,6 +474,11 @@ p4est3_destroy (p4est3_t **pp3)
       SC3E (p4est3_glooffs_unref (&p3->goffsets));
       SC3E (p4est3_gtroffs_unref (&p3->gtreeoffsets));
       SC3E (p4est3_quadrants_unref (&p3->quadrants));
+
+      /* free spins */
+      if (p3->_spin_gtrees != NULL) {
+        SC3E (p4est3_glotree_unref (&p3->_spin_gtrees));
+      }
 
       /* deallocate internal storage */
       for (ti = 0; ti < p3->max_threads; ++ti) {

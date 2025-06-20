@@ -942,6 +942,11 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
     p3->gtrees = old->gtrees;
     p3->gftree = old->gftree;
     SC3E (p4est3_glotree_ref (old->gtrees));
+    if (old->_spin_gtrees != NULL) {
+      SC3A_IS (sc3_refcount_is_last, &old->_spin_gtrees->meta->rc);
+      p3->_spin_gtrees = old->_spin_gtrees;
+      SC3E (p4est3_glotree_ref (p3->_spin_gtrees));
+    }
     if (p3->qvt == old->qvt) {
       /* global position of quadrants stays the same, so we just reference on it */
       p3->gposition = old->gposition;
@@ -993,14 +998,26 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
        we fill onnly the last element, since the rest of them will be set
        during the partition */
 
-    SC3E (p4est3_glotree_new (p3->alloc, &p3->gtrees));
+    if (old->_spin_gtrees != NULL
+        && sc3_refcount_is_last (&old->_spin_gtrees->meta->rc, NULL)) {
+      p3->gtrees = old->_spin_gtrees;
+      SC3E (p4est3_glotree_ref (p3->gtrees));
+    }
+    else {
+      SC3E (p4est3_glotree_new (p3->alloc, &p3->gtrees));
+      SC3E (p4est3_glopartition_set_mpienv
+            (p3->gtrees, NULL, NULL, NULL, NULL, old->split_info));
+      SC3E (p4est3_glopartition_setup (p3->gtrees, NULL, NULL, NULL, NULL));
+    }
+    p3->_spin_gtrees = old->gtrees;
+    SC3E (p4est3_glotree_ref (p3->_spin_gtrees));
+
     SC3E (p4est3_glopos_new (p3->alloc, &p3->gposition));
     SC3E (p4est3_glopos_set_qsize (p3->gposition, p3->qsize));
     SC3E (p4est3_glopartition_set_mpienv
-          (p3->gtrees, p3->gposition, NULL, NULL, NULL, old->split_info));
+          (NULL, p3->gposition, NULL, NULL, NULL, old->split_info));
 
-    SC3E (p4est3_glopartition_setup
-          (p3->gtrees, p3->gposition, NULL, NULL, NULL));
+    SC3E (p4est3_glopartition_setup (NULL, p3->gposition, NULL, NULL, NULL));
     p3->gftree = p3->gtrees->gftree;
     p3->gfpos = p3->gposition->gfpos;
 
