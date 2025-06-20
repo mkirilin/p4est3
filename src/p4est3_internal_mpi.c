@@ -914,7 +914,7 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
   if (!p3->partition) {
     /* without repartition the global partition of trees stays the same,
        so we just reference on it */
-    /* gtrees(->gftree) magic array */
+    /* ref gtrees(->gftree) magic array */
     p3->gtrees = old->gtrees;
     p3->gftree = p3->gtrees->gftree;
     SC3E (p4est3_glotree_ref (old->gtrees));
@@ -925,7 +925,7 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
     }
 
     /* create shared trees offsets storage */
-    /* gtreeoffsets magic array */
+    /* alloc gtreeoffsets magic array */
     if (old->_spin_gtreeoffsets != NULL
         && sc3_refcount_is_last (&old->_spin_gtreeoffsets->meta->rc, NULL)) {
       p3->gtreeoffsets = old->_spin_gtreeoffsets;
@@ -947,7 +947,7 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
     /* allocate new shared memory and create new magic structure,
        we fill onnly the last element, since the rest of them will be set
        during the partition */
-    /* gtrees magic array */
+    /* alloc gtrees magic array */
     if (old->_spin_gtrees != NULL
         && sc3_refcount_is_last (&old->_spin_gtrees->meta->rc, NULL)) {
       p3->gtrees = old->_spin_gtrees;
@@ -963,7 +963,7 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
     SC3E (p4est3_glotree_ref (old->gtrees));
     p3->gftree = p3->gtrees->gftree;
 
-    /* gtreeoffsets magic array */
+    /* ref gtreeoffsets magic array */
     p3->gtreeoffsets = old->gtreeoffsets;
     p3->gtroffset = p3->gtreeoffsets->gtreeoffset;
     SC3E (p4est3_gtroffs_ref (old->gtreeoffsets));
