@@ -67,8 +67,8 @@ typedef struct refine_coarsen_callback_data
 refine_coarsen_callback_data_t;
 
 static sc3_error_t *
-p4est3_refine_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
-                         int ecount, sc3_array_t ** arr)
+p4est3_refine_array_new (sc3_allocator_t *alloc, size_t esize, int ealloc,
+                         int ecount, sc3_array_t **arr)
 {
   SC3E_RETVAL (arr, NULL);
   SC3A_IS (sc3_allocator_is_setup, alloc);
@@ -92,7 +92,7 @@ p4est3_refine_array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
    num_children means creating all the children of the corresponding quadrant
    and inserting them into a new forest.*/
 static sc3_error_t *
-p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
+p4est3_refine_volume_callback (p4est3_iterate_volume_info_t *vi)
 {
   int                 is_refine = 0, level;
   refine_callback_data_t *cdata = (refine_callback_data_t *) vi->user_data;
@@ -109,7 +109,8 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
     ri.qvt = vi->p3->qvt;
     ri.user_data = vi->p3->user_data;
     ri.nquad = (p4est3_locidx) ((p4est3_gloidx) vi->nquad
-      + vi->p3->gtroffset[vi->ntree] - vi->p3->goffset[vi->p3->mpirank]);
+                                + vi->p3->gtroffset[vi->ntree] -
+                                vi->p3->goffset[vi->p3->mpirank]);
     SC3E (cdata->crefine (&ri, &is_refine));
   }
   if (!is_refine) {
@@ -133,7 +134,7 @@ p4est3_refine_volume_callback (p4est3_iterate_volume_info_t * vi)
    corresponding quadrants and inserting them into a new forest.
    We set 1 only for the first quadrant in a family. */
 static sc3_error_t *
-p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
+p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t *vi)
 {
   int                 is_coarsen = 0, child_id;
   char               *pattern_it;
@@ -160,8 +161,9 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
       ci.qvt = vi->p3->qvt;
       ci.user_data = vi->p3->user_data;
       ci.nquad = (p4est3_locidx) ((p4est3_gloidx) vi->nquad
-      + vi->p3->gtroffset[vi->ntree] - vi->p3->goffset[vi->p3->mpirank])
-      - (vi->p3->num_children - 1);
+                                  + vi->p3->gtroffset[vi->ntree] -
+                                  vi->p3->goffset[vi->p3->mpirank])
+        - (vi->p3->num_children - 1);
       SC3E (cdata->ccoarse (&ci, &is_coarsen));
       cdata->nsiblings = 0;
 
@@ -190,7 +192,7 @@ p4est3_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
    num_children means creating all the children of the corresponding quadrant
    and inserting them into a new forest*/
 static sc3_error_t *
-p4est3_refine_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
+p4est3_refine_coarsen_volume_callback (p4est3_iterate_volume_info_t *vi)
 {
   int                 is_refine = 0, is_coarsen = 0, level, child_id;
   void              **quad;
@@ -211,7 +213,8 @@ p4est3_refine_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
     ri.qvt = vi->p3->qvt;
     ri.user_data = vi->p3->user_data;
     ri.nquad = (p4est3_locidx) ((p4est3_gloidx) vi->nquad
-    + vi->p3->gtroffset[vi->ntree] - vi->p3->goffset[vi->p3->mpirank]);
+                                + vi->p3->gtroffset[vi->ntree] -
+                                vi->p3->goffset[vi->p3->mpirank]);
     SC3E (cdata->crefine (&ri, &is_refine));
   }
   if (!is_refine) {
@@ -233,8 +236,9 @@ p4est3_refine_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
         ci.qvt = vi->p3->qvt;
         ci.user_data = vi->p3->user_data;
         ci.nquad = (p4est3_locidx) ((p4est3_gloidx) vi->nquad
-        + vi->p3->gtroffset[vi->ntree] - vi->p3->goffset[vi->p3->mpirank])
-        - (vi->p3->num_children - 1);
+                                    + vi->p3->gtroffset[vi->ntree] -
+                                    vi->p3->goffset[vi->p3->mpirank])
+          - (vi->p3->num_children - 1);
         SC3E (cdata->ccoarse (&ci, &is_coarsen));
 
         cdata->nsiblings = 0;
@@ -259,8 +263,8 @@ p4est3_refine_coarsen_volume_callback (p4est3_iterate_volume_info_t * vi)
 }
 
 static sc3_error_t *
-p4est3_pattern_populate_tree_ref_coar (p4est3_t * p3, p4est3_tree_t * tree,
-                                       sc3_array_t * pattern, int *lt_offset)
+p4est3_pattern_populate_tree_ref_coar (p4est3_t *p3, p4est3_tree_t *tree,
+                                       sc3_array_t *pattern, int *lt_offset)
 {
   int                 i = 0, nch, n_new_quads = 0;
   char               *n_insert;
@@ -276,7 +280,7 @@ p4est3_pattern_populate_tree_ref_coar (p4est3_t * p3, p4est3_tree_t * tree,
     if ((int) *n_insert == 0) {
       quad_new = (void *) (tree->tquads + n_new_quads * p3->qsize);
       SC3E (p4est3_quadrant_translate
-            (p3->old->qvt,quad_old, p3->qvt, quad_new));
+            (p3->old->qvt, quad_old, p3->qvt, quad_new));
       n_new_quads++;
       i++;
     }
@@ -305,8 +309,7 @@ p4est3_pattern_populate_tree_ref_coar (p4est3_t * p3, p4est3_tree_t * tree,
 }
 
 static sc3_error_t *
-p4est3_populate_tree_cpy (p4est3_t * p3, p4est3_tree_t * tree,
-                          int *lt_offset)
+p4est3_populate_tree_cpy (p4est3_t *p3, p4est3_tree_t *tree, int *lt_offset)
 {
   int                 i;
   void               *quad_old, *quad_new;
@@ -324,7 +327,7 @@ p4est3_populate_tree_cpy (p4est3_t * p3, p4est3_tree_t * tree,
 }
 
 sc3_error_t        *
-p4est3_refine_coarsen_copy (p4est3_t * p3)
+p4est3_refine_coarsen_copy (p4est3_t *p3)
 {
   int                 i, nodesize;
   int                 noderank;
@@ -417,7 +420,8 @@ p4est3_refine_coarsen_copy (p4est3_t * p3)
         (p3->alloc, nodesize * sizeof (char *), &p3->nodequads));
   for (i = 0; i < nodesize; ++i) {
     SC3E (sc3_MPI_Win_shared_query (p3->quadrants->meta->win, i,
-                                    &tempbytes, &dispunit, &p3->nodequads[i]));
+                                    &tempbytes, &dispunit,
+                                    &p3->nodequads[i]));
     SC3A_CHECK (dispunit == p3->qsize);
     SC3A_CHECK (p3->nodequads[i] != NULL || tempbytes == 0);
   }

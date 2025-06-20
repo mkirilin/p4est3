@@ -610,6 +610,36 @@ p4est3_get_allocator (const p4est3_t *p3, sc3_allocator_t **alloc)
 }
 
 sc3_error_t        *
+p4est3_get_tree_num_local_quadrants (p4est3_t *p3, p4est3_topidx ntree,
+                                     p4est3_locidx *n)
+{
+  p4est3_tree_t      *tree;
+
+  SC3A_IS (p4est3_is_setup, p3);
+  SC3A_CHECK (n != NULL);
+
+  SC3E (p4est3_tree_index (p3, ntree, &tree));
+  *n = tree->num_quads;
+  return NULL;
+}
+
+sc3_error_t        *
+p4est3_get_tree_quadrants (p4est3_t *p3, p4est3_topidx ntree, char **q)
+{
+  p4est3_tree_t      *tree;
+
+  SC3A_IS (p4est3_is_setup, p3);
+  SC3E_RETVAL (q, NULL);
+
+  SC3E (p4est3_tree_index (p3, ntree, &tree));
+  SC3A_CHECK (tree->tquads != NULL);
+  SC3A_CHECK (tree->num_quads > 0);
+
+  *q = tree->tquads;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_get_quadrants (const p4est3_t *p3, char **q)
 {
   SC3A_IS (p4est3_is_setup, p3);

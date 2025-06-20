@@ -155,8 +155,8 @@ p4est3_quadrant_weight_info_t;
 */
 typedef struct p4est3_ghost_pos_hash_key
 {
-  p4est3_gloidx      gid;      /* global ID of the ghost quadrant */
-  p4est3_locidx      pos;      /* position in the ghosts array */
+  p4est3_gloidx       gid;      /* global ID of the ghost quadrant */
+  p4est3_locidx       pos;      /* position in the ghosts array */
 }
 p4est3_ghost_pos_hash_key_t;
 
@@ -470,6 +470,28 @@ sc3_error_t        *p4est3_get_global_quadrant_tree_offsets
  */
 sc3_error_t        *p4est3_get_allocator (const p4est3_t * p3,
                                           sc3_allocator_t ** alloc);
+
+/** Query the number of local quadrants in a tree.
+ * \param [in] p3          Must be setup. Provides the forest to examine.
+ * \param [in] ntree       The tree id to query.
+ * \param [out] n          On output, the number of local quadrants in the tree.
+ *                         Pointer to this output variable must not be NULL.
+ * \return                 NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_tree_num_local_quadrants (p4est3_t * p3,
+                                                         p4est3_topidx ntree,
+                                                         p4est3_locidx * n);
+
+/** Query the array of local quadrants in the tree.
+ * \param [in] p3          Must be setup. Provides the forest to examine.
+ * \param [in] ntree       The tree id to query.
+ * \param [out] q          On output, points to an array of local quadrants in
+ *                         this tree. The array is owned by the forest and must
+ *                         not be freed or modified.
+ * \return                NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_tree_quadrants (p4est3_t * p3,
+                                               p4est3_topidx ntree, char **q);
 
 /*----------------------- accessing quadrants ------------------------*/
 /* TODO: think about this interface */
