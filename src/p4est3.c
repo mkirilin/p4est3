@@ -479,6 +479,9 @@ p4est3_destroy (p4est3_t **pp3)
       if (p3->_spin_goffsets != NULL) {
         SC3E (p4est3_glooffs_unref (&p3->_spin_goffsets));
       }
+      if (p3->_spin_gtreeoffsets != NULL) {
+        SC3E (p4est3_gtroffs_unref (&p3->_spin_gtreeoffsets));
+      }
 
       /* deallocate internal storage */
       for (ti = 0; ti < p3->max_threads; ++ti) {

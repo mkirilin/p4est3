@@ -914,33 +914,44 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
   if (!p3->partition) {
     /* without repartition the global partition of trees stays the same,
        so we just reference on it */
+    /* gtrees(->gftree) magic array */
     p3->gtrees = old->gtrees;
-    p3->gftree = old->gftree;
+    p3->gftree = p3->gtrees->gftree;
     SC3E (p4est3_glotree_ref (old->gtrees));
     if (old->_spin_gtrees != NULL) {
       SC3A_IS (sc3_refcount_is_last, &old->_spin_gtrees->meta->rc);
       p3->_spin_gtrees = old->_spin_gtrees;
-      SC3E (p4est3_glotree_ref (p3->_spin_gtrees));
+      SC3E (p4est3_glotree_ref (old->_spin_gtrees));
     }
 
     /* create shared trees offsets storage */
-    SC3E (p4est3_gtroffs_new (p3->alloc, &p3->gtreeoffsets));
-    SC3E (p4est3_glopartition_set_mpienv
-          (NULL, NULL, NULL, p3->gtreeoffsets, NULL, old->split_info));
-    SC3E (p4est3_gtroffs_set_num_trees (p3->gtreeoffsets, p3->num_trees));
-    SC3E (p4est3_glopartition_setup
-          (NULL, NULL, NULL, p3->gtreeoffsets, NULL));
+    /* gtreeoffsets magic array */
+    if (old->_spin_gtreeoffsets != NULL
+        && sc3_refcount_is_last (&old->_spin_gtreeoffsets->meta->rc, NULL)) {
+      p3->gtreeoffsets = old->_spin_gtreeoffsets;
+      SC3E (p4est3_gtroffs_ref (old->_spin_gtreeoffsets));
+    }
+    else {
+      SC3E (p4est3_gtroffs_new (p3->alloc, &p3->gtreeoffsets));
+      SC3E (p4est3_glopartition_set_mpienv
+            (NULL, NULL, NULL, p3->gtreeoffsets, NULL, old->split_info));
+      SC3E (p4est3_gtroffs_set_num_trees (p3->gtreeoffsets, p3->num_trees));
+      SC3E (p4est3_glopartition_setup
+            (NULL, NULL, NULL, p3->gtreeoffsets, NULL));
+    }
+    p3->_spin_gtreeoffsets = old->gtreeoffsets;
+    SC3E (p4est3_gtroffs_ref (old->gtreeoffsets));
     p3->gtroffset = p3->gtreeoffsets->gtreeoffset;
   }
   else {
-    /* allocatete new shared memory and create new magic structure,
+    /* allocate new shared memory and create new magic structure,
        we fill onnly the last element, since the rest of them will be set
        during the partition */
-
+    /* gtrees magic array */
     if (old->_spin_gtrees != NULL
         && sc3_refcount_is_last (&old->_spin_gtrees->meta->rc, NULL)) {
       p3->gtrees = old->_spin_gtrees;
-      SC3E (p4est3_glotree_ref (p3->gtrees));
+      SC3E (p4est3_glotree_ref (old->_spin_gtrees));
     }
     else {
       SC3E (p4est3_glotree_new (p3->alloc, &p3->gtrees));
@@ -949,19 +960,25 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
       SC3E (p4est3_glopartition_setup (p3->gtrees, NULL, NULL, NULL, NULL));
     }
     p3->_spin_gtrees = old->gtrees;
-    SC3E (p4est3_glotree_ref (p3->_spin_gtrees));
+    SC3E (p4est3_glotree_ref (old->gtrees));
     p3->gftree = p3->gtrees->gftree;
 
+    /* gtreeoffsets magic array */
     p3->gtreeoffsets = old->gtreeoffsets;
-    p3->gtroffset = old->gtroffset;
+    p3->gtroffset = p3->gtreeoffsets->gtreeoffset;
     SC3E (p4est3_gtroffs_ref (old->gtreeoffsets));
+    if (old->_spin_gtreeoffsets != NULL) {
+      SC3A_IS (sc3_refcount_is_last, &old->_spin_gtreeoffsets->meta->rc);
+      p3->_spin_gtreeoffsets = old->_spin_gtreeoffsets;
+      SC3E (p4est3_gtroffs_ref (old->_spin_gtreeoffsets));
+    }
   }
 
-  /* Allocate shared memory for global offsets */
+  /* Allocate shared memory for global offsets: goffsets */
   if (old->_spin_goffsets != NULL
       && sc3_refcount_is_last (&old->_spin_goffsets->meta->rc, NULL)) {
     p3->goffsets = old->_spin_goffsets;
-    SC3E (p4est3_glooffs_ref (p3->goffsets));
+    SC3E (p4est3_glooffs_ref (old->_spin_goffsets));
   }
   else {
     SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
@@ -970,8 +987,8 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
     SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL, NULL));
   }
   p3->_spin_goffsets = old->goffsets;
+  SC3E (p4est3_glooffs_ref (old->goffsets));
   p3->goffset = p3->goffsets->goffset;
-  SC3E (p4est3_glooffs_ref (p3->_spin_goffsets));
 
   SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),
                               &p3->temp_quad));
