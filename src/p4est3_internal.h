@@ -193,7 +193,6 @@ struct p4est3
 
   /* variables populated during p4est3_setup: partition related */
   p4est3_glotree_t   *gtrees;           /**< Store global tree partition. */
-  p4est3_glopos_t    *gposition;        /**< Store global first quadrants. */
   p4est3_glooffs_t   *goffsets;         /**< Store global quadrants offsets. */
   p4est3_gtroffs_t   *gtreeoffsets;     /**< Store global trees offsets. */
   int                 qsize;            /**< Store byte size of one quadrant. */
@@ -207,7 +206,6 @@ struct p4est3
   p4est3_gloidx       global_num_quads; /**< Count all quadrants globally. */
   p4est3_gloidx      *goffset;          /**< Pointer to \ref goffsetwin's memory. */
   p4est3_topidx      *gftree;           /**< Pointer to \ref gftreewin's memory. */
-  char               *gfpos;            /**< Pointer to \ref gfposwin's memory. */
   p4est3_gloidx      *gtroffset;        /**< Pointer to \ref gtreeoffsetwin's memory. */
 
   /* variables populated during p4est3_setup: tree and quadrant storage */
@@ -255,7 +253,6 @@ struct p4est3
    * referencing them. No outer interface required, for internal use only.
    */
   p4est3_glotree_t   *_spin_gtrees;           /**< Preserve global tree partition. */
-  p4est3_glopos_t    *_spin_gposition;        /**< Preserve global first quadrants. */
   p4est3_glooffs_t   *_spin_goffsets;         /**< Preserve global quadrants offsets. */
   p4est3_gtroffs_t   *_spin_gtreeoffsets;     /**< Preserve global trees offsets. */
   /* Since the length of quadrants array likely differs between forests,

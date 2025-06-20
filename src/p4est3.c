@@ -63,7 +63,6 @@ p4est3_is_valid (const p4est3_t *p3, char *reason)
     SC3E_TEST (p3->accessed_conn >= 0, reason);
     SC3E_IS (sc3_mpienv_is_valid, p3->split_info, reason);
     SC3E_IS (p4est3_glotree_is_valid, p3->gtrees, reason);
-    SC3E_IS (p4est3_glopos_is_valid, p3->gposition, reason);
     SC3E_IS (p4est3_glooffs_is_valid, p3->goffsets, reason);
     SC3E_TEST (p3->old == NULL, reason);
     SC3E_TEST (p3->crefine == NULL && p3->ccoarse == NULL, reason);
@@ -134,7 +133,6 @@ p4est3_new (sc3_allocator_t *alloc, p4est3_t **pp3)
 
   p3->_spin_goffsets = NULL;
   p3->_spin_gtrees = NULL;
-  p3->_spin_gposition = NULL;
   p3->_spin_gtreeoffsets = NULL;
   p3->_spin_quadrants = NULL;
 
@@ -470,7 +468,6 @@ p4est3_destroy (p4est3_t **pp3)
 
       /* free internal MPI objects */
       SC3E (p4est3_glotree_unref (&p3->gtrees));
-      SC3E (p4est3_glopos_unref (&p3->gposition));
       SC3E (p4est3_glooffs_unref (&p3->goffsets));
       SC3E (p4est3_gtroffs_unref (&p3->gtreeoffsets));
       SC3E (p4est3_quadrants_unref (&p3->quadrants));
