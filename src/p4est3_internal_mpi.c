@@ -958,11 +958,20 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
   }
 
   /* Allocate shared memory for global offsets */
-  SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
-  SC3E (p4est3_glopartition_set_mpienv
-        (NULL, NULL, p3->goffsets, NULL, NULL, old->split_info));
-  SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL, NULL));
+  if (old->_spin_goffsets != NULL
+      && sc3_refcount_is_last (&old->_spin_goffsets->meta->rc, NULL)) {
+    p3->goffsets = old->_spin_goffsets;
+    SC3E (p4est3_glooffs_ref (p3->goffsets));
+  }
+  else {
+    SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
+    SC3E (p4est3_glopartition_set_mpienv
+          (NULL, NULL, p3->goffsets, NULL, NULL, old->split_info));
+    SC3E (p4est3_glopartition_setup (NULL, NULL, p3->goffsets, NULL, NULL));
+  }
+  p3->_spin_goffsets = old->goffsets;
   p3->goffset = p3->goffsets->goffset;
+  SC3E (p4est3_glooffs_ref (p3->_spin_goffsets));
 
   SC3E (sc3_allocator_malloc (p3->alloc, p3->max_threads * sizeof (char *),
                               &p3->temp_quad));
