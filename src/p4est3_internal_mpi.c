@@ -886,7 +886,7 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
   }
   /* variables set before p4est3_setup */
   /* this call also sets p4est3_t::commdup */
-  SC3E (p4est3_set_comm (p3, old->mpicomm, 1));
+  SC3E (p4est3_set_comm (p3, old->mpicomm, 0));
 
   /* this call also sets p4est3_t::num_trees */
   SC3E (p4est3_set_connectivity (p3, old->conn));
