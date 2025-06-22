@@ -97,8 +97,10 @@ p4est3_procs_recv_from (const p4est3_t *p3,
                         p4est3_gloidx *from_begin, p4est3_gloidx *from_end,
                         p4est3_gloidx *loc_offsets)
 {
-  int                 from_proc;
+  p4est3_gloidx       from_proc;
   p4est3_gloidx       my_begin, my_end, lower_bound;
+
+  SC3A_CHECK (num_recv_from != NULL);
 
   my_begin = loc_offsets[p3->mpirank];
   my_end = loc_offsets[p3->mpirank + 1] - (p4est3_gloidx) 1;
@@ -135,9 +137,11 @@ p4est3_quads_copy_from (const p4est3_t *p3, p4est3_locidx *num_recv_from,
                         p4est3_gloidx *loc_offsets, int noderank)
 {
   const p4est3_gloidx my_begin = loc_offsets[p3->mpirank];
-  int                 from_proc;
+  p4est3_gloidx       from_proc;
   p4est3_locidx       from_begin_copy, to_qid = 0, li;
   p4est3_gloidx       lower_bound;
+
+  SC3A_CHECK (num_recv_from != NULL);
 
   for (from_proc = from_begin; from_proc <= from_end; ++from_proc) {
     if (num_recv_from[from_proc] == 0) {
@@ -148,18 +152,19 @@ p4est3_quads_copy_from (const p4est3_t *p3, p4est3_locidx *num_recv_from,
       (p4est3_locidx) (SC3_MAX (my_begin, lower_bound) - lower_bound);
     //from_end_copy = from_begin_copy + num_recv_from[from_proc];
     if (p3->qvt == p3->old->qvt) {
-      memcpy (p3->quads + to_qid * p3->qsize,
-              p3->old->nodequads[from_proc] + from_begin_copy * p3->qsize,
-              num_recv_from[from_proc] * p3->qsize);
+      memcpy (p3->quads + (ptrdiff_t) to_qid * (ptrdiff_t) p3->qsize,
+              p3->old->nodequads[from_proc] +
+              (ptrdiff_t) from_begin_copy * (ptrdiff_t) p3->qsize,
+              (ptrdiff_t) num_recv_from[from_proc] * (ptrdiff_t) p3->qsize);
     }
     else {
       for (li = 0; li < num_recv_from[from_proc]; ++li) {
-        SC3E (p4est3_quadrant_translate (p3->old->qvt,
-                                         p3->old->nodequads[from_proc]
-                                         + (from_begin_copy +
-                                            li) * p3->old->qsize, p3->qvt,
-                                         p3->quads + (to_qid +
-                                                      li) * p3->qsize));
+        SC3E
+          (p4est3_quadrant_translate
+           (p3->old->qvt, p3->old->nodequads[from_proc]
+            + (ptrdiff_t) (from_begin_copy + li) * (ptrdiff_t) p3->old->qsize,
+            p3->qvt,
+            p3->quads + (ptrdiff_t) (to_qid + li) * (ptrdiff_t) p3->qsize));
       }
     }
     to_qid += num_recv_from[from_proc];
@@ -193,13 +198,13 @@ p4est3_partition_correction (const p4est3_t *p3,
                              p4est3_gloidx *loc_offsets,
                              p4est3_locidx *correction)
 {
-  int                 from_proc, level, is_parent;
+  int                 level, is_parent;
   int                 i, rk, rank_with_max_quads;
   char               *cut_border_quad;  /* first quadrant in the new uncorrected cut */
   char               *family_parent = p3->temp_quad[0];
   p4est3_locidx       qid, quad_begin, quad_end;
   p4est3_gloidx       my_begin, my_end, lower_bound, from_begin, from_end;
-  p4est3_gloidx       min_quadrant_id, max_quadrant_id, h;
+  p4est3_gloidx       from_proc, min_quadrant_id, max_quadrant_id, h;
   p4est3_gloidx       max_num_quadrants;
 
   for (rk = 0; rk < p3->mpisize; ++rk) {
@@ -218,10 +223,11 @@ p4est3_partition_correction (const p4est3_t *p3,
           (p3->alloc, p3->mpisize, last_goffsets,
            loc_offsets[rk], loc_offsets[rk], &from_begin, &from_end));
     SC3A_CHECK (from_begin == from_end);
-    qid = loc_offsets[rk] - p3->old->goffset[from_begin];
+    qid = (p4est3_locidx) (loc_offsets[rk] - p3->old->goffset[from_begin]);
     /* if border quadrant is a tree, do nothing */
     cut_border_quad =
-      p3->old->nodequads[from_begin - node_offset] + qid * p3->qsize;
+      p3->old->nodequads[from_begin - node_offset] +
+      (ptrdiff_t) qid *(ptrdiff_t) p3->qsize;
     SC3E (p4est3_quadrant_level (p3->qvt, cut_border_quad, &level));
     if (level == 0) {
       continue;
@@ -244,8 +250,8 @@ p4est3_partition_correction (const p4est3_t *p3,
       for (qid = quad_begin; qid <= quad_end; ++qid) {
         SC3E (p4est3_quadrant_is_parent
               (p3->qvt, family_parent,
-               p3->old->nodequads[from_proc - node_offset] + qid * p3->qsize,
-               &is_parent));
+               p3->old->nodequads[from_proc - node_offset] +
+               (ptrdiff_t) qid * (ptrdiff_t) p3->qsize, &is_parent));
         if (is_parent) {
           max_quadrant_id = (p4est3_gloidx) qid + lower_bound;
           min_quadrant_id =
@@ -355,7 +361,7 @@ p4est3_weighted_new_boundaries (p4est3_t *p3, int nodesize,
     wi->ntree = nt;
     SC3E (p4est3_tree_index (p3->old, nt, &tree));
     for (lz = 0; lz < tree->num_quads; ++lz, ++kl) {
-      quad = tree->tquads + p3->qsize * lz;
+      quad = tree->tquads + (ptrdiff_t) p3->qsize * (ptrdiff_t) lz;
       wi->quadrant = quad;
       SC3E (p3->cweight (wi, &weight));
       SC3A_CHECK (weight >= 0);
@@ -445,8 +451,8 @@ p4est3_local_trees_reproduce (p4est3_t *p3,
         (p3->alloc, p3->num_trees, last_gtree_offsets,
          first_quad_gloid, last_quad_gloid, &from_begin, &from_end));
 
-  p3->fltree = from_begin;
-  p3->lltree = from_end;
+  p3->fltree = (p4est3_topidx) from_begin;
+  p3->lltree = (p4est3_topidx) from_end;
   p3->nltrees = p3->lltree - p3->fltree + 1;
 
   SC3E (p4est3_part_array_new
@@ -467,7 +473,7 @@ p4est3_local_trees_reproduce (p4est3_t *p3,
       = p3->gtroffset[p3->fltree + 1] - p3->gtroffset[p3->fltree] - 1;
   }
   tree->end_tquad = tree->last_tquad + 1;
-  tree->num_quads = tree->end_tquad - tree->first_tquad;
+  tree->num_quads = (p4est3_locidx) (tree->end_tquad - tree->first_tquad);
   tree->quad_offset = 0;
   tree->tquads = p3->quads;
 
@@ -487,11 +493,13 @@ p4est3_local_trees_reproduce (p4est3_t *p3,
     SC3E (sc3_array_index (trees, tt - p3->fltree, &tree));
     tree->treeid = tt;
     tree->first_tquad = 0;
-    tree->num_quads = p3->gtroffset[tt + 1] - p3->gtroffset[tt];
+    tree->num_quads =
+      (p4est3_locidx) (p3->gtroffset[tt + 1] - p3->gtroffset[tt]);
     tree->end_tquad = tree->num_quads;
     tree->last_tquad = tree->end_tquad - 1;
     tree->quad_offset = prev_tree->quad_offset + prev_tree->num_quads;
-    tree->tquads = p3->quads + p3->qsize * tree->quad_offset;
+    tree->tquads =
+      p3->quads + (ptrdiff_t) p3->qsize * (ptrdiff_t) tree->quad_offset;
   }
 
   /* process the last local tree */
@@ -500,9 +508,10 @@ p4est3_local_trees_reproduce (p4est3_t *p3,
   tree->first_tquad = 0;
   tree->last_tquad = last_quad_gloid - p3->gtroffset[p3->lltree];
   tree->end_tquad = tree->last_tquad + 1;
-  tree->num_quads = tree->end_tquad;
+  tree->num_quads = (p4est3_locidx) tree->end_tquad;
   tree->quad_offset = prev_tree->quad_offset + prev_tree->num_quads;
-  tree->tquads = p3->quads + p3->qsize * tree->quad_offset;
+  tree->tquads =
+    p3->quads + (ptrdiff_t) p3->qsize * (ptrdiff_t) tree->quad_offset;
 
   return NULL;
 }
@@ -518,7 +527,8 @@ p4est3_partition (p4est3_t *p3)
   p4est3_locidx      *correction;
   p4est3_locidx      *num_recv_from = NULL;
                                 /**< Numbers of quadrants coming from the i-th process */
-  p4est3_gloidx       from_begin, from_end;
+  p4est3_gloidx       from_begin = p3->mpirank, from_end = p3->mpirank;
+                                /**< Range of processes to receive quadrants from */
   p4est3_gloidx       qcount_node;
   p4est3_gloidx      *last_goffsets = NULL;
                                   /**< Offsets of last quadrant in a process */
@@ -555,6 +565,8 @@ p4est3_partition (p4est3_t *p3)
         (p3, &num_recv_from, &last_goffsets,
          &last_gtree_offsets, &loc_offsets));
   p3->global_num_quads = p3->old->global_num_quads;
+
+  SC3A_CHECK (loc_offsets != NULL);
 
   node_offset = node_offsets[node_num];
   node_offset_next = node_offsets[node_num + 1];
@@ -607,8 +619,8 @@ p4est3_partition (p4est3_t *p3)
     SC3E (sc3_allocator_free (p3->alloc, correction));
   }
 
-  p3->local_num_quads =
-    loc_offsets[p3->mpirank + 1] - loc_offsets[p3->mpirank];
+  p3->local_num_quads = (p4est3_locidx)
+    (loc_offsets[p3->mpirank + 1] - loc_offsets[p3->mpirank]);
 
   SC3E (sc3_allocator_malloc
         (p3->alloc, nodesize * sizeof (char *), &p3->nodequads));
@@ -640,7 +652,9 @@ p4est3_partition (p4est3_t *p3)
                                          qcount_node *
                                          (p4est3_gloidx) p3->old->qsize,
                                          p3->qvt,
-                                         p3->quads + li * p3->qsize));
+                                         p3->quads +
+                                         (ptrdiff_t) li *
+                                         (ptrdiff_t) p3->qsize));
       }
     }
   }
