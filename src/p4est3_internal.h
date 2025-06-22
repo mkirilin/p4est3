@@ -141,10 +141,14 @@ typedef struct p4est3_quadrants
                                              For a referencing forest it may
                                              differ. Equals \ref
                                              nodequads[\ref noderank]. */
+  char               *node_quads;             /**< Points to the first quadrant
+                                              local to this node. */
   p4est3_locidx       local_num_quads;  /**< Count process-local quadrants for
                                              a forest the object was initially
                                              created. For a referencing forest
                                              it may differ. */
+  p4est3_gloidx       global_alloc_quads; /**< Count all quadrants allocated
+                                             globally for a forest. */
   int                 qsize;            /**< Size of quadrants stored in the forest. */
 }
 p4est3_quadrants_t;
@@ -199,7 +203,7 @@ struct p4est3
   int                 qmaxlevel;        /**< Maximum allowed refinement level. */
   int                 num_children;     /**< Number of children for a quadrant. */
   int                 max_threads;      /**< Max threads from querying openmp. */
-  int                 family;           /**< Indicator to store quadrant 
+  int                 family;           /**< Indicator to store quadrant
                                              family within the same rank. */
   char              **temp_quad;        /**< Quadrant work space, one per thread. */
   p4est3_locidx       local_num_quads;  /**< Count process-local quadrants. */
@@ -346,6 +350,8 @@ sc3_error_t        *p4est3_quadrants_set_local_num_quads
   (p4est3_quadrants_t * m, p4est3_locidx local_num_quads);
 sc3_error_t        *p4est3_quadrants_set_qsize
   (p4est3_quadrants_t * m, int qsize);
+sc3_error_t        *p4est3_quadrants_set_global_alloc_quads
+  (p4est3_quadrants_t * m, p4est3_gloidx global_alloc_quads);
 sc3_error_t        *p4est3_glopartition_set_mpienv (p4est3_glotree_t * mt,
                                                     p4est3_glopos_t * mp,
                                                     p4est3_glooffs_t * mo,

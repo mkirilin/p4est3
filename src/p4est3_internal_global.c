@@ -164,6 +164,7 @@ p4est3_quadrants_is_valid (const p4est3_quadrants_t *m, char *reason)
     SC3E_TEST (m->quads != NULL, reason);
     SC3E_TEST (m->local_num_quads >= 0, reason);
     SC3E_TEST (m->qsize > 0, reason);
+    SC3E_TEST (m->global_alloc_quads >= m->local_num_quads, reason);
   }
   SC3E_YES (reason);
 }
@@ -296,6 +297,7 @@ p4est3_quadrants_new (sc3_allocator_t *mator, p4est3_quadrants_t **mp)
   m->meta = b;
   m->quads = NULL;
   m->local_num_quads = -1;
+  m->global_alloc_quads = 0;
   m->qsize = 0;
 
   SC3A_IS (p4est3_quadrants_is_new, m);
@@ -378,11 +380,21 @@ p4est3_quadrants_set_qsize (p4est3_quadrants_t *m, int qsize)
 }
 
 sc3_error_t        *
+p4est3_quadrants_set_global_alloc_quads (p4est3_quadrants_t *m,
+                                         p4est3_gloidx global_alloc_quads)
+{
+  SC3A_IS (p4est3_quadrants_is_new, m);
+  SC3A_CHECK (global_alloc_quads >= m->local_num_quads);
+  m->global_alloc_quads = global_alloc_quads;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_glopartition_setup (p4est3_glotree_t *mt, p4est3_glopos_t *mp,
                            p4est3_glooffs_t *mo, p4est3_gtroffs_t *mto,
                            p4est3_quadrants_t *mq)
 {
-  int                 noderank, nodesize, mpisize;
+  int                 i, noderank, nodesize, mpisize;
   int                 dispunit;
   sc3_MPI_Aint_t      gftreebytes = 0, gfposbytes = 0,
     goffsetbytes = 0, gtreeoffbytes = 0, quadbytes = 0, tempbytes;
@@ -456,6 +468,11 @@ p4est3_glopartition_setup (p4est3_glotree_t *mt, p4est3_glopos_t *mp,
     SC3E (sc3_MPI_Win_allocate_shared
           (quadbytes, mq->qsize, info_noncontig, nodecomm, &mq->quads,
            &mq->meta->win));
+
+    SC3E (sc3_MPI_Win_shared_query
+          (mq->meta->win, 0, &tempbytes, &dispunit, &mq->node_quads));
+    SC3A_CHECK (dispunit == mq->qsize);
+    SC3A_CHECK (mq->node_quads != NULL || tempbytes == 0);
   }
   if (noderank > 0) {
     if (mt != NULL) {

@@ -331,11 +331,10 @@ p4est3_refine_coarsen_copy (p4est3_t *p3)
 {
   int                 i, nodesize;
   int                 noderank;
-  int                 dispunit;
   p4est3_locidx       lt_offset;
+  p4est3_gloidx       global_alloc_bytes;
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Comm_t      nodecomm;
-  sc3_MPI_Aint_t      tempbytes;
   p4est3_tree_t      *tree;
   sc3_array_t        *pattern; /**< Every number in this array encodes ref/coar behaviour */
   sc3_array_t        *family;
@@ -405,28 +404,6 @@ p4est3_refine_coarsen_copy (p4est3_t *p3)
     p3->local_num_quads = p3->old->local_num_quads;
   }
 
-  /* Here we allocate shared p4est3_t::quadwin and p4est3_t::nodequads.
-     We will fill in the latter later. */
-  /* create shared quadrant storage */
-  SC3E (p4est3_quadrants_new (p3->alloc, &p3->quadrants));
-  SC3E (p4est3_glopartition_set_mpienv
-        (NULL, NULL, NULL, NULL, p3->quadrants, p3->split_info));
-  SC3E (p4est3_quadrants_set_local_num_quads
-        (p3->quadrants, p3->local_num_quads));
-  SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
-  SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, NULL, p3->quadrants));
-  p3->quads = p3->quadrants->quads;
-  SC3E (sc3_allocator_malloc
-        (p3->alloc, nodesize * sizeof (char *), &p3->nodequads));
-  for (i = 0; i < nodesize; ++i) {
-    SC3E (sc3_MPI_Win_shared_query (p3->quadrants->meta->win, i,
-                                    &tempbytes, &dispunit,
-                                    &p3->nodequads[i]));
-    SC3A_CHECK (dispunit == p3->qsize);
-    SC3A_CHECK (p3->nodequads[i] != NULL || tempbytes == 0);
-  }
-  SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
-
   /* Fill global offsets. */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsets->meta->win));
@@ -442,6 +419,56 @@ p4est3_refine_coarsen_copy (p4est3_t *p3)
   SC3E (sc3_MPI_Win_sync (p3->goffsets->meta->win));
   SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->meta->win));
   SC3E (sc3_MPI_Barrier (nodecomm));
+
+  p3->global_num_quads = p3->goffset[p3->mpisize];
+
+  /* by default we take p3->old as a spin */
+  p3->_spin_quadrants = p3->old->quadrants;
+  SC3E (p4est3_quadrants_ref (p3->old->quadrants));
+
+  /* create shared quadrant storage */
+  if (p3->old->_spin_quadrants != NULL
+      && sc3_refcount_is_last (&p3->old->_spin_quadrants->meta->rc, NULL)
+      && p3->old->_spin_quadrants->global_alloc_quads *
+      p3->old->_spin_quadrants->qsize >= p3->global_num_quads * p3->qsize) {
+    p3->quadrants = p3->old->_spin_quadrants;
+    p3->quadrants->local_num_quads = p3->local_num_quads;
+    p3->quadrants->qsize = p3->qsize;
+    SC3E (p4est3_quadrants_ref (p3->old->_spin_quadrants));
+  }
+  else {
+    SC3E (p4est3_quadrants_new (p3->alloc, &p3->quadrants));
+    SC3E (p4est3_glopartition_set_mpienv
+          (NULL, NULL, NULL, NULL, p3->quadrants, p3->split_info));
+    SC3E (p4est3_quadrants_set_local_num_quads
+          (p3->quadrants, p3->local_num_quads));
+    SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
+    SC3E (p4est3_quadrants_set_global_alloc_quads
+          (p3->quadrants, p3->global_num_quads));
+    SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, NULL, p3->quadrants));
+
+    if (p3->old->_spin_quadrants != NULL
+        && sc3_refcount_is_last (&p3->old->_spin_quadrants->meta->rc, NULL)
+        && p3->old->_spin_quadrants->global_alloc_quads *
+        p3->old->_spin_quadrants->qsize >= p3->old->global_num_quads *
+        p3->old->qsize) {
+      /* It was not enough memory, but old->_spin_quadrants exists.
+         Compare memory allocated in old and its spin, take the one with larger. */
+      SC3E (p4est3_quadrants_unref (&p3->_spin_quadrants));
+      p3->_spin_quadrants = p3->old->_spin_quadrants;
+      SC3E (p4est3_quadrants_ref (p3->old->_spin_quadrants));
+    }
+  }
+  p3->quads = p3->quadrants->quads;
+
+  SC3E (sc3_allocator_malloc
+        (p3->alloc, nodesize * sizeof (char *), &p3->nodequads));
+  /* TODO: Extend to non-contiguous case */
+  for (i = 0; i < nodesize; ++i) {
+    p3->nodequads[i] =          /* TODO: Extend to multi-nodes configs */
+      (char *) (p3->quadrants->node_quads + p3->goffset[i] * p3->qsize);
+  }
+  p3->quads = p3->nodequads[noderank];
 
   /* We got a pattern of population, and now we populate it
      and set p4est3_tree_t:: treeid, quad_offset and num_quads.
@@ -491,7 +518,6 @@ p4est3_refine_coarsen_copy (p4est3_t *p3)
   if (p3->ccoarse != NULL) {
     SC3E (sc3_array_destroy (&family));
   }
-  p3->global_num_quads = p3->goffset[p3->mpisize];
   return NULL;
 }
 

@@ -192,6 +192,8 @@ p4est3_internal_setup_tree (p4est3_t *p3, p4est3_gloidx num_uniform)
         (NULL, NULL, NULL, NULL, p3->quadrants, p3->split_info));
   SC3E (p4est3_quadrants_set_local_num_quads
         (p3->quadrants, p3->local_num_quads));
+  SC3E (p4est3_quadrants_set_global_alloc_quads
+        (p3->quadrants, p3->global_num_quads));
   SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
   SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, NULL, p3->quadrants));
   p3->quads = p3->quadrants->quads;

@@ -124,14 +124,19 @@ p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
 
   p3->num_trees = p->trees->elem_count;
 
+  p3->local_num_quads = p->local_num_quadrants;
+  p3->global_num_quads = p->global_num_quadrants;
+
   /* allocate magic structures */
   SC3E (p4est3_glotree_new (p3->alloc, &p3->gtrees));
   SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
   SC3E (p4est3_gtroffs_new (p3->alloc, &p3->gtreeoffsets));
   SC3E (p4est3_gtroffs_set_num_trees (p3->gtreeoffsets, p3->num_trees));
   SC3E (p4est3_quadrants_new (p3->alloc, &p3->quadrants));
-  SC3E (p4est3_quadrants_set_local_num_quads (p3->quadrants,
-                                              p->local_num_quadrants));
+  SC3E (p4est3_quadrants_set_local_num_quads
+        (p3->quadrants, p->local_num_quadrants));
+  SC3E (p4est3_quadrants_set_global_alloc_quads
+        (p3->quadrants, p->global_num_quadrants));
   SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
   SC3E (p4est3_glopartition_set_mpienv
         (p3->gtrees, NULL, p3->goffsets,
@@ -168,8 +173,6 @@ p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
   SC3E (sc3_MPI_Win_unlock (0, p3->gtrees->meta->win));
 
   /* allocate memory for node proc first quadrant pointers */
-  p3->local_num_quads = p->local_num_quadrants;
-  p3->global_num_quads = p->global_num_quadrants;
 
   SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
   SC3E (sc3_mpienv_get_node_frank (p3->split_info, &node_frank));

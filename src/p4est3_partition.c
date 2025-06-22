@@ -310,6 +310,8 @@ p4est3_quadrants_allocate (p4est3_t *p3, int nodesize)
         (NULL, NULL, NULL, NULL, p3->quadrants, p3->split_info));
   SC3E (p4est3_quadrants_set_local_num_quads
         (p3->quadrants, p3->local_num_quads));
+  SC3E (p4est3_quadrants_set_global_alloc_quads
+        (p3->quadrants, p3->global_num_quads));
   SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
   SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, NULL, p3->quadrants));
   p3->quads = p3->quadrants->quads;
@@ -572,6 +574,7 @@ p4est3_partition (p4est3_t *p3)
     }
   }
   else {
+    /* TODO: Use local array for weighted correction instead of goffsets */
     SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                             p3->goffsets->meta->win));
     SC3E (p4est3_weighted_new_boundaries
@@ -657,6 +660,7 @@ p4est3_partition (p4est3_t *p3)
 
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
                           p3->goffsets->meta->win));
+  /* TODO: Move it as early as possible and use iBarrier */
   p3->goffset[p3->mpirank] = loc_offsets[p3->mpirank];
   if (p3->mpirank == 0) {
     p3->goffset[p3->mpisize] = p3->global_num_quads;
