@@ -89,7 +89,6 @@ p4est3_partition_allocations_prerecv (const p4est3_t *p3,
   return NULL;
 }
 
-/* p4est3::goffsets should be updated before calling this function */
 static sc3_error_t *
 p4est3_procs_recv_from (const p4est3_t *p3,
                         p4est3_gloidx *last_goffsets,
@@ -423,15 +422,13 @@ p4est3_weighted_new_boundaries (p4est3_t *p3, int nodesize,
 }
 
 static sc3_error_t *
-p4est3_local_trees_reproduce (p4est3_t *p3,
-                              p4est3_gloidx *last_gtree_offsets,
-                              p4est3_gloidx *loc_offsets)
+p4est3_find_first_last_local_trees (p4est3_t *p3,
+                                    p4est3_gloidx *last_gtree_offsets,
+                                    p4est3_gloidx *loc_offsets)
 {
   sc3_array_t        *trees;
-  p4est3_tree_t      *tree, *prev_tree;
-  p4est3_gloidx       from_begin, from_end;
   p4est3_gloidx       first_quad_gloid, last_quad_gloid;
-  p4est3_topidx       tt;
+  p4est3_gloidx       from_begin, from_end;
 
   first_quad_gloid = loc_offsets[p3->mpirank];
   last_quad_gloid = loc_offsets[p3->mpirank + 1] - (p4est3_gloidx) 1;
@@ -455,6 +452,32 @@ p4est3_local_trees_reproduce (p4est3_t *p3,
   p3->lltree = (p4est3_topidx) from_end;
   p3->nltrees = p3->lltree - p3->fltree + 1;
 
+  /** TODO: Gather data from the other nodes */
+  p3->gftree[p3->mpirank] = p3->fltree;
+  if (p3->mpirank == 0) {
+    p3->gftree[p3->mpisize] = p3->num_trees;
+  }
+  return NULL;
+}
+
+static sc3_error_t *
+p4est3_local_trees_reproduce (p4est3_t *p3,
+                              p4est3_gloidx *last_gtree_offsets,
+                              p4est3_gloidx *loc_offsets)
+{
+  sc3_array_t        *trees;
+  p4est3_tree_t      *tree, *prev_tree;
+  p4est3_gloidx       first_quad_gloid, last_quad_gloid;
+  p4est3_topidx       tt;
+
+  first_quad_gloid = loc_offsets[p3->mpirank];
+  last_quad_gloid = loc_offsets[p3->mpirank + 1] - (p4est3_gloidx) 1;
+
+  if (first_quad_gloid > last_quad_gloid) {
+    /* everything is already done by p4est3_find_first_last_local_trees */
+    return NULL;
+  }
+
   SC3E (p4est3_part_array_new
         (p3->alloc, sizeof (p4est3_tree_t), p3->nltrees, p3->nltrees,
          &trees));
@@ -476,12 +499,6 @@ p4est3_local_trees_reproduce (p4est3_t *p3,
   tree->num_quads = (p4est3_locidx) (tree->end_tquad - tree->first_tquad);
   tree->quad_offset = 0;
   tree->tquads = p3->quads;
-
-  /** TODO: Gather data from the other nodes */
-  p3->gftree[p3->mpirank] = p3->fltree;
-  if (p3->mpirank == 0) {
-    p3->gftree[p3->mpisize] = p3->num_trees;
-  }
 
   if (p3->nltrees == 1) {
     return NULL;
@@ -538,7 +555,8 @@ p4est3_partition (p4est3_t *p3)
   p4est3_gloidx      *loc_offsets = NULL;
   p4est3_locidx       li;
   p4est3_topidx       t;
-
+  MPI_Request         req[2];
+  MPI_Status          statuses[2];
   /* We suppose to call this function after setting up routine */
   SC3A_CHECK (p3->old != NULL);
   SC3A_IS (p4est3_is_setup, p3->old);
@@ -549,7 +567,7 @@ p4est3_partition (p4est3_t *p3)
   }
 
   /* this function does nothing for processes without shared memory */
-  /** TODO: Make sence to limit it for nodesize == 1, w/o sh.mem it leads to extra work. 
+  /** TODO: Make sence to limit it for nodesize == 1, w/o sh.mem it leads to extra work.
    * Keep it so far for testing purposes.
   */
   /*if (nodesize == 1) {
@@ -603,10 +621,6 @@ p4est3_partition (p4est3_t *p3)
   for (i = 0; i < p3->mpisize; ++i) {
     last_goffsets[i] = p3->old->goffset[i + 1] - 1;
   }
-  for (t = 0; t < p3->num_trees; ++t) {
-    last_gtree_offsets[t] = p3->gtroffset[t + 1] - 1;
-  }
-
   if (p3->family) {
     SC3E (sc3_allocator_calloc
           (p3->alloc, p3->mpisize, sizeof (p4est3_locidx), &correction));
@@ -618,6 +632,26 @@ p4est3_partition (p4est3_t *p3)
     }
     SC3E (sc3_allocator_free (p3->alloc, correction));
   }
+
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->goffsets->meta->win));
+  /* TODO: Move it as early as possible and use iBarrier */
+  p3->goffset[p3->mpirank] = loc_offsets[p3->mpirank];
+  if (p3->mpirank == 0) {
+    p3->goffset[p3->mpisize] = p3->global_num_quads;
+  }
+  SC3E (sc3_MPI_Win_sync (p3->goffsets->meta->win));
+  MPI_Ibarrier (nodecomm, &req[0]);
+
+  for (t = 0; t < p3->num_trees; ++t) {
+    last_gtree_offsets[t] = p3->gtroffset[t + 1] - 1;
+  }
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gtreeoffsets->meta->win));
+  SC3E (p4est3_find_first_last_local_trees
+        (p3, last_gtree_offsets, loc_offsets));
+  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->meta->win));
+  MPI_Ibarrier (nodecomm, &req[1]);
 
   p3->local_num_quads = (p4est3_locidx)
     (loc_offsets[p3->mpirank + 1] - loc_offsets[p3->mpirank]);
@@ -672,24 +706,9 @@ p4est3_partition (p4est3_t *p3)
   }
   SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
 
-  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->goffsets->meta->win));
-  /* TODO: Move it as early as possible and use iBarrier */
-  p3->goffset[p3->mpirank] = loc_offsets[p3->mpirank];
-  if (p3->mpirank == 0) {
-    p3->goffset[p3->mpisize] = p3->global_num_quads;
-  }
-  SC3A_CHECK (p3->global_num_quads == loc_offsets[p3->mpisize]);
-
-  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->gtreeoffsets->meta->win));
-
   SC3E (p4est3_local_trees_reproduce (p3, last_gtree_offsets, loc_offsets));
 
-  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->meta->win));
   SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->meta->win));
-
-  SC3E (sc3_MPI_Win_sync (p3->goffsets->meta->win));
   SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->meta->win));
 
   if ((p3->contiguous && (p3->qvt != p3->old->qvt)) || !p3->contiguous) {
@@ -700,7 +719,7 @@ p4est3_partition (p4est3_t *p3)
   SC3E (sc3_allocator_free (p3->alloc, loc_offsets));
   SC3E (sc3_allocator_free (p3->alloc, last_goffsets));
   SC3E (sc3_allocator_free (p3->alloc, last_gtree_offsets));
-  SC3E (sc3_MPI_Barrier (nodecomm));
+  MPI_Waitall (2, req, statuses);
   return NULL;
 }
 
