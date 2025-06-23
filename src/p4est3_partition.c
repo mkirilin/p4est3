@@ -321,6 +321,8 @@ p4est3_quadrants_allocate (p4est3_t *p3, int nodesize)
   SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, NULL, p3->quadrants));
   p3->quads = p3->quadrants->quads;
   for (i = 0; i < nodesize; ++i) {
+    /* TODO: change functionality for non-cont, wrt pre-allocation functional
+       of quadrant magic array */
     SC3E (sc3_MPI_Win_shared_query (p3->quadrants->meta->win, i,
                                     &tempbytes, &dispunit,
                                     &p3->nodequads[i]));
@@ -684,6 +686,11 @@ p4est3_partition (p4est3_t *p3)
       for (n = 0; n < nodesize; ++n) {
         p3->nodequads[n]
           = p3->old->nodequads[0] + loc_offsets[n] * p3->old->qsize;
+      }
+      if (p3->old->_spin_quadrants != NULL) {
+        SC3A_IS (sc3_refcount_is_last, &p3->old->_spin_quadrants->meta->rc);
+        p3->_spin_quadrants = p3->old->_spin_quadrants;
+        SC3E (p4est3_quadrants_ref (p3->old->_spin_quadrants));
       }
     }
     else {

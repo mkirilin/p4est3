@@ -150,6 +150,8 @@ typedef struct p4est3_quadrants
   p4est3_gloidx       global_alloc_quads; /**< Count all quadrants allocated
                                              globally for a forest. */
   int                 qsize;            /**< Size of quadrants stored in the forest. */
+  int                 is_extend; /**< Boolean: double the memory allocated during
+                                      the next shared memory window creation. */
 }
 p4est3_quadrants_t;
 
@@ -352,6 +354,8 @@ sc3_error_t        *p4est3_quadrants_set_qsize
   (p4est3_quadrants_t * m, int qsize);
 sc3_error_t        *p4est3_quadrants_set_global_alloc_quads
   (p4est3_quadrants_t * m, p4est3_gloidx global_alloc_quads);
+sc3_error_t        *p4est3_quadrant_set_extend (p4est3_quadrants_t * m,
+                                                int is_extend);
 sc3_error_t        *p4est3_glopartition_set_mpienv (p4est3_glotree_t * mt,
                                                     p4est3_glopos_t * mp,
                                                     p4est3_glooffs_t * mo,

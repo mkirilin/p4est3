@@ -445,13 +445,14 @@ p4est3_refine_coarsen_copy (p4est3_t *p3)
     SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
     SC3E (p4est3_quadrants_set_global_alloc_quads
           (p3->quadrants, p3->global_num_quads));
+    SC3E (p4est3_quadrant_set_extend (p3->quadrants, 1));
     SC3E (p4est3_glopartition_setup (NULL, NULL, NULL, NULL, p3->quadrants));
 
     if (p3->old->_spin_quadrants != NULL
         && sc3_refcount_is_last (&p3->old->_spin_quadrants->meta->rc, NULL)
         && p3->old->_spin_quadrants->global_alloc_quads *
-        p3->old->_spin_quadrants->qsize >= p3->old->global_num_quads *
-        p3->old->qsize) {
+        p3->old->_spin_quadrants->qsize >=
+        p3->old->global_num_quads * p3->old->qsize) {
       /* It was not enough memory, but old->_spin_quadrants exists.
          Compare memory allocated in old and its spin, take the one with larger. */
       SC3E (p4est3_quadrants_unref (&p3->_spin_quadrants));
@@ -459,7 +460,6 @@ p4est3_refine_coarsen_copy (p4est3_t *p3)
       SC3E (p4est3_quadrants_ref (p3->old->_spin_quadrants));
     }
   }
-  p3->quads = p3->quadrants->quads;
 
   SC3E (sc3_allocator_malloc
         (p3->alloc, nodesize * sizeof (char *), &p3->nodequads));
@@ -469,6 +469,7 @@ p4est3_refine_coarsen_copy (p4est3_t *p3)
       (char *) (p3->quadrants->node_quads + p3->goffset[i] * p3->qsize);
   }
   p3->quads = p3->nodequads[noderank];
+  p3->quadrants->quads = p3->quads;
 
   /* We got a pattern of population, and now we populate it
      and set p4est3_tree_t:: treeid, quad_offset and num_quads.

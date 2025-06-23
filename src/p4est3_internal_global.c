@@ -299,6 +299,7 @@ p4est3_quadrants_new (sc3_allocator_t *mator, p4est3_quadrants_t **mp)
   m->local_num_quads = -1;
   m->global_alloc_quads = 0;
   m->qsize = 0;
+  m->is_extend = 0;
 
   SC3A_IS (p4est3_quadrants_is_new, m);
   *mp = m;
@@ -390,6 +391,14 @@ p4est3_quadrants_set_global_alloc_quads (p4est3_quadrants_t *m,
 }
 
 sc3_error_t        *
+p4est3_quadrant_set_extend (p4est3_quadrants_t *m, int is_extend)
+{
+  SC3A_IS (p4est3_quadrants_is_new, m);
+  m->is_extend = is_extend;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_glopartition_setup (p4est3_glotree_t *mt, p4est3_glopos_t *mp,
                            p4est3_glooffs_t *mo, p4est3_gtroffs_t *mto,
                            p4est3_quadrants_t *mq)
@@ -465,6 +474,10 @@ p4est3_glopartition_setup (p4est3_glotree_t *mt, p4est3_glopos_t *mp,
     SC3A_CHECK (mq->local_num_quads >= 0);
     /* create shared quadrant storage */
     quadbytes = ((sc3_MPI_Aint_t) (mq->local_num_quads)) * mq->qsize;
+    if (mq->is_extend) {
+      /* double the allocation pool */
+      quadbytes *= 2;
+    }
     SC3E (sc3_MPI_Win_allocate_shared
           (quadbytes, mq->qsize, info_noncontig, nodecomm, &mq->quads,
            &mq->meta->win));
