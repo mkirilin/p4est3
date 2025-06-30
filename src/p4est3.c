@@ -564,6 +564,16 @@ p4est3_get_mpirank (const p4est3_t *p3, int *rank)
 }
 
 sc3_error_t        *
+p4est3_get_mpisize (const p4est3_t * p3, int *size)
+{
+  SC3A_IS (p4est3_is_setup, p3);
+  SC3A_CHECK (size != NULL);
+
+  *size = p3->mpisize;
+  return NULL;
+}
+
+sc3_error_t        *
 p4est3_get_maxlevel (const p4est3_t *p3, int *maxlevel)
 {
   SC3A_IS (p4est3_is_setup, p3);

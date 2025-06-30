@@ -414,6 +414,14 @@ sc3_error_t        *p4est3_get_mpicomm (const p4est3_t * p3,
  */
 sc3_error_t        *p4est3_get_mpirank (const p4est3_t * p3, int *rank);
 
+/** Query the size of the forest communicator.
+ * \param [in] p3          Must be setup.  Provides the forest to examine.
+ * \param [out] size       On output, indicates the size of the forest
+ *                         communicator.
+ * \return                 NULL on success, error object otherwise.
+ */
+sc3_error_t        *p4est3_get_mpisize (const p4est3_t * p3, int *size);
+
 /** Query the Maximum allowed refinement level of this forest.
  * \param [in] p3          Must be setup.  Provides the forest to examine.
  * \param [out] maxlevel   On output, indicates the maximum allowed
@@ -441,7 +449,7 @@ sc3_error_t        *p4est3_get_local_num_trees (const p4est3_t * p3,
  * first quadrant owned. The last entry is the global number of quadrants.
  * \param [in] p3          Must be setup. Provides the forest to examine.
  * \param [out] offset     On output, points to an array of global offsets.
- *                         The array is owned by the forest and must not be 
+ *                         The array is owned by the forest and must not be
  *                         freed or modified.
  * \return                 NULL on success, error object otherwise.
  */
