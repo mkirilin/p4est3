@@ -558,7 +558,7 @@ p4est3_partition (p4est3_t *p3)
   p4est3_locidx       li;
   p4est3_topidx       t;
   MPI_Request         req[2];
-  MPI_Status          statuses[2];
+
   /* We suppose to call this function after setting up routine */
   SC3A_CHECK (p3->old != NULL);
   SC3A_IS (p4est3_is_setup, p3->old);

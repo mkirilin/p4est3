@@ -332,7 +332,6 @@ p4est3_refine_coarsen_copy (p4est3_t *p3)
   int                 i, nodesize;
   int                 noderank;
   p4est3_locidx       lt_offset;
-  p4est3_gloidx       global_alloc_bytes;
   sc3_MPI_Info_t      info_noncontig;
   sc3_MPI_Comm_t      nodecomm;
   p4est3_tree_t      *tree;

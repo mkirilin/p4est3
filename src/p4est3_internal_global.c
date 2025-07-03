@@ -403,7 +403,7 @@ p4est3_glopartition_setup (p4est3_glotree_t *mt, p4est3_glopos_t *mp,
                            p4est3_glooffs_t *mo, p4est3_gtroffs_t *mto,
                            p4est3_quadrants_t *mq)
 {
-  int                 i, noderank, nodesize, mpisize;
+  int                 noderank, nodesize, mpisize;
   int                 dispunit;
   sc3_MPI_Aint_t      gftreebytes = 0, gfposbytes = 0,
     goffsetbytes = 0, gtreeoffbytes = 0, quadbytes = 0, tempbytes;

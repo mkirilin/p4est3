@@ -35,6 +35,14 @@
 #define P4EST3_ITER_CACHE_LVL 32
 #endif
 
+#ifdef __cplusplus
+extern              "C"
+{
+#if 0
+}
+#endif
+#endif
+
 /* Define drop function type since it's not available in sc */
 typedef void        (*sc_drop_function_t) (void *data, const void *user);
 
@@ -85,14 +93,6 @@ static unsigned int sc_hash_mru_hash (const void *v, const void *u);
 static int          sc_hash_mru_is_equal (const void *v1, const void *v2,
                                           const void *u);
 static void         sc_hash_mru_consolidate (sc_hash_mru_t * mru);
-
-#ifdef __cplusplus
-extern              "C"
-{
-#if 0
-}
-#endif
-#endif
 
 /* Forward declarations */
 typedef struct p4est3_search_area p4est3_search_area_t;
