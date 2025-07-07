@@ -557,7 +557,10 @@ p4est3_partition (p4est3_t *p3)
   p4est3_gloidx      *loc_offsets = NULL;
   p4est3_locidx       li;
   p4est3_topidx       t;
+#ifdef P4EST_ENABLE_MPI
+  /* TO DO: figure out why sc_MPI_Request cannot be used presently */
   MPI_Request         req[2];
+#endif
 
   /* We suppose to call this function after setting up routine */
   SC3A_CHECK (p3->old != NULL);
@@ -646,7 +649,10 @@ p4est3_partition (p4est3_t *p3)
   }
   SC3E (sc3_MPI_Win_sync (p3->goffsets->meta->win));
   SC3E (sc3_MPI_Win_unlock (0, p3->goffsets->meta->win));
+#ifdef P4EST_ENABLE_MPI
+  /* TO DO: provide an sc_MPI_Ibarrier definition in the sc_mpi files */
   MPI_Ibarrier (nodecomm, &req[0]);
+#endif
 
   SC3E (sc3_allocator_malloc
         (p3->alloc, p3->num_trees * sizeof (p4est3_gloidx),
@@ -660,7 +666,9 @@ p4est3_partition (p4est3_t *p3)
         (p3, last_gtree_offsets, loc_offsets));
   SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->meta->win));
   SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->meta->win));
+#ifdef P4EST_ENABLE_MPI
   MPI_Ibarrier (nodecomm, &req[1]);
+#endif
 
   if (!p3->family) {
     for (i = 0; i < p3->mpisize; ++i) {
@@ -738,8 +746,12 @@ p4est3_partition (p4est3_t *p3)
   SC3E (sc3_allocator_free (p3->alloc, loc_offsets));
   SC3E (sc3_allocator_free (p3->alloc, last_goffsets));
   SC3E (sc3_allocator_free (p3->alloc, last_gtree_offsets));
+#ifdef P4EST_ENABLE_MPI
+  /* TO DO: figure out why sc_MPI_STATUS_IGNORE, sc_MPI_Wait and
+     sc_MPI_Waitall cannot be used presently */
   MPI_Wait (&req[0], MPI_STATUS_IGNORE);
   MPI_Wait (&req[1], MPI_STATUS_IGNORE);
+#endif
   return NULL;
 }
 

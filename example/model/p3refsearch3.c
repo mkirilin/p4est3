@@ -406,6 +406,10 @@ make_allocator (sc3_allocator_t *oa, sc3_allocator_t **alloc)
 }
 
 #ifndef P4EST_ENABLE_DEBUG
+
+/* TO DO: this if 0 may be temporary, just disabling warnings */
+#if 0
+
 static sc3_error_t *
 array_new (sc3_allocator_t *alloc, size_t esize, int ealloc,
            int ecount, sc3_array_t **arr)
@@ -485,6 +489,8 @@ compare_results (sc3_allocator_t *alloc, p4est3_t *p3, p4est_t *p,
   SC3E (sc3_array_destroy (&levels));
   return NULL;
 }
+
+#endif /* 0 */
 #endif /* P4EST_ENABLE_DEBUG */
 
 static sc3_error_t *
