@@ -773,14 +773,15 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
      for mpirank's fltree. */
   if (p3->gftree[p3->mpirank + 1] > p3->gftree[p3->mpirank]) {
     /* Send only when own the last part of the first local tree */
-    for (p = p3->mpirank - 1; p >= 0 && p3->gftree[p] == p3->fltree; --p) {
+    for (p = p3->mpirank - 1; p >= 0 && p3->gftree[p] == p3->fltree && (p3->goffset[p + 1] - p3->goffset[p] > 0); --p) {
       SC3A_CHECK (p >= 0);
     }
-    if (p >= 0) {
+    if (p >= 0 && (p3->goffset[p + 1] - p3->goffset[p] > 0)) {
       /* Now p is the first rank that starts before the mpirank's fltree.
          There are two possibilities: either p or p + 1 are responsible for
          mpirank's fltree. Check if p + 1 is responsible for mpirank's fltree
          <=> (p + 1)'s 1-st quadrant coordinates are zeros. */
+      /* We consider only non-empty processes p */
       zero = 0;
       SC3A_CHECK (p < p3->mpirank);
       SC3E (p4est3_quadrant_coordinates (p3->qvt, p3->nodequads[p + 1], c));
@@ -791,8 +792,8 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
       p = zero == 0 ? p + 1 : p;
     }
     else {
-      SC3A_CHECK (p == -1);
-      p = 0;
+      //SC3A_CHECK (p == -1);
+      p = p + 1;
     }
 
     /* Now we have rank p to send to. Find the value to send. */

@@ -432,6 +432,10 @@ p4est3_find_first_last_local_trees (p4est3_t *p3,
   p4est3_gloidx       first_quad_gloid, last_quad_gloid;
   p4est3_gloidx       from_begin, from_end;
 
+  if (p3->mpirank == 0) {
+    p3->gftree[p3->mpisize] = p3->num_trees;
+  }
+
   first_quad_gloid = loc_offsets[p3->mpirank];
   last_quad_gloid = loc_offsets[p3->mpirank + 1] - (p4est3_gloidx) 1;
 
@@ -443,6 +447,7 @@ p4est3_find_first_last_local_trees (p4est3_t *p3,
     SC3E (p4est3_part_array_new (p3->alloc, sizeof (p4est3_tree_t),
                                  p3->nltrees, p3->nltrees, &trees));
     p3->trees = trees;
+    p3->gftree[p3->mpirank] = p3->fltree;
     return NULL;
   }
 
@@ -456,9 +461,6 @@ p4est3_find_first_last_local_trees (p4est3_t *p3,
 
   /** TODO: Gather data from the other nodes */
   p3->gftree[p3->mpirank] = p3->fltree;
-  if (p3->mpirank == 0) {
-    p3->gftree[p3->mpisize] = p3->num_trees;
-  }
   return NULL;
 }
 
@@ -559,7 +561,7 @@ p4est3_partition (p4est3_t *p3)
   p4est3_topidx       t;
 #ifdef P4EST_ENABLE_MPI
   /* TO DO: figure out why sc_MPI_Request cannot be used presently */
-  MPI_Request         req[2];
+  MPI_Request         req[3];
 #endif
 
   /* We suppose to call this function after setting up routine */
@@ -668,6 +670,21 @@ p4est3_partition (p4est3_t *p3)
   SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->meta->win));
 #ifdef P4EST_ENABLE_MPI
   MPI_Ibarrier (nodecomm, &req[1]);
+#endif
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gtreeoffsets->meta->win));
+  if (p3->mpirank == 0) {
+    p3->gftree[0] = p3->gftree[0] < 0 ? 0 : p3->gftree[0];
+    for (i = 1; i < p3->mpisize; ++i) {
+      if (p3->gftree[i] < 0) {
+        p3->gftree[i] = p3->gftree[i - 1];
+      }
+    }
+  }
+  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->meta->win));
+#ifdef P4EST_ENABLE_MPI
+  MPI_Ibarrier (nodecomm, &req[2]);
 #endif
 
   if (!p3->family) {
