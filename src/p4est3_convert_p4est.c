@@ -60,7 +60,6 @@ sc3_error_t        *
 p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
 {
   int                 n;
-  int                 dispunit;
   int                 nodesize, node_frank, noderank;
   p4est_topidx_t      ti;
   p4est3_topidx       ti3;
@@ -68,7 +67,6 @@ p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
   size_t              i;
   p4est3_connectivity_t *conn;
   const p4est3_quadrant_vtable_t *qvt_standard;
-  sc3_MPI_Aint_t      tempbytes;
   sc3_MPI_Comm_t      nodecomm;
   p4est_tree_t       *t;
   p4est3_tree_t      *t3;
@@ -178,20 +176,16 @@ p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
   SC3E (sc3_mpienv_get_node_frank (p3->split_info, &node_frank));
   SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
 
+  SC3E (sc3_MPI_Barrier (p3->mpicomm));
   SC3E (sc3_allocator_malloc
         (p3->alloc, nodesize * sizeof (char *), &p3->nodequads));
+  /* TODO: Extend to non-contiguous case */
   for (n = 0; n < nodesize; ++n) {
-    SC3E (sc3_MPI_Win_shared_query
-          (p3->quadrants->meta->win, n, &tempbytes, &dispunit,
-           &p3->nodequads[n]));
-    SC3A_CHECK (sc3_MPI_Barrier (p3->mpicomm) == NULL);
-    SC3A_CHECK (tempbytes >= (sc3_MPI_Aint_t)
-                (p3->goffset[node_frank + n + 1] -
-                 p3->goffset[node_frank + n]) * p3->qsize);
-    SC3A_CHECK (dispunit == p3->qsize);
-    SC3A_CHECK (p3->nodequads[n] != NULL || tempbytes == 0);
+    p3->nodequads[n] =          /* TODO: Extend to multi-nodes configs */
+      (char *) (p3->quadrants->node_quads + p3->goffset[n] * p3->qsize);
   }
-  SC3A_CHECK (p3->nodequads[noderank] == p3->quads);
+  p3->quads = p3->nodequads[noderank];
+  p3->quadrants->quads = p3->quads;
 
   /* copy quadrants in shared memory */
   if (p3->qvt == qvt_standard) {

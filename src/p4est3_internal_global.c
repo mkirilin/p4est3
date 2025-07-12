@@ -404,7 +404,7 @@ p4est3_glopartition_setup (p4est3_glotree_t *mt, p4est3_glopos_t *mp,
                            p4est3_quadrants_t *mq)
 {
   int                 noderank, nodesize, mpisize;
-  int                 dispunit;
+  int                 dispunit, i;
   sc3_MPI_Aint_t      gftreebytes = 0, gfposbytes = 0,
     goffsetbytes = 0, gtreeoffbytes = 0, quadbytes = 0, tempbytes;
   sc3_MPI_Comm_t      nodecomm;
@@ -482,10 +482,18 @@ p4est3_glopartition_setup (p4est3_glotree_t *mt, p4est3_glopos_t *mp,
           (quadbytes, mq->qsize, info_noncontig, nodecomm, &mq->quads,
            &mq->meta->win));
 
-    SC3E (sc3_MPI_Win_shared_query
-          (mq->meta->win, 0, &tempbytes, &dispunit, &mq->node_quads));
-    SC3A_CHECK (dispunit == mq->qsize);
-    SC3A_CHECK (mq->node_quads != NULL || tempbytes == 0);
+    /* query the shared memory for the quadrants */
+    /* looking for the first not NULL pointer */
+    for (i = 0; i < nodesize; ++i){
+      SC3E (sc3_MPI_Win_shared_query
+            (mq->meta->win, i, &tempbytes, &dispunit, &mq->node_quads));
+      SC3A_CHECK (dispunit == mq->qsize);
+      SC3A_CHECK (mq->node_quads != NULL || tempbytes == 0);
+      if (mq->node_quads != NULL) {
+        /* found the first non-NULL pointer */
+        break;
+      }
+    }
   }
   if (noderank > 0) {
     if (mt != NULL) {
