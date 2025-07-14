@@ -100,6 +100,7 @@ if(enable_p8est)
 endif()
 
 p4est_p8est_example(count_quadrants search)
+p4est_p8est_example(search_replicated search)
 
 p4est_p8est_example(read_conn tetgen)
 p4est_p8est_example(write_conn tetgen)
