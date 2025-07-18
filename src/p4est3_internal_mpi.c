@@ -773,7 +773,9 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
      for mpirank's fltree. */
   if (p3->gftree[p3->mpirank + 1] > p3->gftree[p3->mpirank]) {
     /* Send only when own the last part of the first local tree */
-    for (p = p3->mpirank - 1; p >= 0 && p3->gftree[p] == p3->fltree && (p3->goffset[p + 1] - p3->goffset[p] > 0); --p) {
+    for (p = p3->mpirank - 1;
+         p >= 0 && p3->gftree[p] == p3->fltree
+         && (p3->goffset[p + 1] - p3->goffset[p] > 0); --p) {
       SC3A_CHECK (p >= 0);
     }
     if (p >= 0 && (p3->goffset[p + 1] - p3->goffset[p] > 0)) {

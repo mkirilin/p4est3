@@ -504,18 +504,19 @@ p4est3_refine_coarsen_copy (p4est3_t *p3)
 
   /* Adjust first_.., last_.. and end_tquad for the FIRST local tree */
   if (p3->nltrees > 0) {
-  SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
-  tree->first_tquad = p3->goffset[p3->mpirank] - p3->gtroffset[p3->fltree];
-  tree->end_tquad = tree->first_tquad + tree->num_quads;
-  tree->last_tquad = tree->end_tquad - 1;
+    SC3E (p4est3_tree_index (p3, p3->fltree, &tree));
+    tree->first_tquad = p3->goffset[p3->mpirank] - p3->gtroffset[p3->fltree];
+    tree->end_tquad = tree->first_tquad + tree->num_quads;
+    tree->last_tquad = tree->end_tquad - 1;
   }
 
   /* Adjust first_.., last_.. and end_tquad for the LAST local tree */
   if (p3->nltrees > 0) {
-  SC3E (p4est3_tree_index (p3, p3->lltree, &tree));
-  tree->end_tquad = p3->goffset[p3->mpirank + 1] - p3->gtroffset[p3->lltree];
-  tree->last_tquad = tree->end_tquad - 1;
-  tree->first_tquad = tree->end_tquad - tree->num_quads;
+    SC3E (p4est3_tree_index (p3, p3->lltree, &tree));
+    tree->end_tquad =
+      p3->goffset[p3->mpirank + 1] - p3->gtroffset[p3->lltree];
+    tree->last_tquad = tree->end_tquad - 1;
+    tree->first_tquad = tree->end_tquad - tree->num_quads;
   }
 
   SC3E (sc3_array_destroy (&pattern));

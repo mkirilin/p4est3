@@ -561,7 +561,7 @@ p4est3_partition (p4est3_t *p3)
   p4est3_topidx       t;
 #ifdef P4EST_ENABLE_MPI
   /* TO DO: figure out why sc_MPI_Request cannot be used presently */
-  MPI_Request         req[3];
+  MPI_Request         req[2];
 #endif
 
   /* We suppose to call this function after setting up routine */
@@ -663,28 +663,13 @@ p4est3_partition (p4est3_t *p3)
     last_gtree_offsets[t] = p3->gtroffset[t + 1] - 1;
   }
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->gtreeoffsets->meta->win));
+                          p3->gtrees->meta->win));
   SC3E (p4est3_find_first_last_local_trees
         (p3, last_gtree_offsets, loc_offsets));
-  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->meta->win));
-  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->meta->win));
+  SC3E (sc3_MPI_Win_sync (p3->gtrees->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gtrees->meta->win));
 #ifdef P4EST_ENABLE_MPI
   MPI_Ibarrier (nodecomm, &req[1]);
-#endif
-  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
-                          p3->gtreeoffsets->meta->win));
-  if (p3->mpirank == 0) {
-    p3->gftree[0] = p3->gftree[0] < 0 ? 0 : p3->gftree[0];
-    for (i = 1; i < p3->mpisize; ++i) {
-      if (p3->gftree[i] < 0) {
-        p3->gftree[i] = p3->gftree[i - 1];
-      }
-    }
-  }
-  SC3E (sc3_MPI_Win_sync (p3->gtreeoffsets->meta->win));
-  SC3E (sc3_MPI_Win_unlock (0, p3->gtreeoffsets->meta->win));
-#ifdef P4EST_ENABLE_MPI
-  MPI_Ibarrier (nodecomm, &req[2]);
 #endif
 
   if (!p3->family) {
@@ -706,6 +691,9 @@ p4est3_partition (p4est3_t *p3)
          but simply ref to p3->old's one */
       SC3E (p4est3_quadrants_ref (p3->old->quadrants));
       p3->quadrants = p3->old->quadrants;
+
+      SC3A_CHECK (p3->old->nodequads[0] != NULL);
+
       p3->quads =
         p3->old->nodequads[0] + loc_offsets[p3->mpirank] * p3->old->qsize;
       for (n = 0; n < nodesize; ++n) {
@@ -769,6 +757,19 @@ p4est3_partition (p4est3_t *p3)
   MPI_Wait (&req[0], MPI_STATUS_IGNORE);
   MPI_Wait (&req[1], MPI_STATUS_IGNORE);
 #endif
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gtrees->meta->win));
+  if (p3->mpirank == 0) {
+    p3->gftree[0] = p3->gftree[0] < 0 ? 0 : p3->gftree[0];
+    for (i = 1; i < p3->mpisize; ++i) {
+      if (p3->gftree[i] < 0) {
+        p3->gftree[i] = p3->gftree[i - 1];
+      }
+    }
+  }
+  SC3E (sc3_MPI_Win_sync (p3->gtrees->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gtrees->meta->win));
+  SC3E (sc3_MPI_Barrier (nodecomm));
   return NULL;
 }
 
