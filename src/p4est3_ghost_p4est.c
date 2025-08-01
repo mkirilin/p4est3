@@ -219,9 +219,30 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
    *        Now we do it again here. Think on a way to optimize it. */
   SC3E (p4est3_search_lower_bound64
         (global_qid, fi->p3->goffset, fi->p3->mpisize + 1, &p_own));
-  if (fi->p3->goffset[p_own] > global_qid) {
-    SC3A_CHECK (p_own > 0);
-    p_own--;
+  if (fi->p3->goffset[p_own] == global_qid) {
+      /* If we found an empty process, we found the empty process with
+         the smallest rank. Therefore we increment until we find
+         a first non-empty process. It's beginning must be equal to
+         the global_qid. */
+      while (p_own < fi->p3->mpisize
+         && (fi->p3->goffset[p_own + 1] - fi->p3->goffset[p_own]) == 0) {
+          p_own++;
+      }
+      SC3A_CHECK (p_own < fi->p3->mpisize);
+      SC3A_CHECK (fi->p3->goffset[p_own] == global_qid);
+      /*SC3E_DEMAND (p_own < fi->p3->mpisize && fi->p3->goffset[p_own] == global_qid, "");*/
+  }
+  else {
+    do
+    {
+      p_own--;
+    } while (p_own >= 0
+         && (fi->p3->goffset[p_own + 1] - fi->p3->goffset[p_own]) == 0);
+    SC3A_CHECK (p_own >= 0);
+    SC3A_CHECK (fi->p3->goffset[p_own] <= global_qid
+                && global_qid < fi->p3->goffset[p_own + 1]);
+    /*SC3E_DEMAND (p_own >= 0 && fi->p3->goffset[p_own] <= global_qid && global_qid < fi->p3->goffset[p_own + 1], "");*/
+
   }
 
   /* Check if considered ghost is unique */

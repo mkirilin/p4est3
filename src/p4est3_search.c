@@ -285,6 +285,7 @@ p4est3_array_split_ancestor_id_noncontig (sc3_array_t * a, size_t index,
   /* find a process to which the quadrant belongs to */
   SC3E (p4est3_search_lower_bound64 (gloidx, p3->goffset, p3->mpisize + 1,
                                      &proc_begin));
+  /* TODO: Fix this search for empty processes as it is done for p4est3 ghosts */
   if (p3->goffset[proc_begin] > gloidx) {
     SC3A_CHECK (proc_begin > 0);
     proc_begin--;
@@ -292,7 +293,7 @@ p4est3_array_split_ancestor_id_noncontig (sc3_array_t * a, size_t index,
   SC3A_CHECK (proc_begin >= 0 && proc_begin < p3->mpisize);
   q = (void *) (p3->nodequads[proc_begin] +
     p3->qsize * (gloidx - p3->goffset[proc_begin]));
-  
+
   SC3E (d->quadrant_ancestor_id (q, *(d->level), &t));
   *type = t;
   return NULL;
