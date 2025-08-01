@@ -914,10 +914,6 @@ p4est3_internal_iterate_face (p4est3_t *p3,
 #ifdef P4EST_ENABLE_DEBUG
     SC3E (p4est3_array_set_zero (*(sc3_array_t **) (stack_it[side])));
 #endif
-    /* here we start with the very beginning of not necessary local node
-       quadrants, because of our specialized array_split_noncontig function */
-    SC3E (sc3_array_renew_data (&view_q, p3->nodequads[0], p3->qsize,
-                                0, *(e_f[side]) - *(b_f[side])));
     SC3E (p4est3_cached_quadrant_array_split_noncontig
           (p3, view_q, Level[side], *(b_f[side]),
            *(e_f[side]), *(sc3_array_t **) (stack_it[side]), sa));
@@ -1198,10 +1194,6 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
 #ifdef P4EST_ENABLE_DEBUG
   SC3E (p4est3_array_set_zero (*(sc3_array_t **) stack_it));
 #endif
-  /* here we start with the very beginning of not necessary local node
-     quadrants, because of our specialized array_split_noncontig function */
-  SC3E (sc3_array_renew_data
-        (&view_q, p3->nodequads[0], p3->qsize, 0, *end - *begin));
 
   SC3E (p4est3_cached_quadrant_array_split_noncontig
         (p3, view_q, *Level, *begin, *end, *(sc3_array_t **) stack_it, sa));
@@ -1350,8 +1342,19 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   /* Check if caching is available for this level */
   if (sa->split_cache[level] == NULL) {
     sa->cache_misses++;
-    return p4est3_quadrant_array_split_noncontig
-      (p3, array, level, begin, indices);
+    if (p3->contiguous) {
+      SC3E (sc3_array_renew_data
+            (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
+      p4est3_quadrant_array_split (p3->qvt, array, level, indices);
+    }
+    else {
+      /* here we start with the very beginning of not necessary local node
+         quadrants, because of our specialized array_split_noncontig function */
+      SC3E (sc3_array_renew_data
+            (&array, p3->nodequads[0], p3->qsize, 0, end - begin));
+      return p4est3_quadrant_array_split_noncontig
+        (p3, array, level, begin, indices);
+    }
   }
 
   cache = sa->split_cache[level];
@@ -1399,8 +1402,17 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   *found = cache_entry;
 
   /* Compute the split result */
-  SC3E (p4est3_quadrant_array_split_noncontig
-        (p3, array, level, begin, indices));
+  if (p3->contiguous) {
+    SC3E (sc3_array_renew_data
+          (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
+    SC3E (p4est3_quadrant_array_split (p3->qvt, array, level, indices));
+  }
+  else {
+    SC3E (sc3_array_renew_data
+          (&array, p3->nodequads[0], p3->qsize, 0, end - begin));
+    SC3E (p4est3_quadrant_array_split_noncontig
+          (p3, array, level, begin, indices));
+  }
 
   /* Copy the computed split indices to the cache */
   SC3E (sc3_array_index (indices, 0, &src_val));

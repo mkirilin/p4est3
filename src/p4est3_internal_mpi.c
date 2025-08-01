@@ -89,16 +89,11 @@ p4est3_internal_setup_cut (p4est3_t *p3, p4est3_gloidx num_uniform, int qsize)
   endr = sc3_intcut (p3->mpisize + 1, nodesize, noderank + 1);
 
   /* parallelize process loop across threads */
-  nfamilies = num_global / p3->num_children;
   for (p = beginr; p < endr; ++p) {
     p3->goffset[p] = p4est3_glocut (num_global, p3->mpisize, p);
     if (p3->family && p3->level != 0) {
-      if (nfamilies < p3->mpisize) {
-        p3->goffset[p] = p4est3_glocut (num_global, nfamilies, p);
-      }
-      else {
-        p3->goffset[p] -= (p3->goffset[p] % p3->num_children);
-      }
+      nfamilies = num_global / p3->num_children;
+      p3->goffset[p] = p4est3_glocut (nfamilies, p3->mpisize, p);
     }
     p3->gftree[p] = p3->goffset[p] / num_uniform;
   }
@@ -158,7 +153,6 @@ p4est3_internal_setup_tree (p4est3_t *p3, p4est3_gloidx num_uniform)
     p3->fltree = -1;
     p3->lltree = -2;
     p3->nltrees = 0;
-    num_uniform = 0;
   }
   else {
     p3->fltree = (p4est3_topidx) (first_quad / num_uniform);
@@ -237,7 +231,11 @@ p4est3_internal_setup_tree (p4est3_t *p3, p4est3_gloidx num_uniform)
     next_offset = tree->quad_offset + tree->num_quads;
     tree->tquads = p3->quads + tree->quad_offset * p3->qsize;
   }
-  SC3A_CHECK (tt_offset == p3->lltree * num_uniform);
+#ifdef P4EST_ENABLE_DEBUG
+  if (p3->nltrees != 0) {
+    SC3A_CHECK (tt_offset == p3->lltree * num_uniform);
+  }
+#endif /* P4EST_ENABLE_DEBUG */
   SC3A_CHECK (next_offset == p3->local_num_quads);
   return NULL;
 }
@@ -1019,10 +1017,14 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
    * quads, trees, goffsetwin, goffset and global_num_quads.
   */
   if (!p3->partition) {
+    printf("rank %d: begin refine\n", p3->mpirank);
     SC3E (p4est3_refine_coarsen_copy (p3));
+    printf("rank %d: end refine\n", p3->mpirank);
   }
   else {
+    printf("rank %d: begin partition\n", p3->mpirank);
     SC3E (p4est3_partition (p3));
+    printf("rank %d: end partition\n", p3->mpirank);
   }
   return NULL;
 }
