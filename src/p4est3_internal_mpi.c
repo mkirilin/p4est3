@@ -713,7 +713,7 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
 {
   /* So far we consider one shared memory node only,
      which means (almost) no sending messages */
-  int                 p, zero, i, is_recv = 0, *c;
+  int                 p, q, r, zero, i, is_recv = 0, *c;
 #ifdef P4EST_ENABLE_MPI
 #ifdef P4EST_ENABLE_DEBUG
   int                 mpiret;
@@ -731,10 +731,10 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
      range (fltree, lltree). */
   fl_resp_tree = p3->fltree + 1;
   ll_resp_tree = p3->lltree - 1;
-  /* Determine process to receive from: the last process sharing the last
-     mpirank's tree, mpirank is responsible for. */
+  /* Determine process to receive from: the last NON-EMPTY process sharing the
+     last mpirank's tree, mpirank is responsible for. */
   /* Check if mpirank is responsible for its last local tree. If it contains
-     multiple trees, then yes. If it does not => it has only one tree => 
+     multiple trees, then yes. If it does not => it has only one tree =>
      check the first tree (= process) quadrant coordinates. */
   SC3E (sc3_allocator_calloc (p3->alloc, sizeof (int), p3->qvt->dim, &c));
   zero = 0;                     /* if 0, that mpirank is responsible for its last tree */
@@ -746,19 +746,25 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
   }
   if (zero == 0) {
     /* Potentially, mpirank has only the part of its lltree. => The following
-       rank begins at the same tree. If so, mpirank reveices data. */
-    if (p3->lltree == p3->gftree[p3->mpirank + 1]) {
-      /* mpirank receives data. Now, find the rank of the sender. */
-      for (p = p3->mpirank + 1;
-           p < p3->mpisize && p3->gftree[p] == p3->lltree; ++p) {
+       NON-EMPTY rank begins at the same tree. If so, mpirank reveices data. */
+    for (q = p3->mpirank + 1;
+         q < p3->mpisize && p3->goffset[q] == p3->goffset[q + 1]; ++q) {
+      SC3A_CHECK (q < p3->mpisize);
+    }
+    if (p3->lltree == p3->gftree[q]) {
+      /* mpirank receives data. Now, find the rank of the sender,
+         which is the last NON-EMPTY process in the tree. */
+      for (p = q, r = q; p < p3->mpisize && p3->gftree[p] == p3->lltree; ++p) {
         /** TODO: Possible to improve with binary search */
-        SC3A_CHECK (p < p3->mpisize);
+        if (p3->goffset[p + 1] > p3->goffset[p]) {
+          r = p;                /* r is the last NON-EMPTY process in the tree */
+        }
       }
 #ifdef P4EST_ENABLE_MPI
 #ifdef P4EST_ENABLE_DEBUG
       mpiret =
 #endif
-        MPI_Irecv (&recv_buf, 1, SC3_MPI_LONG, --p, 0, nodecomm, &req_recv);
+        MPI_Irecv (&recv_buf, 1, SC3_MPI_LONG, r, 0, nodecomm, &req_recv);
       is_recv = 1;
       SC3A_CHECK (mpiret == SC3_MPI_SUCCESS);
 #endif
@@ -769,31 +775,36 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
 
   /* Determine process to send to: the process responsible
      for mpirank's fltree. */
-  if (p3->gftree[p3->mpirank + 1] > p3->gftree[p3->mpirank]) {
-    /* Send only when own the last part of the first local tree */
-    for (p = p3->mpirank - 1;
-         p >= 0 && p3->gftree[p] == p3->fltree
-         && (p3->goffset[p + 1] - p3->goffset[p] > 0); --p) {
-      SC3A_CHECK (p >= 0);
-    }
-    if (p >= 0 && (p3->goffset[p + 1] - p3->goffset[p] > 0)) {
-      /* Now p is the first rank that starts before the mpirank's fltree.
-         There are two possibilities: either p or p + 1 are responsible for
-         mpirank's fltree. Check if p + 1 is responsible for mpirank's fltree
-         <=> (p + 1)'s 1-st quadrant coordinates are zeros. */
-      /* We consider only non-empty processes p */
-      zero = 0;
-      SC3A_CHECK (p < p3->mpirank);
-      SC3E (p4est3_quadrant_coordinates (p3->qvt, p3->nodequads[p + 1], c));
-      for (i = 0; i < p3->qvt->dim; ++i) {
-        zero |= c[i];
+  if (p3->gftree[p3->mpirank + 1] > p3->gftree[p3->mpirank]
+      && p3->goffset[p3->mpirank + 1] > p3->goffset[p3->mpirank]) {
+    /* Send only when own the last part of the first local tree,
+       meaning mpirank is the last NON-EMPTY process in the tree. */
+    for (p = p3->mpirank, r = p; p >= 0 && p3->gftree[p] == p3->fltree; --p) {
+      if ((p3->goffset[p + 1] > p3->goffset[p])) {
+        r = p;                  /* r is the first (counting from the beginning
+                                   of the tree) NON-EMPTY process starting in the tree */
       }
-      /* if zero == 0, then p + 1 is responsible for mpirank's fltree */
-      p = zero == 0 ? p + 1 : p;
     }
-    else {
-      //SC3A_CHECK (p == -1);
-      p = p + 1;
+    p = r;                      /* rename for consistency */
+    SC3A_CHECK (p >= 0 && p3->goffset[p + 1] > p3->goffset[p]);
+    /* Now p is the first non-empty rank that starts at the mpirank's fltree.
+       There are two possibilities: either p or the first previous non-empty rank
+       are responsible for mpirank's fltree. Check if p is responsible for
+       mpirank's fltree <=> (p)'s 1-st quadrant coordinates are zeros. */
+    /* We consider only non-empty processes p */
+    zero = 0;
+    SC3A_CHECK (p < p3->mpirank);
+    SC3E (p4est3_quadrant_coordinates (p3->qvt, p3->nodequads[p], c));
+    for (i = 0; i < p3->qvt->dim; ++i) {
+      zero |= c[i];
+    }
+    /* if zero == 0, then p is responsible for mpirank's fltree */
+    if (zero != 0) {
+      /* the first previous non-empty rank is responsible for mpirank's fltree */
+      for (p = r - 1; p >= 0 && p3->goffset[p + 1] == p3->goffset[p]; --p) {
+        SC3A_CHECK (p >= 0);
+      }
+      /* now p is the first previous non-empty rank owning the fltree */
     }
 
     /* Now we have rank p to send to. Find the value to send. */
@@ -1017,14 +1028,10 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
    * quads, trees, goffsetwin, goffset and global_num_quads.
   */
   if (!p3->partition) {
-    printf("rank %d: begin refine\n", p3->mpirank);
     SC3E (p4est3_refine_coarsen_copy (p3));
-    printf("rank %d: end refine\n", p3->mpirank);
   }
   else {
-    printf("rank %d: begin partition\n", p3->mpirank);
     SC3E (p4est3_partition (p3));
-    printf("rank %d: end partition\n", p3->mpirank);
   }
   return NULL;
 }
