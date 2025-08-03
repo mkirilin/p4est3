@@ -93,7 +93,8 @@ p4est3_internal_setup_cut (p4est3_t *p3, p4est3_gloidx num_uniform, int qsize)
     p3->goffset[p] = p4est3_glocut (num_global, p3->mpisize, p);
     if (p3->family && p3->level != 0) {
       nfamilies = num_global / p3->num_children;
-      p3->goffset[p] = p4est3_glocut (nfamilies, p3->mpisize, p);
+      p3->goffset[p] =
+        p4est3_glocut (nfamilies, p3->mpisize, p) * p3->num_children;
     }
     p3->gftree[p] = p3->goffset[p] / num_uniform;
   }
@@ -724,7 +725,7 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
 #endif
   p4est3_gloidx       send_buf = -1;
   p4est3_topidx       t, fl_resp_tree, ll_resp_tree;
-  p4est3_tree_t      *tree;
+  p4est3_tree_t      *tree = NULL;
 
   /* A process is responsible for a tree, if it has tree's first quadrant. */
   /* Every process is always responsible for its local trees in
@@ -793,7 +794,7 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
        mpirank's fltree <=> (p)'s 1-st quadrant coordinates are zeros. */
     /* We consider only non-empty processes p */
     zero = 0;
-    SC3A_CHECK (p < p3->mpirank);
+    SC3A_CHECK (p <= p3->mpirank);
     SC3E (p4est3_quadrant_coordinates (p3->qvt, p3->nodequads[p], c));
     for (i = 0; i < p3->qvt->dim; ++i) {
       zero |= c[i];

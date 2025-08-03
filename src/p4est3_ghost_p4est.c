@@ -220,28 +220,27 @@ p4est3_ghost_fill_callback (p4est3_iterate_face_info_t *fi)
   SC3E (p4est3_search_lower_bound64
         (global_qid, fi->p3->goffset, fi->p3->mpisize + 1, &p_own));
   if (fi->p3->goffset[p_own] == global_qid) {
-      /* If we found an empty process, we found the empty process with
-         the smallest rank. Therefore we increment until we find
-         a first non-empty process. It's beginning must be equal to
-         the global_qid. */
-      while (p_own < fi->p3->mpisize
-         && (fi->p3->goffset[p_own + 1] - fi->p3->goffset[p_own]) == 0) {
-          p_own++;
-      }
-      SC3A_CHECK (p_own < fi->p3->mpisize);
-      SC3A_CHECK (fi->p3->goffset[p_own] == global_qid);
-      /*SC3E_DEMAND (p_own < fi->p3->mpisize && fi->p3->goffset[p_own] == global_qid, "");*/
+    /* If we found an empty process, we found the empty process with
+       the smallest rank. Therefore we increment until we find
+       a first non-empty process. It's beginning must be equal to
+       the global_qid. */
+    while (p_own < fi->p3->mpisize
+           && (fi->p3->goffset[p_own + 1] - fi->p3->goffset[p_own]) == 0) {
+      p_own++;
+    }
+    SC3A_CHECK (p_own < fi->p3->mpisize);
+    SC3A_CHECK (fi->p3->goffset[p_own] == global_qid);
+    /*SC3E_DEMAND (p_own < fi->p3->mpisize && fi->p3->goffset[p_own] == global_qid, ""); */
   }
   else {
-    do
-    {
+    do {
       p_own--;
     } while (p_own >= 0
-         && (fi->p3->goffset[p_own + 1] - fi->p3->goffset[p_own]) == 0);
+             && (fi->p3->goffset[p_own + 1] - fi->p3->goffset[p_own]) == 0);
     SC3A_CHECK (p_own >= 0);
     SC3A_CHECK (fi->p3->goffset[p_own] <= global_qid
                 && global_qid < fi->p3->goffset[p_own + 1]);
-    /*SC3E_DEMAND (p_own >= 0 && fi->p3->goffset[p_own] <= global_qid && global_qid < fi->p3->goffset[p_own + 1], "");*/
+    /*SC3E_DEMAND (p_own >= 0 && fi->p3->goffset[p_own] <= global_qid && global_qid < fi->p3->goffset[p_own + 1], ""); */
 
   }
 
@@ -579,7 +578,9 @@ merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
   }
 
   /* Allocate memory for the merged array */
-  ghost->mirror_proc_mirrors = P4EST_ALLOC (p4est_locidx_t, total_mirrors);
+  SC3A_CHECK (total_mirrors >= 0);
+  ghost->mirror_proc_mirrors =
+    total_mirrors > 0 ? P4EST_ALLOC (p4est_locidx_t, total_mirrors) : NULL;
 
   /* Copy data from p2m arrays to mirror_proc_mirrors */
   offset = 0;
