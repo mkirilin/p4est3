@@ -56,9 +56,9 @@ typedef struct setup
 setup_t;
 
 static sc3_error_t *
-set_vtables (const p4est3_quadrant_vtable_t ** q,
-             const p4est3_quadrant_vtable_t ** qmort,
-             const p4est3_quadrant_vtable_t ** qavx)
+set_vtables (const p4est3_quadrant_vtable_t **q,
+             const p4est3_quadrant_vtable_t **qmort,
+             const p4est3_quadrant_vtable_t **qavx)
 {
   SC3X (p4est3_quadrant_vtable_p4est (q));
   SC3X (p4est3_quadrant_mort2d_vtable (qmort));
@@ -85,7 +85,7 @@ make_allocator (setup_t *t)
 }
 
 static sc3_error_t *
-make_connectivity (setup_t * t)
+make_connectivity (setup_t *t)
 {
   SC3E (p4est3_connectivity_new (t->alloc, &t->conn));
   SC3E (p4est3_connectivity_set_dim (t->conn, P4EST_DIM));
@@ -96,8 +96,8 @@ make_connectivity (setup_t * t)
 }
 
 static sc3_error_t *
-make_new_p4est3 (p4est3_t ** p3, setup_t * t,
-                 const p4est3_quadrant_vtable_t * qvt,
+make_new_p4est3 (p4est3_t **p3, setup_t *t,
+                 const p4est3_quadrant_vtable_t *qvt,
                  p4est3_setup_mode_t mode)
 {
   SC3A_IS (sc3_allocator_is_setup, t->alloc);
@@ -116,8 +116,8 @@ make_new_p4est3 (p4est3_t ** p3, setup_t * t,
 }
 
 static sc3_error_t *
-setup_forests (setup_t * t, const p4est3_quadrant_vtable_t * q,
-               p4est3_t ** m, p4est3_t ** s, p4est3_t ** rc)
+setup_forests (setup_t *t, const p4est3_quadrant_vtable_t *q,
+               p4est3_t **m, p4est3_t **s, p4est3_t **rc)
 {
   SC3E (make_new_p4est3 (m, t, q, P4EST3_NEW_MORTON));
   SC3E (make_new_p4est3 (s, t, q, P4EST3_NEW_SUCCESSOR));
@@ -127,9 +127,9 @@ setup_forests (setup_t * t, const p4est3_quadrant_vtable_t * q,
 }
 
 static sc3_error_t *
-compare_p4est3_quadrants (const p4est3_t * lhs, const p4est3_t * rhs,
-                          const p4est3_quadrant_vtable_t * lqvt,
-                          const p4est3_quadrant_vtable_t * rqvt)
+compare_p4est3_quadrants (const p4est3_t *lhs, const p4est3_t *rhs,
+                          const p4est3_quadrant_vtable_t *lqvt,
+                          const p4est3_quadrant_vtable_t *rqvt)
 {
   p4est3_gloidx       i;
   p4est3_gloidx       gln, grn;
@@ -182,7 +182,7 @@ compare_levels (const p4est_t *p2, p4est3_t *p3)
   p4est3_locidx       num_loc_quads;
   p4est_tree_t       *tree2;
   p4est3_tree_t      *tree3;
-  int level3;
+  int                 level3;
 
   if (p3->level < 2) {
     return NULL;
@@ -192,13 +192,13 @@ compare_levels (const p4est_t *p2, p4est3_t *p3)
   SC3E (p4est3_get_global_num_quads (p3, &num_glo_quads));
   SC3E (p4est3_get_local_num_quads (p3, &num_loc_quads));
 
-  /*DEBUG*/
-  for (tt = fltree; tt <= lltree; ++tt) {
+   /*DEBUG*/ for (tt = fltree; tt <= lltree; ++tt) {
     SC3E (p4est3_tree_index (p3, tt, &tree3));
     for (nq = 0; nq < tree3->num_quads; ++nq) {
       q3 = tree3->tquads + nq * p3->qvt->quadrant_size;
       SC3E (p4est3_quadrant_level (p3->qvt, q3, &level3));
-      printf ("New: rank = %d, tree = %d, level = %d\n", p3->mpirank, tt, level3);
+      printf ("New: rank = %d, tree = %d, level = %d\n", p3->mpirank, tt,
+              level3);
     }
   }
 
@@ -206,13 +206,14 @@ compare_levels (const p4est_t *p2, p4est3_t *p3)
     tree2 = p4est_tree_array_index (p2->trees, tt);
     for (nq = 0; nq < tree2->quadrants.elem_count; ++nq) {
       q2 = (p4est_quadrant_t *) sc_array_index (&tree2->quadrants, nq);
-      printf ("Old: rank = %d, tree = %d, level = %d\n", p3->mpirank, tt, q2->level);
+      printf ("Old: rank = %d, tree = %d, level = %d\n", p3->mpirank, tt,
+              q2->level);
     }
   }
-  /*DEBUG*/
-
-  SC3E_DEMAND (fltree == p2->first_local_tree && lltree == p2->last_local_tree,
-               "Different trees at processor");
+   /*DEBUG*/
+    SC3E_DEMAND (fltree == p2->first_local_tree
+                 && lltree == p2->last_local_tree,
+                 "Different trees at processor");
   SC3E_DEMAND (num_glo_quads == p2->global_num_quadrants,
                "different #global quadrants");
   SC3E_DEMAND (num_loc_quads == p2->local_num_quadrants,
@@ -234,10 +235,10 @@ compare_levels (const p4est_t *p2, p4est3_t *p3)
 }
 
 static sc3_error_t *
-perform_test_p4est2 (setup_t * t, p4est3_t **p3,
-                     const p4est3_quadrant_vtable_t * q)
+perform_test_p4est2 (setup_t *t, p4est3_t **p3,
+                     const p4est3_quadrant_vtable_t *q)
 {
-  p4est_t *p2;
+  p4est_t            *p2;
   p4est_connectivity_t *conn2;
 
   conn2 =
@@ -263,16 +264,16 @@ perform_test_p4est2 (setup_t * t, p4est3_t **p3,
 #endif
 
 static sc3_error_t *
-perform_test_mort (setup_t * t,
-                  p4est3_t ** m, p4est3_t ** s, p4est3_t ** rc,
-                  const p4est3_quadrant_vtable_t * qref,
-                  const p4est3_quadrant_vtable_t * q)
+perform_test_mort (setup_t *t,
+                   p4est3_t **m, p4est3_t **s, p4est3_t **rc,
+                   const p4est3_quadrant_vtable_t *qref,
+                   const p4est3_quadrant_vtable_t *q)
 {
   SC3E (setup_forests (t, q, m, s, rc));
   SC3E (compare_p4est3_quadrants (*m, *s, q, q));
   SC3E (compare_p4est3_quadrants (*m, *rc, q, q));
 
-  /*do not destroy m fprest, due to it is referenced for others*/
+  /*do not destroy m fprest, due to it is referenced for others */
   SC3E (p4est3_destroy (s));
   SC3E (p4est3_destroy (rc));
 
@@ -280,10 +281,10 @@ perform_test_mort (setup_t * t,
 }
 
 static sc3_error_t *
-perform_test (setup_t * t,
-              p4est3_t * ref, p4est3_t ** m, p4est3_t ** s, p4est3_t ** rc,
-              const p4est3_quadrant_vtable_t * qref,
-              const p4est3_quadrant_vtable_t * q)
+perform_test (setup_t *t,
+              p4est3_t *ref, p4est3_t **m, p4est3_t **s, p4est3_t **rc,
+              const p4est3_quadrant_vtable_t *qref,
+              const p4est3_quadrant_vtable_t *q)
 {
   SC3E (setup_forests (t, q, m, s, rc));
   SC3E (compare_p4est3_quadrants (ref, *m, qref, q));
@@ -298,7 +299,7 @@ perform_test (setup_t * t,
 }
 
 static sc3_error_t *
-free_allocator (sc3_allocator_t ** alloc)
+free_allocator (sc3_allocator_t **alloc)
 {
   SC3A_IS (sc3_allocator_is_setup, *alloc);
   SC3E (sc3_allocator_destroy (alloc));
@@ -344,10 +345,11 @@ main (int argc, char **argv)
         SC3X (perform_test (t, p3m, &p3m_mort, &p3s_mort, &p3rc_mort, qvt,
                             qvtmort));
 #ifdef P4EST_ENABLE_AVX2
-        SC3X (perform_test (t, p3m, &p3m_avx, &p3s_avx, &p3rc_avx, qvt, qvtavx));
+        SC3X (perform_test
+              (t, p3m, &p3m_avx, &p3s_avx, &p3rc_avx, qvt, qvtavx));
 #endif
 
-        /*destroy forest, that was referenced for others*/
+        /*destroy forest, that was referenced for others */
         SC3X (p4est3_destroy (&p3m));
         SC3X (p4est3_connectivity_destroy (&t->conn));
       }

@@ -86,7 +86,7 @@ static const int    bound_dir_3d[12] =
 /* *INDENT-ON* */
 
 static int
-refine_fraction (p4est_t * p, p4est_topidx_t which_tree, p4est_quadrant_t * q)
+refine_fraction (p4est_t *p, p4est_topidx_t which_tree, p4est_quadrant_t *q)
 {
   /* The formula in the line below implies
    * quadrant_fraction = 7 * refinement_fraction + 1.
@@ -103,7 +103,7 @@ refine_fraction (p4est_t * p, p4est_topidx_t which_tree, p4est_quadrant_t * q)
 }
 
 static sc3_error_t *
-refine_p3_fraction (p4est3_refine_callback_info_t * ri, int *is_refine)
+refine_p3_fraction (p4est3_refine_callback_info_t *ri, int *is_refine)
 {
   /* The formula in the line below implies
    * quadrant_fraction = 7 * refinement_fraction + 1.
@@ -133,7 +133,7 @@ typedef struct setup
 setup_t;
 
 static sc3_error_t *
-make_allocator (setup_t * t)
+make_allocator (setup_t *t)
 {
   SC3A_IS (sc3_allocator_is_setup, t->mainalloc);
   SC3E (sc3_allocator_new (t->mainalloc, &t->alloc));
@@ -143,8 +143,8 @@ make_allocator (setup_t * t)
 }
 
 sc3_error_t        *
-p4est3_connectivity_new_p4est_twotrees (sc3_allocator_t * alloc,
-                                        p4est3_connectivity_t ** pc,
+p4est3_connectivity_new_p4est_twotrees (sc3_allocator_t *alloc,
+                                        p4est3_connectivity_t **pc,
                                         int l_face, int r_face,
                                         int orientation)
 {
@@ -172,7 +172,7 @@ p4est3_connectivity_new_p4est_twotrees (sc3_allocator_t * alloc,
 }
 
 static sc3_error_t *
-set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
+set_parameters (setup_t *t, const p4est3_quadrant_vtable_t **qvt)
 {
   t->mainalloc = sc3_allocator_nothread ();
   SC3E (make_allocator (t));
@@ -191,7 +191,7 @@ set_parameters (setup_t * t, const p4est3_quadrant_vtable_t ** qvt)
 static int          refine_level = 5;
 
 static sc3_error_t *
-refine_p3_fractal (p4est3_refine_callback_info_t * ri, int *is_refine)
+refine_p3_fractal (p4est3_refine_callback_info_t *ri, int *is_refine)
 {
   /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
   p4est3_locidx      *quadrant_local_id = (p4est3_locidx *) ri->user_data;
@@ -209,7 +209,7 @@ refine_p3_fractal (p4est3_refine_callback_info_t * ri, int *is_refine)
 
 #ifdef P4EST_ENABLE_DEBUG
 static int
-refine_fractal (p4est_t * p, p4est_topidx_t which_tree, p4est_quadrant_t * q)
+refine_fractal (p4est_t *p, p4est_topidx_t which_tree, p4est_quadrant_t *q)
 {
   /* Refine every 7th (3d) or 3rd (2d) global quadrant. */
   p4est_locidx_t     *quadrant_local_id = (p4est_locidx_t *) p->user_pointer;
@@ -225,9 +225,9 @@ refine_fractal (p4est_t * p, p4est_topidx_t which_tree, p4est_quadrant_t * q)
 #endif /* P4EST_ENABLE_DEBUG */
 
 static sc3_error_t *
-p4est3_new_shortcut (p4est3_t ** p3, const setup_t * t, int start_level,
-                     const p4est3_quadrant_vtable_t * qvt,
-                     p4est3_t * src, p4est3_refine_callback_t p3crefine,
+p4est3_new_shortcut (p4est3_t **p3, const setup_t *t, int start_level,
+                     const p4est3_quadrant_vtable_t *qvt,
+                     p4est3_t *src, p4est3_refine_callback_t p3crefine,
                      int is_partition, void *user_data)
 {
   SC3E (p4est3_new (t->alloc, p3));
@@ -239,7 +239,7 @@ p4est3_new_shortcut (p4est3_t ** p3, const setup_t * t, int start_level,
   SC3E (p4est3_set_refine (*p3, p3crefine));
   SC3E (p4est3_set_source (*p3, src));
   SC3E (p4est3_set_shared (*p3, 1));
-  SC3E (p4est3_set_contiguous (*p3, 0));
+  SC3E (p4est3_set_contiguous (*p3, 1));
   SC3E (p4est3_set_family (*p3, 0));
   SC3E (p4est3_set_partition (*p3, is_partition, NULL));
   /*SC3E (p4est3_set_user_data (*p3, user_data)); */
@@ -251,8 +251,8 @@ p4est3_new_shortcut (p4est3_t ** p3, const setup_t * t, int start_level,
 }
 
 static sc3_error_t *
-make_forest_for_test (p4est3_t ** p3, setup_t * t,
-                      p4est3_quadrant_vtable_t * qvt)
+make_forest_for_test (p4est3_t **p3, setup_t *t,
+                      p4est3_quadrant_vtable_t *qvt)
 {
   int                 i;
   p4est3_locidx       quadrant_local_id = 0;
@@ -305,7 +305,7 @@ make_forest_for_test (p4est3_t ** p3, setup_t * t,
 }
 
 static sc3_error_t *
-allocate_test_tracking_array (p4est3_t * p3, int8_t *** ptr_qinfo_array)
+allocate_test_tracking_array (p4est3_t *p3, int8_t ***ptr_qinfo_array)
 {
   const size_t        out_array_size = P4EST_FACES * p3->local_num_quads;
   int8_t            **out_array;
@@ -317,7 +317,7 @@ allocate_test_tracking_array (p4est3_t * p3, int8_t *** ptr_qinfo_array)
 }
 
 static sc3_error_t *
-volume_callback (p4est3_iterate_volume_info_t * vi)
+volume_callback (p4est3_iterate_volume_info_t *vi)
 {
   /* for every face of every volume we allocate
      an array by the length of face's area */
@@ -349,8 +349,8 @@ volume_callback (p4est3_iterate_volume_info_t * vi)
 }
 
 static sc3_error_t *
-array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
-           int ecount, sc3_array_t ** arr)
+array_new (sc3_allocator_t *alloc, size_t esize, int ealloc,
+           int ecount, sc3_array_t **arr)
 {
   SC3E_RETVAL (arr, NULL);
   SC3A_IS (sc3_allocator_is_setup, alloc);
@@ -367,7 +367,7 @@ array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 }
 
 static int
-check_q_in_proc (const p4est3_t * p3, const p4est3_topidx t,
+check_q_in_proc (const p4est3_t *p3, const p4est3_topidx t,
                  const p4est3_locidx nquad)
 {
   p4est3_gloidx       nquad_glo = (p4est3_gloidx) nquad + p3->gtroffset[t];
@@ -377,7 +377,7 @@ check_q_in_proc (const p4est3_t * p3, const p4est3_topidx t,
 
 static sc3_error_t *
 quadrant_to_mid (const p4est_qcoord_t coords[P4EST_DIM - 1], int level,
-                 uint64_t * const mid)
+                 uint64_t *const mid)
 {
   int                 i;
   uint64_t            id;
@@ -407,10 +407,10 @@ quadrant_to_mid (const p4est_qcoord_t coords[P4EST_DIM - 1], int level,
 }
 
 static sc3_error_t *
-convert_quad_to_mid (const p4est3_t * const p3,
-                     const p4est3_iterate_face_side_t * const side,
-                     const p4est3_iterate_face_side_t * const patch,
-                     uint64_t * const mid)
+convert_quad_to_mid (const p4est3_t *const p3,
+                     const p4est3_iterate_face_side_t *const side,
+                     const p4est3_iterate_face_side_t *const patch,
+                     uint64_t *const mid)
 {
   /* convert a quadrant to d-1 morton index */
   const int           axis = patch->nface / 2;
@@ -462,9 +462,9 @@ convert_quad_to_mid (const p4est3_t * const p3,
 }
 
 static sc3_error_t *
-fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
-                   const p4est3_iterate_face_side_t * const side,
-                   const p4est3_iterate_face_side_t * const patch,
+fill_in_side_info (const p4est3_t *p3, int8_t **const qinfo_array,
+                   const p4est3_iterate_face_side_t *const side,
+                   const p4est3_iterate_face_side_t *const patch,
                    const int nsides)
 {
   int8_t             *finfo_array;
@@ -498,7 +498,7 @@ fill_in_side_info (const p4est3_t * p3, int8_t ** const qinfo_array,
 }
 
 static sc3_error_t *
-face_callback (p4est3_iterate_face_info_t * fi)
+face_callback (p4est3_iterate_face_info_t *fi)
 {
   /* Test adjacency (necessity) and fill in
      `test tracking array` to check later (sufficiency) */
@@ -583,7 +583,7 @@ face_callback (p4est3_iterate_face_info_t * fi)
 }
 
 static sc3_error_t *
-test_tracking_array (p4est3_t * p3, int8_t ** const qinfo_array)
+test_tracking_array (p4est3_t *p3, int8_t **const qinfo_array)
 {
   int                 qlevel, face_area, is_boundary;
   int                 f, p /* patch number */ , nface, orient;
@@ -636,7 +636,7 @@ test_tracking_array (p4est3_t * p3, int8_t ** const qinfo_array)
 }
 
 static sc3_error_t *
-perform_test (setup_t * t, p4est3_quadrant_vtable_t * qvt)
+perform_test (setup_t *t, p4est3_quadrant_vtable_t *qvt)
 {
   size_t              i, out_array_size;
   int8_t            **qinfo_array = NULL;
@@ -667,7 +667,7 @@ perform_test (setup_t * t, p4est3_quadrant_vtable_t * qvt)
 #endif /* P4EST_ENABLE_VALGRIND */
 
 static sc3_error_t *
-clean_up (setup_t * t)
+clean_up (setup_t *t)
 {
   SC3E (p4est3_connectivity_destroy (&t->conn));
   SC3E (sc3_allocator_destroy (&t->alloc));

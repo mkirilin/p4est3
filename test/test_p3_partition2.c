@@ -55,7 +55,7 @@ setup_t;
   /* Valgrind might indicate false-positiv errors
      with some MPI shared memory implementations */
 static sc3_error_t *
-make_allocator (setup_t * t)
+make_allocator (setup_t *t)
 {
   SC3A_IS (sc3_allocator_is_setup, t->mainalloc);
   SC3E (sc3_allocator_new (t->mainalloc, &t->alloc));
@@ -65,7 +65,7 @@ make_allocator (setup_t * t)
 }
 
 static sc3_error_t *
-make_connectivity (setup_t * t)
+make_connectivity (setup_t *t)
 {
   t->conn2 =
 #ifdef P4_TO_P8
@@ -78,17 +78,16 @@ make_connectivity (setup_t * t)
 }
 
 static sc3_error_t *
-make_new_p4est (p4est_t ** p, setup_t * t)
+make_new_p4est (p4est_t **p, setup_t *t)
 {
-  *p = p4est_new_ext
-    (t->mpicomm, t->conn2, 0, 0, 1, 0, NULL, NULL);
+  *p = p4est_new_ext (t->mpicomm, t->conn2, 0, 0, 1, 0, NULL, NULL);
 
   return NULL;
 }
 
 static sc3_error_t *
-make_new_p4est3 (p4est3_t ** p3, setup_t * t,
-                 const p4est3_quadrant_vtable_t ** qvt)
+make_new_p4est3 (p4est3_t **p3, setup_t *t,
+                 const p4est3_quadrant_vtable_t **qvt)
 {
   SC3A_IS (sc3_allocator_is_setup, t->alloc);
 
@@ -99,15 +98,15 @@ make_new_p4est3 (p4est3_t ** p3, setup_t * t,
   SC3E (p4est3_set_quadrant_vtable (*p3, *qvt));
   SC3E (p4est3_set_level (*p3, 0));
   SC3E (p4est3_set_shared (*p3, 1));
-  SC3E (p4est3_set_contiguous (*p3, 0));
+  SC3E (p4est3_set_contiguous (*p3, 1));
   SC3E (p4est3_setup (*p3));
 
   return NULL;
 }
 
 static sc3_error_t *
-prepare_objects (p4est3_t ** p3, p4est_t ** p, setup_t * t,
-                 const p4est3_quadrant_vtable_t ** qvt)
+prepare_objects (p4est3_t **p3, p4est_t **p, setup_t *t,
+                 const p4est3_quadrant_vtable_t **qvt)
 {
   t->mainalloc = sc3_allocator_nothread ();
   SC3E (make_allocator (t));
@@ -123,8 +122,8 @@ prepare_objects (p4est3_t ** p3, p4est_t ** p, setup_t * t,
 static int          refine_level = 0;
 
 static int
-refine_fn (p4est_t * p4est, p4est_topidx_t which_tree,
-           p4est_quadrant_t * quadrant)
+refine_fn (p4est_t *p4est, p4est_topidx_t which_tree,
+           p4est_quadrant_t *quadrant)
 {
   if ((int) quadrant->level >= SC3_MIN (MAX_TEST_LEVEL, p4est->mpirank)) {
     return 0;
@@ -133,7 +132,7 @@ refine_fn (p4est_t * p4est, p4est_topidx_t which_tree,
 }
 
 static sc3_error_t *
-refine_p3_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
+refine_p3_fn (p4est3_refine_callback_info_t *ri, int *is_refine)
 {
   int                 level;
   *is_refine = 1;
@@ -152,7 +151,7 @@ refine_p3_fn (p4est3_refine_callback_info_t * ri, int *is_refine)
  * 2 - Morton
 */
 static sc3_error_t *
-set_qvt (const p4est3_quadrant_vtable_t ** qvt, int i)
+set_qvt (const p4est3_quadrant_vtable_t **qvt, int i)
 {
   SC3A_CHECK (0 <= i && i <= 2);
   switch (i) {
@@ -174,15 +173,15 @@ set_qvt (const p4est3_quadrant_vtable_t ** qvt, int i)
 }
 
 static sc3_error_t *
-weight_p3_fn (p4est3_quadrant_weight_info_t * wi, int64_t *weight)
+weight_p3_fn (p4est3_quadrant_weight_info_t *wi, int64_t *weight)
 {
   *weight = 1;
   return NULL;
 }
 
 static sc3_error_t *
-array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
-           int ecount, sc3_array_t ** arr)
+array_new (sc3_allocator_t *alloc, size_t esize, int ealloc,
+           int ecount, sc3_array_t **arr)
 {
   SC3E_RETVAL (arr, NULL);
   SC3A_IS (sc3_allocator_is_setup, alloc);
@@ -199,8 +198,8 @@ array_new (sc3_allocator_t * alloc, size_t esize, int ealloc,
 }
 
 static sc3_error_t *
-compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
-                 const p4est3_quadrant_vtable_t * qvt)
+compare_results (setup_t *t, p4est3_t *p3, p4est_t *p,
+                 const p4est3_quadrant_vtable_t *qvt)
 {
 
   char               *q3;
@@ -262,10 +261,10 @@ compare_results (setup_t * t, p4est3_t * p3, p4est_t * p,
 }
 
 static sc3_error_t *
-perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
-              const p4est3_quadrant_vtable_t * qvt)
+perform_test (p4est3_t *p3, p4est_t *p, setup_t *t,
+              const p4est3_quadrant_vtable_t *qvt)
 {
-  int i;
+  int                 i;
   p4est3_t           *p3refined, *p3ptr = p3;
   refine_level = SC3_MIN (MAX_TEST_LEVEL, p3->mpisize);
   p4est_refine (p, 1, refine_fn, NULL);
@@ -293,7 +292,7 @@ perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
   SC3E (p4est3_set_source (p3refined, p3ptr));
   SC3E (p4est3_set_partition (p3refined, 1, weight_p3_fn));
   SC3E (p4est3_set_shared (p3refined, 1));
-  SC3E (p4est3_set_contiguous (p3refined, 0));
+  SC3E (p4est3_set_contiguous (p3refined, 1));
   SC3E (p4est3_set_family (p3refined, 1));
   SC3E (p4est3_setup (p3refined));
 
@@ -304,17 +303,17 @@ perform_test (p4est3_t * p3, p4est_t * p, setup_t * t,
   SC3E (p4est3_destroy (&p3ptr));
   return NULL;
 }
-#endif /*(defined(P4EST_ENABLE_MPICOMMSHARED) || !defined(P4EST_ENABLE_MPI))*/
+#endif /*(defined(P4EST_ENABLE_MPICOMMSHARED) || !defined(P4EST_ENABLE_MPI)) */
 
 static sc3_error_t *
-clean_up (p4est3_t * p3, p4est_t * p, setup_t * t)
+clean_up (p4est3_t *p3, p4est_t *p, setup_t *t)
 {
   /*destroy forest, that was referenced for others */
   SC3E (p4est3_destroy (&p3));
   SC3E (p4est3_connectivity_destroy (&t->conn3));
   p4est_destroy (p);
   /* There is no need to destroy p4est2 connectivity,
-      since it is destroyed at p4est3 conn destroying stage */
+     since it is destroyed at p4est3 conn destroying stage */
   /* p4est_connectivity_destroy (t->conn2); */
   SC3A_IS (sc3_allocator_is_setup, t->alloc);
   SC3E (sc3_allocator_destroy (&t->alloc));
@@ -328,8 +327,8 @@ main (int argc, char **argv)
 #ifndef P4EST_ENABLE_VALGRIND
   /* Valgrind might indicate false-positiv errors
      with some MPI shared memory implementations */
-  p4est3_t *p3;
-  p4est_t *p = NULL;
+  p4est3_t           *p3;
+  p4est_t            *p = NULL;
   const p4est3_quadrant_vtable_t *qvt;
 #endif /* P4EST_ENABLE_VALGRIND */
   setup_t             st, *t = &st;
