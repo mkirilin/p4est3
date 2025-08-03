@@ -208,9 +208,11 @@ compare_ghost_results (p4est_t *p4est, p4est3_t *p4est3,
   }
 
   /* Check mirror_proc_mirrors */
-  SC3E_DEMAND (ghost_p4est->mirror_proc_mirrors != NULL &&
-               ghost_p4est3->mirror_proc_mirrors != NULL,
-               "Ghost mirror_proc_mirrors array is NULL");
+  SC3E_DEMAND ((ghost_p4est->mirror_proc_mirrors != NULL &&
+                ghost_p4est3->mirror_proc_mirrors != NULL)
+               || (ghost_p4est->mirror_proc_mirrors == NULL &&
+                   ghost_p4est3->mirror_proc_mirrors == NULL),
+               "Ghost mirror_proc_mirrors arrays mismatch");
 
   n_offsetx = ghost_p4est->mirror_proc_offsets[ghost_p4est->mpisize];
   for (i = 0; i < n_offsetx; ++i) {
