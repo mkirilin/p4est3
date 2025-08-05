@@ -776,7 +776,12 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
 
   /* Determine process to send to: the process responsible
      for mpirank's fltree. */
-  if (p3->gftree[p3->mpirank + 1] > p3->gftree[p3->mpirank]
+  for (q = p3->mpirank + 1;
+       q < p3->mpisize && p3->goffset[q] == p3->goffset[q + 1]; ++q) {
+    /** TODO: Possible to improve with binary search */
+    SC3A_CHECK (q < p3->mpisize);
+  }
+  if (p3->gftree[q] > p3->gftree[p3->mpirank]
       && p3->goffset[p3->mpirank + 1] > p3->goffset[p3->mpirank]) {
     /* Send only when own the last part of the first local tree,
        meaning mpirank is the last NON-EMPTY process in the tree. */

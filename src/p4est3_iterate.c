@@ -1345,7 +1345,7 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
     if (p3->contiguous) {
       SC3E (sc3_array_renew_data
             (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
-      p4est3_quadrant_array_split (p3->qvt, array, level, indices);
+      return p4est3_quadrant_array_split (p3->qvt, array, level, indices);
     }
     else {
       /* here we start with the very beginning of not necessary local node
