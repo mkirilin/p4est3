@@ -959,10 +959,14 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
       p3->gposition = old->gposition;
       p3->gfpos = old->gfpos;
       SC3E (p4est3_glopos_ref (old->gposition));
+      if (old->_spin_gposition != NULL) {
+        SC3A_IS (sc3_refcount_is_last, &old->_spin_gposition->meta->rc);
+        p3->_spin_gposition = old->_spin_gposition;
+        SC3E (p4est3_glopos_ref (old->_spin_gposition));
+      }
     }
     else {
-      /* Allocate new shared memory for quadrants positions.
-         We translate quadrants later in refinement during iSend/iRecv phase. */
+      /* Allocate new shared memory for quadrants positions. */
       SC3E (p4est3_glopos_new (p3->alloc, &p3->gposition));
       SC3E (p4est3_glopos_set_qsize (p3->gposition, p3->qsize));
       SC3E (p4est3_glopartition_set_mpienv
@@ -1030,12 +1034,24 @@ p4est3_internal_setup_from_source (p4est3_t *p3)
     SC3E (p4est3_glotree_ref (old->gtrees));
     p3->gftree = p3->gtrees->gftree;
 
+    if (old->_spin_gposition != NULL
+      && sc3_refcount_is_last (&old->_spin_gposition->meta->rc, NULL)
+      && p3->qvt == old->qvt) {
+      p3->gposition = old->_spin_gposition;
+      SC3E (p4est3_glopos_ref (old->_spin_gposition));
+    }
+    else {
     SC3E (p4est3_glopos_new (p3->alloc, &p3->gposition));
     SC3E (p4est3_glopos_set_qsize (p3->gposition, p3->qsize));
     SC3E (p4est3_glopartition_set_mpienv
           (NULL, p3->gposition, NULL, NULL, NULL, old->split_info));
 
     SC3E (p4est3_glopartition_setup (NULL, p3->gposition, NULL, NULL, NULL));
+    }
+    if (p3->qvt == old->qvt) {
+      p3->_spin_gposition = old->gposition;
+      SC3E (p4est3_glopos_ref (old->gposition));
+    }
     p3->gfpos = p3->gposition->gfpos;
 
     /* ref gtreeoffsets magic array */
