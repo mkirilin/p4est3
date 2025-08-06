@@ -674,7 +674,7 @@ p4est3_internal_setup_quadrants (p4est3_t *p3)
   SC3A_CHECK (0 <= noderank && noderank < nodesize);
 
   /* we work on the process-local window onte the quadrants */
-  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_EXCLUSIVE, noderank,
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, noderank,
                           SC3_MPI_MODE_NOCHECK, p3->quadrants->meta->win));
   char               *charq;
   p4est3_locidx       tmine, tq;
