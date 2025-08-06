@@ -127,6 +127,8 @@ p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
 
   /* allocate magic structures */
   SC3E (p4est3_glotree_new (p3->alloc, &p3->gtrees));
+  SC3E (p4est3_glopos_new (p3->alloc, &p3->gposition));
+  SC3E (p4est3_glopos_set_qsize (p3->gposition, p3->qsize));
   SC3E (p4est3_glooffs_new (p3->alloc, &p3->goffsets));
   SC3E (p4est3_gtroffs_new (p3->alloc, &p3->gtreeoffsets));
   SC3E (p4est3_gtroffs_set_num_trees (p3->gtreeoffsets, p3->num_trees));
@@ -137,15 +139,50 @@ p4est3_convert_p4est (p4est_t *p, p4est3_t *p3, p4est3_connectivity_t **pconn)
         (p3->quadrants, p->global_num_quadrants));
   SC3E (p4est3_quadrants_set_qsize (p3->quadrants, p3->qsize));
   SC3E (p4est3_glopartition_set_mpienv
-        (p3->gtrees, NULL, p3->goffsets,
+        (p3->gtrees, p3->gposition, p3->goffsets,
          p3->gtreeoffsets, p3->quadrants, p3->split_info));
   SC3E (p4est3_glopartition_setup
-        (p3->gtrees, NULL, p3->goffsets, p3->gtreeoffsets, p3->quadrants));
+        (p3->gtrees, p3->gposition, p3->goffsets,
+         p3->gtreeoffsets, p3->quadrants));
 
   p3->gftree = p3->gtrees->gftree;
+  p3->gfpos = p3->gposition->gfpos;
   p3->goffset = p3->goffsets->goffset;
   p3->gtroffset = p3->gtreeoffsets->gtreeoffset;
   p3->quads = p3->quadrants->quads;
+
+  /* fill in gfpos */
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gposition->meta->win));
+  if (p3->qvt == qvt_standard) {
+    /* just copy */
+    SC3E (p4est3_quadrant_copy
+          (p3->qvt, &p->global_first_position[p->mpirank],
+           p3->gfpos + p3->mpirank * p3->qsize));
+  }
+  else {
+    /* translate */
+    SC3E (p4est3_quadrant_translate
+          (qvt_standard, &p->global_first_position[p->mpirank],
+           p3->qvt, p3->gfpos + p3->mpirank * p3->qsize));
+  }
+  if (p3->mpirank == 0) {
+    /* same but for the (mpisize)'th element */
+    if (p3->qvt == qvt_standard) {
+      /* just copy */
+      SC3E (p4est3_quadrant_copy
+            (p3->qvt, &p->global_first_position[p->mpisize],
+             p3->gfpos + p3->mpisize * p3->qsize));
+    }
+    else {
+      /* translate */
+      SC3E (p4est3_quadrant_translate
+            (qvt_standard, &p->global_first_position[p->mpisize],
+             p3->qvt, p3->gfpos + p3->mpisize * p3->qsize));
+    }
+  }
+  SC3E (sc3_MPI_Win_sync (p3->gposition->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gposition->meta->win));
 
   /* fill in goffset */
   SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,

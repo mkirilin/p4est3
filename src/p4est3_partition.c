@@ -748,6 +748,16 @@ p4est3_partition (p4est3_t *p3)
     SC3E (sc3_MPI_Win_unlock (noderank, p3->quadrants->meta->win));
   }
 
+  SC3E (sc3_MPI_Win_lock (SC3_MPI_LOCK_SHARED, 0, SC3_MPI_MODE_NOCHECK,
+                          p3->gposition->meta->win));
+  /* potentially, the member of gfpos with the (nodesize + 1) index
+     should not be changed, so we edit the nodesize number of quads */
+  SC3E (p4est3_quadrant_first_descendant
+        (p3->qvt, p3->nodequads[noderank],
+         p3->qmaxlevel, p3->gfpos + p3->mpirank * p3->qsize));
+  SC3E (sc3_MPI_Win_sync (p3->gposition->meta->win));
+  SC3E (sc3_MPI_Win_unlock (0, p3->gposition->meta->win));
+
   SC3E (sc3_allocator_free (p3->alloc, loc_offsets));
   SC3E (sc3_allocator_free (p3->alloc, last_goffsets));
   SC3E (sc3_allocator_free (p3->alloc, last_gtree_offsets));
