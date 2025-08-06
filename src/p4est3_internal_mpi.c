@@ -815,7 +815,7 @@ p4est3_tree_offsets_communication (p4est3_t *p3, int noderank,
     /* We consider only non-empty processes p */
     zero = 0;
     SC3A_CHECK (p <= p3->mpirank);
-    SC3E (p4est3_quadrant_coordinates (p3->qvt, p3->nodequads[p], c));
+    SC3E (p4est3_quadrant_coordinates (p3->qvt, p3->gfpos + (p * p3->qsize), c));
     for (i = 0; i < p3->qvt->dim; ++i) {
       zero |= c[i];
     }
