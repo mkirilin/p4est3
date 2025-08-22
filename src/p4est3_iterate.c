@@ -30,7 +30,27 @@
 /* Include MRU cache functionality for array split optimization */
 #include <sc_containers.h>
 
+/* Branch prediction macros (fallback) */
+#ifndef SC_LIKELY
+#if defined(__GNUC__) || defined(__clang__)
+#define SC_LIKELY(x)   __builtin_expect(!!(x), 1)
+#define SC_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#define SC_LIKELY(x)   (x)
+#define SC_UNLIKELY(x) (x)
+#endif
+#endif
+
 /* Define maximum quadrant levels - use a reasonable default if not defined */
+#ifndef SC3E_FAST
+#ifdef P4EST_ENABLE_DEBUG
+#define SC3E_FAST(f) SC3E(f)
+#else
+  /* In release builds assume invariant preconditions already checked */
+#define SC3E_FAST(f) do { (void) (f); } while (0)
+#endif
+#endif
+
 #ifndef P4EST3_ITER_CACHE_LVL
 #define P4EST3_ITER_CACHE_LVL 32
 #endif
@@ -46,14 +66,30 @@ extern              "C"
 /* Define drop function type since it's not available in sc */
 typedef void        (*sc_drop_function_t) (void *data, const void *user);
 
-/* Simple doubly-linked list node for MRU cache */
+/* Split cache entry structure (embedded in MRU nodes) */
+typedef struct p4est3_split_cache_entry
+{
+  p4est3_gloidx       first_quad_id;
+  p4est3_gloidx       last_quad_id;
+  int                 level;
+  int                 tree_id;
+  unsigned long long  composite_key;
+  union
+  {
+    p4est3_gloidx       split_results2d[5];
+    p4est3_gloidx       split_results3d[9];
+  };
+  int                 reuse_count;
+} p4est3_split_cache_entry_t;
+
+/* Doubly-linked list node for MRU cache (embeds entry) */
 typedef struct sc_dlink
 {
-  void               *data;
+  void               *data;     /* Points to &entry */
   struct sc_dlink    *next;
   struct sc_dlink    *prev;
-}
-sc_dlink_t;
+  p4est3_split_cache_entry_t entry;     /* Embedded cache entry */
+} sc_dlink_t;
 
 /* MRU cache structure definition (adapted from p4est_dune.c) */
 typedef struct sc_hash_mru
@@ -97,25 +133,34 @@ static void         sc_hash_mru_consolidate (sc_hash_mru_t * mru);
 /* Forward declarations */
 typedef struct p4est3_search_area p4est3_search_area_t;
 
-/* MRU cache structure for array split optimization - combined key and value */
-typedef struct p4est3_split_cache_entry
-{
-  /* Key fields */
-  p4est3_gloidx       first_quad_id;    /* First quadrant ID in the range */
-  p4est3_gloidx       last_quad_id;     /* Last quadrant ID in the range */
-  int                 level;    /* Split level */
-  int                 tree_id;  /* Tree identifier */
+/* Static lookup tables for face neighbors (const for compiler optimization) */
+static const int    p4est3_children_face_neighbors_2d[4 * 4] = {
+  /* *INDENT-OFF* */
+  -1, 1, -1, 2,
+   0, -1, -1, 3,
+  -1, 3, 0, -1,
+   2, -1, 1, -1
+  /* *INDENT-ON* */
+};
 
-  /* Value fields */
-  union
-  {
-    /* Cached split result indices (num_children + 1 elements) */
-    p4est3_gloidx       split_results2d[5];
-    p4est3_gloidx       split_results3d[9];     /* For 3D, 9 indices */
-  };
-  int                 reuse_count;      /* Number of times this cache entry was reused */
-}
-p4est3_split_cache_entry_t;
+static const int    p4est3_children_face_neighbors_3d[8 * 6] = {
+  /* *INDENT-OFF* */
+  -1, 1, -1, 2, -1, 4,
+   0, -1, -1, 3, -1, 5,
+  -1, 3, 0, -1, -1, 6,
+   2, -1, 1, -1, -1, 7,
+  -1, 5, -1, 6, 0, -1,
+   4, -1, -1, 7, 1, -1,
+  -1, 7, 4, -1, 2, -1,
+   6, -1, 5, -1, 3, -1
+  /* *INDENT-ON* */
+};
+
+/* Static lookup tables for face duals (const for compiler optimization) */
+static const int    p4est3_face_dual_2d[4] = { 1, 0, 3, 2 };
+static const int    p4est3_face_dual_3d[6] = { 1, 0, 3, 2, 5, 4 };
+
+/* (Split cache entry struct definition moved earlier; removed duplicate) */
 
 /* Hash and comparison functions for MRU cache */
 static unsigned int
@@ -123,6 +168,18 @@ p4est3_split_cache_hash (const void *entry, const void *user)
 {
   const p4est3_split_cache_entry_t *cache_entry =
     (const p4est3_split_cache_entry_t *) entry;
+
+  if (cache_entry->composite_key) {
+    /* Fast hash from composite key */
+    unsigned long long  x = cache_entry->composite_key;
+    /* 64->32 finalizer (splitmix32 style) */
+    x ^= x >> 33;
+    x *= 0xff51afd7ed558ccdULL;
+    x ^= x >> 33;
+    x *= 0xc4ceb9fe1a85ec53ULL;
+    x ^= x >> 33;
+    return (unsigned int) x;
+  }
 
   unsigned int        a, b, c;
   a = b = c = 0x9e3779b9;       // Initialize with golden ratio
@@ -154,6 +211,12 @@ p4est3_split_cache_equal (const void *entry1, const void *entry2,
     (const p4est3_split_cache_entry_t *) entry1;
   const p4est3_split_cache_entry_t *e2 =
     (const p4est3_split_cache_entry_t *) entry2;
+
+  if (e1->composite_key || e2->composite_key) {
+    return e1->composite_key == e2->composite_key &&
+      e1->first_quad_id == e2->first_quad_id &&
+      e1->last_quad_id == e2->last_quad_id;
+  }
 
   return (e1->first_quad_id == e2->first_quad_id &&
           e1->last_quad_id == e2->last_quad_id &&
@@ -301,7 +364,9 @@ sc_hash_mru_insert_unique (sc_hash_mru_t *mru, void *v, void ***found)
 
     /* this object is newly added */
     add = (sc_dlink_t *) sc_mempool_alloc (mru->pool);
-    add->data = v;
+    /* Copy provided key/value (currently only key fields valid) into embedded entry */
+    add->entry = *(p4est3_split_cache_entry_t *) v;
+    add->data = &add->entry;
     add->next = NULL;
     if (mru->last == NULL) {
 
@@ -325,6 +390,7 @@ sc_hash_mru_insert_unique (sc_hash_mru_t *mru, void *v, void ***found)
 
     /* this object exists already */
     add = *(sc_dlink_t **) lfound;
+    /* add->data already points to embedded entry */
     if (add != mru->last) {
 
       /* remove it from its place */
@@ -362,7 +428,12 @@ sc_hash_mru_insert_unique (sc_hash_mru_t *mru, void *v, void ***found)
 typedef struct p4est3_search_area
 {
   p4est3_tree_t      *tree;
+  /* Cached invariants (per p4est3 instance) to reduce repeated dereferences */
+  int                 dim;      /* p3->qvt->dim */
+  int                 max_level;        /* p3->qvt->max_level */
+  size_t              quadrant_size;    /* p3->qvt->quadrant_size */
   int                 max_children;
+  int                 half_children;    /* max_children / 2 */
   int                 nfaces;   /*Global number of faces */
   int                 Level;    /* Current volume level */
   int                 child_id; /* Child id of the area under consideration */
@@ -399,11 +470,21 @@ typedef struct p4est3_search_area
                                            quadrants */
 
   /* MRU cache for array split optimization */
-  sc_hash_mru_t      *split_cache[P4EST3_ITER_CACHE_LVL];       /* One cache per level */
-  sc_mempool_t       *cache_entry_pool; /* Pool for cache entry structures */
+  sc_hash_mru_t      *split_cache[P4EST3_ITER_CACHE_LVL];       /* Legacy per-level (unused in unified mode) */
+  sc_hash_mru_t      *split_cache_unified;      /* Unified cache across all levels */
+  /* cache_entry_pool removed: entries embedded in MRU nodes */
   int                 cache_max_size;   /* Maximum cache size per level */
+  int                 cache_base_size;  /* Baseline size for dynamic resizing */
   int                 cache_hits;       /* Statistics: cache hits */
   int                 cache_misses;     /* Statistics: cache misses */
+  int                 cache_op_counter; /* Operations since last resize check */
+  int                 cache_resize_interval;    /* How often to re-evaluate size */
+
+  /* Owner lookup cache (monotonic batch acceleration) */
+  int                 owner_cache_valid;        /* 0 invalid, else valid */
+  int                 owner_cache_rank; /* Cached owning rank */
+  p4est3_gloidx       owner_cache_begin;        /* Inclusive global id begin */
+  p4est3_gloidx       owner_cache_end;  /* Exclusive global id end */
 
   /* general section */
   int                *children_face_neighbors;
@@ -418,28 +499,24 @@ typedef struct p4est3_search_area
 p4est3_search_area_t;
 
 /* Cache drop function */
-static void
+static inline void
 p4est3_split_cache_drop (void *entry, const void *user)
 {
-  p4est3_split_cache_entry_t *cache_entry =
-    (p4est3_split_cache_entry_t *) entry;
-  p4est3_search_area_t *sa = (p4est3_search_area_t *) user;
-
-  /* Use memory pool for cache entry */
-  sc_mempool_free (sa->cache_entry_pool, cache_entry);
+  (void) entry;
+  (void) user;                  /* no-op for embedded entries */
 }
 
 /* Forward declarations for MRU cache functions */
-static void         p4est3_split_cache_drop (void *entry, const void *user);
-static sc3_error_t *p4est3_split_cache_init (p4est3_t * p3,
-                                             p4est3_search_area_t * sa,
-                                             int max_cache_size);
+static inline void  p4est3_split_cache_drop (void *entry, const void *user);
+static inline sc3_error_t *p4est3_split_cache_init (p4est3_t * p3,
+                                                    p4est3_search_area_t * sa,
+                                                    int max_cache_size);
 static sc3_error_t *p4est3_split_cache_destroy (p4est3_search_area_t * sa);
 static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   (p4est3_t * p3, sc3_array_t * array, int level, p4est3_gloidx begin,
    p4est3_gloidx end, sc3_array_t * indices, p4est3_search_area_t * sa);
 
-static sc3_error_t *
+static inline sc3_error_t *
 p4est3_array_new (sc3_allocator_t *alloc, size_t esize, int ealloc,
                   int ecount, int is_resizable, sc3_array_t **arr)
 {
@@ -473,59 +550,59 @@ p4est3_array_set_zero (sc3_array_t *arr)
 }
 #endif
 
-static sc3_error_t *
+static inline sc3_error_t *
 p4est3_set_children_face_neighbors (p4est3_t *p3, p4est3_search_area_t *sa)
 {
-  int                *cfn;
-  SC3E (sc3_allocator_calloc
-        (p3->alloc, (size_t) sa->nfaces * (1 << p3->qvt->dim), sizeof (int),
-         (void *) &sa->children_face_neighbors));
-  cfn = sa->children_face_neighbors;
+  const int          *src_table;
+  size_t              table_size;
+
+  /* Use static const lookup tables for better performance */
   if (p3->qvt->dim == 2) {
-    /* *INDENT-OFF* */
-    cfn[0] = -1; cfn[1] = 1; cfn[2] = -1; cfn[3] = 2;
-    cfn[4] = 0; cfn[5] = -1; cfn[6] = -1; cfn[7] = 3;
-    cfn[8] = -1; cfn[9] = 3; cfn[10] = 0; cfn[11] = -1;
-    cfn[12] = 2; cfn[13] = -1; cfn[14] = 1; cfn[15] = -1;
-    /* *INDENT-ON* */
+    src_table = p4est3_children_face_neighbors_2d;
+    table_size = sizeof (p4est3_children_face_neighbors_2d);
   }
   else if (p3->qvt->dim == 3) {
-    /* *INDENT-OFF* */
-    cfn[0] = -1; cfn[1] = 1; cfn[2] = -1; cfn[3] = 2; cfn[4] = -1; cfn[5] = 4;
-    cfn[6] = 0; cfn[7] = -1; cfn[8] = -1; cfn[9] = 3; cfn[10] = -1; cfn[11] = 5;
-    cfn[12] = -1; cfn[13] = 3; cfn[14] = 0; cfn[15] = -1; cfn[16] = -1; cfn[17] = 6;
-    cfn[18] = 2; cfn[19] = -1; cfn[20] = 1; cfn[21] = -1; cfn[22] = -1; cfn[23] = 7;
-    cfn[24] = -1; cfn[25] = 5; cfn[26] = -1; cfn[27] = 6; cfn[28] = 0; cfn[29] = -1;
-    cfn[30] = 4; cfn[31] = -1; cfn[32] = -1; cfn[33] = 7; cfn[34] = 1; cfn[35] = -1;
-    cfn[36] = -1; cfn[37] = 7; cfn[38] = 4; cfn[39] = -1; cfn[40] = 2; cfn[41] = -1;
-    cfn[42] = 6; cfn[43] = -1; cfn[44] = 5; cfn[45] = -1; cfn[46] = 3; cfn[47] = -1;
-    /* *INDENT-ON* */
+    src_table = p4est3_children_face_neighbors_3d;
+    table_size = sizeof (p4est3_children_face_neighbors_3d);
   }
+  else {
+    return NULL;                /* Unsupported dimension */
+  }
+
+  SC3E (sc3_allocator_calloc
+        (p3->alloc, (size_t) sa->nfaces * (1 << p3->qvt->dim),
+         sizeof (int), (void *) &sa->children_face_neighbors));
+
+  /* Direct memory copy from const table - faster than individual assignments */
+  memcpy (sa->children_face_neighbors, src_table, table_size);
   return NULL;
 }
 
-static sc3_error_t *
+static inline sc3_error_t *
 p4est3_set_face_dual (p4est3_t *p3, p4est3_search_area_t *sa)
 {
-  int                *fd;
+  const int          *src_table;
+  size_t              table_size;
+
+  /* Use static const lookup tables for better performance */
+  if (p3->qvt->dim == 2) {
+    src_table = p4est3_face_dual_2d;
+    table_size = sizeof (p4est3_face_dual_2d);
+  }
+  else if (p3->qvt->dim == 3) {
+    src_table = p4est3_face_dual_3d;
+    table_size = sizeof (p4est3_face_dual_3d);
+  }
+  else {
+    return NULL;                /* Unsupported dimension */
+  }
+
   SC3E (sc3_allocator_calloc
         (p3->alloc, (size_t) 2 * p3->qvt->dim, sizeof (int),
          (void *) &sa->face_dual));
-  fd = sa->face_dual;
-  if (p3->qvt->dim == 2) {
-    fd[0] = 1;
-    fd[1] = 0;
-    fd[2] = 3;
-    fd[3] = 2;
-  }
-  else if (p3->qvt->dim == 3) {
-    fd[0] = 1;
-    fd[1] = 0;
-    fd[2] = 3;
-    fd[3] = 2;
-    fd[4] = 5;
-    fd[5] = 4;
-  }
+
+  /* Direct memory copy from const table - faster than individual assignments */
+  memcpy (sa->face_dual, src_table, table_size);
   return NULL;
 }
 
@@ -537,8 +614,12 @@ p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
   int                 i, side, nodesize, noderank;
   void               *arr;
   /*set general section of sa */
+  sa->dim = p3->qvt->dim;
+  sa->max_level = p3->qvt->max_level;
+  sa->quadrant_size = p3->qvt->quadrant_size;
   sa->max_children = p3->num_children;
-  sa->nfaces = 2 * p3->qvt->dim;
+  sa->half_children = sa->max_children / 2;
+  sa->nfaces = 2 * sa->dim;
   SC3E (p4est3_set_children_face_neighbors (p3, sa));
   SC3E (p4est3_set_face_dual (p3, sa));
 
@@ -548,23 +629,27 @@ p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
   SC3E (p4est3_split_cache_init (p3, sa, cache_size));
   sa->cache_hits = 0;
   sa->cache_misses = 0;
+  sa->owner_cache_valid = 0;
+  sa->owner_cache_rank = -1;
+  sa->owner_cache_begin = 0;
+  sa->owner_cache_end = 0;
 
   /*set volume section of sa */
   SC3E (p4est3_tree_index (p3, p3->fltree, &sa->tree));
   sa->child_id = -1;
   sa->Level = 0;
-  SC3E (sc3_allocator_calloc (p3->alloc, p3->qvt->max_level, sizeof (int),
+  SC3E (sc3_allocator_calloc (p3->alloc, sa->max_level, sizeof (int),
                               (void *) &sa->level2nchildren));
-  memset (sa->level2nchildren, 0, sizeof (int) * p3->qvt->max_level);
+  memset (sa->level2nchildren, 0, sizeof (int) * sa->max_level);
 
   /* set 2d stack (array of arrays) */
   SC3E (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
-                          p3->qvt->max_level, p3->qvt->max_level, 1,
+                          sa->max_level, sa->max_level, 1,
                           &sa->idx_vol_stack));
   SC3E (sc3_array_index (sa->idx_vol_stack, 0, (void **) &arr));
   SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_gloidx), 2, 2, 1,
                           (sc3_array_t **) arr));
-  for (i = 1; i < p3->qvt->max_level; ++i) {
+  for (i = 1; i < sa->max_level; ++i) {
     SC3E (sc3_array_index (sa->idx_vol_stack, i, &arr));
     SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_gloidx), ntypes, ntypes,
                             1, (sc3_array_t **) arr));
@@ -596,12 +681,12 @@ p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
 
     /* set 2d stack (array of arrays) */
     SC3E (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
-                            p3->qvt->max_level, p3->qvt->max_level, 1,
+                            sa->max_level, sa->max_level, 1,
                             &sa->idx_face_stack[side]));
     SC3E (sc3_array_index (sa->idx_face_stack[side], 0, &arr));
     SC3E (p4est3_array_new
           (p3->alloc, sizeof (p4est3_gloidx), 2, 2, 1, (sc3_array_t **) arr));
-    for (i = 1; i < p3->qvt->max_level; ++i) {
+    for (i = 1; i < sa->max_level; ++i) {
       SC3E (sc3_array_index (sa->idx_face_stack[side], i, &arr));
       SC3E (p4est3_array_new
             (p3->alloc, sizeof (p4est3_gloidx), ntypes, ntypes, 1,
@@ -613,7 +698,7 @@ p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
   /*temporarily set view on level2children array to be able to renew it later
      instead of making new / removing */
   SC3E (sc3_array_new_data (p3->alloc, &sa->view_quads, sa->tree->tquads,
-                            p3->qvt->quadrant_size, 0, 0));
+                            sa->quadrant_size, 0, 0));
   return NULL;
 }
 
@@ -630,16 +715,16 @@ p4est3_destroy_outer_data (p4est3_t *p3, p4est3_search_area_t *sa)
   SC3E (sc3_allocator_free (p3->alloc, sa->face_dual));
   SC3E (sc3_allocator_free (p3->alloc, sa->level2nchildren));
 
-  SC3E (sc3_array_resize (sa->idx_vol_stack, p3->qvt->max_level));
-  for (i = 0; i < p3->qvt->max_level; ++i) {
+  SC3E (sc3_array_resize (sa->idx_vol_stack, sa->max_level));
+  for (i = 0; i < sa->max_level; ++i) {
     SC3E (sc3_array_index (sa->idx_vol_stack, i, &arr));
     SC3E (sc3_array_destroy ((sc3_array_t **) arr));
   }
   SC3E (sc3_array_destroy (&sa->idx_vol_stack));
 
   for (side = 0; side < 2; ++side) {
-    SC3E (sc3_array_resize (sa->idx_face_stack[side], p3->qvt->max_level));
-    for (i = 0; i < p3->qvt->max_level; ++i) {
+    SC3E (sc3_array_resize (sa->idx_face_stack[side], sa->max_level));
+    for (i = 0; i < sa->max_level; ++i) {
       SC3E (sc3_array_index (sa->idx_face_stack[side], i, &arr));
       SC3E (sc3_array_destroy ((sc3_array_t **) arr));
     }
@@ -655,16 +740,43 @@ p4est3_destroy_outer_data (p4est3_t *p3, p4est3_search_area_t *sa)
 }
 
 static inline int
-p4est3_get_children_face_nb_id (p4est3_search_area_t *sa,
+p4est3_get_children_face_nb_id (const p4est3_search_area_t *sa,
                                 int child_id, int face)
 {
   return sa->children_face_neighbors[child_id * sa->nfaces + face];
 }
 
 static inline int
-p4est3_get_dual_face (p4est3_search_area_t *sa, int face)
+p4est3_get_dual_face (const p4est3_search_area_t *sa, int face)
 {
   return sa->face_dual[face];
+}
+
+/* Fast owner lookup using a small temporal cache that assumes mostly
+ * monotonic non-decreasing access patterns during iteration. */
+static inline sc3_error_t *
+p4est3_owner_lookup_fast (p4est3_t *p3, p4est3_search_area_t *sa,
+                          p4est3_gloidx gid, p4est3_gloidx *owner_out)
+{
+  if (sa->owner_cache_valid &&
+      gid >= sa->owner_cache_begin && gid < sa->owner_cache_end) {
+    *owner_out = sa->owner_cache_rank;
+    return NULL;                /* cache hit */
+  }
+  p4est3_gloidx       rank;
+  SC3E (p4est3_search_lower_bound64
+        (gid, p3->goffset, p3->mpisize + 1, &rank));
+  if (p3->goffset[rank] > gid) {
+    SC3A_CHECK (rank > 0);
+    rank--;
+  }
+  SC3A_CHECK (rank >= 0 && rank < p3->mpisize);
+  sa->owner_cache_rank = (int) rank;
+  sa->owner_cache_begin = p3->goffset[rank];
+  sa->owner_cache_end = p3->goffset[rank + 1];
+  sa->owner_cache_valid = 1;
+  *owner_out = rank;
+  return NULL;
 }
 
 sc3_error_t        *
@@ -809,14 +921,14 @@ p4est3_internal_iterate_face (p4est3_t *p3,
                               p4est3_iterate_codim_t ccodim,
                               p4est3_search_area_t *sa)
 {
-  const int           max_children = p3->num_children;
-  const int           half_ch = max_children / 2;
+  const int           max_children = sa->max_children;
+  const int           half_ch = sa->half_children;
   p4est3_topidx      *trees = sa->treeid_face;
   p4est3_gloidx      *b_f[2], *e_f[2];
   p4est3_gloidx       proc_owner = p3->mpirank;
   p4est3_gloidx      *base_ptr;
   void               *stack_it[2];
-  sc3_array_t        *view_q = sa->view_quads;
+  /* sa->view_quads not directly needed here; use sa->view_quads inline */
   sc3_array_t       **idx_face_stack = sa->idx_face_stack;
   p4est3_iterate_face_side_t *fside;
   int                *is_refine = sa->is_refine;
@@ -827,14 +939,14 @@ p4est3_internal_iterate_face (p4est3_t *p3,
   void               *first_quad;
 
   for (side = 0; side < sa->nsides; ++side) {
-    SC3E (sc3_array_index
-          (idx_face_stack[side], Level[side], &(stack_it[side])));
-    SC3E (sc3_array_index
-          (*(sc3_array_t **) stack_it[side],
-           sa->child_id_face[side], &(b_f[side])));
-    SC3E (sc3_array_index
-          (*(sc3_array_t **) stack_it[side],
-           sa->child_id_face[side] + 1, &(e_f[side])));
+    SC3E_FAST (sc3_array_index
+               (idx_face_stack[side], Level[side], &(stack_it[side])));
+    SC3E_FAST (sc3_array_index
+               (*(sc3_array_t **) stack_it[side],
+                sa->child_id_face[side], &(b_f[side])));
+    SC3E_FAST (sc3_array_index
+               (*(sc3_array_t **) stack_it[side],
+                sa->child_id_face[side] + 1, &(e_f[side])));
   }
 
   /* Check if both sides belong to remote process(es).
@@ -864,13 +976,7 @@ p4est3_internal_iterate_face (p4est3_t *p3,
       /* Consider batch processing for binary search */
       /* Find process that owns this quadrant */
       /* Start binary search from a local process */
-      SC3E (p4est3_search_lower_bound64
-            (*(b_f[side]), p3->goffset, p3->mpisize + 1, &proc_owner));
-      if (p3->goffset[proc_owner] > *(b_f[side])) {
-        SC3A_CHECK (proc_owner > 0);
-        proc_owner--;
-      }
-      SC3A_CHECK (proc_owner >= 0 && proc_owner < p3->mpisize);
+      SC3E (p4est3_owner_lookup_fast (p3, sa, *(b_f[side]), &proc_owner));
 
       /* Get quadrant from the owning process's window */
       first_quad = (void *) (p3->nodequads[proc_owner] +
@@ -910,17 +1016,18 @@ p4est3_internal_iterate_face (p4est3_t *p3,
     }
     /* we split array taht is unite for and local and remote procs quads */
 
-    SC3E (sc3_array_push (idx_face_stack[side], &(stack_it[side])));
+    SC3E_FAST (sc3_array_push (idx_face_stack[side], &(stack_it[side])));
 #ifdef P4EST_ENABLE_DEBUG
     SC3E (p4est3_array_set_zero (*(sc3_array_t **) (stack_it[side])));
 #endif
     SC3E (p4est3_cached_quadrant_array_split_noncontig
-          (p3, view_q, Level[side], *(b_f[side]),
+          (p3, sa->view_quads, Level[side], *(b_f[side]),
            *(e_f[side]), *(sc3_array_t **) (stack_it[side]), sa));
 
     /* since array_split doesn't count shift from the beinning of quadrants
        in a proc, we shift result indices at the loop below */
-    SC3E (sc3_array_index (*(sc3_array_t **) (stack_it[side]), 0, &base_ptr));
+    SC3E_FAST (sc3_array_index
+               (*(sc3_array_t **) (stack_it[side]), 0, &base_ptr));
     for (i = 0; i < max_children + 1; ++i) {
       base_ptr[i] += *(b_f[side]);
     }
@@ -943,7 +1050,7 @@ p4est3_internal_iterate_face (p4est3_t *p3,
       Level[side]++;
       is_lvl_increased[side] = 1;
     }
-    SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, sa));
+    SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, sa));        /* keep full check here */
     for (side = 0; side < sa->nsides; ++side) {
       Level[side] = is_lvl_increased[side] ? Level[side] - 1 : Level[side];
       if (i != half_ch - 1) {
@@ -976,12 +1083,13 @@ p4est3_iterate_face_inner_init (p4est3_t *p3, p4est3_search_area_t *sa,
     Level_face[s] = sa->Level;
     is_refine[s] = 1;
     sa->child_id_face[s] = ch_neigh[s];
-    SC3E (sc3_array_resize (idx_f_stack[s], sa->Level + 1));
-    SC3E (sc3_array_index (idx_f_stack[s], Level_face[s], &top));
-    SC3E (sc3_array_index (*(sc3_array_t **) top, ch_neigh[s], &begin));
-    SC3E (sc3_array_index (*(sc3_array_t **) top, ch_neigh[s] + 1, &end));
-    SC3E (sc3_array_index (sa->idx_vol_stack, Level_face[s], &top));
-    SC3E (sc3_array_index (*(sc3_array_t **) top, 0, &arr_vol_it));
+    SC3E_FAST (sc3_array_resize (idx_f_stack[s], sa->Level + 1));
+    SC3E_FAST (sc3_array_index (idx_f_stack[s], Level_face[s], &top));
+    SC3E_FAST (sc3_array_index (*(sc3_array_t **) top, ch_neigh[s], &begin));
+    SC3E_FAST (sc3_array_index
+               (*(sc3_array_t **) top, ch_neigh[s] + 1, &end));
+    SC3E_FAST (sc3_array_index (sa->idx_vol_stack, Level_face[s], &top));
+    SC3E_FAST (sc3_array_index (*(sc3_array_t **) top, 0, &arr_vol_it));
     *(begin) = *(arr_vol_it + ch_neigh[s]);
     *(end) = *(arr_vol_it + ch_neigh[s] + 1);
     /* Since we iterate inner faces, we inherit the local boundaries for volumes */
@@ -1003,7 +1111,7 @@ p4est3_iterate_face_inner (p4est3_t *p3,
   p4est3_iterate_face_side_t *fside;
   search_area->treeid_face[0] = search_area->treeid_face[1]
     = search_area->tree->treeid;
-  SC3E (sc3_array_index (search_area->finfo->sides, 0, &fside));
+  SC3E_FAST (sc3_array_index (search_area->finfo->sides, 0, &fside));
   for (child = 0; child < search_area->max_children; ++child) {
     for (face = 0; face < search_area->nfaces; ++face) {
       nb_id = p4est3_get_children_face_nb_id (search_area, child, face);
@@ -1108,6 +1216,8 @@ p4est3_iterate_volume_rec_init (p4est3_t *p3,
   return NULL;
 }
 
+/* Legacy recursive implementation kept for reference (disabled). */
+#if 0
 static sc3_error_t *
 p4est3_iterate_volume_rec (p4est3_t *p3,
                            p4est3_iterate_volume_t cvolume,
@@ -1122,7 +1232,7 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
   p4est3_gloidx      *arr_it;
   p4est3_gloidx       proc_owner = p3->mpirank;
 
-  const int           max_children = p3->num_children;
+  const int           max_children = sa->max_children;
   int                *l2nch = sa->level2nchildren;
   int                *Level = &sa->Level;
   p4est3_gloidx      *begin, *end;
@@ -1131,9 +1241,11 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
   sc3_array_t        *idx_vol_stack = sa->idx_vol_stack;
   p4est3_iterate_volume_info_t *vinfo = sa->vinfo;
 
-  SC3E (sc3_array_index (idx_vol_stack, *Level, &stack_it));
-  SC3E (sc3_array_index (*(sc3_array_t **) stack_it, sa->child_id, &begin));
-  SC3E (sc3_array_index (*(sc3_array_t **) stack_it, sa->child_id + 1, &end));
+  SC3E_FAST (sc3_array_index (idx_vol_stack, *Level, &stack_it));
+  SC3E_FAST (sc3_array_index
+             (*(sc3_array_t **) stack_it, sa->child_id, &begin));
+  SC3E_FAST (sc3_array_index
+             (*(sc3_array_t **) stack_it, sa->child_id + 1, &end));
 
   /* Check if the considered search area intersect
      the area of the local process. If not, then skip it. */
@@ -1152,13 +1264,7 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
     first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
   }
   else {
-    SC3E (p4est3_search_lower_bound64
-          (*begin, p3->goffset, p3->mpisize + 1, &proc_owner));
-    if (p3->goffset[proc_owner] > *begin) {
-      SC3A_CHECK (proc_owner > 0);
-      proc_owner--;
-    }
-    SC3A_CHECK (proc_owner >= 0 && proc_owner < p3->mpisize);
+    SC3E (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
 
     /* Get quadrant from the owning process's window */
     first_quad = (void *) (p3->nodequads[proc_owner] +
@@ -1190,7 +1296,7 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
     return NULL;
   }
 
-  SC3E (sc3_array_push (idx_vol_stack, &stack_it));
+  SC3E_FAST (sc3_array_push (idx_vol_stack, &stack_it));
 #ifdef P4EST_ENABLE_DEBUG
   SC3E (p4est3_array_set_zero (*(sc3_array_t **) stack_it));
 #endif
@@ -1201,7 +1307,7 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
 
   /* since array_split doesn't count shift from the beinning of quadrants
      in a node, we shift result indices at the loop below */
-  SC3E (sc3_array_index (*(sc3_array_t **) stack_it, 0, &arr_it));
+  SC3E_FAST (sc3_array_index (*(sc3_array_t **) stack_it, 0, &arr_it));
   for (i = 0; i < max_children + 1; ++i) {
     arr_it[i] += *begin;
   }
@@ -1213,6 +1319,176 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
   SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, sa));
   l2nch[--(*Level)]++;
   SC3E (sc3_array_pop (idx_vol_stack));
+  return NULL;
+}
+#endif
+
+/* Iterative replacement for recursive volume traversal */
+typedef struct
+{
+  int                 level;    /* Current level (after splitting) */
+  int                 next_child;       /* Next child index to process */
+} p4est3_iter_frame_t;
+
+static sc3_error_t *
+p4est3_iterate_volume_iterative (p4est3_t *p3,
+                                 p4est3_iterate_volume_t cvolume,
+                                 p4est3_iterate_face_t cface,
+                                 p4est3_iterate_codim_t ccodim,
+                                 p4est3_search_area_t *sa)
+{
+  p4est3_gloidx      *begin, *end;
+  p4est3_gloidx       proc_owner;
+  void               *first_quad;
+  int                 levelq;
+  int                 max_children = sa->max_children;
+  int                *l2nch = sa->level2nchildren;
+  sc3_array_t        *idx_vol_stack = sa->idx_vol_stack;
+  p4est3_iterate_volume_info_t *vinfo = sa->vinfo;
+
+  p4est3_iter_frame_t *frames;
+  int                 top = -1; /* empty */
+  /* allocate temp frame buffer on stack (bounded by max_level) */
+  frames = (p4est3_iter_frame_t *) alloca (sizeof (*frames) * sa->max_level);
+
+  /* Initialize owner cache */
+  proc_owner = p3->mpirank;
+
+  /* Access root range (already initialized in rec_init) */
+  sa->Level = 0;
+  sa->child_id = 0;
+  void               *root_stack_it;
+  SC3E_FAST (sc3_array_index (idx_vol_stack, 0, &root_stack_it));
+  SC3E_FAST (sc3_array_index (*(sc3_array_t **) root_stack_it, 0, &begin));
+  SC3E_FAST (sc3_array_index (*(sc3_array_t **) root_stack_it, 1, &end));
+
+  if (*begin < sa->local_end && *end > sa->local_begin) {
+    if (p3->contiguous) {
+      first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
+    }
+    else {
+      SC3E (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
+      first_quad = (void *) (p3->nodequads[proc_owner] +
+                             p3->qsize * (*begin - p3->goffset[proc_owner]));
+    }
+    SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &levelq));
+    if (levelq == sa->Level) {
+      if (cvolume != NULL) {
+        vinfo->quadrant = first_quad;
+        vinfo->nquad =
+          (p4est3_locidx) (*begin - p3->gtroffset[sa->tree->treeid]);
+        SC3E (cvolume (vinfo));
+      }
+      /* root leaf -> done */
+      return NULL;
+    }
+    /* Split root region */
+    {
+      void               *stack_it;
+      p4est3_gloidx      *arr_it;
+      SC3E_FAST (sc3_array_push (idx_vol_stack, &stack_it));
+#ifdef P4EST_ENABLE_DEBUG
+      SC3E (p4est3_array_set_zero (*(sc3_array_t **) stack_it));
+#endif
+      SC3E (p4est3_cached_quadrant_array_split_noncontig
+            (p3, sa->view_quads, sa->Level, *begin, *end,
+             *(sc3_array_t **) stack_it, sa));
+      SC3E_FAST (sc3_array_index (*(sc3_array_t **) stack_it, 0, &arr_it));
+      for (int i = 0; i < max_children + 1; ++i) {
+        arr_it[i] += *begin;
+      }
+      l2nch[++sa->Level] = 0;
+      frames[++top] = (p4est3_iter_frame_t) {
+      sa->Level, 0};
+    }
+  }
+  else {
+    /* Root outside local - nothing to do */
+    return NULL;
+  }
+
+  /* DFS using explicit stack */
+  while (top >= 0) {
+    p4est3_iter_frame_t *fr = &frames[top];
+    if (fr->next_child >= max_children) {
+      /* Finished all children at this level */
+      SC3A_CHECK (l2nch[fr->level] == max_children);
+      /* Process inner faces at this (still current) level */
+      SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, sa));
+      /* Pop indices stack and decrement level */
+      SC3E_FAST (sc3_array_pop (idx_vol_stack));
+      --top;                    /* remove current frame first */
+      sa->Level = fr->level - 1;
+      if (sa->Level >= 0) {
+        l2nch[sa->Level]++;     /* parent observed one more finished child */
+        /* Advance parent frame child index to avoid reprocessing */
+        frames[top].next_child++;
+      }
+      continue;
+    }
+
+    /* Process next child at this frame level */
+    sa->child_id = fr->next_child;
+    /* Obtain begin/end for this child */
+    void               *stack_it;
+    p4est3_gloidx      *arr_child;
+    SC3E_FAST (sc3_array_index (idx_vol_stack, fr->level, &stack_it));
+    SC3E_FAST (sc3_array_index (*(sc3_array_t **) stack_it, 0, &arr_child));
+    begin = &arr_child[sa->child_id];
+    end = &arr_child[sa->child_id + 1];
+
+    if (*begin >= sa->local_end || *end <= sa->local_begin) {
+      /* Skip non-local */
+      ++fr->next_child;
+      l2nch[fr->level]++;
+      continue;
+    }
+
+    /* Fetch quadrant level */
+    if (p3->contiguous) {
+      first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
+      proc_owner = p3->mpirank;
+    }
+    else {
+      SC3E (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
+      first_quad = (void *) (p3->nodequads[proc_owner] +
+                             p3->qsize * (*begin - p3->goffset[proc_owner]));
+    }
+    SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &levelq));
+    if (levelq == fr->level) {
+      if (cvolume != NULL && proc_owner == p3->mpirank) {
+        vinfo->quadrant = first_quad;
+        vinfo->nquad =
+          (p4est3_locidx) (*begin - p3->gtroffset[sa->tree->treeid]);
+        SC3E (cvolume (vinfo));
+      }
+      ++fr->next_child;
+      l2nch[fr->level]++;
+      continue;
+    }
+
+    /* Need to split this child range -> descend */
+    {
+      void               *stack_it_child;
+      p4est3_gloidx      *arr_it;
+      SC3E_FAST (sc3_array_push (idx_vol_stack, &stack_it_child));
+#ifdef P4EST_ENABLE_DEBUG
+      SC3E (p4est3_array_set_zero (*(sc3_array_t **) stack_it_child));
+#endif
+      SC3E (p4est3_cached_quadrant_array_split_noncontig
+            (p3, sa->view_quads, fr->level, *begin, *end,
+             *(sc3_array_t **) stack_it_child, sa));
+      SC3E_FAST (sc3_array_index
+                 (*(sc3_array_t **) stack_it_child, 0, &arr_it));
+      for (int i = 0; i < max_children + 1; ++i) {
+        arr_it[i] += *begin;
+      }
+      l2nch[++sa->Level] = 0;
+      frames[++top] = (p4est3_iter_frame_t) {
+      sa->Level, 0};
+      /* After return will continue with this child's siblings */
+    }
+  }
   return NULL;
 }
 
@@ -1246,7 +1522,7 @@ p4est3_iterate_codim (p4est3_t *p3, int codims,
   for (tree = p3->fltree; tree <= p3->lltree; ++tree) {
 
     SC3E (p4est3_iterate_volume_rec_init (p3, search_area, tree));
-    SC3E (p4est3_iterate_volume_rec
+    SC3E (p4est3_iterate_volume_iterative
           (p3, cvolume, cface, ccodim, search_area));
 
     /* frame faces part */
@@ -1271,20 +1547,20 @@ p4est3_split_cache_init (p4est3_t *p3, p4est3_search_area_t *sa,
                          int max_cache_size)
 {
   int                 i;
-
+  sa->cache_base_size = max_cache_size;
   sa->cache_max_size = max_cache_size;
   sa->cache_hits = 0;
   sa->cache_misses = 0;
+  sa->cache_op_counter = 0;
+  sa->cache_resize_interval = 512;      /* heuristic */
 
-  /* Initialize memory pool for frequent allocations */
-  sa->cache_entry_pool = sc_mempool_new (sizeof (p4est3_split_cache_entry_t));
-
-  /* Initialize MRU cache for each level */
-  for (i = 0; i < P4EST3_ITER_CACHE_LVL; i++) {
-    sa->split_cache[i] =
-      sc_hash_mru_new (p4est3_split_cache_hash, p4est3_split_cache_equal,
-                       p4est3_split_cache_drop, sa, max_cache_size);
+  /* Initialize unified cache (per-level disabled) */
+  for (i = 0; i < P4EST3_ITER_CACHE_LVL; ++i) {
+    sa->split_cache[i] = NULL;
   }
+  sa->split_cache_unified =
+    sc_hash_mru_new (p4est3_split_cache_hash, p4est3_split_cache_equal,
+                     p4est3_split_cache_drop, sa, sa->cache_max_size);
 
   return NULL;
 }
@@ -1293,8 +1569,6 @@ p4est3_split_cache_init (p4est3_t *p3, p4est3_search_area_t *sa,
 static sc3_error_t *
 p4est3_split_cache_destroy (p4est3_search_area_t *sa)
 {
-  int                 i;
-
   /* Print cache statistics before cleanup */
 //  if (sa->cache_hits > 0 || sa->cache_misses > 0) {
 //    printf ("MRU Cache Statistics: Hits=%d, Misses=%d, Hit Rate=%.2f%%\n",
@@ -1311,16 +1585,12 @@ p4est3_split_cache_destroy (p4est3_search_area_t *sa)
 //  }
 
   /* Destroy MRU cache for each level */
-  for (i = 0; i < P4EST3_ITER_CACHE_LVL; i++) {
-    if (sa->split_cache[i] != NULL) {
-      sc_hash_mru_destroy (sa->split_cache[i]);
-      sa->split_cache[i] = NULL;
-    }
+  if (sa->split_cache_unified != NULL) {
+    sc_hash_mru_destroy (sa->split_cache_unified);
+    sa->split_cache_unified = NULL;
   }
 
-  /* Destroy memory pools */
-  sc_mempool_destroy (sa->cache_entry_pool);
-  sa->cache_entry_pool = NULL;
+  /* Embedded entries freed with MRU nodes */
 
   return NULL;                  /* Success */
 }
@@ -1339,8 +1609,24 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   sc_hash_mru_t      *cache;
   p4est3_gloidx      *src_val;
 
+  /* Fast path: very small ranges (<= number of children) skip cache overhead */
+  if (SC_UNLIKELY ((end - begin) <= (p4est3_gloidx) sa->max_children)) {
+    if (p3->contiguous) {
+      SC3E (sc3_array_renew_data
+            (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
+      return p4est3_quadrant_array_split (p3->qvt, array, level, indices);
+    }
+    else {
+      SC3E (sc3_array_renew_data
+            (&array, p3->nodequads[0], p3->qsize, 0, end - begin));
+      return p4est3_quadrant_array_split_noncontig
+        (p3, array, level, begin, indices);
+    }
+  }
+
   /* Check if caching is available for this level */
-  if (sa->split_cache[level] == NULL) {
+  /* Choose unified cache */
+  if (sa->split_cache_unified == NULL) {
     sa->cache_misses++;
     if (p3->contiguous) {
       SC3E (sc3_array_renew_data
@@ -1357,7 +1643,7 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
     }
   }
 
-  cache = sa->split_cache[level];
+  cache = sa->split_cache_unified;
 
   SC3A_CHECK (sa->tree != NULL);
   /* Create search entry with key information */
@@ -1365,6 +1651,10 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   search_entry.last_quad_id = end;
   search_entry.level = level;
   search_entry.tree_id = sa->tree->treeid;
+  search_entry.composite_key =
+    (((unsigned long long) (unsigned int) level) << 56) ^
+    (((unsigned long long) (unsigned int) sa->tree->treeid) << 40) ^
+    ((unsigned long long) begin << 3) ^ (unsigned long long) (end - begin);
   search_entry.reuse_count = 0;
 
   /* Try to find in cache */
@@ -1379,13 +1669,13 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
     /* Copy cached split indices to the output array */
     /* Copy the cached data directly */
     SC3E (sc3_array_index (indices, 0, &src_val));
-    if (p3->qvt->dim == 2) {
+    if (sa->dim == 2) {
       memcpy (src_val, cache_entry->split_results2d,
-              sizeof (p4est3_gloidx) * (p3->num_children + 1));
+              sizeof (p4est3_gloidx) * (sa->max_children + 1));
     }
     else {
       memcpy (src_val, cache_entry->split_results3d,
-              sizeof (p4est3_gloidx) * (p3->num_children + 1));
+              sizeof (p4est3_gloidx) * (sa->max_children + 1));
     }
     /* Success - used cached result */
     return NULL;
@@ -1393,13 +1683,32 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
 
   /* Cache miss - allocate persistent cache entry and compute result */
   sa->cache_misses++;
+  if (++sa->cache_op_counter == sa->cache_resize_interval) {
+    /* Dynamic resize heuristic: expand if hit rate high, shrink if low */
+    double              hr = (sa->cache_hits + sa->cache_misses) ?
+      (double) sa->cache_hits / (double) (sa->cache_hits +
+                                          sa->cache_misses) : 0.0;
+    size_t              target = sa->cache_max_size;
+    if (hr > 0.75 && sa->cache_max_size < sa->cache_base_size * 8) {
+      target = (size_t) (sa->cache_max_size * 1.5) + 1;
+    }
+    else if (hr < 0.30 && sa->cache_max_size > sa->cache_base_size) {
+      target = (size_t) (sa->cache_max_size / 1.5) + 1;
+      if (target < (size_t) sa->cache_base_size)
+        target = sa->cache_base_size;
+    }
+    if (target != (size_t) sa->cache_max_size) {
+      sa->split_cache_unified->maxcount = target;       /* simple adjust */
+      sa->cache_max_size = (int) target;
+      sc_hash_mru_consolidate (sa->split_cache_unified);
+    }
+    sa->cache_op_counter = 0;
+  }
 
-  /* Allocate persistent storage for the cache entry using memory pool */
-  cache_entry =
-    (p4est3_split_cache_entry_t *) sc_mempool_alloc (sa->cache_entry_pool);
+  /* Retrieve embedded entry pointer from MRU node (inserted case) */
+  cache_entry = (p4est3_split_cache_entry_t *) * found;
   *cache_entry = search_entry;
   cache_entry->reuse_count = 1;
-  *found = cache_entry;
 
   /* Compute the split result */
   if (p3->contiguous) {
@@ -1416,21 +1725,14 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
 
   /* Copy the computed split indices to the cache */
   SC3E (sc3_array_index (indices, 0, &src_val));
-  if (p3->qvt->dim == 2) {
+  if (sa->dim == 2) {
     memcpy (cache_entry->split_results2d, src_val,
-            sizeof (p4est3_gloidx) * (p3->num_children + 1));
+            sizeof (p4est3_gloidx) * (sa->max_children + 1));
   }
   else {
     memcpy (cache_entry->split_results3d, src_val,
-            sizeof (p4est3_gloidx) * (p3->num_children + 1));
+            sizeof (p4est3_gloidx) * (sa->max_children + 1));
   }
 
   return NULL;
 }
-
-#ifdef __cplusplus
-#if 0
-{
-#endif
-}
-#endif
