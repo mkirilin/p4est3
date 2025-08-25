@@ -186,10 +186,11 @@ p4est3_tier_ring_lookup (p4est3_tier_ring_t *ring, int tree_id,
   /* Linear scan – ring->size is tiny (<= 16) */
   for (int i = 0; i < ring->size; ++i) {
     p4est3_tier_entry_t *e = &ring->entries[i];
-    /* Relaxed key: match only (tree_id, level, begin). Require same end for now */
-    if (e->tree_id == tree_id && e->level == level &&
-        e->begin == begin && e->end == end) {
-      return e;                 /* hit (may still be placeholder if !valid) */
+    /* Further relaxed key: match (tree_id, level, begin) only; allow end mismatch */
+    if (e->tree_id == tree_id && e->level == level && e->begin == begin) {
+      /* If stored covers a superset (end >= requested end) treat as hit outright */
+      /* If requested extends further (end > e->end) we will later expand e->end after computing */
+      return e;                 /* hit (may be placeholder or may need extension) */
     }
   }
   return NULL;                  /* miss */
@@ -595,6 +596,9 @@ typedef struct p4est3_search_area
   int                 tier_placeholder_lookups; /* found placeholder during lookup */
   long long           split_total;      /* total split requests */
   long long           split_fastpath;   /* small-range fast path count */
+  long long           splits_computed;  /* actual expensive split computations performed */
+  int                 tier_extensions;  /* times an existing tier entry was extended (end grew) */
+  int                 tier_subinterval_hits;    /* hits where cached end > requested end */
 
   /* Owner lookup cache (monotonic batch acceleration) */
   int                 owner_cache_valid;        /* 0 invalid, else valid */
@@ -1705,6 +1709,9 @@ p4est3_split_cache_init (p4est3_t *p3, p4est3_search_area_t *sa,
   sa->tier_placeholder_lookups = 0;
   sa->split_total = 0;
   sa->split_fastpath = 0;
+  sa->splits_computed = 0;
+  sa->tier_extensions = 0;
+  sa->tier_subinterval_hits = 0;
 
   return NULL;
 }
@@ -1728,18 +1735,25 @@ p4est3_split_cache_destroy (p4est3_search_area_t *sa)
       (double) (sa->tier_hits + sa->cache_hits);
     double              combined_lookups =
       (double) (sa->split_total - sa->split_fastpath);
-    double              combined_rate =
-      combined_lookups >
-      0.0 ? (100.0 * combined_hits / combined_lookups) : 0.0;
+    double              combined_rate = combined_lookups > 0.0 ?
+      (100.0 * combined_hits / combined_lookups) : 0.0;
+    long long           avoided_splits = (long long) combined_hits;
+    double              avoided_rate = combined_lookups > 0.0 ?
+      (100.0 * (double) avoided_splits / combined_lookups) : 0.0;
     double              seed_fill_rate = sa->tier_seed_total ?
       (100.0 * (double) sa->tier_seed_hits / (double) sa->tier_seed_total) :
       0.0;
     int                 rr_print = fprintf (stderr,
-                                            "[p4est3_iterate] cache stats: total=%lld fastpath=%lld combined_rate=%.2f%% | tier_hits=%d misses=%d rate=%.2f%% | seeds: placed=%d hits=%d fill=%.2f%% attempted=%d skipped=%d evicted=%d ph_lookups=%d | mru_hits=%d misses=%d rate=%.2f%% cap=%zu\n",
+                                            "[p4est3_iterate] cache stats: total=%lld fastpath=%lld computed=%lld avoided=%lld avoided_rate=%.2f%% combined_rate=%.2f%% | tier_hits=%d misses=%d rate=%.2f%% ext=%d subhits=%d | seeds: placed=%d hits=%d fill=%.2f%% attempted=%d skipped=%d evicted=%d ph_lookups=%d | mru_hits=%d misses=%d rate=%.2f%% cap=%zu\n",
                                             sa->split_total,
-                                            sa->split_fastpath, combined_rate,
+                                            sa->split_fastpath,
+                                            sa->splits_computed,
+                                            avoided_splits,
+                                            avoided_rate,
+                                            combined_rate,
                                             sa->tier_hits, sa->tier_misses,
-                                            tier_hr,
+                                            tier_hr, sa->tier_extensions,
+                                            sa->tier_subinterval_hits,
                                             sa->tier_seed_total,
                                             sa->tier_seed_hits,
                                             seed_fill_rate,
@@ -1806,6 +1820,11 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   sc_hash_mru_t      *cache;
   p4est3_gloidx      *src_val;
   p4est3_tier_entry_t *tier_hit = NULL;
+  int                 tier_extend = 0;  /* need to extend stored end after computing */
+  /* (tier_extend used later to decide extension; suppress unused-value warning in some analyzers) */
+  if (0) {
+    tier_extend = tier_extend;
+  }
 
   sa->split_total++;
 
@@ -1816,16 +1835,24 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
     tier_hit =
       p4est3_tier_ring_lookup (ring, sa->tree->treeid, level, begin, end);
     if (SC_LIKELY (tier_hit != NULL)) {
-      if (tier_hit->valid) {
-        /* Cached real data */
+      if (tier_hit->valid && tier_hit->end >= end) {
+        if (tier_hit->end > end) {
+          ++sa->tier_subinterval_hits;
+        }
+        /* Cached data covers requested sub-interval (or equal) */
         SC3E (sc3_array_index (indices, 0, &src_val));
         memcpy (src_val, tier_hit->splits,
                 sizeof (p4est3_gloidx) * (sa->max_children + 1));
         sa->tier_hits++;
         return NULL;
       }
-      /* Placeholder (seed). Treat as miss but record placeholder lookup */
-      ++sa->tier_placeholder_lookups;
+      if (!tier_hit->valid) {
+        ++sa->tier_placeholder_lookups; /* will compute below */
+      }
+      else if (tier_hit->end < end) {
+        /* Have a prefix; we will recompute and then extend */
+        tier_extend = 1;
+      }
     }
     if (tier_hit == NULL) {
       sa->tier_misses++;
@@ -1907,6 +1934,7 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
 
   /* Cache miss - allocate persistent cache entry and compute result */
   sa->cache_misses++;
+  /* This path will result in a real split computation below */
   if (++sa->cache_op_counter == sa->cache_resize_interval) {
     /* Dynamic resize heuristic: expand if hit rate high, shrink if low */
     double              hr = (sa->cache_hits + sa->cache_misses) ?
@@ -1935,6 +1963,7 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   cache_entry->reuse_count = 1;
 
   /* Compute the split result */
+  ++sa->splits_computed;
   if (p3->contiguous) {
     SC3E (sc3_array_renew_data
           (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
@@ -1958,31 +1987,40 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
             sizeof (p4est3_gloidx) * (sa->max_children + 1));
   }
 
-  /* Insert also into tier ring (dual caching). This keeps the very hot recent
-     splits in the cheapest structure. */
+  /* Insert or extend tier ring entry */
   if (level >= 0 && level < sa->max_level && sa->tier_rings != NULL) {
     p4est3_tier_ring_t *ring = &sa->tier_rings[level];
-    /* Overwrite existing entry with same (tree,level,begin) if present */
-    p4est3_tier_entry_t *overwrite = NULL;
-    for (int i = 0; i < ring->size; ++i) {
-      p4est3_tier_entry_t *e2 = &ring->entries[i];
-      if (e2->tree_id == sa->tree->treeid && e2->level == level
-          && e2->begin == begin) {
-        overwrite = e2;
-        break;
+    p4est3_tier_entry_t *e = NULL;
+    if (tier_hit != NULL && (tier_extend || !tier_hit->valid)) {
+      e = tier_hit;             /* extend or materialize existing */
+    }
+    else {
+      /* search again for overwrite (cheap small ring) */
+      for (int i = 0; i < ring->size; ++i) {
+        p4est3_tier_entry_t *e2 = &ring->entries[i];
+        if (e2->tree_id == sa->tree->treeid && e2->level == level
+            && e2->begin == begin) {
+          e = e2;
+          break;
+        }
+      }
+      if (e == NULL) {
+        e =
+          p4est3_tier_ring_insert (ring, sa->tree->treeid, level, begin, end);
       }
     }
-    p4est3_tier_entry_t *e = overwrite ? overwrite :
-      p4est3_tier_ring_insert (ring, sa->tree->treeid, level, begin, end);
     if (e != NULL) {
-      e->end = end;             /* update stored end to most recent */
+      if (e->seeded) {
+        ++sa->tier_seed_hits;   /* seeded prediction realized (even if extension) */
+      }
+      if (e->end < end) {
+        ++sa->tier_extensions;
+        e->end = end;
+      }
       memcpy (e->splits, src_val,
               sizeof (p4est3_gloidx) * (sa->max_children + 1));
       e->valid = 1;
-      if (e->seeded) {
-        ++sa->tier_seed_hits;   /* seeded prediction realized */
-      }
-      e->seeded = 0;            /* now materialized */
+      e->seeded = 0;
     }
 
     /* Pre-seed child intervals for next level (conservative: first large child only) */
