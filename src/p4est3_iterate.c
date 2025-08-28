@@ -606,6 +606,9 @@ typedef struct p4est3_search_area
   p4est3_gloidx       owner_cache_begin;        /* Inclusive global id begin */
   p4est3_gloidx       owner_cache_end;  /* Exclusive global id end */
 
+  long long           subtree_full_local_hits;  /* times we skipped owner lookup */
+  long long           first_child_level_reuses; /* times we reused parent-known first child level */
+
   /* general section */
   int                *children_face_neighbors;
   int                *face_dual;
@@ -754,6 +757,8 @@ p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
   sa->owner_cache_rank = -1;
   sa->owner_cache_begin = 0;
   sa->owner_cache_end = 0;
+  sa->subtree_full_local_hits = 0;
+  sa->first_child_level_reuses = 0;
 
   /*set volume section of sa */
   SC3E (p4est3_tree_index (p3, p3->fltree, &sa->tree));
@@ -1449,7 +1454,12 @@ typedef struct
 {
   int                 level;    /* Current level (after splitting) */
   int                 next_child;       /* Next child index to process */
+  int                 fully_local;      /* Subtree wholly local to this rank */
+  int                 have_first_level; /* We already know level of first child */
+  int                 first_child_level;        /* Cached level value for first child */
 } p4est3_iter_frame_t;
+
+/* Small 2-slot level cache query */
 
 static sc3_error_t *
 p4est3_iterate_volume_iterative (p4est3_t *p3,
@@ -1490,11 +1500,20 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
   SC3E_FAST (sc3_array_index (*(sc3_array_t **) root_stack_it, 1, &end));
 
   if (*begin < sa->local_end && *end > sa->local_begin) {
+    int                 root_fully_local = (*begin >= sa->local_begin
+                                            && *end <= sa->local_end);
     if (p3->contiguous) {
       first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
+      proc_owner = p3->mpirank;
     }
     else {
-      SC3E (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
+      if (root_fully_local) {
+        proc_owner = p3->mpirank;
+        ++sa->subtree_full_local_hits;
+      }
+      else {
+        SC3E (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
+      }
       first_quad = (void *) (p3->nodequads[proc_owner] +
                              p3->qsize * (*begin - p3->goffset[proc_owner]));
     }
@@ -1526,7 +1545,7 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
       }
       l2nch[++sa->Level] = 0;
       frames[++top] = (p4est3_iter_frame_t) {
-      sa->Level, 0};
+      sa->Level, 0, root_fully_local, 1, levelq};       /* first child shares parent begin */
     }
   }
   else {
@@ -1573,17 +1592,33 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
       continue;
     }
 
-    /* Fetch quadrant level */
+    /* Fetch quadrant level (avoid second query for first child if we already know it) */
     if (p3->contiguous) {
       first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
       proc_owner = p3->mpirank;
     }
     else {
-      SC3E (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
+      if (fr->fully_local && *begin >= sa->local_begin
+          && *end <= sa->local_end) {
+        proc_owner = p3->mpirank;
+        ++sa->subtree_full_local_hits;
+      }
+      else {
+        SC3E (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
+      }
       first_quad = (void *) (p3->nodequads[proc_owner] +
                              p3->qsize * (*begin - p3->goffset[proc_owner]));
     }
-    SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &levelq));
+    if (fr->next_child == 0 && fr->have_first_level && *begin == arr_child[0]) {
+      /* Reuse the level we already queried at parent range decision */
+      levelq = fr->first_child_level;
+      ++sa->first_child_level_reuses;
+      /* Invalidate so only first child benefits */
+      fr->have_first_level = 0;
+    }
+    else {
+      SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &levelq));
+    }
     if (levelq == fr->level) {
       if (cvolume != NULL && proc_owner == p3->mpirank) {
         vinfo->quadrant = first_quad;
@@ -1613,8 +1648,12 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
         arr_it[i] += *begin;
       }
       l2nch[++sa->Level] = 0;
+      int                 child_full_local = (fr->fully_local
+                                              || (*begin >= sa->local_begin
+                                                  && *end <= sa->local_end));
+      /* Store known first child level for the new frame: levelq already corresponds to *begin of child 0 */
       frames[++top] = (p4est3_iter_frame_t) {
-      sa->Level, 0};
+      sa->Level, 0, child_full_local, 1, levelq};
       /* After return will continue with this child's siblings */
     }
   }
@@ -1744,7 +1783,7 @@ p4est3_split_cache_destroy (p4est3_search_area_t *sa)
       (100.0 * (double) sa->tier_seed_hits / (double) sa->tier_seed_total) :
       0.0;
     int                 rr_print = fprintf (stderr,
-                                            "[p4est3_iterate] cache stats: total=%lld fastpath=%lld computed=%lld avoided=%lld avoided_rate=%.2f%% combined_rate=%.2f%% | tier_hits=%d misses=%d rate=%.2f%% ext=%d subhits=%d | seeds: placed=%d hits=%d fill=%.2f%% attempted=%d skipped=%d evicted=%d ph_lookups=%d | mru_hits=%d misses=%d rate=%.2f%% cap=%zu\n",
+                                            "[p4est3_iterate] cache stats: total=%lld fastpath=%lld computed=%lld avoided=%lld avoided_rate=%.2f%% combined_rate=%.2f%% | tier_hits=%d misses=%d rate=%.2f%% ext=%d subhits=%d | seeds: placed=%d hits=%d fill=%.2f%% attempted=%d skipped=%d evicted=%d ph_lookups=%d | mru_hits=%d misses=%d rate=%.2f%% cap=%zu | subtree_full_local=%lld first_child_reuse=%lld\n",
                                             sa->split_total,
                                             sa->split_fastpath,
                                             sa->splits_computed,
@@ -1766,7 +1805,9 @@ p4est3_split_cache_destroy (p4est3_search_area_t *sa)
                                             sa->split_cache_unified ?
                                             sa->
                                             split_cache_unified->maxcount :
-                                            0UL);
+                                            0UL,
+                                            sa->subtree_full_local_hits,
+                                            sa->first_child_level_reuses);
     (void) rr_print;
   }
   /* Print cache statistics before cleanup */
