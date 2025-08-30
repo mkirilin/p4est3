@@ -595,10 +595,20 @@ typedef struct p4est3_search_area
   int                 tier_seed_evicted;        /* placeholder overwritten before materialization */
   int                 tier_placeholder_lookups; /* found placeholder during lookup */
   long long           split_total;      /* total split requests */
-  long long           split_fastpath;   /* small-range fast path count */
+  long long           sibling_fastpath; /* exact full-sibling pack fast path count */
   long long           splits_computed;  /* actual expensive split computations performed */
   int                 tier_extensions;  /* times an existing tier entry was extended (end grew) */
   int                 tier_subinterval_hits;    /* hits where cached end > requested end */
+  /* (removed histogram instrumentation) */
+  /* Last-used split single-entry direct cache */
+  int                 last_split_level; /* -1 means invalid */
+  p4est3_topidx       last_split_tree;
+  p4est3_gloidx       last_split_begin;
+  p4est3_gloidx       last_split_end;
+  p4est3_gloidx       last_split_results[P4EST3_TIER_MAX_SPLITS];
+  unsigned long long  last_split_hits;
+  unsigned long long  last_split_uses;
+  int                 is_contiguous;    /* cached copy of p3->contiguous */
 
   /* Owner lookup cache (monotonic batch acceleration) */
   int                 owner_cache_valid;        /* 0 invalid, else valid */
@@ -1747,10 +1757,19 @@ p4est3_split_cache_init (p4est3_t *p3, p4est3_search_area_t *sa,
   sa->tier_seed_evicted = 0;
   sa->tier_placeholder_lookups = 0;
   sa->split_total = 0;
-  sa->split_fastpath = 0;
+  sa->sibling_fastpath = 0;
   sa->splits_computed = 0;
   sa->tier_extensions = 0;
   sa->tier_subinterval_hits = 0;
+  /* initialize last-used split cache */
+  sa->last_split_level = -1;
+  sa->last_split_tree = -1;
+  sa->last_split_begin = -1;
+  sa->last_split_end = -2;
+  sa->last_split_hits = 0ULL;
+  sa->last_split_uses = 0ULL;
+  sa->is_contiguous = p3->contiguous;
+  /* histogram removed */
 
   return NULL;
 }
@@ -1773,7 +1792,7 @@ p4est3_split_cache_destroy (p4est3_search_area_t *sa)
     double              combined_hits =
       (double) (sa->tier_hits + sa->cache_hits);
     double              combined_lookups =
-      (double) (sa->split_total - sa->split_fastpath);
+      (double) (sa->split_total - sa->sibling_fastpath);
     double              combined_rate = combined_lookups > 0.0 ?
       (100.0 * combined_hits / combined_lookups) : 0.0;
     long long           avoided_splits = (long long) combined_hits;
@@ -1782,14 +1801,22 @@ p4est3_split_cache_destroy (p4est3_search_area_t *sa)
     double              seed_fill_rate = sa->tier_seed_total ?
       (100.0 * (double) sa->tier_seed_hits / (double) sa->tier_seed_total) :
       0.0;
+    double              last_rate = sa->last_split_uses ?
+      (100.0 * (double) sa->last_split_hits /
+       (double) sa->last_split_uses) : 0.0;
     int                 rr_print = fprintf (stderr,
-                                            "[p4est3_iterate] cache stats: total=%lld fastpath=%lld computed=%lld avoided=%lld avoided_rate=%.2f%% combined_rate=%.2f%% | tier_hits=%d misses=%d rate=%.2f%% ext=%d subhits=%d | seeds: placed=%d hits=%d fill=%.2f%% attempted=%d skipped=%d evicted=%d ph_lookups=%d | mru_hits=%d misses=%d rate=%.2f%% cap=%zu | subtree_full_local=%lld first_child_reuse=%lld\n",
+                                            "[p4est3_iterate] cache stats: total=%lld fastpath=%lld computed=%lld avoided=%lld avoided_rate=%.2f%% combined_rate=%.2f%% | last_used: uses=%llu hits=%llu rate=%.2f%% | tier_hits=%d misses=%d rate=%.2f%% ext=%d subhits=%d | seeds: placed=%d hits=%d fill=%.2f%% attempted=%d skipped=%d evicted=%d ph_lookups=%d | mru_hits=%d misses=%d rate=%.2f%% cap=%zu | subtree_full_local=%lld first_child_reuse=%lld\n",
                                             sa->split_total,
-                                            sa->split_fastpath,
+                                            sa->sibling_fastpath,
                                             sa->splits_computed,
                                             avoided_splits,
                                             avoided_rate,
                                             combined_rate,
+                                            (unsigned long long)
+                                            sa->last_split_uses,
+                                            (unsigned long long)
+                                            sa->last_split_hits,
+                                            last_rate,
                                             sa->tier_hits, sa->tier_misses,
                                             tier_hr, sa->tier_extensions,
                                             sa->tier_subinterval_hits,
@@ -1803,11 +1830,11 @@ p4est3_split_cache_destroy (p4est3_search_area_t *sa)
                                             sa->cache_hits, sa->cache_misses,
                                             mru_hr,
                                             sa->split_cache_unified ?
-                                            sa->
-                                            split_cache_unified->maxcount :
-                                            0UL,
+                                            sa->split_cache_unified->
+                                            maxcount : 0UL,
                                             sa->subtree_full_local_hits,
                                             sa->first_child_level_reuses);
+    /* histogram print removed */
     (void) rr_print;
   }
   /* Print cache statistics before cleanup */
@@ -1868,6 +1895,25 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   }
 
   sa->split_total++;
+  /* Range length (only needed for sibling fast path check) */
+  p4est3_gloidx       range_len = end - begin;
+  /* Last-used direct cache: exact reuse only */
+  if (sa->last_split_level == level &&
+      sa->last_split_tree == sa->tree->treeid &&
+      sa->last_split_begin == begin) {
+    ++sa->last_split_uses;
+    if (sa->last_split_end == end) {
+      ++sa->last_split_hits;    /* exact match */
+      p4est3_gloidx      *dst;
+      SC3E (sc3_array_index (indices, 0, &dst));
+      memcpy (dst, sa->last_split_results,
+              sizeof (p4est3_gloidx) * (sa->max_children + 1));
+      return NULL;
+    }
+  }
+  else {
+    ++sa->last_split_uses;      /* count attempt with different begin/tree/level */
+  }
 
   /* Tier ring fast path (per-level, extremely small & hot) */
   if (SC_LIKELY
@@ -1900,17 +1946,17 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
     }
   }
 
-  /* Fast path: very small ranges (<= number of children) skip cache overhead */
-  if (SC_UNLIKELY ((end - begin) <= (p4est3_gloidx) sa->max_children)) {
-    sa->split_fastpath++;
-    if (p3->contiguous) {
-      SC3E (sc3_array_renew_data
-            (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
+  /* Sibling pack fast path: exactly full set of children; direct split */
+  if (SC_UNLIKELY (range_len == (p4est3_gloidx) sa->max_children)) {
+    sa->sibling_fastpath++;
+    if (sa->is_contiguous) {
+      SC3E (sc3_array_renew_data (&array, p3->nodequads[0], p3->qsize,
+                                  begin, range_len));
       return p4est3_quadrant_array_split (p3->qvt, array, level, indices);
     }
     else {
-      SC3E (sc3_array_renew_data
-            (&array, p3->nodequads[0], p3->qsize, 0, end - begin));
+      SC3E (sc3_array_renew_data (&array, p3->nodequads[0], p3->qsize,
+                                  0, range_len));
       return p4est3_quadrant_array_split_noncontig
         (p3, array, level, begin, indices);
     }
@@ -1920,7 +1966,7 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   /* Choose unified cache */
   if (sa->split_cache_unified == NULL) {
     sa->cache_misses++;
-    if (p3->contiguous) {
+    if (sa->is_contiguous) {
       SC3E (sc3_array_renew_data
             (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
       return p4est3_quadrant_array_split (p3->qvt, array, level, indices);
@@ -2005,7 +2051,7 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
 
   /* Compute the split result */
   ++sa->splits_computed;
-  if (p3->contiguous) {
+  if (sa->is_contiguous) {
     SC3E (sc3_array_renew_data
           (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
     SC3E (p4est3_quadrant_array_split (p3->qvt, array, level, indices));
@@ -2027,6 +2073,13 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
     memcpy (cache_entry->split_results3d, src_val,
             sizeof (p4est3_gloidx) * (sa->max_children + 1));
   }
+  /* Update last-used cache */
+  sa->last_split_level = level;
+  sa->last_split_tree = sa->tree->treeid;
+  sa->last_split_begin = begin;
+  sa->last_split_end = end;
+  memcpy (sa->last_split_results, src_val,
+          sizeof (p4est3_gloidx) * (sa->max_children + 1));
 
   /* Insert or extend tier ring entry */
   if (level >= 0 && level < sa->max_level && sa->tier_rings != NULL) {
