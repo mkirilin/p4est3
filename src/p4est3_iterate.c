@@ -33,16 +33,27 @@
 #include <stdio.h>
 
 #include <sc_containers.h>
-
-/* Branch prediction macros (fallback) */
-#ifndef SC_LIKELY
-#if defined(__GNUC__) || defined(__clang__)
-#define SC_LIKELY(x)   __builtin_expect(!!(x), 1)
-#define SC_UNLIKELY(x) __builtin_expect(!!(x), 0)
-#else
-#define SC_LIKELY(x)   (x)
-#define SC_UNLIKELY(x) (x)
+/*
+ * Performance hint: Assume contiguous shared-memory layout unless
+ * P4EST3_ASSUME_CONTIGUOUS is explicitly set to 0. This strips all
+ * non-contiguous branches from hot iteration paths to reduce branch
+ * misprediction and enable better inlining/constant folding.
+ */
+#ifndef P4EST3_ASSUME_CONTIGUOUS
+#define P4EST3_ASSUME_CONTIGUOUS 1
 #endif
+#if P4EST3_ASSUME_CONTIGUOUS
+#define P4EST3_ASSERT_CONTIGUOUS(p3) SC3A_CHECK ((p3)->contiguous)
+#else
+#define P4EST3_ASSERT_CONTIGUOUS(p3) ((void) 0)
+#endif
+
+/* Branch prediction helpers (local fallback if not provided by sc3) */
+#ifndef SC3_LIKELY
+#define SC3_LIKELY(x)   __builtin_expect(!!(x), 1)
+#endif
+#ifndef SC3_UNLIKELY
+#define SC3_UNLIKELY(x) __builtin_expect(!!(x), 0)
 #endif
 
 /* Define maximum quadrant levels - use a reasonable default if not defined */
@@ -53,10 +64,6 @@
   /* In release builds assume invariant preconditions already checked */
 #define SC3E_FAST(f) do { (void) (f); } while (0)
 #endif
-#endif
-
-#ifndef P4EST3_ITER_CACHE_LVL
-#define P4EST3_ITER_CACHE_LVL 32
 #endif
 
 #ifdef __cplusplus
@@ -127,7 +134,7 @@ static inline p4est3_tier_entry_t *
 p4est3_tier_ring_lookup (p4est3_tier_ring_t *ring, int tree_id,
                          int level, p4est3_gloidx begin, p4est3_gloidx end)
 {
-  if (SC_UNLIKELY (ring->size == 0)) {
+  if (SC3_UNLIKELY (ring->size == 0)) {
     return NULL;
   }
   /* Linear scan – ring->size is tiny (<= 16) */
@@ -659,6 +666,7 @@ p4est3_iterate_face_bound_init (p4est3_t *p3,
     sa->remote_last[s] = p3->mpisize - 1;
   }
 
+#if !P4EST3_ASSUME_CONTIGUOUS
   if (!p3->contiguous && sa->nsides == 2) {
     /* only if we probe not a physical boundary */
     for (s = 0; s < sa->nsides; ++s) {
@@ -675,6 +683,7 @@ p4est3_iterate_face_bound_init (p4est3_t *p3,
       }
     }
   }
+#endif /* !P4EST3_ASSUME_CONTIGUOUS */
 
   for (s = 0; s < sa->nsides; ++s) {
     Level_face[s] = 0;
@@ -707,7 +716,9 @@ p4est3_internal_iterate_face (p4est3_t *p3,
   const int           half_ch = sa->half_children;
   p4est3_topidx      *trees = sa->treeid_face;
   p4est3_gloidx      *b_f[2], *e_f[2];
+#if !P4EST3_ASSUME_CONTIGUOUS
   p4est3_gloidx       proc_owner = p3->mpirank;
+#endif
   p4est3_gloidx      *base_ptr;
   void               *stack_it[2];
   /* sa->view_quads not directly needed here; use sa->view_quads inline */
@@ -733,12 +744,14 @@ p4est3_internal_iterate_face (p4est3_t *p3,
 
   /* Check if both sides belong to remote process(es).
      If so, we ignore this face. */
-  if ((sa->nsides == 1 && (*(b_f[0]) >= sa->local_end_face[0]
-                           || *(e_f[0]) <= sa->local_begin_face[0]))
-      || (sa->nsides == 2 && (*(b_f[0]) >= sa->local_end_face[0]
-                              || *(e_f[0]) <= sa->local_begin_face[0])
-          && (*(b_f[1]) >= sa->local_end_face[1]
-              || *(e_f[1]) <= sa->local_begin_face[1]))) {
+  if (SC3_UNLIKELY ((sa->nsides == 1 && (*(b_f[0]) >= sa->local_end_face[0]
+                                         || *(e_f[0]) <=
+                                         sa->local_begin_face[0]))
+                    || (sa->nsides == 2 && (*(b_f[0]) >= sa->local_end_face[0]
+                                            || *(e_f[0]) <=
+                                            sa->local_begin_face[0])
+                        && (*(b_f[1]) >= sa->local_end_face[1]
+                            || *(e_f[1]) <= sa->local_begin_face[1])))) {
     return NULL;
   }
 
@@ -749,6 +762,10 @@ p4est3_internal_iterate_face (p4est3_t *p3,
       continue;
     }
 
+    /* Contiguous fast path (non-contiguous disabled under macro). */
+#if P4EST3_ASSUME_CONTIGUOUS
+    first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*(b_f[side])));
+#else
     if (p3->contiguous) {
       /* Get quadrant from shared storage */
       first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*(b_f[side])));
@@ -765,6 +782,7 @@ p4est3_internal_iterate_face (p4est3_t *p3,
                              p3->qsize * (*(b_f[side]) -
                                           p3->goffset[proc_owner]));
     }
+#endif
 
     SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
     if (level == Level[side]) {
@@ -772,8 +790,8 @@ p4est3_internal_iterate_face (p4est3_t *p3,
       fside[side].nquad =
         (p4est3_locidx) (*(b_f[side]) - p3->gtroffset[trees[side]]);
       fside[side].quadrant = first_quad;
-      if (*(b_f[side]) < p3->goffset[p3->mpirank] ||
-          *(e_f[side]) > p3->goffset[p3->mpirank + 1]) {
+      if (SC3_UNLIKELY (*(b_f[side]) < p3->goffset[p3->mpirank] ||
+                        *(e_f[side]) > p3->goffset[p3->mpirank + 1])) {
         /* This is a ghost quadrant */
         fside[side].is_ghost = 1;
       }
@@ -784,7 +802,7 @@ p4est3_internal_iterate_face (p4est3_t *p3,
   }
 
   if (!is_refine[0] && !is_refine[1]) {
-    if (cface != NULL) {
+    if (SC3_LIKELY (cface != NULL)) {
       SC3E (cface (sa->finfo));
     }
     /*for (side = 0; side < sa->nsides; ++side) {
@@ -960,10 +978,9 @@ p4est3_iterate_volume_rec_init (p4est3_t *p3,
     sa->remote_last[side] = p3->mpisize - 1;
   }
 
-  if (p3->contiguous) {
-    /* The rest functional is valid only for non-contiguous shared memory */
-    return NULL;
-  }
+#if P4EST3_ASSUME_CONTIGUOUS
+  return NULL;                  /* Skip remote partition logic */
+#endif
 
   if (tree == p3->fltree && p3->gtroffset[tree] != p3->goffset[p3->mpirank]) {
     SC3E (p4est3_find_partition
@@ -1113,8 +1130,6 @@ typedef struct
   int                 first_child_level;        /* Cached level value for first child */
 } p4est3_iter_frame_t;
 
-/* Small 2-slot level cache query */
-
 static sc3_error_t *
 p4est3_iterate_volume_iterative (p4est3_t *p3,
                                  p4est3_iterate_volume_t cvolume,
@@ -1123,7 +1138,9 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
                                  p4est3_search_area_t *sa)
 {
   p4est3_gloidx      *begin, *end;
+#if !P4EST3_ASSUME_CONTIGUOUS
   p4est3_gloidx       proc_owner;
+#endif
   void               *first_quad;
   int                 levelq;
   int                 max_children = sa->max_children;
@@ -1142,9 +1159,6 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
   /* allocate temp frame buffer on stack (bounded by max_level) */
   frames = (p4est3_iter_frame_t *) alloca (sizeof (*frames) * sa->max_level);
 
-  /* Initialize owner cache */
-  proc_owner = p3->mpirank;
-
   /* Access root range (already initialized in rec_init) */
   sa->Level = 0;
   sa->child_id = 0;
@@ -1156,6 +1170,10 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
   if (*begin < sa->local_end && *end > sa->local_begin) {
     int                 root_fully_local = (*begin >= sa->local_begin
                                             && *end <= sa->local_end);
+    /* Root first quadrant */
+#if P4EST3_ASSUME_CONTIGUOUS
+    first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
+#else
     if (p3->contiguous) {
       first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
       proc_owner = p3->mpirank;
@@ -1171,6 +1189,7 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
       first_quad = (void *) (p3->nodequads[proc_owner] +
                              p3->qsize * (*begin - p3->goffset[proc_owner]));
     }
+#endif
     SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &levelq));
     if (levelq == sa->Level) {
       if (cvolume != NULL) {
@@ -1210,7 +1229,7 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
   /* DFS using explicit stack */
   while (top >= 0) {
     p4est3_iter_frame_t *fr = &frames[top];
-    if (fr->next_child >= max_children) {
+    if (SC3_UNLIKELY (fr->next_child >= max_children)) {
       /* Finished all children at this level */
       SC3A_CHECK (l2nch[fr->level] == max_children);
       /* Process inner faces at this (still current) level */
@@ -1219,7 +1238,7 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
       SC3E_FAST (sc3_array_pop (idx_vol_stack));
       --top;                    /* remove current frame first */
       sa->Level = fr->level - 1;
-      if (sa->Level >= 0) {
+      if (SC3_LIKELY (sa->Level >= 0)) {
         l2nch[sa->Level]++;     /* parent observed one more finished child */
         /* Advance parent frame child index to avoid reprocessing */
         if (top >= 0) {
@@ -1239,7 +1258,7 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
     begin = &arr_child[sa->child_id];
     end = &arr_child[sa->child_id + 1];
 
-    if (*begin >= sa->local_end || *end <= sa->local_begin) {
+    if (SC3_UNLIKELY (*begin >= sa->local_end || *end <= sa->local_begin)) {
       /* Skip non-local */
       ++fr->next_child;
       l2nch[fr->level]++;
@@ -1247,6 +1266,10 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
     }
 
     /* Fetch quadrant level (avoid second query for first child if we already know it) */
+    /* Child first quadrant */
+#if P4EST3_ASSUME_CONTIGUOUS
+    first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
+#else
     if (p3->contiguous) {
       first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
       proc_owner = p3->mpirank;
@@ -1263,7 +1286,10 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
       first_quad = (void *) (p3->nodequads[proc_owner] +
                              p3->qsize * (*begin - p3->goffset[proc_owner]));
     }
-    if (fr->next_child == 0 && fr->have_first_level && *begin == arr_child[0]) {
+#endif
+    if (SC3_UNLIKELY
+        (fr->next_child == 0 && fr->have_first_level
+         && *begin == arr_child[0])) {
       /* Reuse the level we already queried at parent range decision */
       levelq = fr->first_child_level;
       ++sa->first_child_level_reuses;
@@ -1274,7 +1300,11 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
       SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &levelq));
     }
     if (levelq == fr->level) {
+#if P4EST3_ASSUME_CONTIGUOUS
+      if (SC3_UNLIKELY (cvolume != NULL)) {
+#else
       if (cvolume != NULL && proc_owner == p3->mpirank) {
+#endif
         vinfo->quadrant = first_quad;
         vinfo->nquad =
           (p4est3_locidx) (*begin - p3->gtroffset[sa->tree->treeid]);
@@ -1419,6 +1449,8 @@ p4est3_split_cache_destroy (p4est3_search_area_t *sa)
   return NULL;                  /* Success */
 }
 
+static p4est3_gloidx seq[9] = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
+
 /* Cached array split function */
 /* Cached version of array split function using unified cache entry structure */
 static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
@@ -1431,12 +1463,13 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
 
   p4est3_gloidx       range_len = end - begin;
   /* Early sibling fast path: no split, no other counters */
-  if (range_len == (p4est3_gloidx) sa->max_children) {
+  if (SC3_LIKELY (range_len == (p4est3_gloidx) sa->max_children)) {
     sa->sibling_fastpath++;
     SC3E_FAST (sc3_array_index (indices, 0, &src_val));
-    for (int i = 0; i < range_len + 1; i++) {
-      src_val[i] = i;
-    }
+    memcpy (src_val, seq, sizeof (p4est3_gloidx) * (sa->max_children + 1));
+    /*for (int i = 0; i < range_len + 1; i++) {
+       src_val[i] = i;
+       } */
     return NULL;
   }
 
@@ -1444,9 +1477,10 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   sa->non_sibling_requests++;
   /* Last-used direct cache */
   ++sa->last_split_uses;
-  if (sa->last_split_level == level &&
-      sa->last_split_tree == sa->tree->treeid &&
-      sa->last_split_begin == begin && sa->last_split_end == end) {
+  if (SC3_UNLIKELY (sa->last_split_level == level &&
+                    sa->last_split_tree == sa->tree->treeid &&
+                    sa->last_split_begin == begin
+                    && sa->last_split_end == end)) {
     ++sa->last_split_hits;
     p4est3_gloidx      *dst;
     SC3E (sc3_array_index (indices, 0, &dst));
@@ -1470,12 +1504,17 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
       return NULL;
     }
   }
-  if (tier_hit == NULL) {
+  if (SC3_LIKELY (tier_hit == NULL)) {
     sa->tier_misses++;
   }
 
   /* Compute the split result */
   ++sa->splits_computed;
+#if P4EST3_ASSUME_CONTIGUOUS
+  SC3E (sc3_array_renew_data
+        (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
+  SC3E (p4est3_quadrant_array_split (p3->qvt, array, level, indices));
+#else
   if (sa->is_contiguous) {
     SC3E (sc3_array_renew_data
           (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
@@ -1487,6 +1526,7 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
     SC3E (p4est3_quadrant_array_split_noncontig
           (p3, array, level, begin, indices));
   }
+#endif
 
   SC3E (sc3_array_index (indices, 0, &src_val));
   /* Update last-used cache */
@@ -1496,13 +1536,11 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   sa->last_split_end = end;
   memcpy (sa->last_split_results, src_val,
           sizeof (p4est3_gloidx) * (sa->max_children + 1));
-
   /* Insert or extend tier ring entry */
   SC3A_CHECK (level >= 0 && level < sa->max_level && sa->alloc != NULL);
   ring = &sa->tier_rings[level];
   p4est3_tier_entry_t *e =
     p4est3_tier_ring_insert (ring, sa->tree->treeid, level, begin, end);
-
   if (e != NULL) {
     if (e->end < end) {
       e->end = end;             /* extend silently (no stats) */
