@@ -62,7 +62,7 @@
 #define SC3E_FAST(f) SC3E(f)
 #else
   /* In release builds assume invariant preconditions already checked */
-#define SC3E_FAST(f) do { (void) (f); } while (0)
+#define SC3E_FAST(f) (f);
 #endif
 #endif
 
@@ -92,17 +92,13 @@ extern              "C"
 typedef struct p4est3_tier_entry
 {
   p4est3_gloidx       begin;    /* inclusive global id */
-  p4est3_gloidx       end;      /* exclusive global id last computed (may differ from request) */
-  int                 tree_id;  /* owning tree */
-  int                 level;    /* level at which split was done */
-  int                 valid;    /* entry has computed splits */
+  //int                 tree_id;  /* owning tree */
   p4est3_gloidx       splits[P4EST3_TIER_MAX_SPLITS];   /* cached child boundaries */
 } p4est3_tier_entry_t;
 
 typedef struct p4est3_tier_ring
 {
   int                 next;     /* next insertion slot */
-  int                 size;     /* number of valid entries */
   int                 capacity; /* fixed ring capacity */
   p4est3_tier_entry_t *entries; /* array[capacity] */
 } p4est3_tier_ring_t;
@@ -113,11 +109,13 @@ p4est3_tier_ring_init (p4est3_tier_ring_t *ring, sc3_allocator_t *A,
 {
   SC_ASSERT (capacity > 0);
   ring->next = 0;
-  ring->size = 0;
   ring->capacity = capacity;
   (void) sc3_allocator_calloc (A, (size_t) capacity,
                                sizeof (p4est3_tier_entry_t),
                                (void **) &ring->entries);
+  for (int i = 0; i < capacity; ++i) {
+    ring->entries[i].begin = -1;        /* mark as invalid */
+  }
 }
 
 static inline void
@@ -127,23 +125,16 @@ p4est3_tier_ring_destroy (p4est3_tier_ring_t *ring, sc3_allocator_t *A)
     (void) sc3_allocator_free (A, ring->entries);
   }
   ring->entries = NULL;
-  ring->capacity = ring->size = ring->next = 0;
+  ring->capacity = ring->next = 0;
 }
 
 static inline p4est3_tier_entry_t *
-p4est3_tier_ring_lookup (p4est3_tier_ring_t *ring, int tree_id,
-                         int level, p4est3_gloidx begin, p4est3_gloidx end)
+p4est3_tier_ring_lookup (p4est3_tier_ring_t *ring, p4est3_gloidx begin)
 {
-  if (SC3_UNLIKELY (ring->size == 0)) {
-    return NULL;
-  }
-  /* Linear scan – ring->size is tiny (<= 16) */
-  for (int i = 0; i < ring->size; ++i) {
+  for (int i = 0; i < ring->capacity; ++i) {
     p4est3_tier_entry_t *e = &ring->entries[i];
     /* Further relaxed key: match (tree_id, level, begin) only; allow end mismatch */
-    if (e->tree_id == tree_id && e->level == level && e->begin == begin) {
-      /* If stored covers a superset (end >= requested end) treat as hit outright */
-      /* If requested extends further (end > e->end) we will later expand e->end after computing */
+    if (e->begin == begin) {
       return e;                 /* hit (may be placeholder or may need extension) */
     }
   }
@@ -151,19 +142,11 @@ p4est3_tier_ring_lookup (p4est3_tier_ring_t *ring, int tree_id,
 }
 
 static inline p4est3_tier_entry_t *
-p4est3_tier_ring_insert (p4est3_tier_ring_t *ring, int tree_id,
-                         int level, p4est3_gloidx begin, p4est3_gloidx end)
+p4est3_tier_ring_insert (p4est3_tier_ring_t *ring, p4est3_gloidx begin)
 {
   p4est3_tier_entry_t *e = &ring->entries[ring->next];
   ring->next = (ring->next + 1) % ring->capacity;
-  if (ring->size < ring->capacity) {
-    ring->size++;
-  }
   e->begin = begin;
-  e->end = end;
-  e->tree_id = tree_id;
-  e->level = level;
-  e->valid = 1;
   return e;
 }
 
@@ -258,9 +241,7 @@ typedef struct p4est3_search_area
   /* (removed histogram instrumentation) */
   /* Last-used split single-entry direct cache */
   int                 last_split_level; /* -1 means invalid */
-  p4est3_topidx       last_split_tree;
   p4est3_gloidx       last_split_begin;
-  p4est3_gloidx       last_split_end;
   p4est3_gloidx       last_split_results[P4EST3_TIER_MAX_SPLITS];
   unsigned long long  last_split_hits;
   unsigned long long  last_split_uses;
@@ -300,14 +281,14 @@ p4est3_array_new (sc3_allocator_t *alloc, size_t esize, int ealloc,
   SC3A_IS (sc3_allocator_is_setup, alloc);
   SC3A_CHECK (ealloc >= 0);
 
-  SC3E (sc3_array_new (alloc, arr));
-  SC3E (sc3_array_set_elem_size (*arr, esize));
-  SC3E (sc3_array_set_elem_alloc (*arr, ealloc));
-  SC3E (sc3_array_set_elem_count (*arr, ecount));
-  SC3E (sc3_array_set_initzero (*arr, 1));
-  SC3E (sc3_array_set_resizable (*arr, is_resizable));
-  SC3E (sc3_array_set_tighten (*arr, 0));
-  SC3E (sc3_array_setup (*arr));
+  SC3E_FAST (sc3_array_new (alloc, arr));
+  SC3E_FAST (sc3_array_set_elem_size (*arr, esize));
+  SC3E_FAST (sc3_array_set_elem_alloc (*arr, ealloc));
+  SC3E_FAST (sc3_array_set_elem_count (*arr, ecount));
+  SC3E_FAST (sc3_array_set_initzero (*arr, 1));
+  SC3E_FAST (sc3_array_set_resizable (*arr, is_resizable));
+  SC3E_FAST (sc3_array_set_tighten (*arr, 0));
+  SC3E_FAST (sc3_array_setup (*arr));
 
   return NULL;
 }
@@ -318,9 +299,9 @@ p4est3_array_set_zero (sc3_array_t *arr)
 {
   size_t              esize, ecount;
   void               *idx;
-  SC3E (sc3_array_get_elem_count (arr, &ecount));
-  SC3E (sc3_array_get_elem_size (arr, &esize));
-  SC3E (sc3_array_index (arr, 0, &idx));
+  SC3E_FAST (sc3_array_get_elem_count (arr, &ecount));
+  SC3E_FAST (sc3_array_get_elem_size (arr, &esize));
+  SC3E_FAST (sc3_array_index (arr, 0, &idx));
   memset (idx, 0, ecount * esize);
   return NULL;
 }
@@ -345,9 +326,9 @@ p4est3_set_children_face_neighbors (p4est3_t *p3, p4est3_search_area_t *sa)
     return NULL;                /* Unsupported dimension */
   }
 
-  SC3E (sc3_allocator_calloc
-        (p3->alloc, (size_t) sa->nfaces * (1 << p3->qvt->dim),
-         sizeof (int), (void *) &sa->children_face_neighbors));
+  SC3E_FAST (sc3_allocator_calloc
+             (p3->alloc, (size_t) sa->nfaces * (1 << p3->qvt->dim),
+              sizeof (int), (void *) &sa->children_face_neighbors));
 
   /* Direct memory copy from const table - faster than individual assignments */
   memcpy (sa->children_face_neighbors, src_table, table_size);
@@ -373,9 +354,9 @@ p4est3_set_face_dual (p4est3_t *p3, p4est3_search_area_t *sa)
     return NULL;                /* Unsupported dimension */
   }
 
-  SC3E (sc3_allocator_calloc
-        (p3->alloc, (size_t) 2 * p3->qvt->dim, sizeof (int),
-         (void *) &sa->face_dual));
+  SC3E_FAST (sc3_allocator_calloc
+             (p3->alloc, (size_t) 2 * p3->qvt->dim, sizeof (int),
+              (void *) &sa->face_dual));
 
   /* Direct memory copy from const table - faster than individual assignments */
   memcpy (sa->face_dual, src_table, table_size);
@@ -397,8 +378,8 @@ p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
   sa->max_children = p3->num_children;
   sa->half_children = sa->max_children / 2;
   sa->nfaces = 2 * sa->dim;
-  SC3E (p4est3_set_children_face_neighbors (p3, sa));
-  SC3E (p4est3_set_face_dual (p3, sa));
+  SC3E_FAST (p4est3_set_children_face_neighbors (p3, sa));
+  SC3E_FAST (p4est3_set_face_dual (p3, sa));
 
   sa->owner_cache_valid = 0;
   sa->owner_cache_rank = -1;
@@ -408,9 +389,9 @@ p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
   sa->first_child_level_reuses = 0;
   /* Initialize tier rings (lightweight per-level tiny caches) */
   sa->tier_rings = NULL;
-  SC3E (sc3_allocator_calloc (p3->alloc, (size_t) sa->max_level,
-                              sizeof (p4est3_tier_ring_t),
-                              (void *) &sa->tier_rings));
+  SC3E_FAST (sc3_allocator_calloc (p3->alloc, (size_t) sa->max_level,
+                                   sizeof (p4est3_tier_ring_t),
+                                   (void *) &sa->tier_rings));
   for (int L = 0; L < sa->max_level; ++L) {
     p4est3_tier_ring_init ((&sa->tier_rings[L]), p3->alloc, 2 * sa->max_children);      /* small fixed capacity */
   }
@@ -420,46 +401,47 @@ p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
   sa->tier_hits = sa->tier_misses = 0;
   sa->last_split_uses = sa->last_split_hits = 0;
   sa->last_split_level = -1;    /* sentinel invalid */
-  sa->last_split_tree = -1;
-  sa->last_split_begin = sa->last_split_end = (p4est3_gloidx) - 1;
+  sa->last_split_begin = (p4est3_gloidx) - 1;
 
   /*set volume section of sa */
-  SC3E (p4est3_tree_index (p3, p3->fltree, &sa->tree));
+  SC3E_FAST (p4est3_tree_index (p3, p3->fltree, &sa->tree));
   sa->child_id = -1;
   sa->Level = 0;
-  SC3E (sc3_allocator_calloc (p3->alloc, sa->max_level, sizeof (int),
-                              (void *) &sa->level2nchildren));
+  SC3E_FAST (sc3_allocator_calloc (p3->alloc, sa->max_level, sizeof (int),
+                                   (void *) &sa->level2nchildren));
   memset (sa->level2nchildren, 0, sizeof (int) * sa->max_level);
 
   /* set 2d stack (array of arrays) */
-  SC3E (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
-                          sa->max_level, sa->max_level, 1,
-                          &sa->idx_vol_stack));
-  SC3E (sc3_array_index (sa->idx_vol_stack, 0, (void **) &arr));
-  SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_gloidx), 2, 2, 1,
-                          (sc3_array_t **) arr));
+  SC3E_FAST (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
+                               sa->max_level, sa->max_level, 1,
+                               &sa->idx_vol_stack));
+  SC3E_FAST (sc3_array_index (sa->idx_vol_stack, 0, (void **) &arr));
+  SC3E_FAST (p4est3_array_new (p3->alloc, sizeof (p4est3_gloidx), 2, 2, 1,
+                               (sc3_array_t **) arr));
   for (i = 1; i < sa->max_level; ++i) {
-    SC3E (sc3_array_index (sa->idx_vol_stack, i, &arr));
-    SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_gloidx), ntypes, ntypes,
-                            1, (sc3_array_t **) arr));
+    SC3E_FAST (sc3_array_index (sa->idx_vol_stack, i, &arr));
+    SC3E_FAST (p4est3_array_new
+               (p3->alloc, sizeof (p4est3_gloidx), ntypes, ntypes, 1,
+                (sc3_array_t **) arr));
   }
-  SC3E (sc3_array_resize (sa->idx_vol_stack, 1));
+  SC3E_FAST (sc3_array_resize (sa->idx_vol_stack, 1));
 
-  SC3E (sc3_allocator_calloc_one (p3->alloc,
-                                  sizeof (p4est3_iterate_volume_info_t),
-                                  &sa->vinfo));
+  SC3E_FAST (sc3_allocator_calloc_one (p3->alloc,
+                                       sizeof (p4est3_iterate_volume_info_t),
+                                       &sa->vinfo));
   sa->vinfo->p3 = p3;
   sa->vinfo->user_data = user_data;
 
   /*set face section of sa */
   sa->nsides = 2;
-  SC3E (sc3_allocator_calloc_one (p3->alloc,
-                                  sizeof (p4est3_iterate_face_info_t),
-                                  &sa->finfo));
-  SC3E (p4est3_array_new (p3->alloc, sizeof (p4est3_iterate_face_side_t), 2,
-                          2, 1, &sa->finfo->sides));
-  SC3E (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
-  SC3E (sc3_mpienv_get_noderank (p3->split_info, &noderank));
+  SC3E_FAST (sc3_allocator_calloc_one (p3->alloc,
+                                       sizeof (p4est3_iterate_face_info_t),
+                                       &sa->finfo));
+  SC3E_FAST (p4est3_array_new
+             (p3->alloc, sizeof (p4est3_iterate_face_side_t), 2, 2, 1,
+              &sa->finfo->sides));
+  SC3E_FAST (sc3_mpienv_get_nodesize (p3->split_info, &nodesize));
+  SC3E_FAST (sc3_mpienv_get_noderank (p3->split_info, &noderank));
   sa->finfo->p3 = p3;
   sa->finfo->user_data = user_data;
   for (side = 0; side < 2; ++side) {
@@ -469,25 +451,26 @@ p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
     sa->is_refine[side] = 1;
 
     /* set 2d stack (array of arrays) */
-    SC3E (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
-                            sa->max_level, sa->max_level, 1,
-                            &sa->idx_face_stack[side]));
-    SC3E (sc3_array_index (sa->idx_face_stack[side], 0, &arr));
-    SC3E (p4est3_array_new
-          (p3->alloc, sizeof (p4est3_gloidx), 2, 2, 1, (sc3_array_t **) arr));
+    SC3E_FAST (p4est3_array_new (p3->alloc, sizeof (sc3_array_t *),
+                                 sa->max_level, sa->max_level, 1,
+                                 &sa->idx_face_stack[side]));
+    SC3E_FAST (sc3_array_index (sa->idx_face_stack[side], 0, &arr));
+    SC3E_FAST (p4est3_array_new
+               (p3->alloc, sizeof (p4est3_gloidx), 2, 2, 1,
+                (sc3_array_t **) arr));
     for (i = 1; i < sa->max_level; ++i) {
-      SC3E (sc3_array_index (sa->idx_face_stack[side], i, &arr));
-      SC3E (p4est3_array_new
-            (p3->alloc, sizeof (p4est3_gloidx), ntypes, ntypes, 1,
-             (sc3_array_t **) arr));
+      SC3E_FAST (sc3_array_index (sa->idx_face_stack[side], i, &arr));
+      SC3E_FAST (p4est3_array_new
+                 (p3->alloc, sizeof (p4est3_gloidx), ntypes, ntypes, 1,
+                  (sc3_array_t **) arr));
     }
-    SC3E (sc3_array_resize (sa->idx_face_stack[side], 1));
+    SC3E_FAST (sc3_array_resize (sa->idx_face_stack[side], 1));
   }
 
   /*temporarily set view on level2children array to be able to renew it later
      instead of making new / removing */
-  SC3E (sc3_array_new_data (p3->alloc, &sa->view_quads, sa->tree->tquads,
-                            sa->quadrant_size, 0, 0));
+  SC3E_FAST (sc3_array_new_data (p3->alloc, &sa->view_quads, sa->tree->tquads,
+                                 sa->quadrant_size, 0, 0));
   return NULL;
 }
 
@@ -498,32 +481,32 @@ p4est3_destroy_outer_data (p4est3_t *p3, p4est3_search_area_t *sa)
   void               *arr;
 
   /* Cleanup caches (tier rings + stats print) */
-  SC3E (p4est3_split_cache_destroy (sa));
+  SC3E_FAST (p4est3_split_cache_destroy (sa));
 
-  SC3E (sc3_allocator_free (p3->alloc, sa->children_face_neighbors));
-  SC3E (sc3_allocator_free (p3->alloc, sa->face_dual));
-  SC3E (sc3_allocator_free (p3->alloc, sa->level2nchildren));
+  SC3E_FAST (sc3_allocator_free (p3->alloc, sa->children_face_neighbors));
+  SC3E_FAST (sc3_allocator_free (p3->alloc, sa->face_dual));
+  SC3E_FAST (sc3_allocator_free (p3->alloc, sa->level2nchildren));
 
-  SC3E (sc3_array_resize (sa->idx_vol_stack, sa->max_level));
+  SC3E_FAST (sc3_array_resize (sa->idx_vol_stack, sa->max_level));
   for (i = 0; i < sa->max_level; ++i) {
-    SC3E (sc3_array_index (sa->idx_vol_stack, i, &arr));
-    SC3E (sc3_array_destroy ((sc3_array_t **) arr));
+    SC3E_FAST (sc3_array_index (sa->idx_vol_stack, i, &arr));
+    SC3E_FAST (sc3_array_destroy ((sc3_array_t **) arr));
   }
-  SC3E (sc3_array_destroy (&sa->idx_vol_stack));
+  SC3E_FAST (sc3_array_destroy (&sa->idx_vol_stack));
 
   for (side = 0; side < 2; ++side) {
-    SC3E (sc3_array_resize (sa->idx_face_stack[side], sa->max_level));
+    SC3E_FAST (sc3_array_resize (sa->idx_face_stack[side], sa->max_level));
     for (i = 0; i < sa->max_level; ++i) {
-      SC3E (sc3_array_index (sa->idx_face_stack[side], i, &arr));
-      SC3E (sc3_array_destroy ((sc3_array_t **) arr));
+      SC3E_FAST (sc3_array_index (sa->idx_face_stack[side], i, &arr));
+      SC3E_FAST (sc3_array_destroy ((sc3_array_t **) arr));
     }
   }
-  SC3E (sc3_array_destroy (&sa->idx_face_stack[0]));
-  SC3E (sc3_array_destroy (&sa->idx_face_stack[1]));
-  SC3E (sc3_array_destroy (&sa->view_quads));
-  SC3E (sc3_array_destroy (&sa->finfo->sides));
-  SC3E (sc3_allocator_free (p3->alloc, sa->vinfo));
-  SC3E (sc3_allocator_free (p3->alloc, sa->finfo));
+  SC3E_FAST (sc3_array_destroy (&sa->idx_face_stack[0]));
+  SC3E_FAST (sc3_array_destroy (&sa->idx_face_stack[1]));
+  SC3E_FAST (sc3_array_destroy (&sa->view_quads));
+  SC3E_FAST (sc3_array_destroy (&sa->finfo->sides));
+  SC3E_FAST (sc3_allocator_free (p3->alloc, sa->vinfo));
+  SC3E_FAST (sc3_allocator_free (p3->alloc, sa->finfo));
 
   return NULL;
 }
@@ -553,8 +536,8 @@ p4est3_owner_lookup_fast (p4est3_t *p3, p4est3_search_area_t *sa,
     return NULL;                /* cache hit */
   }
   p4est3_gloidx       rank;
-  SC3E (p4est3_search_lower_bound64
-        (gid, p3->goffset, p3->mpisize + 1, &rank));
+  SC3E_FAST (p4est3_search_lower_bound64
+             (gid, p3->goffset, p3->mpisize + 1, &rank));
   if (p3->goffset[rank] > gid) {
     SC3A_CHECK (rank > 0);
     rank--;
@@ -573,7 +556,8 @@ p4est3_iterate_face (p4est3_t *p3,
                      p4est3_iterate_volume_t cvolume,
                      p4est3_iterate_face_t cface, void *user_data)
 {
-  SC3E (p4est3_iterate_codim (p3, 0x01, cvolume, cface, NULL, user_data));
+  SC3E_FAST (p4est3_iterate_codim
+             (p3, 0x01, cvolume, cface, NULL, user_data));
   return NULL;
 }
 
@@ -595,11 +579,11 @@ p4est3_iterate_volume (p4est3_t *p3,
   info.user_data = user_data;
   for (ntree = p3->fltree; ntree <= p3->lltree; ++ntree) {
     info.ntree = ntree;
-    SC3E (p4est3_tree_index (p3, ntree, &tree));
+    SC3E_FAST (p4est3_tree_index (p3, ntree, &tree));
     for (si = 0; si < tree->num_quads; ++si) {
       info.quadrant = tree->tquads + si * p3->qvt->quadrant_size;
       info.nquad = (p4est3_locidx) (si + tree->first_tquad);
-      SC3E (cvolume (&info));
+      SC3E_FAST (cvolume (&info));
     }
   }
   return NULL;
@@ -627,8 +611,8 @@ p4est3_iterate_face_bound_init (p4est3_t *p3,
   fside[0].ntree = tree;
   fside[0].nface = face;
   fside[0].is_ghost = -1;
-  SC3E (p4est3_connectivity_get_face
-        (p3->conn, &tree_neighbor, &face, &orient));
+  SC3E_FAST (p4est3_connectivity_get_face
+             (p3->conn, &tree_neighbor, &face, &orient));
   /*if (tree_neighbor > p3->lltree || tree_neighbor < p3->fltree) {
    *is_lower = 1;
    return NULL;
@@ -655,7 +639,7 @@ p4est3_iterate_face_bound_init (p4est3_t *p3,
     fside[1].nface = face;
     fside[1].is_ghost = -1;
   }
-  SC3E (sc3_array_resize (sa->finfo->sides, sa->nsides));
+  SC3E_FAST (sc3_array_resize (sa->finfo->sides, sa->nsides));
   tree_ids[0] = tree;
   tree_ids[1] = tree_neighbor;
   /* Find here two ranges of procs that:
@@ -670,10 +654,11 @@ p4est3_iterate_face_bound_init (p4est3_t *p3,
   if (!p3->contiguous && sa->nsides == 2) {
     /* only if we probe not a physical boundary */
     for (s = 0; s < sa->nsides; ++s) {
-      SC3E (p4est3_find_partition
-            (p3->alloc, p3->mpisize, p3->goffset, p3->gtroffset[tree_ids[s]],
-             p3->gtroffset[tree_ids[s] + 1] - 1,
-             &sa->remote_first[s], &sa->remote_last[s]));
+      SC3E_FAST (p4est3_find_partition
+                 (p3->alloc, p3->mpisize, p3->goffset,
+                  p3->gtroffset[tree_ids[s]],
+                  p3->gtroffset[tree_ids[s] + 1] - 1, &sa->remote_first[s],
+                  &sa->remote_last[s]));
       if (p3->goffset[sa->remote_first[s]] > p3->gtroffset[tree_ids[s]]) {
         sa->remote_first[s]--;
       }
@@ -689,10 +674,10 @@ p4est3_iterate_face_bound_init (p4est3_t *p3,
     Level_face[s] = 0;
     is_refine[s] = 1;
     sa->child_id_face[s] = 0;
-    SC3E (sc3_array_resize (idx_f_stack[s], 1));
-    SC3E (sc3_array_index (idx_f_stack[s], 0, &arr));
-    SC3E (sc3_array_index (*(sc3_array_t **) arr, 0, &begin));
-    SC3E (sc3_array_index (*(sc3_array_t **) arr, 1, &end));
+    SC3E_FAST (sc3_array_resize (idx_f_stack[s], 1));
+    SC3E_FAST (sc3_array_index (idx_f_stack[s], 0, &arr));
+    SC3E_FAST (sc3_array_index (*(sc3_array_t **) arr, 0, &begin));
+    SC3E_FAST (sc3_array_index (*(sc3_array_t **) arr, 1, &end));
 
     sa->local_begin_face[s] =
       SC3_MAX (p3->gtroffset[tree_ids[s]], p3->goffset[p3->mpirank]);
@@ -732,14 +717,14 @@ p4est3_internal_iterate_face (p4est3_t *p3,
   void               *first_quad;
 
   for (side = 0; side < sa->nsides; ++side) {
-    SC3E (sc3_array_index
-          (idx_face_stack[side], Level[side], &(stack_it[side])));
-    SC3E (sc3_array_index
-          (*(sc3_array_t **) stack_it[side], sa->child_id_face[side],
-           &(b_f[side])));
-    SC3E (sc3_array_index
-          (*(sc3_array_t **) stack_it[side], sa->child_id_face[side] + 1,
-           &(e_f[side])));
+    SC3E_FAST (sc3_array_index
+               (idx_face_stack[side], Level[side], &(stack_it[side])));
+    SC3E_FAST (sc3_array_index
+               (*(sc3_array_t **) stack_it[side], sa->child_id_face[side],
+                &(b_f[side])));
+    SC3E_FAST (sc3_array_index
+               (*(sc3_array_t **) stack_it[side], sa->child_id_face[side] + 1,
+                &(e_f[side])));
   }
 
   /* Check if both sides belong to remote process(es).
@@ -756,7 +741,7 @@ p4est3_internal_iterate_face (p4est3_t *p3,
   }
 
   /* first check if the whole quadrant passes */
-  SC3E (sc3_array_index (sa->finfo->sides, 0, &fside));
+  SC3E_FAST (sc3_array_index (sa->finfo->sides, 0, &fside));
   for (side = 0; side < sa->nsides; ++side) {
     if (!is_refine[side]) {
       continue;
@@ -775,7 +760,8 @@ p4est3_internal_iterate_face (p4est3_t *p3,
       /* Consider batch processing for binary search */
       /* Find process that owns this quadrant */
       /* Start binary search from a local process */
-      SC3E (p4est3_owner_lookup_fast (p3, sa, *(b_f[side]), &proc_owner));
+      SC3E_FAST (p4est3_owner_lookup_fast
+                 (p3, sa, *(b_f[side]), &proc_owner));
 
       /* Get quadrant from the owning process's window */
       first_quad = (void *) (p3->nodequads[proc_owner] +
@@ -784,7 +770,7 @@ p4est3_internal_iterate_face (p4est3_t *p3,
     }
 #endif
 
-    SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
+    SC3E_FAST (p4est3_quadrant_level (p3->qvt, first_quad, &level));
     if (level == Level[side]) {
       is_refine[side] = 0;
       fside[side].nquad =
@@ -803,7 +789,7 @@ p4est3_internal_iterate_face (p4est3_t *p3,
 
   if (!is_refine[0] && !is_refine[1]) {
     if (SC3_LIKELY (cface != NULL)) {
-      SC3E (cface (sa->finfo));
+      SC3E_FAST (cface (sa->finfo));
     }
     /*for (side = 0; side < sa->nsides; ++side) {
        is_refine[side] = 1;
@@ -816,17 +802,18 @@ p4est3_internal_iterate_face (p4est3_t *p3,
     }
     /* we split array taht is unite for and local and remote procs quads */
 
-    SC3E (sc3_array_push (idx_face_stack[side], &(stack_it[side])));
+    SC3E_FAST (sc3_array_push (idx_face_stack[side], &(stack_it[side])));
 #ifdef P4EST_ENABLE_DEBUG
-    SC3E (p4est3_array_set_zero (*(sc3_array_t **) (stack_it[side])));
+    SC3E_FAST (p4est3_array_set_zero (*(sc3_array_t **) (stack_it[side])));
 #endif
-    SC3E (p4est3_cached_quadrant_array_split_noncontig
-          (p3, sa->view_quads, Level[side], *(b_f[side]),
-           *(e_f[side]), *(sc3_array_t **) (stack_it[side]), sa));
+    SC3E_FAST (p4est3_cached_quadrant_array_split_noncontig
+               (p3, sa->view_quads, Level[side], *(b_f[side]),
+                *(e_f[side]), *(sc3_array_t **) (stack_it[side]), sa));
 
     /* since array_split doesn't count shift from the beinning of quadrants
        in a proc, we shift result indices at the loop below */
-    SC3E (sc3_array_index (*(sc3_array_t **) (stack_it[side]), 0, &base_ptr));
+    SC3E_FAST (sc3_array_index
+               (*(sc3_array_t **) (stack_it[side]), 0, &base_ptr));
     for (i = 0; i < max_children + 1; ++i) {
       base_ptr[i] += *(b_f[side]);
     }
@@ -840,23 +827,23 @@ p4est3_internal_iterate_face (p4est3_t *p3,
       }
       idx = i;
       if (side == 1) {
-        SC3E (p4est3_connectivity_get_neighbor_face_corner
-              (p3->conn, fside[0].nface, fside[1].nface, ori, &idx));
+        SC3E_FAST (p4est3_connectivity_get_neighbor_face_corner
+                   (p3->conn, fside[0].nface, fside[1].nface, ori, &idx));
       }
-      SC3E (p4est3_connectivity_get_face_child_id
-            (p3->conn, fside[side].nface, idx, &child_id));
+      SC3E_FAST (p4est3_connectivity_get_face_child_id
+                 (p3->conn, fside[side].nface, idx, &child_id));
       sa->child_id_face[side] = child_id;
       Level[side]++;
       is_lvl_increased[side] = 1;
     }
-    SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, sa));        /* keep full check here */
+    SC3E_FAST (p4est3_internal_iterate_face (p3, cface, ccodim, sa));   /* keep full check here */
     for (side = 0; side < sa->nsides; ++side) {
       Level[side] = is_lvl_increased[side] ? Level[side] - 1 : Level[side];
       if (i != half_ch - 1) {
         is_refine[side] = is_lvl_increased[side];
       }
       else if (is_lvl_increased[side]) {
-        SC3E (sc3_array_pop (idx_face_stack[side]));
+        SC3E_FAST (sc3_array_pop (idx_face_stack[side]));
       }
     }
   }
@@ -882,12 +869,13 @@ p4est3_iterate_face_inner_init (p4est3_t *p3, p4est3_search_area_t *sa,
     Level_face[s] = sa->Level;
     is_refine[s] = 1;
     sa->child_id_face[s] = ch_neigh[s];
-    SC3E (sc3_array_resize (idx_f_stack[s], sa->Level + 1));
-    SC3E (sc3_array_index (idx_f_stack[s], Level_face[s], &top));
-    SC3E (sc3_array_index (*(sc3_array_t **) top, ch_neigh[s], &begin));
-    SC3E (sc3_array_index (*(sc3_array_t **) top, ch_neigh[s] + 1, &end));
-    SC3E (sc3_array_index (sa->idx_vol_stack, Level_face[s], &top));
-    SC3E (sc3_array_index (*(sc3_array_t **) top, 0, &arr_vol_it));
+    SC3E_FAST (sc3_array_resize (idx_f_stack[s], sa->Level + 1));
+    SC3E_FAST (sc3_array_index (idx_f_stack[s], Level_face[s], &top));
+    SC3E_FAST (sc3_array_index (*(sc3_array_t **) top, ch_neigh[s], &begin));
+    SC3E_FAST (sc3_array_index
+               (*(sc3_array_t **) top, ch_neigh[s] + 1, &end));
+    SC3E_FAST (sc3_array_index (sa->idx_vol_stack, Level_face[s], &top));
+    SC3E_FAST (sc3_array_index (*(sc3_array_t **) top, 0, &arr_vol_it));
     *(begin) = *(arr_vol_it + ch_neigh[s]);
     *(end) = *(arr_vol_it + ch_neigh[s] + 1);
     /* Since we iterate inner faces, we inherit the local boundaries for volumes */
@@ -909,7 +897,7 @@ p4est3_iterate_face_inner (p4est3_t *p3,
   p4est3_iterate_face_side_t *fside;
   search_area->treeid_face[0] = search_area->treeid_face[1]
     = search_area->tree->treeid;
-  SC3E (sc3_array_index (search_area->finfo->sides, 0, &fside));
+  SC3E_FAST (sc3_array_index (search_area->finfo->sides, 0, &fside));
   for (child = 0; child < search_area->max_children; ++child) {
     for (face = 0; face < search_area->nfaces; ++face) {
       nb_id = p4est3_get_children_face_nb_id (search_area, child, face);
@@ -918,8 +906,10 @@ p4est3_iterate_face_inner (p4est3_t *p3,
       }
       fside[0].nface = face;
       fside[1].nface = p4est3_get_dual_face (search_area, face);
-      SC3E (p4est3_iterate_face_inner_init (p3, search_area, child, nb_id));
-      SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
+      SC3E_FAST (p4est3_iterate_face_inner_init
+                 (p3, search_area, child, nb_id));
+      SC3E_FAST (p4est3_internal_iterate_face
+                 (p3, cface, ccodim, search_area));
     }
   }
   return NULL;
@@ -934,27 +924,27 @@ p4est3_iterate_volume_rec_init (p4est3_t *p3,
   p4est3_iterate_face_side_t *fside;
   p4est3_gloidx      *begin, *end;
 
-  SC3E (p4est3_tree_index (p3, tree, &sa->tree));
+  SC3E_FAST (p4est3_tree_index (p3, tree, &sa->tree));
   sa->vinfo->ntree = tree;
   sa->finfo->orientation = 0;
   sa->finfo->tree_boundary = 0;
-  SC3E (sc3_array_resize (sa->finfo->sides, 2));
+  SC3E_FAST (sc3_array_resize (sa->finfo->sides, 2));
 
   memset (sa->level2nchildren, 0, sizeof (int) * p3->qvt->max_level);
   SC3A_CHECK (sa->Level == 0);
 
-  SC3E (sc3_array_index (sa->idx_vol_stack, 0, &arr));
+  SC3E_FAST (sc3_array_index (sa->idx_vol_stack, 0, &arr));
 #ifdef P4EST_ENABLE_DEBUG
   size_t              ecount;
-  SC3E (sc3_array_get_elem_count (*(sc3_array_t **) arr, &ecount));
+  SC3E_FAST (sc3_array_get_elem_count (*(sc3_array_t **) arr, &ecount));
   SC3A_CHECK (ecount == 2);
-  SC3E (sc3_array_get_elem_count (sa->idx_vol_stack, &ecount));
+  SC3E_FAST (sc3_array_get_elem_count (sa->idx_vol_stack, &ecount));
   SC3A_CHECK (ecount == 1);
 #endif
 
   sa->child_id = 0;
-  SC3E (sc3_array_index (*(sc3_array_t **) arr, sa->child_id, &begin));
-  SC3E (sc3_array_index (*(sc3_array_t **) arr, sa->child_id + 1, &end));
+  SC3E_FAST (sc3_array_index (*(sc3_array_t **) arr, sa->child_id, &begin));
+  SC3E_FAST (sc3_array_index (*(sc3_array_t **) arr, sa->child_id + 1, &end));
 
   *begin = p3->gtroffset[tree];
   *end = p3->gtroffset[tree + 1];
@@ -963,7 +953,7 @@ p4est3_iterate_volume_rec_init (p4est3_t *p3,
   sa->local_end =
     SC3_MIN (p3->gtroffset[tree + 1], p3->goffset[p3->mpirank + 1]);
 
-  SC3E (sc3_array_index (sa->finfo->sides, 0, &fside));
+  SC3E_FAST (sc3_array_index (sa->finfo->sides, 0, &fside));
   for (int side = 0; side < 2; ++side) {
     fside[side].ntree = tree;
     fside[side].is_ghost = -1;
@@ -983,10 +973,10 @@ p4est3_iterate_volume_rec_init (p4est3_t *p3,
 #endif
 
   if (tree == p3->fltree && p3->gtroffset[tree] != p3->goffset[p3->mpirank]) {
-    SC3E (p4est3_find_partition
-          (p3->alloc, p3->mpisize, p3->goffset, p3->gtroffset[tree],
-           p3->goffset[p3->mpirank] - 1, &sa->remote_first[0],
-           &sa->remote_last[0]));
+    SC3E_FAST (p4est3_find_partition
+               (p3->alloc, p3->mpisize, p3->goffset, p3->gtroffset[tree],
+                p3->goffset[p3->mpirank] - 1, &sa->remote_first[0],
+                &sa->remote_last[0]));
     if (p3->goffset[sa->remote_first[0]] > p3->gtroffset[tree]) {
       sa->remote_first[0]--;
     }
@@ -997,10 +987,10 @@ p4est3_iterate_volume_rec_init (p4est3_t *p3,
   }
   if (tree == p3->lltree
       && p3->gtroffset[tree + 1] != p3->goffset[p3->mpirank + 1]) {
-    SC3E (p4est3_find_partition
-          (p3->alloc, p3->mpisize, p3->goffset, p3->goffset[p3->mpirank + 1],
-           p3->gtroffset[tree + 1] - 1,
-           &sa->remote_first[1], &sa->remote_last[1]));
+    SC3E_FAST (p4est3_find_partition
+               (p3->alloc, p3->mpisize, p3->goffset,
+                p3->goffset[p3->mpirank + 1], p3->gtroffset[tree + 1] - 1,
+                &sa->remote_first[1], &sa->remote_last[1]));
     if (p3->goffset[sa->remote_first[1]] > p3->goffset[p3->mpirank + 1]) {
       sa->remote_first[1]--;
     }
@@ -1061,14 +1051,14 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
     first_quad = (void *) (p3->nodequads[0] + p3->qsize * (*begin));
   }
   else {
-    SC3E (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
+    SC3E_FAST (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
 
     /* Get quadrant from the owning process's window */
     first_quad = (void *) (p3->nodequads[proc_owner] +
                            p3->qsize * (*begin - p3->goffset[proc_owner]));
   }
 
-  SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &level));
+  SC3E_FAST (p4est3_quadrant_level (p3->qvt, first_quad, &level));
   if (level == *Level) {
     if (cvolume != NULL) {
       /* Check that this state is never reached by a remote process */
@@ -1087,7 +1077,7 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
       /* vinfo->nquad =  THE PREVIOUS VERSION
        *begin + p3->goffset[p3->mpirank] - p3->gtroffset[tree->treeid]; */
       vinfo->nquad = (p4est3_locidx) (*begin - p3->gtroffset[tree->treeid]);
-      SC3E (cvolume (vinfo));
+      SC3E_FAST (cvolume (vinfo));
     }
     l2nch[*Level]++;
     return NULL;
@@ -1095,11 +1085,12 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
 
   SC3E_FAST (sc3_array_push (idx_vol_stack, &stack_it));
 #ifdef P4EST_ENABLE_DEBUG
-  SC3E (p4est3_array_set_zero (*(sc3_array_t **) stack_it));
+  SC3E_FAST (p4est3_array_set_zero (*(sc3_array_t **) stack_it));
 #endif
 
-  SC3E (p4est3_cached_quadrant_array_split_noncontig
-        (p3, view_q, *Level, *begin, *end, *(sc3_array_t **) stack_it, sa));
+  SC3E_FAST (p4est3_cached_quadrant_array_split_noncontig
+             (p3, view_q, *Level, *begin, *end, *(sc3_array_t **) stack_it,
+              sa));
   l2nch[++(*Level)] = 0;
 
   /* since array_split doesn't count shift from the beinning of quadrants
@@ -1110,12 +1101,12 @@ p4est3_iterate_volume_rec (p4est3_t *p3,
   }
   for (i = 0; i < max_children; ++i) {
     sa->child_id = i;
-    SC3E (p4est3_iterate_volume_rec (p3, cvolume, cface, ccodim, sa));
+    SC3E_FAST (p4est3_iterate_volume_rec (p3, cvolume, cface, ccodim, sa));
   }
   SC3A_CHECK (l2nch[*Level] == max_children);
-  SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, sa));
+  SC3E_FAST (p4est3_iterate_face_inner (p3, cface, ccodim, sa));
   l2nch[--(*Level)]++;
-  SC3E (sc3_array_pop (idx_vol_stack));
+  SC3E_FAST (sc3_array_pop (idx_vol_stack));
   return NULL;
 }
 #endif
@@ -1163,9 +1154,9 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
   sa->Level = 0;
   sa->child_id = 0;
   void               *root_stack_it;
-  SC3E (sc3_array_index (idx_vol_stack, 0, &root_stack_it));
-  SC3E (sc3_array_index (*(sc3_array_t **) root_stack_it, 0, &begin));
-  SC3E (sc3_array_index (*(sc3_array_t **) root_stack_it, 1, &end));
+  SC3E_FAST (sc3_array_index (idx_vol_stack, 0, &root_stack_it));
+  SC3E_FAST (sc3_array_index (*(sc3_array_t **) root_stack_it, 0, &begin));
+  SC3E_FAST (sc3_array_index (*(sc3_array_t **) root_stack_it, 1, &end));
 
   if (*begin < sa->local_end && *end > sa->local_begin) {
     int                 root_fully_local = (*begin >= sa->local_begin
@@ -1184,19 +1175,19 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
         ++sa->subtree_full_local_hits;
       }
       else {
-        SC3E (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
+        SC3E_FAST (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
       }
       first_quad = (void *) (p3->nodequads[proc_owner] +
                              p3->qsize * (*begin - p3->goffset[proc_owner]));
     }
 #endif
-    SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &levelq));
+    SC3E_FAST (p4est3_quadrant_level (p3->qvt, first_quad, &levelq));
     if (levelq == sa->Level) {
       if (cvolume != NULL) {
         vinfo->quadrant = first_quad;
         vinfo->nquad =
           (p4est3_locidx) (*begin - p3->gtroffset[sa->tree->treeid]);
-        SC3E (cvolume (vinfo));
+        SC3E_FAST (cvolume (vinfo));
       }
       /* root leaf -> done */
       return NULL;
@@ -1205,13 +1196,13 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
     {
       void               *stack_it;
       p4est3_gloidx      *arr_it;
-      SC3E (sc3_array_push (idx_vol_stack, &stack_it));
+      SC3E_FAST (sc3_array_push (idx_vol_stack, &stack_it));
 #ifdef P4EST_ENABLE_DEBUG
-      SC3E (p4est3_array_set_zero (*(sc3_array_t **) stack_it));
+      SC3E_FAST (p4est3_array_set_zero (*(sc3_array_t **) stack_it));
 #endif
-      SC3E (p4est3_cached_quadrant_array_split_noncontig
-            (p3, sa->view_quads, sa->Level, *begin, *end,
-             *(sc3_array_t **) stack_it, sa));
+      SC3E_FAST (p4est3_cached_quadrant_array_split_noncontig
+                 (p3, sa->view_quads, sa->Level, *begin, *end,
+                  *(sc3_array_t **) stack_it, sa));
       SC3E_FAST (sc3_array_index (*(sc3_array_t **) stack_it, 0, &arr_it));
       for (int i = 0; i < max_children + 1; ++i) {
         arr_it[i] += *begin;
@@ -1233,7 +1224,7 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
       /* Finished all children at this level */
       SC3A_CHECK (l2nch[fr->level] == max_children);
       /* Process inner faces at this (still current) level */
-      SC3E (p4est3_iterate_face_inner (p3, cface, ccodim, sa));
+      SC3E_FAST (p4est3_iterate_face_inner (p3, cface, ccodim, sa));
       /* Pop indices stack and decrement level */
       SC3E_FAST (sc3_array_pop (idx_vol_stack));
       --top;                    /* remove current frame first */
@@ -1281,7 +1272,7 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
         ++sa->subtree_full_local_hits;
       }
       else {
-        SC3E (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
+        SC3E_FAST (p4est3_owner_lookup_fast (p3, sa, *begin, &proc_owner));
       }
       first_quad = (void *) (p3->nodequads[proc_owner] +
                              p3->qsize * (*begin - p3->goffset[proc_owner]));
@@ -1297,7 +1288,7 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
       fr->have_first_level = 0;
     }
     else {
-      SC3E (p4est3_quadrant_level (p3->qvt, first_quad, &levelq));
+      SC3E_FAST (p4est3_quadrant_level (p3->qvt, first_quad, &levelq));
     }
     if (levelq == fr->level) {
 #if P4EST3_ASSUME_CONTIGUOUS
@@ -1308,7 +1299,7 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
         vinfo->quadrant = first_quad;
         vinfo->nquad =
           (p4est3_locidx) (*begin - p3->gtroffset[sa->tree->treeid]);
-        SC3E (cvolume (vinfo));
+        SC3E_FAST (cvolume (vinfo));
       }
       ++fr->next_child;
       l2nch[fr->level]++;
@@ -1321,11 +1312,11 @@ p4est3_iterate_volume_iterative (p4est3_t *p3,
       p4est3_gloidx      *arr_it;
       SC3E_FAST (sc3_array_push (idx_vol_stack, &stack_it_child));
 #ifdef P4EST_ENABLE_DEBUG
-      SC3E (p4est3_array_set_zero (*(sc3_array_t **) stack_it_child));
+      SC3E_FAST (p4est3_array_set_zero (*(sc3_array_t **) stack_it_child));
 #endif
-      SC3E (p4est3_cached_quadrant_array_split_noncontig
-            (p3, sa->view_quads, fr->level, *begin, *end,
-             *(sc3_array_t **) stack_it_child, sa));
+      SC3E_FAST (p4est3_cached_quadrant_array_split_noncontig
+                 (p3, sa->view_quads, fr->level, *begin, *end,
+                  *(sc3_array_t **) stack_it_child, sa));
       SC3E_FAST (sc3_array_index
                  (*(sc3_array_t **) stack_it_child, 0, &arr_it));
       for (int i = 0; i < max_children + 1; ++i) {
@@ -1365,31 +1356,32 @@ p4est3_iterate_codim (p4est3_t *p3, int codims,
   }
 
   if (codims == P4EST3_ITERATE_VOLUME) {
-    SC3E (p4est3_iterate_volume (p3, cvolume, user_data));
+    SC3E_FAST (p4est3_iterate_volume (p3, cvolume, user_data));
     return NULL;
   }
 
-  SC3E (p4est3_set_outer_data (p3, search_area, user_data));
-  SC3E (sc3_array_index (search_area->finfo->sides, 0, &fside));
+  SC3E_FAST (p4est3_set_outer_data (p3, search_area, user_data));
+  SC3E_FAST (sc3_array_index (search_area->finfo->sides, 0, &fside));
   for (tree = p3->fltree; tree <= p3->lltree; ++tree) {
 
-    SC3E (p4est3_iterate_volume_rec_init (p3, search_area, tree));
-    SC3E (p4est3_iterate_volume_iterative
-          (p3, cvolume, cface, ccodim, search_area));
+    SC3E_FAST (p4est3_iterate_volume_rec_init (p3, search_area, tree));
+    SC3E_FAST (p4est3_iterate_volume_iterative
+               (p3, cvolume, cface, ccodim, search_area));
 
     /* frame faces part */
     search_area->finfo->tree_boundary = 1;
     search_area->treeid_face[0] = search_area->tree->treeid;
     for (face = 0; face < search_area->nfaces; ++face) {
-      SC3E (p4est3_iterate_face_bound_init
-            (p3, search_area, tree, face, fside, &is_iterate));
+      SC3E_FAST (p4est3_iterate_face_bound_init
+                 (p3, search_area, tree, face, fside, &is_iterate));
       if (is_iterate) {
         /* we iterate over such trees that tree_neighbor < tree */
-        SC3E (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
+        SC3E_FAST (p4est3_internal_iterate_face
+                   (p3, cface, ccodim, search_area));
       }
     }
   }
-  SC3E (p4est3_destroy_outer_data (p3, search_area));
+  SC3E_FAST (p4est3_destroy_outer_data (p3, search_area));
   return NULL;
 }
 
@@ -1478,12 +1470,10 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   /* Last-used direct cache */
   ++sa->last_split_uses;
   if (SC3_UNLIKELY (sa->last_split_level == level &&
-                    sa->last_split_tree == sa->tree->treeid &&
-                    sa->last_split_begin == begin
-                    && sa->last_split_end == end)) {
+                    sa->last_split_begin == begin)) {
     ++sa->last_split_hits;
     p4est3_gloidx      *dst;
-    SC3E (sc3_array_index (indices, 0, &dst));
+    SC3E_FAST (sc3_array_index (indices, 0, &dst));
     memcpy (dst, sa->last_split_results,
             sizeof (p4est3_gloidx) * (sa->max_children + 1));
     return NULL;
@@ -1492,63 +1482,51 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
   /* Tier ring fast path (only for non-sibling requests) */
   SC3A_CHECK (level >= 0 && level < sa->max_level && sa->tier_rings != NULL);
   p4est3_tier_ring_t *ring = &sa->tier_rings[level];
-  tier_hit =
-    p4est3_tier_ring_lookup (ring, sa->tree->treeid, level, begin, end);
+  tier_hit = p4est3_tier_ring_lookup (ring, begin);
   if (tier_hit != NULL) {
-    if (tier_hit->valid && tier_hit->end >= end) {
-      /* Cached data covers requested sub-interval (or equal) */
-      SC3E (sc3_array_index (indices, 0, &src_val));
-      memcpy (src_val, tier_hit->splits,
-              sizeof (p4est3_gloidx) * (sa->max_children + 1));
-      sa->tier_hits++;
-      return NULL;
-    }
+    /* Cached data covers requested sub-interval (or equal) */
+    SC3E_FAST (sc3_array_index (indices, 0, &src_val));
+    memcpy (src_val, tier_hit->splits,
+            sizeof (p4est3_gloidx) * (sa->max_children + 1));
+    sa->tier_hits++;
+    return NULL;
   }
-  if (SC3_LIKELY (tier_hit == NULL)) {
+  else {
     sa->tier_misses++;
   }
 
   /* Compute the split result */
   ++sa->splits_computed;
 #if P4EST3_ASSUME_CONTIGUOUS
-  SC3E (sc3_array_renew_data
-        (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
-  SC3E (p4est3_quadrant_array_split (p3->qvt, array, level, indices));
+  SC3E_FAST (sc3_array_renew_data
+             (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
+  SC3E_FAST (p4est3_quadrant_array_split (p3->qvt, array, level, indices));
 #else
   if (sa->is_contiguous) {
-    SC3E (sc3_array_renew_data
-          (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
-    SC3E (p4est3_quadrant_array_split (p3->qvt, array, level, indices));
+    SC3E_FAST (sc3_array_renew_data
+               (&array, p3->nodequads[0], p3->qsize, begin, end - begin));
+    SC3E_FAST (p4est3_quadrant_array_split (p3->qvt, array, level, indices));
   }
   else {
-    SC3E (sc3_array_renew_data
-          (&array, p3->nodequads[0], p3->qsize, 0, end - begin));
-    SC3E (p4est3_quadrant_array_split_noncontig
-          (p3, array, level, begin, indices));
+    SC3E_FAST (sc3_array_renew_data
+               (&array, p3->nodequads[0], p3->qsize, 0, end - begin));
+    SC3E_FAST (p4est3_quadrant_array_split_noncontig
+               (p3, array, level, begin, indices));
   }
 #endif
 
-  SC3E (sc3_array_index (indices, 0, &src_val));
+  SC3E_FAST (sc3_array_index (indices, 0, &src_val));
   /* Update last-used cache */
   sa->last_split_level = level;
-  sa->last_split_tree = sa->tree->treeid;
   sa->last_split_begin = begin;
-  sa->last_split_end = end;
   memcpy (sa->last_split_results, src_val,
           sizeof (p4est3_gloidx) * (sa->max_children + 1));
   /* Insert or extend tier ring entry */
   SC3A_CHECK (level >= 0 && level < sa->max_level && sa->alloc != NULL);
   ring = &sa->tier_rings[level];
-  p4est3_tier_entry_t *e =
-    p4est3_tier_ring_insert (ring, sa->tree->treeid, level, begin, end);
-  if (e != NULL) {
-    if (e->end < end) {
-      e->end = end;             /* extend silently (no stats) */
-    }
-    memcpy (e->splits, src_val,
-            sizeof (p4est3_gloidx) * (sa->max_children + 1));
-    e->valid = 1;
-  }
+  p4est3_tier_entry_t *e = p4est3_tier_ring_insert (ring, begin);
+  memcpy (e->splits, src_val,
+          sizeof (p4est3_gloidx) * (sa->max_children + 1));
 
   return NULL;
 }
