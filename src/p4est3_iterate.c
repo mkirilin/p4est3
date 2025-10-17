@@ -153,8 +153,8 @@ p4est3_tier_ring_insert (p4est3_tier_ring_t *ring, p4est3_gloidx begin)
 /* Forward declarations */
 typedef struct p4est3_search_area p4est3_search_area_t;
 
-/* Static lookup tables for face neighbors (const for compiler optimization) */
-static const int    p4est3_children_face_neighbors_2d[4 * 4] = {
+/* DIR */
+static const int    children_face_neighbors_2d[4 * 4] = {
   /* *INDENT-OFF* */
   -1, 1, -1, 2,
    0, -1, -1, 3,
@@ -163,7 +163,7 @@ static const int    p4est3_children_face_neighbors_2d[4 * 4] = {
   /* *INDENT-ON* */
 };
 
-static const int    p4est3_children_face_neighbors_3d[8 * 6] = {
+static const int    children_face_neighbors_3d[8 * 6] = {
   /* *INDENT-OFF* */
   -1, 1, -1, 2, -1, 4,
    0, -1, -1, 3, -1, 5,
@@ -176,9 +176,19 @@ static const int    p4est3_children_face_neighbors_3d[8 * 6] = {
   /* *INDENT-ON* */
 };
 
-/* Static lookup tables for face duals (const for compiler optimization) */
-static const int    p4est3_face_dual_2d[4] = { 1, 0, 3, 2 };
-static const int    p4est3_face_dual_3d[6] = { 1, 0, 3, 2, 5, 4 };
+/* Face number from perspective of neighbor quadrant*/
+static const int    face_dual_2d[4] = { 1, 0, 3, 2 };
+static const int    face_dual_3d[6] = { 1, 0, 3, 2, 5, 4 };
+
+/* F */
+static const int    face_sequence_2d[4] = { 1, 3, 3, 1 };
+static const int    face_sequence_3d[12] =
+  { 1, 3, 5, 3, 5, 1, 5, 5, 1, 3, 3, 1 };
+
+/* Inner face id to child */
+static const int    face_child_2d[4] = { 0, 0, 1, 2 };
+static const int    face_child_3d[12] =
+  { 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 5, 6 };
 
 /* (Split cache entry struct definition moved earlier; removed duplicate) */
 
@@ -193,6 +203,7 @@ typedef struct p4est3_search_area
   int                 max_children;
   int                 half_children;    /* max_children / 2 */
   int                 nfaces;   /*Global number of faces */
+  int                 ninner_faces;     /* Number of inner faces */
   int                 Level;    /* Current volume level */
   int                 child_id; /* Child id of the area under consideration */
   p4est3_gloidx       local_begin;      /* Id of the first local quadrant in
@@ -257,8 +268,10 @@ typedef struct p4est3_search_area
   long long           first_child_level_reuses; /* times we reused parent-known first child level */
 
   /* general section */
-  int                *children_face_neighbors;
-  int                *face_dual;
+  const int          *children_face_neighbors;
+  const int          *face_dual;
+  const int          *face_sequence;
+  const int          *face2child;
   int                *level2nchildren;  /* Array specifing the number n
                                            of children processed on
                                            the particular level; n can't be
@@ -307,62 +320,6 @@ p4est3_array_set_zero (sc3_array_t *arr)
 }
 #endif
 
-static inline sc3_error_t *
-p4est3_set_children_face_neighbors (p4est3_t *p3, p4est3_search_area_t *sa)
-{
-  const int          *src_table;
-  size_t              table_size;
-
-  /* Use static const lookup tables for better performance */
-  if (p3->qvt->dim == 2) {
-    src_table = p4est3_children_face_neighbors_2d;
-    table_size = sizeof (p4est3_children_face_neighbors_2d);
-  }
-  else if (p3->qvt->dim == 3) {
-    src_table = p4est3_children_face_neighbors_3d;
-    table_size = sizeof (p4est3_children_face_neighbors_3d);
-  }
-  else {
-    return NULL;                /* Unsupported dimension */
-  }
-
-  SC3E_FAST (sc3_allocator_calloc
-             (p3->alloc, (size_t) sa->nfaces * (1 << p3->qvt->dim),
-              sizeof (int), (void *) &sa->children_face_neighbors));
-
-  /* Direct memory copy from const table - faster than individual assignments */
-  memcpy (sa->children_face_neighbors, src_table, table_size);
-  return NULL;
-}
-
-static inline sc3_error_t *
-p4est3_set_face_dual (p4est3_t *p3, p4est3_search_area_t *sa)
-{
-  const int          *src_table;
-  size_t              table_size;
-
-  /* Use static const lookup tables for better performance */
-  if (p3->qvt->dim == 2) {
-    src_table = p4est3_face_dual_2d;
-    table_size = sizeof (p4est3_face_dual_2d);
-  }
-  else if (p3->qvt->dim == 3) {
-    src_table = p4est3_face_dual_3d;
-    table_size = sizeof (p4est3_face_dual_3d);
-  }
-  else {
-    return NULL;                /* Unsupported dimension */
-  }
-
-  SC3E_FAST (sc3_allocator_calloc
-             (p3->alloc, (size_t) 2 * p3->qvt->dim, sizeof (int),
-              (void *) &sa->face_dual));
-
-  /* Direct memory copy from const table - faster than individual assignments */
-  memcpy (sa->face_dual, src_table, table_size);
-  return NULL;
-}
-
 static sc3_error_t *
 p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
                        void *user_data)
@@ -378,8 +335,16 @@ p4est3_set_outer_data (p4est3_t *p3, p4est3_search_area_t *sa,
   sa->max_children = p3->num_children;
   sa->half_children = sa->max_children / 2;
   sa->nfaces = 2 * sa->dim;
-  SC3E_FAST (p4est3_set_children_face_neighbors (p3, sa));
-  SC3E_FAST (p4est3_set_face_dual (p3, sa));
+  sa->ninner_faces = sa->dim == 2 ? 4 : 12;
+
+  sa->children_face_neighbors = sa->dim == 2 ?
+    children_face_neighbors_2d : children_face_neighbors_3d;
+
+  sa->face_dual = sa->dim == 2 ? face_dual_2d : face_dual_3d;
+
+  sa->face_sequence = sa->dim == 2 ? face_sequence_2d : face_sequence_3d;
+
+  sa->face2child = sa->dim == 2 ? face_child_2d : face_child_3d;
 
   sa->owner_cache_valid = 0;
   sa->owner_cache_rank = -1;
@@ -483,8 +448,6 @@ p4est3_destroy_outer_data (p4est3_t *p3, p4est3_search_area_t *sa)
   /* Cleanup caches (tier rings + stats print) */
   SC3E_FAST (p4est3_split_cache_destroy (sa));
 
-  SC3E_FAST (sc3_allocator_free (p3->alloc, sa->children_face_neighbors));
-  SC3E_FAST (sc3_allocator_free (p3->alloc, sa->face_dual));
   SC3E_FAST (sc3_allocator_free (p3->alloc, sa->level2nchildren));
 
   SC3E_FAST (sc3_array_resize (sa->idx_vol_stack, sa->max_level));
@@ -892,25 +855,22 @@ p4est3_iterate_face_inner (p4est3_t *p3,
                            p4est3_iterate_codim_t ccodim,
                            p4est3_search_area_t *search_area)
 {
-
-  int                 child, face, nb_id;
+  const int           nfaces = search_area->nfaces;
+  int                 i, child, face, nb_id;
   p4est3_iterate_face_side_t *fside;
   search_area->treeid_face[0] = search_area->treeid_face[1]
     = search_area->tree->treeid;
   SC3E_FAST (sc3_array_index (search_area->finfo->sides, 0, &fside));
-  for (child = 0; child < search_area->max_children; ++child) {
-    for (face = 0; face < search_area->nfaces; ++face) {
-      nb_id = p4est3_get_children_face_nb_id (search_area, child, face);
-      if (nb_id < child) {
-        continue;
-      }
-      fside[0].nface = face;
-      fside[1].nface = p4est3_get_dual_face (search_area, face);
-      SC3E_FAST (p4est3_iterate_face_inner_init
-                 (p3, search_area, child, nb_id));
-      SC3E_FAST (p4est3_internal_iterate_face
-                 (p3, cface, ccodim, search_area));
-    }
+  for (i = 0; i < search_area->ninner_faces; ++i) {
+    face = search_area->face_sequence[i];
+    fside[0].nface = face;
+    fside[1].nface = search_area->face_dual[face];
+
+    child = search_area->face2child[i];
+    nb_id = search_area->children_face_neighbors[child * nfaces + face];
+    SC3E_FAST (p4est3_iterate_face_inner_init
+               (p3, search_area, child, nb_id));
+    SC3E_FAST (p4est3_internal_iterate_face (p3, cface, ccodim, search_area));
   }
   return NULL;
 }
@@ -1004,7 +964,7 @@ p4est3_iterate_volume_rec_init (p4est3_t *p3,
 }
 
 /* Legacy recursive implementation kept for reference (disabled). */
-#if 0
+#if 1
 static sc3_error_t *
 p4est3_iterate_volume_rec (p4est3_t *p3,
                            p4est3_iterate_volume_t cvolume,
