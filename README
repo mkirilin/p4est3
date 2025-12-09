@@ -1,3 +1,7 @@
+The `p4est3` project grows on top of `p4est` software library
+as an experimental feature in order to study new algorithms,
+interfaces design and technical solutions.
+
 This is the README file for `p4est`.
 
 `p4est` is a C library to manage a collection (a forest) of multiple
