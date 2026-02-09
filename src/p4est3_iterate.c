@@ -1490,3 +1490,10 @@ static sc3_error_t *p4est3_cached_quadrant_array_split_noncontig
 
   return NULL;
 }
+
+#ifdef __cplusplus
+#if 0
+{
+#endif
+}
+#endif
