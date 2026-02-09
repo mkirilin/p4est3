@@ -579,8 +579,7 @@ merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
 
   /* Allocate memory for the merged array */
   SC3A_CHECK (total_mirrors >= 0);
-  ghost->mirror_proc_mirrors =
-    total_mirrors > 0 ? P4EST_ALLOC (p4est_locidx_t, total_mirrors) : NULL;
+  ghost->mirror_proc_mirrors = P4EST_ALLOC (p4est_locidx_t, total_mirrors);
 
   /* Copy data from p2m arrays to mirror_proc_mirrors */
   offset = 0;
