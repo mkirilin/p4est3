@@ -579,7 +579,9 @@ merge_mirror_proc_arrays (p4est3_t *p3, p4est_ghost_t *ghost,
 
   /* Allocate memory for the merged array */
   SC3A_CHECK (total_mirrors >= 0);
+#ifdef P4EST_ENABLE_MPI
   ghost->mirror_proc_mirrors = P4EST_ALLOC (p4est_locidx_t, total_mirrors);
+#endif
 
   /* Copy data from p2m arrays to mirror_proc_mirrors */
   offset = 0;
@@ -708,6 +710,10 @@ p4est3_ghost_fill_p4est (p4est3_t *p3, p4est3_ghost_p4est_t **ptr_ghost)
 
   /** Merge \c d->p2m arrays to \c mirror_proc_mirrors */
   SC3E (merge_mirror_proc_arrays (p3, ghost, p2m));
+
+  /* Alias mirror_proc_fronts to mirror_proc_mirrors, matching p4est */
+  ghost->mirror_proc_fronts = ghost->mirror_proc_mirrors;
+  ghost->mirror_proc_front_offsets = ghost->mirror_proc_offsets;
 
   /* Build the ghost global ID to position mapping */
   build_ghost_id_map (p3, ghost, ghost_hdata);
