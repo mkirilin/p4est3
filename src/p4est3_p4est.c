@@ -512,7 +512,7 @@ p4est_quadrant_vtable_last_descendant (const void *q, int l, void *r)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_morton (int level, p4est_gloidx_t id, void *r)
+p4est_quadrant_vtable_morton (int level, p4est3_gloidx id, void *r)
 {
   p4est_quadrant_set_morton ((p4est_quadrant_t *) r, level, (uint64_t) id);
   return NULL;
@@ -528,9 +528,10 @@ p4est_vtable_nearest_common_ancestor (const void *q1, const void *q2, void *r)
 }
 
 static sc3_error_t *
-p4est_quadrant_vtable_linear_id (const void *q, int level, p4est_gloidx_t *id)
+p4est_quadrant_vtable_linear_id (const void *q, int level, p4est3_gloidx *id)
 {
-  *id = p4est_quadrant_linear_id ((const p4est_quadrant_t *) q, level);
+  *id = (p4est3_gloidx)
+    p4est_quadrant_linear_id ((const p4est_quadrant_t *) q, level);
   return NULL;
 }
 

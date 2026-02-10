@@ -500,7 +500,7 @@ p4est3_owner_lookup_fast (p4est3_t *p3, p4est3_search_area_t *sa,
   }
   p4est3_gloidx       rank;
   SC3E_FAST (p4est3_search_lower_bound64
-             (gid, p3->goffset, p3->mpisize + 1, &rank));
+             (gid, (const int64_t *) p3->goffset, p3->mpisize + 1, &rank));
   if (p3->goffset[rank] > gid) {
     SC3A_CHECK (rank > 0);
     rank--;
