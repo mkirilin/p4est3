@@ -964,7 +964,7 @@ p4est3_iterate_volume_rec_init (p4est3_t *p3,
 }
 
 /* Legacy recursive implementation kept for reference (disabled). */
-#if 1
+#if 0
 static sc3_error_t *
 p4est3_iterate_volume_rec (p4est3_t *p3,
                            p4est3_iterate_volume_t cvolume,
