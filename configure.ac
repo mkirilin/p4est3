@@ -3,9 +3,14 @@ dnl This file is part of p4est.
 dnl
 
 AC_INIT([p4est],
-        [m4_esyscmd([build-aux/git-version-gen .tarball-version])],
+        [m4_esyscmd_s([build-aux/git-version-gen .tarball-version 2>/dev/null])],
         [p4est@ins.uni-bonn.de])
 AC_PREREQ(2.61)
+
+dnl P4EST3 version from git tags with p4est3- prefix (for tarball naming)
+P4EST3_VERSION=m4_esyscmd_s([git describe --tags --match "p4est3-*" --always 2>/dev/null | sed 's/^p4est3-//'])
+AC_SUBST([P4EST3_VERSION])
+AC_SUBST([P4EST_BASE_VERSION])
 AC_CONFIG_HEADERS([config/p4est_autotools_config.h])
 AC_CONFIG_SRCDIR([src/p4est.h])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -77,6 +82,9 @@ AM_CONDITIONAL([P4EST_DIST_DENY], [test "x$P4EST_DIST_DENY" != x])
 AC_SUBST([P4EST_DISTCLEAN])
 
 # Print summary.
+echo "o----------------------------------"
+echo "| p4est version: $PACKAGE_VERSION"
+echo "| p4est3 version: $P4EST3_VERSION"
 echo "o----------------------------------"
 echo "| Results for p4est are"
 echo "o----------------------------------"

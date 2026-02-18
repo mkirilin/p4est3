@@ -88,13 +88,22 @@ ChangeLog:
 
 dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version
-	(GITGEN_VERSION=`(cd @top_srcdir@ && ./build-aux/git-version-gen\
-                .tarball-version)` ; \
-	 test "x$(VERSION)" = "x$${GITGEN_VERSION}" || \
-         ((echo "Stale version;"; echo $(VERSION); echo "$${GITGEN_VERSION}"; \
-           echo "Please run:" ; \
-           echo "     (cd @top_srcdir@ && ./bootstrap)" ; \
-           echo "before make dist") 1>&2 ; rm -r $(distdir) ; exit 1))
+
+# Create p4est3-prefixed distribution tarball
+.PHONY: dist-p4est3
+dist-p4est3:
+	@P4EST3_TAG=`(cd $(top_srcdir) && git describe --tags --match "p4est3-*" --always 2>/dev/null | sed 's/^p4est3-//')` ; \
+	if test -z "$${P4EST3_TAG}"; then \
+		echo "Error: Could not determine p4est3 version from git tags matching 'p4est3-*'" >&2 ; \
+		exit 1 ; \
+	fi ; \
+	$(MAKE) dist && \
+	for tarball in $(DIST_ARCHIVES); do \
+		if test -f "$$tarball"; then \
+			mv "$$tarball" "p4est3-$${P4EST3_TAG}.tar.gz" ; \
+		fi ; \
+	done ; \
+	echo "Created: p4est3-$${P4EST3_TAG}.tar.gz"
 if P4EST_DIST_DENY
 	@echo "-----------------------------------------------------"
 	@echo "make dist does not work with external libsc"
