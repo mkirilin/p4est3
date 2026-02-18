@@ -3,6 +3,9 @@
 
 cff-version: 1.2.0
 title: p4est3
+version: 1.0.1
+doi: 10.5281/zenodo.18684771
+date-released: 2026-02-18
 message: >-
   If you use this software, please cite it using the
   metadata from this file.
