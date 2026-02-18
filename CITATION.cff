@@ -2,7 +2,7 @@
 # Visit https://bit.ly/cffinit to generate yours today!
 
 cff-version: 1.2.0
-title: p4est3
+title: Source code for the "p4est3" experimental features for "p4est" software library
 version: 1.0.1
 doi: 10.5281/zenodo.18684771
 date-released: 2026-02-18
