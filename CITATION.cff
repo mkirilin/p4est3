@@ -1,0 +1,32 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: p4est3
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Mikhail
+    family-names: Kirilin
+    email: kirilin@ins.uni-bonn.de
+    affiliation: University of Bonn
+    orcid: 'https://orcid.org/0009-0009-8676-053X'
+  - given-names: Carsten
+    family-names: Burstedde
+    email: burstedde@ins.uni-bonn.de
+    affiliation: University of Bonn
+repository-code: 'https://github.com/mkirilin/p4est3'
+abstract: >-
+  The `p4est3` project grows on top of `p4est` software
+  library as an experimental feature in order to study new
+  algorithms, interfaces design and technical solutions for
+  high-performance adaptive mesh refinement.
+keywords:
+  - AMR
+  - Adaptive Mesh Refinement
+  - p4est
+  - HPC
+  - High Performance Computing
+license: GPL-2.0
